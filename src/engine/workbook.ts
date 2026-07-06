@@ -12,6 +12,7 @@ import {
   collectRefs,
   evaluate,
   parseFormula,
+  serializeAst,
 } from "./formula";
 
 export interface Cell {
@@ -286,6 +287,9 @@ export class Workbook {
         return c.value;
       },
       getRange: (range: RangeRef): CellValue[] => {
+        if (range.c0 < 0 || range.r0 < 0 || range.c1 < 0 || range.r1 < 0) {
+          throw new FormulaError("#REF");
+        }
         const tid = this.resolveTableId(range.table, homeTid);
         if (!tid) throw new FormulaError("#REF", `unknown table ${range.table}`);
         const out: CellValue[] = [];
@@ -312,6 +316,122 @@ export class Workbook {
   private cellByKey(key: CellKey): Cell | undefined {
     const [tid, coord] = splitKey(key);
     return this.tables.get(tid)?.cells.get(coord);
+  }
+
+  // ---------- structural edits (insert/delete rows & columns) ----------
+
+  /**
+   * Shift an axis: move cells, rewrite every formula reference in the whole
+   * workbook that points at this table (broken refs become #REF!), then
+   * rebuild the dependency graph and recalculate.
+   */
+  private structuralEdit(
+    tableId: string,
+    axis: "row" | "col",
+    at: number,
+    count: number,
+    mode: "insert" | "delete",
+  ) {
+    const table = this.tables.get(tableId);
+    if (!table) return;
+
+    // 1. shift the table's own cells
+    const moved = new Map<string, Cell>();
+    for (const [coord, cell] of table.cells) {
+      const [c, r] = parseCoord(coord);
+      let v = axis === "row" ? r : c;
+      if (mode === "insert") {
+        if (v >= at) v += count;
+      } else {
+        if (v >= at && v < at + count) continue; // deleted
+        if (v >= at + count) v -= count;
+      }
+      moved.set(axis === "row" ? `${c},${v}` : `${v},${r}`, cell);
+    }
+    table.cells = moved;
+    if (axis === "row") {
+      table.rows = mode === "insert" ? table.rows + count : Math.max(1, table.rows - count);
+    } else {
+      table.cols = mode === "insert" ? table.cols + count : Math.max(1, table.cols - count);
+    }
+
+    // 2. rewrite references across all tables
+    const adjust = (v: number): number | null => {
+      if (mode === "insert") return v >= at ? v + count : v;
+      if (v >= at + count) return v - count;
+      if (v >= at) return null; // pointed into the deleted band
+      return v;
+    };
+    for (const [otherId, other] of this.tables) {
+      for (const cell of other.cells.values()) {
+        if (!cell.ast) continue;
+        const collected = { refs: [] as CellRef[], ranges: [] as RangeRef[] };
+        collectRefs(cell.ast, collected);
+        let touched = false;
+        for (const ref of collected.refs) {
+          const tid = this.resolveTableId(ref.table, otherId);
+          if (tid !== tableId) continue;
+          const v = axis === "row" ? ref.row : ref.col;
+          if (v < 0) continue;
+          const nv = adjust(v);
+          if (nv === null) {
+            ref.col = -1;
+            ref.row = -1;
+            touched = true;
+          } else if (nv !== v) {
+            if (axis === "row") ref.row = nv;
+            else ref.col = nv;
+            touched = true;
+          }
+        }
+        for (const range of collected.ranges) {
+          const tid = this.resolveTableId(range.table, otherId);
+          if (tid !== tableId) continue;
+          if (range.c0 < 0 || range.r0 < 0) continue;
+          const [k0, k1] = axis === "row" ? (["r0", "r1"] as const) : (["c0", "c1"] as const);
+          const v0 = range[k0];
+          const v1 = range[k1];
+          let n0 = adjust(v0);
+          let n1 = adjust(v1);
+          if (mode === "delete") {
+            // clamp endpoints that fell into the deleted band
+            if (n0 === null) n0 = at;
+            if (n1 === null) n1 = at - 1;
+          }
+          if (n0 === null || n1 === null || n1 < n0) {
+            range.c0 = range.r0 = range.c1 = range.r1 = -1; // fully deleted
+            touched = true;
+          } else if (n0 !== v0 || n1 !== v1) {
+            range[k0] = n0;
+            range[k1] = n1;
+            touched = true;
+          }
+        }
+        if (touched) cell.raw = "=" + serializeAst(cell.ast);
+      }
+    }
+
+    // 3. rebuild the dependency graph from scratch and recalc everything
+    this.deps.clear();
+    this.dependents.clear();
+    this.recalcAllFormulas();
+    this.notify(tableId, new Set(moved.keys()));
+  }
+
+  insertRows(tableId: string, at: number, count = 1) {
+    this.structuralEdit(tableId, "row", at, count, "insert");
+  }
+
+  deleteRows(tableId: string, at: number, count = 1) {
+    this.structuralEdit(tableId, "row", at, count, "delete");
+  }
+
+  insertCols(tableId: string, at: number, count = 1) {
+    this.structuralEdit(tableId, "col", at, count, "insert");
+  }
+
+  deleteCols(tableId: string, at: number, count = 1) {
+    this.structuralEdit(tableId, "col", at, count, "delete");
   }
 
   // ---------- dependency introspection ----------

@@ -13,10 +13,11 @@ import { ObjectFrame } from "./ObjectFrame";
 interface Props {
   note: NoteMeta;
   pos: { x: number; y: number };
+  isActive: boolean;
   getScale(): number;
 }
 
-export const NoteView = memo(function NoteView({ note, pos, getScale }: Props) {
+export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.text);
 
@@ -42,6 +43,7 @@ export const NoteView = memo(function NoteView({ note, pos, getScale }: Props) {
       pos={pos}
       width={note.w}
       float={note.float}
+      isActive={isActive}
       getScale={getScale}
       onMove={(x, y) => moveNote(note.id, x, y)}
       onResize={(dw, dh) => resizeNote(note.id, note.w + dw, note.h + dh)}

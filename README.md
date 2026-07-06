@@ -38,7 +38,23 @@ primitives (tables, maps).
   to relocate (freed tracks are pruned)
 - **Data-flow wires**: animated connectors show what feeds what — blue for
   table → map bindings, green for cross-table formula references. Wires
-  track cards mid-drag and pulse when the source table's data changes
+  track cards mid-drag and pulse when the source table's data changes.
+  **Drag a blue wire's endpoint** onto another map to move the connection
+- **Interaction levels**: the keyboard addresses one level at a time —
+  Grid (arrows page the viewport, corner brackets show), Section (arrows
+  walk between sections, blue section ring), or Primitive (arrows navigate
+  table cells, blue card ring). **Esc** steps up a level; the toolbar
+  breadcrumb (**↑ · Grid › Section › Card**) shows where you are and each
+  segment is clickable navigation
+- **＋** on any of a section's four edges adds a neighbor section there
+- **Right-click** everywhere: a section surface offers add-primitive,
+  insert-section (all four directions), split, expand, and remove; a table
+  cell offers insert/delete row & column, clear cell, and delete table —
+  structural edits **rewrite formulas** (`=SUM(B2:B6)` becomes
+  `=SUM(B3:B7)` after an insert; references into deleted rows become
+  `#REF!`); an empty grid cell offers create-section
+- **Track resizing** happens via a grab knob that appears on rollover and
+  rides along the boundary under your cursor
 
 Inside a section, primitives **dock into a flow grid** by default — new cards
 take the next slot, and everything reflows on a spring when something is

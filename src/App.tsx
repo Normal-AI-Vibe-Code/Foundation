@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { motion } from "motion/react";
 import { GridViewport } from "./components/GridViewport";
+import { ContextMenuView } from "./components/ContextMenu";
 import {
   addNote,
   createMap,
@@ -106,7 +107,7 @@ function App() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app" onContextMenu={(e) => e.preventDefault()}>
       <motion.header
         className="app-bar"
         initial={{ y: -48, opacity: 0 }}
@@ -122,6 +123,7 @@ function App() {
         </div>
       </motion.header>
       <GridViewport />
+      <ContextMenuView />
     </div>
   );
 }

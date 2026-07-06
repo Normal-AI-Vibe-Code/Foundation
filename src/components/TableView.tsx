@@ -24,7 +24,14 @@ import {
   renameTable,
   requestSnap,
   resizeTable,
+  setActiveObject,
   setObjectFloat,
+} from "../state/store";
+import {
+  insertTableCols,
+  insertTableRows,
+  deleteTableCols,
+  deleteTableRows,
 } from "../state/store";
 import {
   endEditingSession,
@@ -32,11 +39,14 @@ import {
   tryInsertRef,
 } from "../state/editing";
 import { Spring2D, presets } from "../physics/spring";
+import { openContextMenu } from "./ContextMenu";
 
 interface Props {
   table: TableMeta;
   /** effective position (flow-layout slot when docked, free when floating) */
   framePos: { x: number; y: number };
+  /** this card is the current keyboard/interaction context */
+  isActive: boolean;
   /** current camera scale, for converting screen drag deltas to world space */
   getScale(): number;
 }
@@ -57,7 +67,7 @@ function formatValue(v: number | string | boolean | null): string {
   return String(v);
 }
 
-export const TableView = memo(function TableView({ table, framePos, getScale }: Props) {
+export const TableView = memo(function TableView({ table, framePos, isActive, getScale }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
   const [, force] = useState(0);
@@ -266,6 +276,51 @@ export const TableView = memo(function TableView({ table, framePos, getScale }: 
     [editing, commitEdit, table.id, table.name],
   );
 
+  // ----- spreadsheet context menu -----
+  const onCellContextMenu = useCallback(
+    (e: React.MouseEvent, col: number, row: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (editing) commitEdit("none");
+      setSel({ col, row });
+      sheetRef.current?.focus();
+      const colLabel = colToName(col);
+      openContextMenu(e.clientX, e.clientY, [
+        { icon: "↑", label: "Insert row above", action: () => insertTableRows(table.id, row) },
+        { icon: "↓", label: "Insert row below", action: () => insertTableRows(table.id, row + 1) },
+        { icon: "←", label: "Insert column left", action: () => insertTableCols(table.id, col) },
+        { icon: "→", label: "Insert column right", action: () => insertTableCols(table.id, col + 1) },
+        { divider: true },
+        {
+          icon: "✕",
+          label: `Delete row ${row + 1}`,
+          disabled: table.rows <= 1,
+          action: () => deleteTableRows(table.id, row),
+        },
+        {
+          icon: "✕",
+          label: `Delete column ${colLabel}`,
+          disabled: table.cols <= 1,
+          action: () => deleteTableCols(table.id, col),
+        },
+        { divider: true },
+        {
+          icon: "⌫",
+          label: "Clear cell",
+          action: () => workbook.setCell(table.id, col, row, ""),
+        },
+        { divider: true },
+        {
+          icon: "🗑",
+          label: "Delete table",
+          danger: true,
+          action: () => removeTable(table.id),
+        },
+      ]);
+    },
+    [table.id, table.rows, table.cols, editing, commitEdit],
+  );
+
   const editorKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       e.stopPropagation();
@@ -419,6 +474,7 @@ export const TableView = memo(function TableView({ table, framePos, getScale }: 
           }
           style={{ gridColumn: c + 2, gridRow: r + 2 }}
           onMouseDown={(e) => onCellMouseDown(e, c, r)}
+          onContextMenu={(e) => onCellContextMenu(e, c, r)}
           onDoubleClick={() => {
             if (image) setLightbox(image);
             else beginEdit(c, r);
@@ -463,10 +519,11 @@ export const TableView = memo(function TableView({ table, framePos, getScale }: 
       style={{ width: ROWNUM_W + table.cols * CELL_W }}
     >
       <motion.div
-        className="table-card"
+        className={"table-card" + (isActive ? " ctx-active" : "")}
         initial={{ scale: 0.55, opacity: 0, y: 60, rotate: -1.5 }}
         animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: "spring", stiffness: 230, damping: 19, mass: 1.05 }}
+        onPointerDown={() => setActiveObject(table.id)}
       >
         {/* header / drag handle */}
         <div

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { workbook } from "../engine/workbook";
-import { gridSize, objectWorldRect, useAppState } from "../state/store";
+import { bindMap, getState, gridSize, objectWorldRect, useAppState } from "../state/store";
 
 /**
  * Animated data-flow wires drawn in world space:
@@ -22,6 +22,76 @@ export function WireLayer() {
   const [formulaEdges, setFormulaEdges] = useState(() => workbook.tableDependencies());
   const groupRefs = useRef(new Map<string, SVGGElement>());
   const hotUntil = useRef(new Map<string, number>()); // source tableId -> ts
+  const svgRef = useRef<SVGSVGElement>(null);
+  const highlightRef = useRef<SVGRectElement>(null);
+
+  /** live rebind drag: pull a map wire's consumer end onto another map */
+  const rebind = useRef<{
+    edgeKey: string;
+    tableId: string;
+    oldMapId: string;
+    x: number;
+    y: number;
+    hoverMapId: string | null;
+  } | null>(null);
+
+  const worldPoint = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const r = svg.getBoundingClientRect();
+    const size = gridSize(getState().grid);
+    const scale = size.w > 0 ? r.width / size.w : 1;
+    return { x: (clientX - r.left) / scale, y: (clientY - r.top) / scale };
+  }, []);
+
+  const beginRebind = useCallback(
+    (e: React.PointerEvent, edge: Edge) => {
+      if (edge.kind !== "map") return;
+      e.stopPropagation();
+      e.preventDefault();
+      const pt = worldPoint(e.clientX, e.clientY);
+      if (!pt) return;
+      rebind.current = {
+        edgeKey: edge.key,
+        tableId: edge.from,
+        oldMapId: edge.to,
+        x: pt.x,
+        y: pt.y,
+        hoverMapId: null,
+      };
+      document.body.classList.add("rewiring");
+      const move = (ev: PointerEvent) => {
+        const p = worldPoint(ev.clientX, ev.clientY);
+        const rb = rebind.current;
+        if (!p || !rb) return;
+        rb.x = p.x;
+        rb.y = p.y;
+        rb.hoverMapId = null;
+        for (const m of Object.values(getState().maps)) {
+          const rect = objectWorldRect(m);
+          if (rect && p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h) {
+            rb.hoverMapId = m.id;
+            break;
+          }
+        }
+      };
+      const up = () => {
+        const rb = rebind.current;
+        rebind.current = null;
+        document.body.classList.remove("rewiring");
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        if (highlightRef.current) highlightRef.current.style.display = "none";
+        if (rb?.hoverMapId && rb.hoverMapId !== rb.oldMapId) {
+          bindMap(rb.hoverMapId, rb.tableId); // the connection moves…
+          bindMap(rb.oldMapId, null); // …away from the old map
+        }
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    },
+    [worldPoint],
+  );
 
   // refresh the edge list + pulse wires when data flows
   useEffect(() => {
@@ -73,18 +143,20 @@ export function WireLayer() {
           continue;
         }
         g.style.display = "";
+        // while this wire's consumer end is being dragged, follow the cursor
+        const activeRebind = rebind.current?.edgeKey === edge.key ? rebind.current : null;
         // pick facing edges
         const acx = ra.x + ra.w / 2;
-        const bcx = rb.x + rb.w / 2;
+        const bcx = activeRebind ? activeRebind.x : rb.x + rb.w / 2;
         const acy = ra.y + ra.h / 2;
-        const bcy = rb.y + rb.h / 2;
+        const bcy = activeRebind ? activeRebind.y : rb.y + rb.h / 2;
         const horizontal = Math.abs(bcx - acx) > Math.abs(bcy - acy);
         let x1: number, y1: number, x2: number, y2: number, d: string;
         if (horizontal) {
           const leftToRight = acx < bcx;
           x1 = leftToRight ? ra.x + ra.w : ra.x;
           y1 = acy;
-          x2 = leftToRight ? rb.x : rb.x + rb.w;
+          x2 = activeRebind ? activeRebind.x : leftToRight ? rb.x : rb.x + rb.w;
           y2 = bcy;
           const k = Math.max(50, Math.abs(x2 - x1) * 0.45) * (leftToRight ? 1 : -1);
           d = `M ${x1} ${y1} C ${x1 + k} ${y1}, ${x2 - k} ${y2}, ${x2} ${y2}`;
@@ -93,10 +165,11 @@ export function WireLayer() {
           x1 = acx;
           y1 = topToBottom ? ra.y + ra.h : ra.y;
           x2 = bcx;
-          y2 = topToBottom ? rb.y : rb.y + rb.h;
+          y2 = activeRebind ? activeRebind.y : topToBottom ? rb.y : rb.y + rb.h;
           const k = Math.max(50, Math.abs(y2 - y1) * 0.45) * (topToBottom ? 1 : -1);
           d = `M ${x1} ${y1} C ${x1} ${y1 + k}, ${x2} ${y2 - k}, ${x2} ${y2}`;
         }
+        g.classList.toggle("rebinding", !!activeRebind);
         const path = g.querySelector("path.wire") as SVGPathElement;
         const glow = g.querySelector("path.wire-glow") as SVGPathElement;
         path?.setAttribute("d", d);
@@ -110,6 +183,22 @@ export function WireLayer() {
         // recalc pulse: source table just changed
         const hot = (hotUntil.current.get(edge.from) ?? 0) > now;
         g.classList.toggle("hot", hot);
+      }
+      // drop-target highlight while rebinding
+      const hl = highlightRef.current;
+      if (hl) {
+        const rb = rebind.current;
+        const hoverMap = rb?.hoverMapId ? getState().maps[rb.hoverMapId] : null;
+        const hr = hoverMap && objectWorldRect(hoverMap);
+        if (hr) {
+          hl.style.display = "";
+          hl.setAttribute("x", String(hr.x - 6));
+          hl.setAttribute("y", String(hr.y - 6));
+          hl.setAttribute("width", String(hr.w + 12));
+          hl.setAttribute("height", String(hr.h + 12));
+        } else {
+          hl.style.display = "none";
+        }
       }
       raf = requestAnimationFrame(tick);
       timer = setTimeout(tick, 80); // hidden-window fallback
@@ -127,6 +216,7 @@ export function WireLayer() {
 
   return (
     <svg
+      ref={svgRef}
       className="wire-layer"
       width={size.w}
       height={size.h}
@@ -145,9 +235,16 @@ export function WireLayer() {
           <path className="wire-glow" />
           <path className="wire" />
           <circle className="port-a" r={5} />
-          <circle className="port-b" r={5} />
+          <circle
+            className={"port-b" + (e.kind === "map" ? " port-grab" : "")}
+            r={e.kind === "map" ? 7 : 5}
+            onPointerDown={(ev) => beginRebind(ev, e)}
+          >
+            {e.kind === "map" && <title>Drag to move this connection to another map</title>}
+          </circle>
         </g>
       ))}
+      <rect ref={highlightRef} className="rebind-highlight" rx={14} style={{ display: "none" }} />
     </svg>
   );
 }

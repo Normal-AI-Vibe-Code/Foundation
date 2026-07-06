@@ -89,9 +89,14 @@ export interface AppState {
   notes: Record<string, NoteMeta>;
   media: Record<string, MediaMeta>;
   activeSectionId: string;
+  /** which layer the keyboard/context currently addresses */
+  focusLevel: "grid" | "section" | "object";
+  activeObjectId: string | null;
   snapRequest: (SnapTarget & { nonce: number }) | null;
   /** cell highlighted while a section is being dragged to a new home */
   sectionDragTarget: { sectionId: string; c: number; r: number } | null;
+  /** section awaiting the remove-confirmation popover (e.g. via context menu) */
+  pendingRemoval: string | null;
 }
 
 // ---------- geometry constants ----------
@@ -151,7 +156,8 @@ const FLOW_GAP = 26;
 
 /**
  * Flow layout for a section's docked primitives: shelves packed
- * left-to-right in creation order, wrapping at the section width.
+ * left-to-right in creation order, wrapping at the section width, and
+ * flowing AROUND floating cards so nothing ever overlays anything.
  */
 export function sectionLayout(sectionId: string): Map<string, { x: number; y: number }> {
   const st = getState();
@@ -160,18 +166,46 @@ export function sectionLayout(sectionId: string): Map<string, { x: number; y: nu
   if (!sec) return out;
   const card = sectionCardRect(st.grid, sec);
   const availW = Math.max(360, card.w - CONTENT_PAD * 2);
-  const docked = objectsInSection(sectionId)
-    .filter((o) => !o.float)
-    .sort((a, b) => a.bornAt - b.bornAt);
+  const all = objectsInSection(sectionId);
+  const docked = all.filter((o) => !o.float).sort((a, b) => a.bornAt - b.bornAt);
+  const floaters = all
+    .filter((o) => o.float)
+    .map((o) => {
+      const s = objectPixelSize(o);
+      return { x: o.x, y: o.y, w: s.w, h: s.h };
+    });
+  const collide = (x: number, y: number, w: number, h: number) =>
+    floaters.find(
+      (f) =>
+        x < f.x + f.w + FLOW_GAP &&
+        x + w + FLOW_GAP > f.x &&
+        y < f.y + f.h + FLOW_GAP &&
+        y + h + FLOW_GAP > f.y,
+    );
+
   let x = 0;
   let y = 0;
   let shelfH = 0;
   for (const o of docked) {
     const { w, h } = objectPixelSize(o);
-    if (x > 0 && x + w > availW) {
-      x = 0;
-      y += shelfH + FLOW_GAP;
-      shelfH = 0;
+    let guard = 0;
+    while (guard++ < 80) {
+      if (x > 0 && x + w > availW) {
+        x = 0;
+        y += shelfH + FLOW_GAP;
+        shelfH = 0;
+        continue;
+      }
+      const hit = collide(x, y, w, h);
+      if (!hit) break;
+      const nextX = hit.x + hit.w + FLOW_GAP;
+      if (nextX + w <= availW) {
+        x = nextX;
+      } else {
+        x = 0;
+        y = Math.max(y + FLOW_GAP, hit.y + hit.h + FLOW_GAP);
+        shelfH = 0;
+      }
     }
     out.set(o.id, { x, y });
     x += w + FLOW_GAP;
@@ -313,8 +347,11 @@ let state: AppState = {
   notes: {},
   media: {},
   activeSectionId: firstSectionId,
+  focusLevel: "grid",
+  activeObjectId: null,
   snapRequest: { kind: "all", nonce: Math.random() },
   sectionDragTarget: null,
+  pendingRemoval: null,
 };
 
 const listeners = new Set<() => void>();
@@ -348,7 +385,71 @@ export function requestSnap(target: SnapTarget) {
 }
 
 export function setActiveSection(id: string) {
-  if (state.activeSectionId !== id) set({ activeSectionId: id });
+  if (state.activeSectionId === id && state.focusLevel === "section" && !state.activeObjectId)
+    return;
+  set({ activeSectionId: id, focusLevel: "section", activeObjectId: null });
+}
+
+export function setActiveObject(id: string) {
+  const found = findObject(id);
+  if (!found) return;
+  if (state.activeObjectId === id && state.focusLevel === "object") return;
+  set({
+    activeObjectId: id,
+    activeSectionId: found.obj.sectionId,
+    focusLevel: "object",
+  });
+}
+
+export function setFocusGrid() {
+  if (state.focusLevel === "grid") return;
+  set({ focusLevel: "grid", activeObjectId: null });
+}
+
+/** step one level up: object → section → grid */
+export function focusUp() {
+  if (state.focusLevel === "object") {
+    set({ focusLevel: "section", activeObjectId: null });
+    requestSnap({ kind: "section", id: state.activeSectionId });
+  } else if (state.focusLevel === "section") {
+    set({ focusLevel: "grid", activeObjectId: null });
+    requestSnap({ kind: "all" });
+  } else {
+    requestSnap({ kind: "all" });
+  }
+}
+
+export function getObject(id: string): AnyObject | null {
+  return findObject(id)?.obj ?? null;
+}
+
+/** spatially nearest section in a direction (for section-level arrows) */
+export function neighborSection(fromId: string, dir: "left" | "right" | "up" | "down"): Section | null {
+  const st = getState();
+  const cur = st.sections[fromId];
+  if (!cur) return null;
+  const cr = sectionCellRect(st.grid, cur);
+  const cx = cr.x + cr.w / 2;
+  const cy = cr.y + cr.h / 2;
+  let best: { s: Section; score: number } | null = null;
+  for (const s of Object.values(st.sections)) {
+    if (s.id === fromId) continue;
+    const r = sectionCellRect(st.grid, s);
+    const x = r.x + r.w / 2;
+    const y = r.y + r.h / 2;
+    const dx = x - cx;
+    const dy = y - cy;
+    let primary = 0;
+    let cross = 0;
+    if (dir === "left") [primary, cross] = [-dx, Math.abs(dy)];
+    else if (dir === "right") [primary, cross] = [dx, Math.abs(dy)];
+    else if (dir === "up") [primary, cross] = [-dy, Math.abs(dx)];
+    else [primary, cross] = [dy, Math.abs(dx)];
+    if (primary <= 1) continue; // wrong direction
+    const score = primary + cross * 2;
+    if (!best || score < best.score) best = { s, score };
+  }
+  return best?.s ?? null;
 }
 
 // ---------- section actions ----------
@@ -428,11 +529,14 @@ export function splitSection(sectionId: string, dir: "h" | "v") {
 }
 
 /**
- * Add a fresh section beside an existing one — inserts a new track after the
- * section's span (spreadsheet insert-column/row: later sections shift,
+ * Add a fresh section beside an existing one — inserts a new track next to
+ * the section's span (spreadsheet insert-column/row: later sections shift,
  * ranges crossing the insertion point widen).
  */
-export function addSectionAdjacent(sectionId: string, dir: "right" | "below") {
+export function addSectionAdjacent(
+  sectionId: string,
+  dir: "right" | "below" | "left" | "above",
+) {
   const s = state.sections[sectionId];
   if (!s) return;
   const grid: GridTracks = { cols: [...state.grid.cols], rows: [...state.grid.rows] };
@@ -448,26 +552,29 @@ export function addSectionAdjacent(sectionId: string, dir: "right" | "below") {
     scroll: { x: 0, y: 0 },
   };
 
-  if (dir === "right") {
-    const k = s.c1 + 1;
-    grid.cols.splice(k, 0, grid.cols[s.c1]);
+  if (dir === "right" || dir === "left") {
+    // new track index: after the span for "right", before it for "left"
+    const k = dir === "right" ? s.c1 + 1 : s.c0;
+    grid.cols.splice(k, 0, grid.cols[dir === "right" ? s.c1 : s.c0]);
     for (const o of Object.values(sections)) {
       const n = { ...o };
       if (n.c0 >= k) n.c0++;
       if (n.c1 >= k) n.c1++;
       sections[o.id] = n;
     }
-    Object.assign(fresh, { c0: k, c1: k, r0: s.r0, r1: s.r1 });
+    const home = sections[sectionId]; // may have shifted
+    Object.assign(fresh, { c0: k, c1: k, r0: home.r0, r1: home.r1 });
   } else {
-    const k = s.r1 + 1;
-    grid.rows.splice(k, 0, grid.rows[s.r1]);
+    const k = dir === "below" ? s.r1 + 1 : s.r0;
+    grid.rows.splice(k, 0, grid.rows[dir === "below" ? s.r1 : s.r0]);
     for (const o of Object.values(sections)) {
       const n = { ...o };
       if (n.r0 >= k) n.r0++;
       if (n.r1 >= k) n.r1++;
       sections[o.id] = n;
     }
-    Object.assign(fresh, { r0: k, r1: k, c0: s.c0, c1: s.c1 });
+    const home = sections[sectionId];
+    Object.assign(fresh, { r0: k, r1: k, c0: home.c0, c1: home.c1 });
   }
 
   sections[fresh.id] = fresh;
@@ -528,6 +635,8 @@ export function removeSection(id: string) {
 
   const nextActive =
     state.activeSectionId === id ? Object.keys(sections)[0] : state.activeSectionId;
+  const objGone =
+    state.activeObjectId !== null && !getObjectIn(state.activeObjectId, tables, maps, notes, media);
   set({
     grid,
     sections,
@@ -536,8 +645,18 @@ export function removeSection(id: string) {
     notes,
     media,
     activeSectionId: nextActive,
+    ...(objGone ? { activeObjectId: null, focusLevel: "grid" as const } : {}),
     snapRequest: { kind: "all", nonce: Math.random() },
+    pendingRemoval: null,
   });
+}
+
+function getObjectIn(
+  id: string,
+  ...records: Array<Record<string, AnyObject>>
+): AnyObject | undefined {
+  for (const r of records) if (r[id]) return r[id];
+  return undefined;
 }
 
 /** drop tracks that no section spans anymore, shifting spans down */
@@ -625,6 +744,11 @@ export function renameSection(id: string, name: string) {
   set({ sections: { ...state.sections, [id]: { ...s, name: name.trim() } } });
 }
 
+/** ask a section to show its remove-confirmation popover */
+export function requestRemoveSection(id: string | null) {
+  if (state.pendingRemoval !== id) set({ pendingRemoval: id });
+}
+
 export function setSectionScroll(id: string, x: number, y: number) {
   const s = state.sections[id];
   if (!s) return;
@@ -708,7 +832,7 @@ export function updateNoteText(id: string, text: string) {
 export function removeNote(id: string) {
   const { [id]: gone, ...rest } = state.notes;
   if (!gone) return;
-  set({ notes: rest });
+  set({ notes: rest, ...focusCleanup(id) });
 }
 
 export function moveNote(id: string, x: number, y: number) {
@@ -769,7 +893,7 @@ export function removeMedia(id: string) {
   const { [id]: gone, ...rest } = state.media;
   if (!gone) return;
   URL.revokeObjectURL(gone.src);
-  set({ media: rest });
+  set({ media: rest, ...focusCleanup(id) });
 }
 
 export function moveMedia(id: string, x: number, y: number) {
@@ -837,11 +961,16 @@ function tableNameFree(name: string): boolean {
   );
 }
 
+function focusCleanup(removedId: string): Partial<AppState> {
+  if (state.activeObjectId !== removedId) return {};
+  return { activeObjectId: null, focusLevel: "section" };
+}
+
 export function removeTable(id: string) {
   const { [id]: gone, ...rest } = state.tables;
   if (!gone) return;
   workbook.removeTable(id);
-  set({ tables: rest });
+  set({ tables: rest, ...focusCleanup(id) });
 }
 
 export function moveTable(id: string, x: number, y: number) {
@@ -865,6 +994,36 @@ export function resizeTable(id: string, cols: number, rows: number) {
   rows = Math.max(1, Math.min(200, rows));
   workbook.resize(id, cols, rows);
   set({ tables: { ...state.tables, [id]: { ...t, cols, rows } } });
+}
+
+// spreadsheet structural edits — formulas are rewritten by the workbook
+
+export function insertTableRows(id: string, at: number, count = 1) {
+  const t = state.tables[id];
+  if (!t || t.rows + count > 200) return;
+  workbook.insertRows(id, at, count);
+  set({ tables: { ...state.tables, [id]: { ...t, rows: t.rows + count } } });
+}
+
+export function deleteTableRows(id: string, at: number, count = 1) {
+  const t = state.tables[id];
+  if (!t || t.rows - count < 1) return;
+  workbook.deleteRows(id, at, count);
+  set({ tables: { ...state.tables, [id]: { ...t, rows: t.rows - count } } });
+}
+
+export function insertTableCols(id: string, at: number, count = 1) {
+  const t = state.tables[id];
+  if (!t || t.cols + count > 26) return;
+  workbook.insertCols(id, at, count);
+  set({ tables: { ...state.tables, [id]: { ...t, cols: t.cols + count } } });
+}
+
+export function deleteTableCols(id: string, at: number, count = 1) {
+  const t = state.tables[id];
+  if (!t || t.cols - count < 1) return;
+  workbook.deleteCols(id, at, count);
+  set({ tables: { ...state.tables, [id]: { ...t, cols: t.cols - count } } });
 }
 
 // ---------- map actions ----------
@@ -903,7 +1062,7 @@ export function createMap(sectionId: string, atX?: number, atY?: number): MapMet
 export function removeMap(id: string) {
   const { [id]: gone, ...rest } = state.maps;
   if (!gone) return;
-  set({ maps: rest });
+  set({ maps: rest, ...focusCleanup(id) });
 }
 
 export function moveMap(id: string, x: number, y: number) {

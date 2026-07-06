@@ -1,6 +1,6 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "motion/react";
-import { MINI_HEADER, liveObjPos, setObjectFloat } from "../state/store";
+import { MINI_HEADER, liveObjPos, setActiveObject, setObjectFloat } from "../state/store";
 import { Spring2D, presets } from "../physics/spring";
 
 /**
@@ -14,6 +14,7 @@ interface Props {
   pos: { x: number; y: number };
   width: number;
   float: boolean;
+  isActive?: boolean;
   getScale(): number;
   onMove(x: number, y: number): void;
   onResize?(dw: number, dh: number): void;
@@ -29,6 +30,7 @@ export function ObjectFrame({
   pos,
   width,
   float,
+  isActive,
   getScale,
   onMove,
   onResize,
@@ -139,10 +141,11 @@ export function ObjectFrame({
   return (
     <div ref={rootRef} className="frame-anchor" style={{ width }}>
       <motion.div
-        className="frame-card"
+        className={"frame-card" + (isActive ? " ctx-active" : "")}
         initial={{ scale: 0.55, opacity: 0, y: 50 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 240, damping: 20 }}
+        onPointerDown={() => setActiveObject(id)}
       >
         <div
           className="frame-header"

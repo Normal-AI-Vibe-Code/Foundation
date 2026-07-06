@@ -7,19 +7,25 @@ import {
   allObjects,
   createSectionAt,
   emptyCells,
+  focusUp,
+  getObject,
   getState,
   gridCellRect,
   gridSize,
+  neighborSection,
   objectWorldRect,
   requestSnap,
   resizeCol,
   resizeRow,
   sectionCardRect,
+  setActiveSection,
+  setFocusGrid,
   trackOffsets,
   useAppState,
 } from "../state/store";
 import { SectionView } from "./SectionView";
 import { WireLayer } from "./WireLayer";
+import { openContextMenu } from "./ContextMenu";
 
 function colName(col: number): string {
   let s = "";
@@ -255,17 +261,54 @@ export function GridViewport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.snapRequest]);
 
-  // Escape → overview (unless typing somewhere)
+  // ----- leveled keyboard navigation -----
+  // grid level: arrows page the viewport by its own size
+  // section level: arrows walk to the spatially adjacent section
+  // object level: the primitive owns its keys (table cell navigation etc.)
+  // Escape: step up one level
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      const tag = (document.activeElement as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
-      requestSnap({ kind: "all" });
+      if (e.defaultPrevented) return; // a primitive already handled it
+      const el = document.activeElement as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || el?.isContentEditable)
+        return;
+      if (e.key === "Escape") {
+        el?.blur(); // release e.g. a table sheet so section arrows take over
+        focusUp();
+        return;
+      }
+      const dir = (
+        {
+          ArrowLeft: "left",
+          ArrowRight: "right",
+          ArrowUp: "up",
+          ArrowDown: "down",
+        } as const
+      )[e.key];
+      if (!dir) return;
+      const st = getState();
+      if (st.focusLevel === "grid") {
+        e.preventDefault();
+        const vp = viewportRect();
+        if (!vp) return;
+        const dx = dir === "left" ? vp.w : dir === "right" ? -vp.w : 0;
+        const dy = dir === "up" ? vp.h : dir === "down" ? -vp.h : 0;
+        camera.to(camera.x.goal + dx * 0.9, camera.y.goal + dy * 0.9);
+        armWheelSnap(); // settle onto the nearest framing
+      } else if (st.focusLevel === "section") {
+        e.preventDefault();
+        const n = neighborSection(st.activeSectionId, dir);
+        if (n) {
+          setActiveSection(n.id);
+          requestSnap({ kind: "section", id: n.id });
+        }
+      }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera, viewportRect]);
 
   // ----- pan / zoom gestures (always resolving to a snap) -----
 
@@ -275,6 +318,7 @@ export function GridViewport() {
     const target = e.target as HTMLElement;
     if (target.closest(".section-card, button, input, select, .viewport-toolbar, .gutter")) return;
     if (e.button !== 0 && e.button !== 1) return;
+    setFocusGrid(); // clicking the void addresses the grid level
     const d = panDrag.current;
     d.active = true;
     d.lastX = e.clientX;
@@ -436,6 +480,25 @@ export function GridViewport() {
     document.body.classList.remove("resizing-h", "resizing-v");
   }, []);
 
+  // the resize knob rides along the boundary, following the cursor on hover
+  const knobRefs = useRef(new Map<string, HTMLDivElement>());
+  const onGutterHover = useCallback(
+    (e: React.PointerEvent, axis: "col" | "row", index: number) => {
+      if (gutterDrag.current.active) return;
+      const knob = knobRefs.current.get(axis + index);
+      const world = worldRef.current;
+      if (!knob || !world) return;
+      const wr = world.getBoundingClientRect();
+      const s = zoom.value;
+      if (axis === "col") {
+        knob.style.top = `${(e.clientY - wr.top) / s - 22}px`;
+      } else {
+        knob.style.left = `${(e.clientX - wr.left) / s - 22}px`;
+      }
+    },
+    [zoom],
+  );
+
   // ----- render -----
   const size = gridSize(state.grid);
   const xo = trackOffsets(state.grid.cols);
@@ -443,10 +506,13 @@ export function GridViewport() {
   const sections = Object.values(state.sections);
   const spring = { type: "spring", stiffness: 480, damping: 24 } as const;
 
+  const activeSec = state.sections[state.activeSectionId];
+  const activeObj = state.activeObjectId ? getObject(state.activeObjectId) : null;
+
   return (
     <div
       ref={containerRef}
-      className="grid-viewport"
+      className={`grid-viewport ctx-${state.focusLevel}`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -486,6 +552,17 @@ export function GridViewport() {
                 top: rect.y + 12,
                 width: rect.w - 24,
                 height: rect.h - 24,
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openContextMenu(e.clientX, e.clientY, [
+                  {
+                    icon: "+",
+                    label: `Create section at ${colName(c)}${r + 1}`,
+                    action: () => createSectionAt(c, r),
+                  },
+                ]);
               }}
             >
               <span className="empty-cell-label">
@@ -531,18 +608,27 @@ export function GridViewport() {
           />
         ))}
 
-        {/* track resize gutters — spreadsheet row/column edges */}
+        {/* track resize gutters — hover reveals a grab knob on the boundary */}
         {state.grid.cols.slice(0, -1).map((_, i) => (
           <div
             key={`gc${i}`}
             className="gutter gutter-col"
             style={{ left: xo[i + 1] - 7, top: 0, height: size.h }}
-            onPointerDown={(e) => onGutterDown(e, "col", i)}
-            onPointerMove={onGutterMove}
-            onPointerUp={onGutterUp}
-            onPointerCancel={onGutterUp}
+            onPointerMove={(e) => onGutterHover(e, "col", i)}
           >
             <div className="gutter-line" />
+            <div
+              className="gutter-knob"
+              ref={(el) => {
+                if (el) knobRefs.current.set("col" + i, el);
+                else knobRefs.current.delete("col" + i);
+              }}
+              title="Drag to resize column"
+              onPointerDown={(e) => onGutterDown(e, "col", i)}
+              onPointerMove={onGutterMove}
+              onPointerUp={onGutterUp}
+              onPointerCancel={onGutterUp}
+            />
           </div>
         ))}
         {state.grid.rows.slice(0, -1).map((_, i) => (
@@ -550,17 +636,34 @@ export function GridViewport() {
             key={`gr${i}`}
             className="gutter gutter-row"
             style={{ top: yo[i + 1] - 7, left: 0, width: size.w }}
-            onPointerDown={(e) => onGutterDown(e, "row", i)}
-            onPointerMove={onGutterMove}
-            onPointerUp={onGutterUp}
-            onPointerCancel={onGutterUp}
+            onPointerMove={(e) => onGutterHover(e, "row", i)}
           >
             <div className="gutter-line" />
+            <div
+              className="gutter-knob"
+              ref={(el) => {
+                if (el) knobRefs.current.set("row" + i, el);
+                else knobRefs.current.delete("row" + i);
+              }}
+              title="Drag to resize row"
+              onPointerDown={(e) => onGutterDown(e, "row", i)}
+              onPointerMove={onGutterMove}
+              onPointerUp={onGutterUp}
+              onPointerCancel={onGutterUp}
+            />
           </div>
         ))}
 
         {/* data-flow wires above everything */}
         <WireLayer />
+      </div>
+
+      {/* grid-context corner brackets */}
+      <div className="ctx-corners">
+        <span className="ctx-corner tl" />
+        <span className="ctx-corner tr" />
+        <span className="ctx-corner bl" />
+        <span className="ctx-corner br" />
       </div>
 
       {/* viewport toolbar */}
@@ -570,16 +673,59 @@ export function GridViewport() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: "spring", stiffness: 210, damping: 20, delay: 0.05 }}
       >
+        {/* context breadcrumb — where the keyboard is aimed */}
         <motion.button
-          className="tb-btn"
-          whileHover={{ scale: 1.06, y: -2 }}
-          whileTap={{ scale: 0.9, y: 1 }}
+          className="tb-btn crumb-up"
+          whileHover={{ scale: 1.1, y: -2 }}
+          whileTap={{ scale: 0.88, y: 1 }}
           transition={spring}
-          title="Overview — frame the whole grid (Esc)"
-          onClick={() => requestSnap({ kind: "all" })}
+          title="Up a level (Esc)"
+          onClick={() => focusUp()}
         >
-          ⤢ Overview
+          ↑
         </motion.button>
+        <div className="crumbs">
+          <motion.button
+            className={"crumb" + (state.focusLevel === "grid" ? " on" : "")}
+            whileTap={{ scale: 0.94 }}
+            title="Grid level — arrow keys page the viewport"
+            onClick={() => {
+              setFocusGrid();
+              requestSnap({ kind: "all" });
+            }}
+          >
+            ⊞ Grid
+          </motion.button>
+          {activeSec && state.focusLevel !== "grid" && (
+            <>
+              <span className="crumb-sep">›</span>
+              <motion.button
+                className={"crumb" + (state.focusLevel === "section" ? " on" : "")}
+                whileTap={{ scale: 0.94 }}
+                title="Section level — arrow keys walk between sections"
+                onClick={() => {
+                  setActiveSection(activeSec.id);
+                  requestSnap({ kind: "section", id: activeSec.id });
+                }}
+              >
+                {activeSec.name}
+              </motion.button>
+            </>
+          )}
+          {activeObj && state.focusLevel === "object" && (
+            <>
+              <span className="crumb-sep">›</span>
+              <motion.button
+                className="crumb on"
+                whileTap={{ scale: 0.94 }}
+                title="Primitive level — keys act inside this card"
+                onClick={() => requestSnap({ kind: "object", id: activeObj.id })}
+              >
+                {activeObj.name}
+              </motion.button>
+            </>
+          )}
+        </div>
         <div className="tb-divider" />
         <motion.button
           className="tb-btn"

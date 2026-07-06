@@ -153,6 +153,14 @@ function tokenize(src: string): Token[] {
       i++;
       continue;
     }
+    if (c === "#") {
+      if (src.slice(i, i + 5).toUpperCase() === "#REF!") {
+        tokens.push({ t: "ident", v: "#REF!" });
+        i += 5;
+        continue;
+      }
+      throw new FormulaError("#ERR", "unexpected '#'");
+    }
     // multi-char comparison ops
     if (c === "<" && src[i + 1] === "=") {
       tokens.push({ t: "op", v: "<=" });
@@ -300,6 +308,8 @@ class Parser {
 
     if (tok.t === "ident") {
       const upper = tok.v.toUpperCase();
+      // a reference broken by a structural edit (deleted row/column)
+      if (upper === "#REF!") return { kind: "ref", ref: { table: null, col: -1, row: -1 } };
       const after = this.peek();
 
       // function call
@@ -380,6 +390,58 @@ class Parser {
 
 export function parseFormula(src: string): AstNode {
   return new Parser(tokenize(src)).parse();
+}
+
+// ---------- serialization (AST → formula text) ----------
+
+const BIN_PREC: Record<string, number> = {
+  "=": 1, "<>": 1, "<": 1, ">": 1, "<=": 1, ">=": 1,
+  "&": 2,
+  "+": 3, "-": 3,
+  "*": 4, "/": 4, "%": 4,
+  "^": 5,
+};
+
+function tablePrefix(table: string | null): string {
+  if (table === null) return "";
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(table) ? `${table}!` : `'${table}'!`;
+}
+
+function refText(table: string | null, col: number, row: number): string {
+  if (col < 0 || row < 0) return "#REF!";
+  return `${tablePrefix(table)}${colToName(col)}${row + 1}`;
+}
+
+/** Regenerate formula source from an AST (used after structural edits). */
+export function serializeAst(node: AstNode, parentPrec = 0): string {
+  switch (node.kind) {
+    case "num":
+      return String(node.value);
+    case "str":
+      return `"${node.value}"`;
+    case "ref":
+      return refText(node.ref.table, node.ref.col, node.ref.row);
+    case "range": {
+      const { table, c0, r0, c1, r1 } = node.range;
+      if (c0 < 0 || r0 < 0 || c1 < 0 || r1 < 0) return "#REF!";
+      return `${tablePrefix(table)}${colToName(c0)}${r0 + 1}:${colToName(c1)}${r1 + 1}`;
+    }
+    case "unary": {
+      const s = `${node.op === "-" ? "-" : "+"}${serializeAst(node.operand, 6)}`;
+      return parentPrec > 5 ? `(${s})` : s;
+    }
+    case "binary": {
+      const p = BIN_PREC[node.op] ?? 1;
+      const rightAssoc = node.op === "^";
+      const s =
+        serializeAst(node.left, rightAssoc ? p + 1 : p) +
+        node.op +
+        serializeAst(node.right, rightAssoc ? p : p + 1);
+      return p < parentPrec ? `(${s})` : s;
+    }
+    case "call":
+      return `${node.name}(${node.args.map((a) => serializeAst(a, 0)).join(", ")})`;
+  }
 }
 
 // ---------- dependency extraction ----------

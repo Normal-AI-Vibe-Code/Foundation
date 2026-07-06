@@ -18,6 +18,7 @@ import {
   objectsInSection,
   removeSection,
   renameSection,
+  requestRemoveSection,
   requestSnap,
   sectionCardRect,
   setActiveSection,
@@ -31,6 +32,7 @@ import { TableView } from "./TableView";
 import { MapView } from "./MapView";
 import { NoteView } from "./NoteView";
 import { MediaView } from "./MediaView";
+import { openContextMenu } from "./ContextMenu";
 
 interface Props {
   section: Section;
@@ -248,6 +250,48 @@ export const SectionView = memo(function SectionView({
   const scrollable = maxScroll();
   const iconSpring = { type: "spring", stiffness: 500, damping: 22 } as const;
 
+  // ----- right-click menu on the section's own surface -----
+  const onSectionContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      // primitives own their right-click (table cells etc.)
+      if ((e.target as HTMLElement).closest(".obj-slot")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveSection(section.id);
+      openContextMenu(e.clientX, e.clientY, [
+        { icon: "⊞", label: "Add table", action: () => createTable(section.id) },
+        { icon: "◍", label: "Add map", action: () => createMap(section.id) },
+        { icon: "▤", label: "Add note", action: () => addNote(section.id) },
+        { icon: "⇪", label: "Add image / video…", action: () => fileRef.current?.click() },
+        { divider: true },
+        { icon: "←", label: "Insert section left", action: () => addSectionAdjacent(section.id, "left") },
+        { icon: "→", label: "Insert section right", action: () => addSectionAdjacent(section.id, "right") },
+        { icon: "↑", label: "Insert section above", action: () => addSectionAdjacent(section.id, "above") },
+        { icon: "↓", label: "Insert section below", action: () => addSectionAdjacent(section.id, "below") },
+        { divider: true },
+        { icon: "◫", label: "Split column", action: () => splitSection(section.id, "h") },
+        { icon: "⬓", label: "Split row", action: () => splitSection(section.id, "v") },
+        { divider: true },
+        { icon: "⤢", label: "Expand section", action: () => requestSnap({ kind: "section", id: section.id }) },
+        {
+          icon: "🗑",
+          label: "Remove section…",
+          danger: true,
+          disabled: !canRemove,
+          action: () => requestRemoveSection(section.id),
+        },
+      ]);
+    },
+    [section.id, canRemove],
+  );
+
+  // confirmation can be requested locally (✕ button) or via the context menu
+  const confirmingActive = confirming || state.pendingRemoval === section.id;
+  const cancelConfirm = () => {
+    setConfirming(false);
+    requestRemoveSection(null);
+  };
+
   const secBtn = (
     title: string,
     glyph: string,
@@ -266,15 +310,27 @@ export const SectionView = memo(function SectionView({
     </motion.button>
   );
 
+  const sectionCtx = active && state.focusLevel === "section";
+
   return (
     <motion.div
       ref={cardRef}
-      className={"section-card" + (active ? " active" : "") + (dropping ? " dropping" : "")}
+      className={
+        "section-card" +
+        (active ? " active" : "") +
+        (sectionCtx ? " ctx-active" : "") +
+        (dropping ? " dropping" : "")
+      }
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: "spring", stiffness: 240, damping: 22 }}
-      onPointerDown={() => setActiveSection(section.id)}
+      onPointerDown={(e) => {
+        // clicks on primitives set the object context themselves
+        if ((e.target as HTMLElement).closest(".obj-slot")) return;
+        setActiveSection(section.id);
+      }}
+      onContextMenu={onSectionContextMenu}
       onDragOver={(e) => {
         e.preventDefault();
         if (!dropping) setDropping(true);
@@ -350,7 +406,7 @@ export const SectionView = memo(function SectionView({
 
       {/* remove confirmation */}
       <AnimatePresence>
-        {confirming && (
+        {confirmingActive && (
           <motion.div
             className="confirm-pop"
             initial={{ opacity: 0, y: -10, scale: 0.9 }}
@@ -374,7 +430,7 @@ export const SectionView = memo(function SectionView({
               className="confirm-btn"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
-              onClick={() => setConfirming(false)}
+              onClick={cancelConfirm}
             >
               Cancel
             </motion.button>
@@ -400,18 +456,33 @@ export const SectionView = memo(function SectionView({
         <div ref={contentRef} className="section-content">
           {objects.map((o) => {
             const pos = layout.get(o.id) ?? { x: o.x, y: o.y };
+            const isObjActive = state.focusLevel === "object" && state.activeObjectId === o.id;
             const slot = (child: React.ReactNode) => (
               <div key={o.id} className="obj-slot" style={{ left: CONTENT_PAD, top: CONTENT_PAD }}>
                 {child}
               </div>
             );
-            if ("cols" in o) return slot(<TableView table={o} framePos={pos} getScale={getScale} />);
+            if ("cols" in o)
+              return slot(
+                <TableView table={o} framePos={pos} isActive={isObjActive} getScale={getScale} />,
+              );
             if ("sourceTableId" in o)
               return slot(
-                <MapView map={o} framePos={pos} getScale={getScale} zoomSpring={zoomSpring} />,
+                <MapView
+                  map={o}
+                  framePos={pos}
+                  isActive={isObjActive}
+                  getScale={getScale}
+                  zoomSpring={zoomSpring}
+                />,
               );
-            if ("text" in o) return slot(<NoteView note={o} pos={pos} getScale={getScale} />);
-            return slot(<MediaView item={o} pos={pos} getScale={getScale} />);
+            if ("text" in o)
+              return slot(
+                <NoteView note={o} pos={pos} isActive={isObjActive} getScale={getScale} />,
+              );
+            return slot(
+              <MediaView item={o} pos={pos} isActive={isObjActive} getScale={getScale} />,
+            );
           })}
         </div>
 
@@ -424,7 +495,7 @@ export const SectionView = memo(function SectionView({
         {(scrollable.x > 1 || scrollable.y > 1) && <div className="scroll-hint" />}
       </div>
 
-      {/* add-section affordances on the edges */}
+      {/* add-section affordances on all four edges */}
       <motion.button
         className="add-btn add-section-right"
         whileHover={{ scale: 1.15 }}
@@ -442,6 +513,26 @@ export const SectionView = memo(function SectionView({
         transition={iconSpring}
         title="Add section below"
         onClick={() => addSectionAdjacent(section.id, "below")}
+      >
+        +
+      </motion.button>
+      <motion.button
+        className="add-btn add-section-left"
+        whileHover={{ scale: 1.15 }}
+        whileTap={{ scale: 0.8 }}
+        transition={iconSpring}
+        title="Add section to the left"
+        onClick={() => addSectionAdjacent(section.id, "left")}
+      >
+        +
+      </motion.button>
+      <motion.button
+        className="add-btn add-section-above"
+        whileHover={{ scale: 1.15 }}
+        whileTap={{ scale: 0.8 }}
+        transition={iconSpring}
+        title="Add section above"
+        onClick={() => addSectionAdjacent(section.id, "above")}
       >
         +
       </motion.button>

@@ -12,12 +12,13 @@ import { ObjectFrame } from "./ObjectFrame";
 interface Props {
   item: MediaMeta;
   pos: { x: number; y: number };
+  isActive: boolean;
   getScale(): number;
 }
 
 const iconSpring = { type: "spring", stiffness: 500, damping: 22 } as const;
 
-export const MediaView = memo(function MediaView({ item, pos, getScale }: Props) {
+export const MediaView = memo(function MediaView({ item, pos, isActive, getScale }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // keep the <video> element in line with the autoplay/mute flags
@@ -65,6 +66,7 @@ export const MediaView = memo(function MediaView({ item, pos, getScale }: Props)
       pos={pos}
       width={item.w}
       float={item.float}
+      isActive={isActive}
       getScale={getScale}
       onMove={(x, y) => moveMedia(item.id, x, y)}
       onResize={(dw, dh) => resizeMedia(item.id, item.w + dw, item.h + dh)}

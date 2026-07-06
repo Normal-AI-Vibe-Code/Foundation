@@ -12,6 +12,7 @@ import {
   removeMap,
   requestSnap,
   resizeMap,
+  setActiveObject,
   setObjectFloat,
   toggleMapPitch,
   useAppState,
@@ -22,6 +23,8 @@ interface Props {
   map: MapMeta;
   /** effective position (flow-layout slot when docked, free when floating) */
   framePos: { x: number; y: number };
+  /** this card is the current keyboard/interaction context */
+  isActive: boolean;
   getScale(): number;
   /** grid zoom spring — maps are interactive when zoom ≈ 1 */
   zoomSpring: Spring;
@@ -106,7 +109,7 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-export const MapView = memo(function MapView({ map: meta, framePos, getScale, zoomSpring }: Props) {
+export const MapView = memo(function MapView({ map: meta, framePos, isActive, getScale, zoomSpring }: Props) {
   const state = useAppState();
   const rootRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -302,11 +305,12 @@ export const MapView = memo(function MapView({ map: meta, framePos, getScale, zo
   return (
     <div ref={rootRef} className="map-anchor" style={{ width: meta.w }}>
       <motion.div
-        className="map-card"
+        className={"map-card" + (isActive ? " ctx-active" : "")}
         style={{ width: meta.w }}
         initial={{ scale: 0.55, opacity: 0, y: 60, rotate: 1.5 }}
         animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: "spring", stiffness: 230, damping: 19, mass: 1.05 }}
+        onPointerDown={() => setActiveObject(meta.id)}
       >
         <div
           className="table-header map-header"
