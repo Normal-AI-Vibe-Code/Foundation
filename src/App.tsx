@@ -2,9 +2,13 @@ import { useEffect } from "react";
 import { motion } from "motion/react";
 import { GridViewport } from "./components/GridViewport";
 import { ContextMenuView } from "./components/ContextMenu";
+import { VoiceCommand } from "./components/VoiceCommand";
 import {
   addNote,
+  addSectionAdjacent,
+  bindMap,
   createMap,
+  createSectionAt,
   createTable,
   getState,
   renameSection,
@@ -12,6 +16,7 @@ import {
   resizeTable,
   splitSection,
 } from "./state/store";
+import { restorePersisted, startAutosave } from "./state/persist";
 import { workbook } from "./engine/workbook";
 import "./App.css";
 
@@ -90,8 +95,46 @@ function seedDemo() {
   put(0, 8, "Team size");
   put(1, 8, `=COUNTA('${team.name}'!A2:A7)`);
 
-  // map in the Atlas section, bound to the Team table
-  createMap(s3, 0, 0);
+  // map in the Atlas section, wired to the Team table
+  const atlasMap = createMap(s3, 0, 0);
+  bindMap(atlasMap.id, team.id);
+
+  // second table→map pair: market locations plotted on their own map
+  addSectionAdjacent(s2, "right"); // new column, beside Team
+  const s4 = getState().activeSectionId;
+  renameSection(s4, "Markets");
+  const s5 = createSectionAt(2, 1)!.id; // the empty cell under Markets
+  renameSection(s5, "World");
+
+  const markets = createTable(s4, 0, 0);
+  const putM = (col: number, row: number, v: string) =>
+    workbook.setCell(markets.id, col, row, v);
+  putM(0, 0, "Market");
+  putM(1, 0, "City");
+  putM(2, 0, "Lat");
+  putM(3, 0, "Lng");
+  const places: [string, string, number, number][] = [
+    ["Kobayashi Group", "Tokyo", 35.6762, 139.6503],
+    ["AHE Group", "Amsterdam", 52.3676, 4.9041],
+    ["Snow Mass", "Aspen", 39.1911, -106.8175],
+    ["Farmy", "Zurich", 47.3769, 8.5417],
+    ["Isle Communities", "Honolulu", 21.3069, -157.8583],
+  ];
+  places.forEach(([market, city, lat, lng], i) => {
+    putM(0, i + 1, market);
+    putM(1, i + 1, city);
+    putM(2, i + 1, String(lat));
+    putM(3, i + 1, String(lng));
+  });
+  // pull each market's contracted revenue across from Projections
+  resizeTable(markets.id, 5, 8);
+  putM(4, 0, "Contracted");
+  places.forEach((_, i) => {
+    putM(4, i + 1, `='${t.name}'!B${i + 2}`);
+  });
+
+  const worldMap = createMap(s5, 0, 0);
+  bindMap(worldMap.id, markets.id);
 
   addNote(
     s2,
@@ -101,9 +144,16 @@ function seedDemo() {
   requestSnap({ kind: "all" });
 }
 
+let booted = false;
+
 function App() {
   useEffect(() => {
-    seedDemo();
+    if (booted) return;
+    booted = true;
+    void restorePersisted().then((restored) => {
+      if (!restored) seedDemo();
+      startAutosave();
+    });
   }, []);
 
   return (
@@ -117,13 +167,14 @@ function App() {
         <div className="logo">✳</div>
         <div className="app-title">Foundation</div>
         <div className="app-hint">
-          drag the void to pan — the view snaps to sections · ctrl+scroll to
-          zoom · scroll inside a section · <b>Esc</b> for overview · <b>=</b>{" "}
-          starts a formula
+          hold <b>space</b> to command by voice · arrows navigate per level ·{" "}
+          <b>Esc</b> steps up · right-click for menus · <b>=</b> starts a
+          formula
         </div>
       </motion.header>
       <GridViewport />
       <ContextMenuView />
+      <VoiceCommand />
     </div>
   );
 }

@@ -173,7 +173,8 @@ body.resizing-v .section-card,
   cursor: grabbing;
 }
 
-.section-card.dropping {
+.section-card.dropping,
+.section-card.receiving {
   border-color: var(--select);
   box-shadow:
     inset 0 0 0 2px var(--select),
@@ -185,6 +186,42 @@ body.resizing-v .section-card,
   box-shadow:
     0 1px 2px rgba(28, 27, 25, 0.06),
     0 14px 44px rgba(28, 27, 25, 0.09);
+}
+
+/* multi-selected (ctrl/cmd-click, shift-click) — merge candidates */
+.section-card.selected {
+  border-color: var(--select);
+  box-shadow:
+    inset 0 0 0 2px var(--select),
+    0 0 0 5px var(--select-soft),
+    0 14px 44px rgba(47, 111, 237, 0.16);
+}
+
+/* merge pill — hovers over the selection's bounding box in world space */
+.merge-pill {
+  position: absolute;
+  translate: -50% -130%;
+  z-index: 46;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: var(--select);
+  border: none;
+  border-radius: 999px;
+  padding: 11px 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    0 2px 6px rgba(47, 111, 237, 0.35),
+    0 14px 40px rgba(47, 111, 237, 0.3);
+}
+
+.merge-pill.blocked {
+  background: var(--ink-faint);
+  cursor: not-allowed;
+  box-shadow: 0 8px 26px rgba(28, 27, 25, 0.18);
 }
 
 .section-header {
@@ -280,6 +317,16 @@ body.resizing-v .section-card,
   border-radius: 0 0 16px 16px;
   background-image: radial-gradient(circle, rgba(28, 27, 25, 0.13) 1.1px, transparent 1.4px);
   background-size: 28px 28px;
+}
+
+/* while a card is being dragged, let it escape the section's clip and ride
+   above sibling sections so it can travel to another section */
+.section-card:has(.table-anchor.dragging),
+.section-card:has(.frame-anchor.dragging) {
+  z-index: 45;
+}
+.section-body:has(.dragging) {
+  overflow: visible;
 }
 
 .section-content {
@@ -504,6 +551,13 @@ body.resizing-v .section-card,
   background: rgba(47, 111, 237, 0.03);
 }
 
+/* desktop file drag hovering this cell — drop creates a section here */
+.empty-cell.dropping {
+  border-color: var(--select);
+  border-style: solid;
+  background: var(--select-soft);
+}
+
 .empty-cell-label {
   font-size: 15px;
   font-weight: 700;
@@ -560,7 +614,77 @@ body.resizing-v .section-card,
   left: 0;
   top: 0;
   pointer-events: none;
-  z-index: 30;
+}
+
+/* paths live beneath the section cards, ports above them */
+.wires-under {
+  z-index: 0;
+}
+
+.wires-over {
+  z-index: 31;
+}
+
+.section-card {
+  z-index: 1;
+}
+
+/* wires rest faded; hovering a connected card lights them up */
+.wires-under .wire-group {
+  opacity: 0.24;
+  transition: opacity 0.3s ease;
+}
+
+.wires-under .wire-group.lit {
+  opacity: 1;
+}
+
+.wires-over .wire-ports {
+  opacity: 0.45;
+  transition: opacity 0.3s ease;
+}
+
+.wires-over .wire-ports.lit {
+  opacity: 1;
+}
+
+.wires-over .wire-ports.map circle {
+  fill: #2f6fed;
+}
+
+.wires-over .wire-ports.ref circle {
+  fill: #2c9a5b;
+}
+
+.wires-over circle {
+  stroke: var(--paper-raised);
+  stroke-width: 2;
+}
+
+/* every table offers a source port to drag onto a map */
+.src-port {
+  pointer-events: all;
+  cursor: grab;
+  fill: var(--paper-raised);
+  stroke: #2f6fed;
+  stroke-width: 2.5;
+  opacity: 0.35;
+  transition: opacity 0.25s ease, r 0.15s ease;
+}
+
+.src-port:hover,
+.src-port.lit {
+  opacity: 1;
+  r: 8.5;
+}
+
+.temp-wire {
+  fill: none;
+  stroke: #2f6fed;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 5 7;
+  animation: wire-flow 0.4s linear infinite;
 }
 
 .wire-group .wire {
@@ -822,6 +946,94 @@ body.rewiring {
   height: 1px;
   background: var(--line);
   margin: 4px 8px;
+}
+
+/* ============ voice / natural-language HUD ============ */
+
+.voice-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  translate: -50% 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 340px;
+  max-width: 560px;
+  padding: 12px 18px;
+  background: rgba(251, 250, 248, 0.92);
+  backdrop-filter: blur(18px) saturate(1.15);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card-lift);
+}
+
+.voice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+.voice-dot.live {
+  background: #e04b3a;
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 75, 58, 0.4); }
+  50% { box-shadow: 0 0 0 7px rgba(224, 75, 58, 0); }
+}
+
+.voice-wave {
+  width: 140px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.voice-text {
+  font-size: 13px;
+  color: var(--ink-soft);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-prompt {
+  font-size: 16px;
+  color: var(--select);
+}
+
+.voice-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--ink);
+  min-width: 300px;
+}
+
+.voice-input::placeholder {
+  color: var(--ink-faint);
+}
+
+.voice-feedback {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.voice-feedback.ok {
+  color: #217a46;
+}
+
+.voice-feedback.err {
+  color: var(--ink-soft);
+  font-weight: 500;
 }
 
 /* add-section edge buttons */

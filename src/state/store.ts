@@ -11,6 +11,7 @@
 
 import { useSyncExternalStore } from "react";
 import { workbook } from "../engine/workbook";
+import { sfx } from "../sound/sfx";
 
 let idCounter = 0;
 export function uid(prefix: string): string {
@@ -92,9 +93,13 @@ export interface AppState {
   /** which layer the keyboard/context currently addresses */
   focusLevel: "grid" | "section" | "object";
   activeObjectId: string | null;
+  /** multi-selected sections (ctrl/cmd-click, shift-click) — for merge etc. */
+  selectedSectionIds: string[];
   snapRequest: (SnapTarget & { nonce: number }) | null;
   /** cell highlighted while a section is being dragged to a new home */
   sectionDragTarget: { sectionId: string; c: number; r: number } | null;
+  /** foreign section hovered while a primitive card is being dragged */
+  objectDropTarget: { objId: string; sectionId: string } | null;
   /** section awaiting the remove-confirmation popover (e.g. via context menu) */
   pendingRemoval: string | null;
 }
@@ -349,8 +354,10 @@ let state: AppState = {
   activeSectionId: firstSectionId,
   focusLevel: "grid",
   activeObjectId: null,
+  selectedSectionIds: [],
   snapRequest: { kind: "all", nonce: Math.random() },
   sectionDragTarget: null,
+  objectDropTarget: null,
   pendingRemoval: null,
 };
 
@@ -378,6 +385,62 @@ function set(partial: Partial<AppState>) {
   emit();
 }
 
+// ---------- persistence hydration ----------
+
+function maxNamed(names: string[], pattern: RegExp): number {
+  let max = 0;
+  for (const n of names) {
+    const m = n.match(pattern);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  return max;
+}
+
+/**
+ * Replace the document portion of the state with a persisted snapshot.
+ * Interaction state resets; naming counters re-sync so fresh objects don't
+ * collide; bornAt is renormalized to negative values so objects created in
+ * this session (performance.now() ≥ 0) always flow after restored ones.
+ */
+export function hydrateState(
+  saved: Pick<
+    AppState,
+    "grid" | "sections" | "tables" | "maps" | "notes" | "media" | "activeSectionId"
+  >,
+) {
+  const all: AnyObject[] = [
+    ...Object.values(saved.tables),
+    ...Object.values(saved.maps),
+    ...Object.values(saved.notes),
+    ...Object.values(saved.media),
+  ].sort((a, b) => a.bornAt - b.bornAt);
+  all.forEach((o, i) => (o.bornAt = i - all.length));
+
+  const sectionNames = Object.values(saved.sections).map((s) => s.name);
+  sectionCount = Math.max(Object.keys(saved.sections).length, maxNamed(sectionNames, /^Section (\d+)$/));
+  tableCount = maxNamed(Object.values(saved.tables).map((t) => t.name), /^Table (\d+)$/);
+  mapCount = maxNamed(Object.values(saved.maps).map((m) => m.name), /^Map (\d+)$/);
+  noteCount = maxNamed(Object.values(saved.notes).map((n) => n.name), /^Note (\d+)$/);
+
+  const activeSectionId = saved.sections[saved.activeSectionId]
+    ? saved.activeSectionId
+    : Object.keys(saved.sections)[0];
+
+  state = {
+    ...state,
+    ...saved,
+    activeSectionId,
+    focusLevel: "grid",
+    activeObjectId: null,
+    selectedSectionIds: [],
+    sectionDragTarget: null,
+    objectDropTarget: null,
+    pendingRemoval: null,
+    snapRequest: { kind: "all", nonce: Math.random() },
+  };
+  emit();
+}
+
 // ---------- snap / focus ----------
 
 export function requestSnap(target: SnapTarget) {
@@ -387,6 +450,7 @@ export function requestSnap(target: SnapTarget) {
 export function setActiveSection(id: string) {
   if (state.activeSectionId === id && state.focusLevel === "section" && !state.activeObjectId)
     return;
+  if (state.focusLevel !== "section") sfx.tick();
   set({ activeSectionId: id, focusLevel: "section", activeObjectId: null });
 }
 
@@ -394,6 +458,7 @@ export function setActiveObject(id: string) {
   const found = findObject(id);
   if (!found) return;
   if (state.activeObjectId === id && state.focusLevel === "object") return;
+  if (state.activeObjectId !== id) sfx.tick();
   set({
     activeObjectId: id,
     activeSectionId: found.obj.sectionId,
@@ -403,11 +468,17 @@ export function setActiveObject(id: string) {
 
 export function setFocusGrid() {
   if (state.focusLevel === "grid") return;
+  sfx.tick();
   set({ focusLevel: "grid", activeObjectId: null });
 }
 
 /** step one level up: object → section → grid */
 export function focusUp() {
+  if (state.selectedSectionIds.length > 0) {
+    // Escape drops the multi-select before changing levels
+    set({ selectedSectionIds: [] });
+    return;
+  }
   if (state.focusLevel === "object") {
     set({ focusLevel: "section", activeObjectId: null });
     requestSnap({ kind: "section", id: state.activeSectionId });
@@ -520,6 +591,7 @@ export function splitSection(sectionId: string, dir: "h" | "v") {
   }
 
   sections[fresh.id] = fresh;
+  sfx.split();
   set({
     grid,
     sections,
@@ -578,6 +650,7 @@ export function addSectionAdjacent(
   }
 
   sections[fresh.id] = fresh;
+  sfx.split();
   set({
     grid,
     sections,
@@ -633,6 +706,7 @@ export function removeSection(id: string) {
   const grid: GridTracks = { cols: [...state.grid.cols], rows: [...state.grid.rows] };
   pruneEmptyTracks(grid, sections);
 
+  sfx.trash();
   const nextActive =
     state.activeSectionId === id ? Object.keys(sections)[0] : state.activeSectionId;
   const objGone =
@@ -645,6 +719,7 @@ export function removeSection(id: string) {
     notes,
     media,
     activeSectionId: nextActive,
+    selectedSectionIds: state.selectedSectionIds.filter((s) => s !== id),
     ...(objGone ? { activeObjectId: null, focusLevel: "grid" as const } : {}),
     snapRequest: { kind: "all", nonce: Math.random() },
     pendingRemoval: null,
@@ -715,12 +790,14 @@ export function moveSectionTo(id: string, c: number, r: number) {
   }
   const grid: GridTracks = { cols: [...state.grid.cols], rows: [...state.grid.rows] };
   pruneEmptyTracks(grid, sections);
+  sfx.drop();
   set({ grid, sections, activeSectionId: id });
 }
 
 /** create a fresh section in an uncovered grid cell */
-export function createSectionAt(c: number, r: number) {
-  if (sectionCovering(c, r)) return;
+export function createSectionAt(c: number, r: number): Section | null {
+  if (sectionCovering(c, r)) return null;
+  sfx.split();
   sectionCount++;
   const fresh: Section = {
     id: uid("sec"),
@@ -736,6 +813,124 @@ export function createSectionAt(c: number, r: number) {
     activeSectionId: fresh.id,
     snapRequest: { kind: "section", id: fresh.id, nonce: Math.random() },
   });
+  return fresh;
+}
+
+// ---------- multi-select & merge ----------
+
+export function toggleSectionSelected(id: string) {
+  if (!state.sections[id]) return;
+  let sel = [...state.selectedSectionIds];
+  // seed the selection with the active section so the first modifier-click
+  // already forms a pair
+  if (sel.length === 0 && id !== state.activeSectionId && state.sections[state.activeSectionId]) {
+    sel.push(state.activeSectionId);
+  }
+  if (sel.includes(id)) sel = sel.filter((s) => s !== id);
+  else sel.push(id);
+  if (sel.length === 1) sel = []; // a lone section isn't a multi-select
+  sfx.tick();
+  set({
+    selectedSectionIds: sel,
+    activeSectionId: id,
+    focusLevel: "section",
+    activeObjectId: null,
+  });
+}
+
+/** shift-click: select every section touching the rect between active and target */
+export function selectSectionRange(toId: string) {
+  const from = state.sections[state.activeSectionId];
+  const to = state.sections[toId];
+  if (!from || !to) return;
+  const c0 = Math.min(from.c0, to.c0);
+  const c1 = Math.max(from.c1, to.c1);
+  const r0 = Math.min(from.r0, to.r0);
+  const r1 = Math.max(from.r1, to.r1);
+  const sel = Object.values(state.sections)
+    .filter((s) => s.c0 <= c1 && s.c1 >= c0 && s.r0 <= r1 && s.r1 >= r0)
+    .map((s) => s.id);
+  sfx.tick();
+  set({
+    selectedSectionIds: sel.length > 1 ? sel : [],
+    focusLevel: "section",
+    activeObjectId: null,
+  });
+}
+
+export function clearSectionSelection() {
+  if (state.selectedSectionIds.length === 0) return;
+  set({ selectedSectionIds: [] });
+}
+
+/**
+ * Sections can merge only when their cell spans tile a solid rectangle.
+ * Spans never overlap, so covered area == bounding-box area ⇔ exact tiling.
+ */
+export function canMergeSections(ids: string[]): boolean {
+  const secs = ids.map((id) => state.sections[id]).filter(Boolean) as Section[];
+  if (secs.length < 2) return false;
+  const c0 = Math.min(...secs.map((s) => s.c0));
+  const c1 = Math.max(...secs.map((s) => s.c1));
+  const r0 = Math.min(...secs.map((s) => s.r0));
+  const r1 = Math.max(...secs.map((s) => s.r1));
+  const covered = secs.reduce((a, s) => a + (s.c1 - s.c0 + 1) * (s.r1 - s.r0 + 1), 0);
+  return covered === (c1 - c0 + 1) * (r1 - r0 + 1);
+}
+
+/**
+ * Merge sections into one: the survivor's span grows to the union rectangle
+ * and it absorbs every object from the others. The active section survives
+ * when it's part of the selection, otherwise the top-left one.
+ */
+export function mergeSections(ids: string[]) {
+  if (!canMergeSections(ids)) {
+    sfx.nope();
+    return;
+  }
+  const secs = ids.map((id) => state.sections[id]).filter(Boolean) as Section[];
+  const c0 = Math.min(...secs.map((s) => s.c0));
+  const c1 = Math.max(...secs.map((s) => s.c1));
+  const r0 = Math.min(...secs.map((s) => s.r0));
+  const r1 = Math.max(...secs.map((s) => s.r1));
+  const survivor = ids.includes(state.activeSectionId)
+    ? state.sections[state.activeSectionId]
+    : secs.find((s) => s.c0 === c0 && s.r0 === r0)!;
+
+  const doomed = new Set(ids.filter((id) => id !== survivor.id));
+  const adopt = <T extends AnyObject>(rec: Record<string, T>): Record<string, T> => {
+    let changed = false;
+    const out = { ...rec };
+    for (const o of Object.values(rec)) {
+      if (doomed.has(o.sectionId)) {
+        out[o.id] = { ...o, sectionId: survivor.id };
+        changed = true;
+      }
+    }
+    return changed ? out : rec;
+  };
+
+  const sections: Record<string, Section> = { ...state.sections };
+  for (const id of doomed) delete sections[id];
+  sections[survivor.id] = { ...survivor, c0, c1, r0, r1 };
+
+  sfx.connect();
+  set({
+    sections,
+    tables: adopt(state.tables),
+    maps: adopt(state.maps),
+    notes: adopt(state.notes),
+    media: adopt(state.media),
+    selectedSectionIds: [],
+    activeSectionId: survivor.id,
+    focusLevel: "section",
+    activeObjectId: null,
+    snapRequest: { kind: "section", id: survivor.id, nonce: Math.random() },
+  });
+}
+
+export function mergeSelectedSections() {
+  mergeSections(state.selectedSectionIds);
 }
 
 export function renameSection(id: string, name: string) {
@@ -786,6 +981,8 @@ function findObject(id: string): { key: ObjKey; obj: AnyObject } | null {
 export function setObjectFloat(id: string, float: boolean) {
   const found = findObject(id);
   if (!found || found.obj.float === float) return;
+  if (float) sfx.lift();
+  else sfx.drop();
   // when releasing into float, freeze the current flow position so the
   // object doesn't jump
   const pos = float ? effectivePos(found.obj) : { x: found.obj.x, y: found.obj.y };
@@ -795,6 +992,81 @@ export function setObjectFloat(id: string, float: boolean) {
       [id]: { ...found.obj, float, x: pos.x, y: pos.y },
     },
   } as Partial<AppState>);
+}
+
+// ---------- moving primitives between sections ----------
+
+export function setObjectDropTarget(target: AppState["objectDropTarget"]) {
+  const a = state.objectDropTarget;
+  if (a?.objId === target?.objId && a?.sectionId === target?.sectionId) return;
+  set({ objectDropTarget: target });
+}
+
+/**
+ * Re-parent a primitive into another section, keeping it visually where it
+ * was dropped: worldX/Y is the card's top-left in grid world space, converted
+ * into the target section's content space. The card arrives floating.
+ */
+export function moveObjectToSection(
+  id: string,
+  sectionId: string,
+  worldX: number,
+  worldY: number,
+): boolean {
+  const found = findObject(id);
+  const sec = state.sections[sectionId];
+  if (!found || !sec || found.obj.sectionId === sectionId) return false;
+  const card = sectionCardRect(state.grid, sec);
+  const scroll = getLiveScroll(sectionId);
+  const x = Math.max(0, worldX - (card.x + CONTENT_PAD) + scroll.x);
+  const y = Math.max(0, worldY - (card.y + SECTION_HEADER + CONTENT_PAD) + scroll.y);
+  sfx.drop();
+  set({
+    [found.key]: {
+      ...(state[found.key] as Record<string, AnyObject>),
+      [id]: { ...found.obj, sectionId, float: true, x, y },
+    },
+    activeSectionId: sectionId,
+    activeObjectId: id,
+    focusLevel: "object",
+    objectDropTarget: null,
+  } as Partial<AppState>);
+  return true;
+}
+
+/**
+ * Called each move of a card drag: which foreign section is the pointer
+ * over? Feeds the target highlight and the drop on release.
+ */
+export function trackObjectDrag(
+  el: HTMLElement | null,
+  id: string,
+  clientX: number,
+  clientY: number,
+  scale: number,
+) {
+  const obj = findObject(id)?.obj;
+  const world = el?.closest(".world") as HTMLElement | null;
+  if (!obj || !world) return;
+  const wr = world.getBoundingClientRect();
+  const cell = cellAtWorld((clientX - wr.left) / scale, (clientY - wr.top) / scale);
+  const over = cell ? sectionCovering(cell.c, cell.r) : null;
+  setObjectDropTarget(
+    over && over.id !== obj.sectionId ? { objId: id, sectionId: over.id } : null,
+  );
+}
+
+/** on release: re-parent when hovering a foreign section; true if it moved */
+export function dropObjectIfRetargeted(id: string): boolean {
+  const t = state.objectDropTarget;
+  if (!t || t.objId !== id) return false;
+  const obj = findObject(id)?.obj;
+  const rect = obj ? objectWorldRect(obj) : null;
+  if (!rect) {
+    setObjectDropTarget(null);
+    return false;
+  }
+  return moveObjectToSection(id, t.sectionId, rect.x, rect.y);
 }
 
 // ---------- note actions ----------
@@ -815,6 +1087,7 @@ export function addNote(sectionId: string, text?: string): NoteMeta {
     float: false,
     bornAt: performance.now(),
   };
+  sfx.pop(1.15);
   set({
     notes: { ...state.notes, [meta.id]: meta },
     activeSectionId: sectionId,
@@ -832,6 +1105,7 @@ export function updateNoteText(id: string, text: string) {
 export function removeNote(id: string) {
   const { [id]: gone, ...rest } = state.notes;
   if (!gone) return;
+  sfx.trash();
   set({ notes: rest, ...focusCleanup(id) });
 }
 
@@ -881,6 +1155,7 @@ export function addMedia(
     float: false,
     bornAt: performance.now(),
   };
+  sfx.pop(1.05);
   set({
     media: { ...state.media, [meta.id]: meta },
     activeSectionId: sectionId,
@@ -893,6 +1168,7 @@ export function removeMedia(id: string) {
   const { [id]: gone, ...rest } = state.media;
   if (!gone) return;
   URL.revokeObjectURL(gone.src);
+  sfx.trash();
   set({ media: rest, ...focusCleanup(id) });
 }
 
@@ -947,6 +1223,7 @@ export function createTable(sectionId: string, atX?: number, atY?: number): Tabl
     bornAt: performance.now(),
   };
   workbook.addTable(id, name, cols, rows);
+  sfx.pop();
   set({
     tables: { ...state.tables, [id]: meta },
     activeSectionId: sectionId,
@@ -970,6 +1247,7 @@ export function removeTable(id: string) {
   const { [id]: gone, ...rest } = state.tables;
   if (!gone) return;
   workbook.removeTable(id);
+  sfx.trash();
   set({ tables: rest, ...focusCleanup(id) });
 }
 
@@ -1035,9 +1313,8 @@ let mapCount = 0;
 export function createMap(sectionId: string, atX?: number, atY?: number): MapMeta {
   const id = uid("map");
   mapCount++;
-  // default binding: the most recently created table anywhere
-  const allTables = Object.values(state.tables);
-  const source = allTables.length ? allTables[allTables.length - 1] : null;
+  // maps start unbound — drag a wire from a table's port (or use the
+  // dropdown) to connect data
   const meta: MapMeta = {
     id,
     sectionId,
@@ -1046,11 +1323,12 @@ export function createMap(sectionId: string, atX?: number, atY?: number): MapMet
     y: atY ?? 0,
     w: MAP_W,
     h: MAP_H,
-    sourceTableId: source?.id ?? null,
+    sourceTableId: null,
     pitched: true,
     float: false,
     bornAt: performance.now(),
   };
+  sfx.pop(0.85);
   set({
     maps: { ...state.maps, [id]: meta },
     activeSectionId: sectionId,
@@ -1062,6 +1340,7 @@ export function createMap(sectionId: string, atX?: number, atY?: number): MapMet
 export function removeMap(id: string) {
   const { [id]: gone, ...rest } = state.maps;
   if (!gone) return;
+  sfx.trash();
   set({ maps: rest, ...focusCleanup(id) });
 }
 
@@ -1084,7 +1363,9 @@ export function resizeMap(id: string, w: number, h: number) {
 
 export function bindMap(id: string, sourceTableId: string | null) {
   const m = state.maps[id];
-  if (!m) return;
+  if (!m || m.sourceTableId === sourceTableId) return;
+  if (sourceTableId) sfx.connect();
+  else sfx.disconnect();
   set({ maps: { ...state.maps, [id]: { ...m, sourceTableId } } });
 }
 

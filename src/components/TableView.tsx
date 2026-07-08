@@ -18,8 +18,10 @@ import {
   HEADER_H,
   ROWNUM_W,
   TableMeta,
+  dropObjectIfRetargeted,
   liveObjPos,
   moveTable,
+  trackObjectDrag,
   removeTable,
   renameTable,
   requestSnap,
@@ -40,6 +42,7 @@ import {
 } from "../state/editing";
 import { Spring2D, presets } from "../physics/spring";
 import { openContextMenu } from "./ContextMenu";
+import { sfx } from "../sound/sfx";
 
 interface Props {
   table: TableMeta;
@@ -143,8 +146,9 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
       if (!d.active) return;
       const s = getScale();
       pos.to(d.origX + (e.clientX - d.startX) / s, d.origY + (e.clientY - d.startY) / s);
+      trackObjectDrag(rootRef.current, table.id, e.clientX, e.clientY, s);
     },
-    [pos, getScale],
+    [pos, getScale, table.id],
   );
 
   const onHeaderPointerUp = useCallback(() => {
@@ -152,6 +156,7 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
     if (!d.active) return;
     d.active = false;
     rootRef.current?.classList.remove("dragging");
+    if (dropObjectIfRetargeted(table.id)) return; // landed in another section
     moveTable(table.id, pos.x.goal, pos.y.goal);
   }, [pos, table.id]);
 
@@ -159,6 +164,7 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
   const commitEdit = useCallback(
     (move: "down" | "right" | "stay" | "none") => {
       if (!editing) return;
+      sfx.thock();
       workbook.setCell(table.id, editing.col, editing.row, editText);
       setEditing(null);
       if (move === "down" && editing.row < table.rows - 1) {
@@ -520,6 +526,7 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
     >
       <motion.div
         className={"table-card" + (isActive ? " ctx-active" : "")}
+        data-obj-id={table.id}
         initial={{ scale: 0.55, opacity: 0, y: 60, rotate: -1.5 }}
         animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: "spring", stiffness: 230, damping: 19, mass: 1.05 }}

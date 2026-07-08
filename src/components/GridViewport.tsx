@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { motion } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { ShaderBackground } from "../gl/background";
 import { Spring, Spring2D, presets } from "../physics/spring";
 import {
   SnapTarget,
   allObjects,
+  canMergeSections,
+  clearSectionSelection,
   createSectionAt,
   emptyCells,
   focusUp,
@@ -12,20 +14,24 @@ import {
   getState,
   gridCellRect,
   gridSize,
+  mergeSelectedSections,
   neighborSection,
   objectWorldRect,
   requestSnap,
   resizeCol,
   resizeRow,
   sectionCardRect,
+  sectionCellRect,
   setActiveSection,
   setFocusGrid,
   trackOffsets,
   useAppState,
 } from "../state/store";
+import { dragHasFiles, ingestMediaFiles } from "../state/media";
 import { SectionView } from "./SectionView";
 import { WireLayer } from "./WireLayer";
 import { openContextMenu } from "./ContextMenu";
+import { sfx } from "../sound/sfx";
 
 function colName(col: number): string {
   let s = "";
@@ -237,6 +243,13 @@ export function GridViewport() {
       if (!rect) return false;
       const frame = frameOf(rect, cap);
       if (!frame) return false;
+      // audible only when the camera meaningfully travels
+      if (
+        Math.hypot(frame.x - camera.x.goal, frame.y - camera.y.goal) > 40 ||
+        Math.abs(Math.log(frame.scale / zoom.goal)) > 0.08
+      ) {
+        sfx.whoosh();
+      }
       zoom.to(frame.scale);
       camera.to(frame.x, frame.y);
       return true;
@@ -277,6 +290,14 @@ export function GridViewport() {
         el?.blur(); // release e.g. a table sheet so section arrows take over
         focusUp();
         return;
+      }
+      if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const sel = getState().selectedSectionIds;
+        if (sel.length >= 2) {
+          e.preventDefault();
+          mergeSelectedSections();
+          return;
+        }
       }
       const dir = (
         {
@@ -319,6 +340,7 @@ export function GridViewport() {
     if (target.closest(".section-card, button, input, select, .viewport-toolbar, .gutter")) return;
     if (e.button !== 0 && e.button !== 1) return;
     setFocusGrid(); // clicking the void addresses the grid level
+    clearSectionSelection();
     const d = panDrag.current;
     d.active = true;
     d.lastX = e.clientX;
@@ -508,6 +530,9 @@ export function GridViewport() {
 
   const activeSec = state.sections[state.activeSectionId];
   const activeObj = state.activeObjectId ? getObject(state.activeObjectId) : null;
+  const [soundOn, setSoundOn] = useState(!sfx.isMuted());
+  // empty cell currently hovered by a desktop file drag
+  const [dropCell, setDropCell] = useState<{ c: number; r: number } | null>(null);
 
   return (
     <div
@@ -546,12 +571,31 @@ export function GridViewport() {
           return (
             <div
               key={`empty${c},${r}`}
-              className="empty-cell"
+              className={
+                "empty-cell" +
+                (dropCell?.c === c && dropCell?.r === r ? " dropping" : "")
+              }
               style={{
                 left: rect.x + 12,
                 top: rect.y + 12,
                 width: rect.w - 24,
                 height: rect.h - 24,
+              }}
+              onDragOver={(e) => {
+                if (!dragHasFiles(e)) return;
+                e.preventDefault();
+                if (dropCell?.c !== c || dropCell?.r !== r) setDropCell({ c, r });
+              }}
+              onDragLeave={(e) => {
+                if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node))
+                  setDropCell(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDropCell(null);
+                const files = e.dataTransfer.files;
+                const fresh = createSectionAt(c, r);
+                if (fresh) void ingestMediaFiles(fresh.id, files);
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -607,6 +651,42 @@ export function GridViewport() {
             zoomSpring={zoom}
           />
         ))}
+
+        {/* merge pill — floats over the multi-selection's bounding box */}
+        <AnimatePresence>
+          {(() => {
+            const sel = state.selectedSectionIds
+              .map((id) => state.sections[id])
+              .filter(Boolean);
+            if (sel.length < 2) return null;
+            const rects = sel.map((s) => sectionCellRect(state.grid, s));
+            const x0 = Math.min(...rects.map((r) => r.x));
+            const x1 = Math.max(...rects.map((r) => r.x + r.w));
+            const y0 = Math.min(...rects.map((r) => r.y));
+            const ok = canMergeSections(state.selectedSectionIds);
+            return (
+              <motion.button
+                key="merge-pill"
+                className={"merge-pill" + (ok ? "" : " blocked")}
+                style={{ left: (x0 + x1) / 2, top: y0 }}
+                initial={{ opacity: 0, scale: 0.7, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 6 }}
+                whileHover={ok ? { scale: 1.06 } : undefined}
+                whileTap={ok ? { scale: 0.92 } : undefined}
+                transition={{ type: "spring", stiffness: 480, damping: 26 }}
+                title={
+                  ok
+                    ? "Merge the selected sections into one (M)"
+                    : "Selection must form a solid rectangle to merge"
+                }
+                onClick={() => ok && mergeSelectedSections()}
+              >
+                ⧉ Merge {sel.length} sections
+              </motion.button>
+            );
+          })()}
+        </AnimatePresence>
 
         {/* track resize gutters — hover reveals a grab knob on the boundary */}
         {state.grid.cols.slice(0, -1).map((_, i) => (
@@ -752,6 +832,22 @@ export function GridViewport() {
           }}
         >
           +
+        </motion.button>
+        <div className="tb-divider" />
+        <motion.button
+          className="tb-btn"
+          whileHover={{ scale: 1.08, y: -2 }}
+          whileTap={{ scale: 0.88, y: 1 }}
+          transition={spring}
+          title={soundOn ? "Mute interaction sounds" : "Unmute interaction sounds"}
+          onClick={() => {
+            const next = !soundOn;
+            sfx.setMuted(!next);
+            setSoundOn(next);
+            if (next) sfx.pop();
+          }}
+        >
+          {soundOn ? "🔊" : "🔇"}
         </motion.button>
       </motion.div>
     </div>

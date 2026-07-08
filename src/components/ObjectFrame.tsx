@@ -1,6 +1,13 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "motion/react";
-import { MINI_HEADER, liveObjPos, setActiveObject, setObjectFloat } from "../state/store";
+import {
+  MINI_HEADER,
+  dropObjectIfRetargeted,
+  liveObjPos,
+  setActiveObject,
+  setObjectFloat,
+  trackObjectDrag,
+} from "../state/store";
 import { Spring2D, presets } from "../physics/spring";
 
 /**
@@ -97,8 +104,9 @@ export function ObjectFrame({
         Math.max(0, d.origX + (e.clientX - d.startX) / s),
         Math.max(0, d.origY + (e.clientY - d.startY) / s),
       );
+      trackObjectDrag(rootRef.current, id, e.clientX, e.clientY, s);
     },
-    [spring, getScale],
+    [spring, getScale, id],
   );
 
   const onHeaderUp = useCallback(() => {
@@ -106,8 +114,9 @@ export function ObjectFrame({
     if (!d.active) return;
     d.active = false;
     rootRef.current?.classList.remove("dragging");
+    if (dropObjectIfRetargeted(id)) return; // landed in another section
     onMove(spring.x.goal, spring.y.goal);
-  }, [spring, onMove]);
+  }, [spring, onMove, id]);
 
   // ----- resize -----
   const resizeRef = useRef({ active: false, startX: 0, startY: 0 });

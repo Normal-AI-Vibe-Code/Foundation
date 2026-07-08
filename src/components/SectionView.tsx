@@ -5,13 +5,16 @@ import {
   GridTracks,
   SECTION_HEADER,
   Section,
-  addMedia,
   addNote,
   addSectionAdjacent,
+  canMergeSections,
   cellAtWorld,
+  clearSectionSelection,
   createMap,
   createTable,
   effectivePos,
+  getState,
+  mergeSelectedSections,
   liveScroll,
   moveSectionTo,
   objectPixelSize,
@@ -22,11 +25,14 @@ import {
   requestSnap,
   sectionCardRect,
   setActiveSection,
+  selectSectionRange,
   setSectionDragTarget,
   setSectionScroll,
   splitSection,
+  toggleSectionSelected,
   useAppState,
 } from "../state/store";
+import { dragHasFiles, ingestMediaFiles } from "../state/media";
 import { Spring, Spring2D, presets } from "../physics/spring";
 import { TableView } from "./TableView";
 import { MapView } from "./MapView";
@@ -41,25 +47,6 @@ interface Props {
   canRemove: boolean;
   getScale(): number;
   zoomSpring: Spring;
-}
-
-/** read natural media dimensions so cards start with the right aspect */
-function probeMedia(file: File): Promise<{ src: string; w: number; h: number }> {
-  const src = URL.createObjectURL(file);
-  return new Promise((resolve) => {
-    if (file.type.startsWith("video/")) {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.onloadedmetadata = () => resolve({ src, w: v.videoWidth || 640, h: v.videoHeight || 360 });
-      v.onerror = () => resolve({ src, w: 640, h: 360 });
-      v.src = src;
-    } else {
-      const img = new Image();
-      img.onload = () => resolve({ src, w: img.naturalWidth || 480, h: img.naturalHeight || 360 });
-      img.onerror = () => resolve({ src, w: 480, h: 360 });
-      img.src = src;
-    }
-  });
 }
 
 export const SectionView = memo(function SectionView({
@@ -100,6 +87,7 @@ export const SectionView = memo(function SectionView({
 
   const onSectionHeaderDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) return; // modifier clicks select, never drag
     if ((e.target as HTMLElement).closest("button, input")) return;
     const d = moveDrag.current;
     d.down = true;
@@ -226,15 +214,7 @@ export const SectionView = memo(function SectionView({
 
   // ----- media intake: desktop drag-drop + open dialog -----
   const ingestFiles = useCallback(
-    async (files: FileList | File[]) => {
-      for (const file of [...files]) {
-        if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
-          const kind = file.type.startsWith("video/") ? "video" : "image";
-          const { src, w, h } = await probeMedia(file);
-          addMedia(section.id, src, kind, file.name, w, h);
-        }
-      }
-    },
+    (files: FileList | File[]) => ingestMediaFiles(section.id, files),
     [section.id],
   );
 
@@ -258,7 +238,21 @@ export const SectionView = memo(function SectionView({
       e.preventDefault();
       e.stopPropagation();
       setActiveSection(section.id);
+      const sel = getState().selectedSectionIds;
+      const mergeItems =
+        sel.length >= 2 && sel.includes(section.id)
+          ? [
+              {
+                icon: "⧉",
+                label: `Merge ${sel.length} sections`,
+                disabled: !canMergeSections(sel),
+                action: () => mergeSelectedSections(),
+              },
+              { divider: true as const },
+            ]
+          : [];
       openContextMenu(e.clientX, e.clientY, [
+        ...mergeItems,
         { icon: "⊞", label: "Add table", action: () => createTable(section.id) },
         { icon: "◍", label: "Add map", action: () => createMap(section.id) },
         { icon: "▤", label: "Add note", action: () => addNote(section.id) },
@@ -311,6 +305,8 @@ export const SectionView = memo(function SectionView({
   );
 
   const sectionCtx = active && state.focusLevel === "section";
+  const selected = state.selectedSectionIds.includes(section.id);
+  const receiving = state.objectDropTarget?.sectionId === section.id;
 
   return (
     <motion.div
@@ -319,7 +315,9 @@ export const SectionView = memo(function SectionView({
         "section-card" +
         (active ? " active" : "") +
         (sectionCtx ? " ctx-active" : "") +
-        (dropping ? " dropping" : "")
+        (selected ? " selected" : "") +
+        (dropping ? " dropping" : "") +
+        (receiving ? " receiving" : "")
       }
       style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}
       initial={{ opacity: 0, scale: 0.92 }}
@@ -328,10 +326,26 @@ export const SectionView = memo(function SectionView({
       onPointerDown={(e) => {
         // clicks on primitives set the object context themselves
         if ((e.target as HTMLElement).closest(".obj-slot")) return;
+        if (e.shiftKey) {
+          selectSectionRange(section.id);
+          return;
+        }
+        if (e.ctrlKey || e.metaKey) {
+          toggleSectionSelected(section.id);
+          return;
+        }
+        clearSectionSelection();
         setActiveSection(section.id);
       }}
       onContextMenu={onSectionContextMenu}
+      onDoubleClick={(e) => {
+        // double-click on the section's own surface zooms into it
+        const t = e.target as HTMLElement;
+        if (t.closest(".obj-slot, button, input, select")) return;
+        requestSnap({ kind: "section", id: section.id });
+      }}
       onDragOver={(e) => {
+        if (!dragHasFiles(e)) return;
         e.preventDefault();
         if (!dropping) setDropping(true);
       }}

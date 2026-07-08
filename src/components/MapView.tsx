@@ -7,8 +7,10 @@ import {
   HEADER_H,
   MapMeta,
   bindMap,
+  dropObjectIfRetargeted,
   liveObjPos,
   moveMap,
+  trackObjectDrag,
   removeMap,
   requestSnap,
   resizeMap,
@@ -170,14 +172,16 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
       if (!d.active) return;
       const s = getScale();
       pos.to(d.origX + (e.clientX - d.startX) / s, d.origY + (e.clientY - d.startY) / s);
+      trackObjectDrag(rootRef.current, meta.id, e.clientX, e.clientY, s);
     },
-    [pos, getScale],
+    [pos, getScale, meta.id],
   );
   const onHeaderPointerUp = useCallback(() => {
     const d = dragRef.current;
     if (!d.active) return;
     d.active = false;
     rootRef.current?.classList.remove("dragging");
+    if (dropObjectIfRetargeted(meta.id)) return; // landed in another section
     moveMap(meta.id, pos.x.goal, pos.y.goal);
   }, [pos, meta.id]);
 
@@ -306,6 +310,7 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
     <div ref={rootRef} className="map-anchor" style={{ width: meta.w }}>
       <motion.div
         className={"map-card" + (isActive ? " ctx-active" : "")}
+        data-obj-id={meta.id}
         style={{ width: meta.w }}
         initial={{ scale: 0.55, opacity: 0, y: 60, rotate: 1.5 }}
         animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
