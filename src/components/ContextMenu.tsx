@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { sfx } from "../sound/sfx";
 
 /**
  * App-wide right-click menu. Anyone can call openContextMenu(x, y, items);
@@ -26,6 +27,7 @@ const listeners = new Set<() => void>();
 
 export function openContextMenu(x: number, y: number, items: MenuItem[]) {
   current = { x, y, items };
+  sfx.tick();
   for (const fn of listeners) fn();
 }
 

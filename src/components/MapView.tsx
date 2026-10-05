@@ -6,9 +6,12 @@ import { workbook } from "../engine/workbook";
 import {
   HEADER_H,
   MapMeta,
+  beginObjectDrag,
   bindMap,
+  endObjectDrag,
   liveObjPos,
   moveMap,
+  trackObjectDrag,
   removeMap,
   requestSnap,
   resizeMap,
@@ -151,6 +154,7 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
       if ((e.target as HTMLElement).closest("button, select")) return;
       e.stopPropagation();
       if (!meta.float) setObjectFloat(meta.id, true); // grabbing undocks it
+      beginObjectDrag(meta.id);
       const d = dragRef.current;
       d.active = true;
       d.startX = e.clientX;
@@ -170,14 +174,21 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
       if (!d.active) return;
       const s = getScale();
       pos.to(d.origX + (e.clientX - d.startX) / s, d.origY + (e.clientY - d.startY) / s);
+      trackObjectDrag(rootRef.current, meta.id, e.clientX, e.clientY, s);
     },
-    [pos, getScale],
+    [pos, getScale, meta.id],
   );
   const onHeaderPointerUp = useCallback(() => {
     const d = dragRef.current;
     if (!d.active) return;
     d.active = false;
     rootRef.current?.classList.remove("dragging");
+    const action = endObjectDrag(meta.id);
+    if (action === "deleted" || action === "moved") return;
+    if (action === "returned") {
+      pos.to(d.origX, d.origY); // glide back to where it was grabbed
+      return;
+    }
     moveMap(meta.id, pos.x.goal, pos.y.goal);
   }, [pos, meta.id]);
 
@@ -306,6 +317,7 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
     <div ref={rootRef} className="map-anchor" style={{ width: meta.w }}>
       <motion.div
         className={"map-card" + (isActive ? " ctx-active" : "")}
+        data-obj-id={meta.id}
         style={{ width: meta.w }}
         initial={{ scale: 0.55, opacity: 0, y: 60, rotate: 1.5 }}
         animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}

@@ -173,7 +173,8 @@ body.resizing-v .section-card,
   cursor: grabbing;
 }
 
-.section-card.dropping {
+.section-card.dropping,
+.section-card.receiving {
   border-color: var(--select);
   box-shadow:
     inset 0 0 0 2px var(--select),
@@ -185,6 +186,42 @@ body.resizing-v .section-card,
   box-shadow:
     0 1px 2px rgba(28, 27, 25, 0.06),
     0 14px 44px rgba(28, 27, 25, 0.09);
+}
+
+/* multi-selected (ctrl/cmd-click, shift-click) — merge candidates */
+.section-card.selected {
+  border-color: var(--select);
+  box-shadow:
+    inset 0 0 0 2px var(--select),
+    0 0 0 5px var(--select-soft),
+    0 14px 44px rgba(47, 111, 237, 0.16);
+}
+
+/* merge pill — hovers over the selection's bounding box in world space */
+.merge-pill {
+  position: absolute;
+  translate: -50% -130%;
+  z-index: 46;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: var(--select);
+  border: none;
+  border-radius: 999px;
+  padding: 11px 22px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow:
+    0 2px 6px rgba(47, 111, 237, 0.35),
+    0 14px 40px rgba(47, 111, 237, 0.3);
+}
+
+.merge-pill.blocked {
+  background: var(--ink-faint);
+  cursor: not-allowed;
+  box-shadow: 0 8px 26px rgba(28, 27, 25, 0.18);
 }
 
 .section-header {
@@ -282,6 +319,15 @@ body.resizing-v .section-card,
   background-size: 28px 28px;
 }
 
+/* while a card is being dragged, let it escape the section's clip and ride
+   above sibling sections so it can travel to another section */
+.section-card:has(.dragging) {
+  z-index: 45;
+}
+.section-body:has(.dragging) {
+  overflow: visible;
+}
+
 .section-content {
   position: absolute;
   left: 0;
@@ -328,6 +374,9 @@ body.resizing-v .section-card,
   display: flex;
   align-items: center;
   justify-content: center;
+  /* the strip itself is pointer-transparent — only .gutter-hit segments
+     catch the mouse, so cards under a spanning section stay grabbable */
+  pointer-events: none;
 }
 
 .gutter-col {
@@ -338,9 +387,25 @@ body.resizing-v .section-card,
   height: 14px;
 }
 
+.gutter-hit {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.gutter-col .gutter-hit {
+  left: 0;
+  width: 100%;
+}
+
+.gutter-row .gutter-hit {
+  top: 0;
+  height: 100%;
+}
+
 /* the grab knob that appears on rollover and rides along the boundary */
 .gutter-knob {
   position: absolute;
+  pointer-events: auto;
   border-radius: 99px;
   background: var(--paper-raised);
   border: 1.5px solid var(--line-strong);
@@ -410,6 +475,7 @@ body.resizing-v .section-card,
 }
 
 .gutter-line {
+  position: absolute;
   border-radius: 99px;
   background: rgba(28, 27, 25, 0.1);
   transition: background 0.2s ease, transform 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);
@@ -417,18 +483,30 @@ body.resizing-v .section-card,
 
 .gutter-col .gutter-line {
   width: 2px;
-  height: 100%;
+  left: 6px;
 }
 
 .gutter-row .gutter-line {
   height: 2px;
-  width: 100%;
+  top: 6px;
+}
+
+/* where the boundary runs beneath a spanning (merged) section, the line
+   stays but whispers — the card's translucency shouldn't reveal a hard line */
+.gutter-line.faint {
+  background: rgba(28, 27, 25, 0.025);
 }
 
 .gutter:hover .gutter-line,
 .gutter:active .gutter-line {
   background: rgba(47, 111, 237, 0.55);
   transform: scale(1.6);
+}
+
+/* hovering the boundary hints its hidden stretch, so resize still reads */
+.gutter:hover .gutter-line.faint,
+.gutter:active .gutter-line.faint {
+  background: rgba(47, 111, 237, 0.2);
 }
 
 /* ============ grid chrome: frame, lines, labels, empty cells ============ */
@@ -504,6 +582,13 @@ body.resizing-v .section-card,
   background: rgba(47, 111, 237, 0.03);
 }
 
+/* desktop file drag hovering this cell — drop creates a section here */
+.empty-cell.dropping {
+  border-color: var(--select);
+  border-style: solid;
+  background: var(--select-soft);
+}
+
 .empty-cell-label {
   font-size: 15px;
   font-weight: 700;
@@ -560,7 +645,77 @@ body.resizing-v .section-card,
   left: 0;
   top: 0;
   pointer-events: none;
-  z-index: 30;
+}
+
+/* paths live beneath the section cards, ports above them */
+.wires-under {
+  z-index: 0;
+}
+
+.wires-over {
+  z-index: 31;
+}
+
+.section-card {
+  z-index: 1;
+}
+
+/* wires rest faded; hovering a connected card lights them up */
+.wires-under .wire-group {
+  opacity: 0.24;
+  transition: opacity 0.3s ease;
+}
+
+.wires-under .wire-group.lit {
+  opacity: 1;
+}
+
+.wires-over .wire-ports {
+  opacity: 0.45;
+  transition: opacity 0.3s ease;
+}
+
+.wires-over .wire-ports.lit {
+  opacity: 1;
+}
+
+.wires-over .wire-ports.map circle {
+  fill: #2f6fed;
+}
+
+.wires-over .wire-ports.ref circle {
+  fill: #2c9a5b;
+}
+
+.wires-over circle {
+  stroke: var(--paper-raised);
+  stroke-width: 2;
+}
+
+/* every table offers a source port to drag onto a map */
+.src-port {
+  pointer-events: all;
+  cursor: grab;
+  fill: var(--paper-raised);
+  stroke: #2f6fed;
+  stroke-width: 2.5;
+  opacity: 0.35;
+  transition: opacity 0.25s ease, r 0.15s ease;
+}
+
+.src-port:hover,
+.src-port.lit {
+  opacity: 1;
+  r: 8.5;
+}
+
+.temp-wire {
+  fill: none;
+  stroke: #2f6fed;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 5 7;
+  animation: wire-flow 0.4s linear infinite;
 }
 
 .wire-group .wire {
@@ -822,6 +977,148 @@ body.rewiring {
   height: 1px;
   background: var(--line);
   margin: 4px 8px;
+}
+
+/* ============ drag-to-trash target ============ */
+
+.drag-trash {
+  position: absolute;
+  right: 30px;
+  bottom: 30px;
+  min-width: 64px;
+  height: 64px;
+  padding: 0 20px;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 22px;
+  background: var(--paper-raised);
+  border: 1.5px solid var(--line-strong);
+  box-shadow: 0 10px 34px rgba(28, 27, 25, 0.18);
+  z-index: 90;
+  pointer-events: none; /* hit-testing is geometric — never block the drag */
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+}
+
+.drag-trash-label {
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.drag-trash.hot {
+  background: #e04b3a;
+  border-color: #c73a2b;
+  box-shadow:
+    0 12px 44px rgba(224, 75, 58, 0.45),
+    0 0 0 6px rgba(224, 75, 58, 0.15);
+}
+
+.drag-trash.hot .drag-trash-label {
+  color: #fff;
+}
+
+/* ============ voice / natural-language HUD ============ */
+
+.voice-hud {
+  position: fixed;
+  left: 50%;
+  bottom: 84px;
+  translate: -50% 0;
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 340px;
+  max-width: 560px;
+  padding: 12px 18px;
+  background: rgba(251, 250, 248, 0.92);
+  backdrop-filter: blur(18px) saturate(1.15);
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: var(--shadow-card-lift);
+}
+
+.voice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  flex-shrink: 0;
+}
+
+.voice-dot.live {
+  background: #e04b3a;
+  animation: voice-pulse 1.2s ease-in-out infinite;
+}
+
+/* whisper is working on the utterance */
+.voice-dot.thinking {
+  background: var(--select);
+  animation: voice-think 1s ease-in-out infinite;
+}
+
+@keyframes voice-think {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47, 111, 237, 0.4); transform: scale(1); }
+  50% { box-shadow: 0 0 0 7px rgba(47, 111, 237, 0); transform: scale(1.25); }
+}
+
+@keyframes voice-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 75, 58, 0.4); }
+  50% { box-shadow: 0 0 0 7px rgba(224, 75, 58, 0); }
+}
+
+.voice-wave {
+  width: 140px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.voice-text {
+  font-size: 13px;
+  color: var(--ink-soft);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voice-prompt {
+  font-size: 16px;
+  color: var(--select);
+}
+
+.voice-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13.5px;
+  color: var(--ink);
+  min-width: 300px;
+}
+
+.voice-input::placeholder {
+  color: var(--ink-faint);
+}
+
+.voice-feedback {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.voice-feedback.ok {
+  color: #217a46;
+}
+
+.voice-feedback.err {
+  color: var(--ink-soft);
+  font-weight: 500;
 }
 
 /* add-section edge buttons */

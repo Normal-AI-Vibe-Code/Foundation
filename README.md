@@ -36,10 +36,21 @@ primitives (tables, maps).
 - **Move sections**: drag a section's header — a highlight tracks the cell
   under the cursor; drop on a sibling to swap places, or on an empty cell
   to relocate (freed tracks are pruned)
-- **Data-flow wires**: animated connectors show what feeds what — blue for
-  table → map bindings, green for cross-table formula references. Wires
-  track cards mid-drag and pulse when the source table's data changes.
-  **Drag a blue wire's endpoint** onto another map to move the connection
+- **Data-flow wires** run beneath the sections, faded until you hover a
+  connected card — blue for table → map bindings, green for cross-table
+  formula references; they pulse when the source data changes. Every table
+  has a **source port** on its right edge: drag it onto a map to connect.
+  Drag a blue wire's map-side port onto another map to **move** the
+  connection, or into the void to **disconnect**. New maps start unbound
+- **Hold Space** to command by voice — the mic waveform renders live;
+  release to run. Without speech/mic, releasing opens a typed command bar.
+  Commands use your current selection as context: "add a table",
+  "map of team", "split this section", "add 3 rows", "rename this to
+  Budget", "connect team to map 2", "delete this", "overview"…
+- **Sound design**: every interaction has a synthesized voice — pops for
+  creating, thunks for docking, whooshes for camera snaps, chimes for
+  connections, descending knocks for deletion. Toggle with 🔊 in the toolbar
+- **Double-click a section** (header or empty canvas) to zoom into it
 - **Interaction levels**: the keyboard addresses one level at a time —
   Grid (arrows page the viewport, corner brackets show), Section (arrows
   walk between sections, blue section ring), or Primitive (arrows navigate

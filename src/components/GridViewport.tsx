@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { motion } from "motion/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { ShaderBackground } from "../gl/background";
 import { Spring, Spring2D, presets } from "../physics/spring";
 import {
   SnapTarget,
   allObjects,
+  canMergeSections,
+  clearSectionSelection,
   createSectionAt,
   emptyCells,
   focusUp,
@@ -12,20 +14,24 @@ import {
   getState,
   gridCellRect,
   gridSize,
+  mergeSelectedSections,
   neighborSection,
   objectWorldRect,
   requestSnap,
   resizeCol,
   resizeRow,
   sectionCardRect,
+  sectionCellRect,
   setActiveSection,
   setFocusGrid,
   trackOffsets,
   useAppState,
 } from "../state/store";
+import { dragHasFiles, ingestMediaFiles } from "../state/media";
 import { SectionView } from "./SectionView";
 import { WireLayer } from "./WireLayer";
 import { openContextMenu } from "./ContextMenu";
+import { sfx } from "../sound/sfx";
 
 function colName(col: number): string {
   let s = "";
@@ -40,6 +46,22 @@ function colName(col: number): string {
 const MIN_SCALE = 0.12;
 const MAX_SCALE = 1.6;
 const FIT_MARGIN = 0.92;
+
+/** [0, total] minus the given intervals — the visible pieces of a grid line */
+function cutSegments(
+  total: number,
+  cuts: Array<[number, number]>,
+): Array<[number, number]> {
+  const sorted = [...cuts].sort((a, b) => a[0] - b[0]);
+  const out: Array<[number, number]> = [];
+  let pos = 0;
+  for (const [a, b] of sorted) {
+    if (a > pos + 1) out.push([pos, a]);
+    pos = Math.max(pos, b);
+  }
+  if (pos < total - 1) out.push([pos, total]);
+  return out;
+}
 
 interface Rect {
   x: number;
@@ -237,6 +259,13 @@ export function GridViewport() {
       if (!rect) return false;
       const frame = frameOf(rect, cap);
       if (!frame) return false;
+      // audible only when the camera meaningfully travels
+      if (
+        Math.hypot(frame.x - camera.x.goal, frame.y - camera.y.goal) > 40 ||
+        Math.abs(Math.log(frame.scale / zoom.goal)) > 0.08
+      ) {
+        sfx.whoosh();
+      }
       zoom.to(frame.scale);
       camera.to(frame.x, frame.y);
       return true;
@@ -277,6 +306,14 @@ export function GridViewport() {
         el?.blur(); // release e.g. a table sheet so section arrows take over
         focusUp();
         return;
+      }
+      if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const sel = getState().selectedSectionIds;
+        if (sel.length >= 2) {
+          e.preventDefault();
+          mergeSelectedSections();
+          return;
+        }
       }
       const dir = (
         {
@@ -319,6 +356,7 @@ export function GridViewport() {
     if (target.closest(".section-card, button, input, select, .viewport-toolbar, .gutter")) return;
     if (e.button !== 0 && e.button !== 1) return;
     setFocusGrid(); // clicking the void addresses the grid level
+    clearSectionSelection();
     const d = panDrag.current;
     d.active = true;
     d.lastX = e.clientX;
@@ -508,6 +546,9 @@ export function GridViewport() {
 
   const activeSec = state.sections[state.activeSectionId];
   const activeObj = state.activeObjectId ? getObject(state.activeObjectId) : null;
+  const [soundOn, setSoundOn] = useState(!sfx.isMuted());
+  // empty cell currently hovered by a desktop file drag
+  const [dropCell, setDropCell] = useState<{ c: number; r: number } | null>(null);
 
   return (
     <div
@@ -523,12 +564,33 @@ export function GridViewport() {
       <div ref={worldRef} className="world">
         {/* ----- grid chrome: track lines + spreadsheet labels ----- */}
         <div className="grid-frame" style={{ width: size.w, height: size.h }} />
-        {xo.slice(1, -1).map((x, i) => (
-          <div key={`lc${i}`} className="grid-line-v" style={{ left: x, height: size.h }} />
-        ))}
-        {yo.slice(1, -1).map((y, i) => (
-          <div key={`lr${i}`} className="grid-line-h" style={{ top: y, width: size.w }} />
-        ))}
+        {/* track lines, skipping sections that span across them (e.g. merged) */}
+        {xo.slice(1, -1).map((x, i) => {
+          const b = i + 1; // boundary between col tracks b-1 and b
+          const cuts = sections
+            .filter((s) => s.c0 < b && s.c1 >= b)
+            .map((s) => [yo[s.r0], yo[s.r1 + 1]] as [number, number]);
+          return cutSegments(size.h, cuts).map(([y0, y1], j) => (
+            <div
+              key={`lc${i}-${j}`}
+              className="grid-line-v"
+              style={{ left: x, top: y0, height: y1 - y0 }}
+            />
+          ));
+        })}
+        {yo.slice(1, -1).map((y, i) => {
+          const b = i + 1; // boundary between row tracks b-1 and b
+          const cuts = sections
+            .filter((s) => s.r0 < b && s.r1 >= b)
+            .map((s) => [xo[s.c0], xo[s.c1 + 1]] as [number, number]);
+          return cutSegments(size.w, cuts).map(([x0, x1], j) => (
+            <div
+              key={`lr${i}-${j}`}
+              className="grid-line-h"
+              style={{ top: y, left: x0, width: x1 - x0 }}
+            />
+          ));
+        })}
         {state.grid.cols.map((w, i) => (
           <div key={`hc${i}`} className="track-label track-label-col" style={{ left: xo[i], width: w }}>
             {colName(i)}
@@ -546,12 +608,31 @@ export function GridViewport() {
           return (
             <div
               key={`empty${c},${r}`}
-              className="empty-cell"
+              className={
+                "empty-cell" +
+                (dropCell?.c === c && dropCell?.r === r ? " dropping" : "")
+              }
               style={{
                 left: rect.x + 12,
                 top: rect.y + 12,
                 width: rect.w - 24,
                 height: rect.h - 24,
+              }}
+              onDragOver={(e) => {
+                if (!dragHasFiles(e)) return;
+                e.preventDefault();
+                if (dropCell?.c !== c || dropCell?.r !== r) setDropCell({ c, r });
+              }}
+              onDragLeave={(e) => {
+                if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node))
+                  setDropCell(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDropCell(null);
+                const files = e.dataTransfer.files;
+                const fresh = createSectionAt(c, r);
+                if (fresh) void ingestMediaFiles(fresh.id, files);
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -608,15 +689,67 @@ export function GridViewport() {
           />
         ))}
 
+        {/* merge pill — floats over the multi-selection's bounding box */}
+        <AnimatePresence>
+          {(() => {
+            const sel = state.selectedSectionIds
+              .map((id) => state.sections[id])
+              .filter(Boolean);
+            if (sel.length < 2) return null;
+            const rects = sel.map((s) => sectionCellRect(state.grid, s));
+            const x0 = Math.min(...rects.map((r) => r.x));
+            const x1 = Math.max(...rects.map((r) => r.x + r.w));
+            const y0 = Math.min(...rects.map((r) => r.y));
+            const ok = canMergeSections(state.selectedSectionIds);
+            return (
+              <motion.button
+                key="merge-pill"
+                className={"merge-pill" + (ok ? "" : " blocked")}
+                style={{ left: (x0 + x1) / 2, top: y0 }}
+                initial={{ opacity: 0, scale: 0.7, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.85, y: 6 }}
+                whileHover={ok ? { scale: 1.06 } : undefined}
+                whileTap={ok ? { scale: 0.92 } : undefined}
+                transition={{ type: "spring", stiffness: 480, damping: 26 }}
+                title={
+                  ok
+                    ? "Merge the selected sections into one (M)"
+                    : "Selection must form a solid rectangle to merge"
+                }
+                onClick={() => ok && mergeSelectedSections()}
+              >
+                ⧉ Merge {sel.length} sections
+              </motion.button>
+            );
+          })()}
+        </AnimatePresence>
+
         {/* track resize gutters — hover reveals a grab knob on the boundary */}
-        {state.grid.cols.slice(0, -1).map((_, i) => (
+        {state.grid.cols.slice(0, -1).map((_, i) => {
+          const b = i + 1;
+          const cuts = sections
+            .filter((s) => s.c0 < b && s.c1 >= b)
+            .map((s) => [yo[s.r0], yo[s.r1 + 1]] as [number, number]);
+          const open = cutSegments(size.h, cuts);
+          return (
           <div
             key={`gc${i}`}
             className="gutter gutter-col"
             style={{ left: xo[i + 1] - 7, top: 0, height: size.h }}
             onPointerMove={(e) => onGutterHover(e, "col", i)}
           >
-            <div className="gutter-line" />
+            {/* pointer targets only where the boundary is a real edge —
+                spanning sections keep their cards grabbable underneath */}
+            {open.map(([y0, y1], j) => (
+              <div key={`h${j}`} className="gutter-hit" style={{ top: y0, height: y1 - y0 }} />
+            ))}
+            {open.map(([y0, y1], j) => (
+              <div key={`o${j}`} className="gutter-line" style={{ top: y0, height: y1 - y0 }} />
+            ))}
+            {cuts.map(([y0, y1], j) => (
+              <div key={`f${j}`} className="gutter-line faint" style={{ top: y0, height: y1 - y0 }} />
+            ))}
             <div
               className="gutter-knob"
               ref={(el) => {
@@ -630,15 +763,30 @@ export function GridViewport() {
               onPointerCancel={onGutterUp}
             />
           </div>
-        ))}
-        {state.grid.rows.slice(0, -1).map((_, i) => (
+          );
+        })}
+        {state.grid.rows.slice(0, -1).map((_, i) => {
+          const b = i + 1;
+          const cuts = sections
+            .filter((s) => s.r0 < b && s.r1 >= b)
+            .map((s) => [xo[s.c0], xo[s.c1 + 1]] as [number, number]);
+          const open = cutSegments(size.w, cuts);
+          return (
           <div
             key={`gr${i}`}
             className="gutter gutter-row"
             style={{ top: yo[i + 1] - 7, left: 0, width: size.w }}
             onPointerMove={(e) => onGutterHover(e, "row", i)}
           >
-            <div className="gutter-line" />
+            {open.map(([x0, x1], j) => (
+              <div key={`h${j}`} className="gutter-hit" style={{ left: x0, width: x1 - x0 }} />
+            ))}
+            {open.map(([x0, x1], j) => (
+              <div key={`o${j}`} className="gutter-line" style={{ left: x0, width: x1 - x0 }} />
+            ))}
+            {cuts.map(([x0, x1], j) => (
+              <div key={`f${j}`} className="gutter-line faint" style={{ left: x0, width: x1 - x0 }} />
+            ))}
             <div
               className="gutter-knob"
               ref={(el) => {
@@ -652,11 +800,35 @@ export function GridViewport() {
               onPointerCancel={onGutterUp}
             />
           </div>
-        ))}
+          );
+        })}
 
         {/* data-flow wires above everything */}
         <WireLayer />
       </div>
+
+      {/* trash drop target — appears while a primitive is being dragged */}
+      <AnimatePresence>
+        {state.dragHud && (
+          <motion.div
+            key="drag-trash"
+            className={"drag-trash" + (state.dragHud.overTrash ? " hot" : "")}
+            initial={{ scale: 0.4, opacity: 0, y: 40 }}
+            animate={{
+              scale: state.dragHud.overTrash ? 1.18 : 1,
+              opacity: 1,
+              y: 0,
+            }}
+            exit={{ scale: 0.5, opacity: 0, y: 30 }}
+            transition={{ type: "spring", stiffness: 420, damping: 26 }}
+          >
+            🗑
+            <span className="drag-trash-label">
+              {state.dragHud.overTrash ? "release to delete" : "drop here to delete"}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* grid-context corner brackets */}
       <div className="ctx-corners">
@@ -752,6 +924,22 @@ export function GridViewport() {
           }}
         >
           +
+        </motion.button>
+        <div className="tb-divider" />
+        <motion.button
+          className="tb-btn"
+          whileHover={{ scale: 1.08, y: -2 }}
+          whileTap={{ scale: 0.88, y: 1 }}
+          transition={spring}
+          title={soundOn ? "Mute interaction sounds" : "Unmute interaction sounds"}
+          onClick={() => {
+            const next = !soundOn;
+            sfx.setMuted(!next);
+            setSoundOn(next);
+            if (next) sfx.pop();
+          }}
+        >
+          {soundOn ? "🔊" : "🔇"}
         </motion.button>
       </motion.div>
     </div>
