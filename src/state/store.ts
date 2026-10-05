@@ -100,6 +100,8 @@ export interface AppState {
   sectionDragTarget: { sectionId: string; c: number; r: number } | null;
   /** foreign section hovered while a primitive card is being dragged */
   objectDropTarget: { objId: string; sectionId: string } | null;
+  /** a primitive drag in progress — drives the trash drop-target overlay */
+  dragHud: { objId: string; overTrash: boolean } | null;
   /** section awaiting the remove-confirmation popover (e.g. via context menu) */
   pendingRemoval: string | null;
 }
@@ -358,6 +360,7 @@ let state: AppState = {
   snapRequest: { kind: "all", nonce: Math.random() },
   sectionDragTarget: null,
   objectDropTarget: null,
+  dragHud: null,
   pendingRemoval: null,
 };
 
@@ -1034,9 +1037,21 @@ export function moveObjectToSection(
   return true;
 }
 
+/** which section the pointer hovered at the last drag move (null = void) */
+let lastHoverSectionId: string | null = null;
+
+/** call on grab: shows the trash target and seeds hover tracking */
+export function beginObjectDrag(id: string) {
+  const obj = findObject(id)?.obj;
+  if (!obj) return;
+  lastHoverSectionId = obj.sectionId;
+  set({ dragHud: { objId: id, overTrash: false } });
+}
+
 /**
  * Called each move of a card drag: which foreign section is the pointer
- * over? Feeds the target highlight and the drop on release.
+ * over, and is it hovering the trash target? Feeds the highlights and the
+ * decision on release.
  */
 export function trackObjectDrag(
   el: HTMLElement | null,
@@ -1046,27 +1061,75 @@ export function trackObjectDrag(
   scale: number,
 ) {
   const obj = findObject(id)?.obj;
+  if (!obj) return;
+  // trash hit-test happens in screen space — the overlay is viewport-fixed
+  let overTrash = false;
+  const trash = document.querySelector(".drag-trash");
+  if (trash) {
+    const r = trash.getBoundingClientRect();
+    const pad = 12; // a forgiving halo around the icon
+    overTrash =
+      clientX >= r.left - pad &&
+      clientX <= r.right + pad &&
+      clientY >= r.top - pad &&
+      clientY <= r.bottom + pad;
+  }
+  const hud = state.dragHud;
+  if (!hud || hud.objId !== id || hud.overTrash !== overTrash) {
+    set({ dragHud: { objId: id, overTrash } });
+  }
   const world = el?.closest(".world") as HTMLElement | null;
-  if (!obj || !world) return;
+  if (!world) return;
   const wr = world.getBoundingClientRect();
   const cell = cellAtWorld((clientX - wr.left) / scale, (clientY - wr.top) / scale);
   const over = cell ? sectionCovering(cell.c, cell.r) : null;
+  lastHoverSectionId = over?.id ?? null;
   setObjectDropTarget(
-    over && over.id !== obj.sectionId ? { objId: id, sectionId: over.id } : null,
+    !overTrash && over && over.id !== obj.sectionId
+      ? { objId: id, sectionId: over.id }
+      : null,
   );
 }
 
-/** on release: re-parent when hovering a foreign section; true if it moved */
-export function dropObjectIfRetargeted(id: string): boolean {
-  const t = state.objectDropTarget;
-  if (!t || t.objId !== id) return false;
-  const obj = findObject(id)?.obj;
-  const rect = obj ? objectWorldRect(obj) : null;
-  if (!rect) {
-    setObjectDropTarget(null);
-    return false;
+/** remove any primitive by id, whatever its type */
+export function removeObject(id: string) {
+  const found = findObject(id);
+  if (!found) return;
+  if (found.key === "tables") removeTable(id);
+  else if (found.key === "maps") removeMap(id);
+  else if (found.key === "notes") removeNote(id);
+  else removeMedia(id);
+}
+
+/**
+ * Call on release. Decides the drop:
+ *  - "deleted"  — dropped on the trash target
+ *  - "moved"    — re-parented into the hovered foreign section
+ *  - "stay"     — released over its home section; caller commits the move
+ *  - "returned" — released over the void / an empty cell; caller springs
+ *                 the card back to where it was grabbed
+ */
+export function endObjectDrag(id: string): "deleted" | "moved" | "stay" | "returned" {
+  const hud = state.dragHud;
+  const target = state.objectDropTarget;
+  const overTrash = hud?.objId === id && hud.overTrash;
+  const hover = lastHoverSectionId;
+  if (state.dragHud || state.objectDropTarget) {
+    set({ dragHud: null, objectDropTarget: null });
   }
-  return moveObjectToSection(id, t.sectionId, rect.x, rect.y);
+  const obj = findObject(id)?.obj;
+  if (!obj) return "stay";
+  if (overTrash) {
+    removeObject(id);
+    return "deleted";
+  }
+  if (target && target.objId === id) {
+    const rect = objectWorldRect(obj);
+    if (rect && moveObjectToSection(id, target.sectionId, rect.x, rect.y)) return "moved";
+  }
+  if (hover === obj.sectionId) return "stay";
+  sfx.nope();
+  return "returned";
 }
 
 // ---------- note actions ----------

@@ -47,6 +47,22 @@ const MIN_SCALE = 0.12;
 const MAX_SCALE = 1.6;
 const FIT_MARGIN = 0.92;
 
+/** [0, total] minus the given intervals — the visible pieces of a grid line */
+function cutSegments(
+  total: number,
+  cuts: Array<[number, number]>,
+): Array<[number, number]> {
+  const sorted = [...cuts].sort((a, b) => a[0] - b[0]);
+  const out: Array<[number, number]> = [];
+  let pos = 0;
+  for (const [a, b] of sorted) {
+    if (a > pos + 1) out.push([pos, a]);
+    pos = Math.max(pos, b);
+  }
+  if (pos < total - 1) out.push([pos, total]);
+  return out;
+}
+
 interface Rect {
   x: number;
   y: number;
@@ -548,12 +564,33 @@ export function GridViewport() {
       <div ref={worldRef} className="world">
         {/* ----- grid chrome: track lines + spreadsheet labels ----- */}
         <div className="grid-frame" style={{ width: size.w, height: size.h }} />
-        {xo.slice(1, -1).map((x, i) => (
-          <div key={`lc${i}`} className="grid-line-v" style={{ left: x, height: size.h }} />
-        ))}
-        {yo.slice(1, -1).map((y, i) => (
-          <div key={`lr${i}`} className="grid-line-h" style={{ top: y, width: size.w }} />
-        ))}
+        {/* track lines, skipping sections that span across them (e.g. merged) */}
+        {xo.slice(1, -1).map((x, i) => {
+          const b = i + 1; // boundary between col tracks b-1 and b
+          const cuts = sections
+            .filter((s) => s.c0 < b && s.c1 >= b)
+            .map((s) => [yo[s.r0], yo[s.r1 + 1]] as [number, number]);
+          return cutSegments(size.h, cuts).map(([y0, y1], j) => (
+            <div
+              key={`lc${i}-${j}`}
+              className="grid-line-v"
+              style={{ left: x, top: y0, height: y1 - y0 }}
+            />
+          ));
+        })}
+        {yo.slice(1, -1).map((y, i) => {
+          const b = i + 1; // boundary between row tracks b-1 and b
+          const cuts = sections
+            .filter((s) => s.r0 < b && s.r1 >= b)
+            .map((s) => [xo[s.c0], xo[s.c1 + 1]] as [number, number]);
+          return cutSegments(size.w, cuts).map(([x0, x1], j) => (
+            <div
+              key={`lr${i}-${j}`}
+              className="grid-line-h"
+              style={{ top: y, left: x0, width: x1 - x0 }}
+            />
+          ));
+        })}
         {state.grid.cols.map((w, i) => (
           <div key={`hc${i}`} className="track-label track-label-col" style={{ left: xo[i], width: w }}>
             {colName(i)}
@@ -689,14 +726,30 @@ export function GridViewport() {
         </AnimatePresence>
 
         {/* track resize gutters — hover reveals a grab knob on the boundary */}
-        {state.grid.cols.slice(0, -1).map((_, i) => (
+        {state.grid.cols.slice(0, -1).map((_, i) => {
+          const b = i + 1;
+          const cuts = sections
+            .filter((s) => s.c0 < b && s.c1 >= b)
+            .map((s) => [yo[s.r0], yo[s.r1 + 1]] as [number, number]);
+          const open = cutSegments(size.h, cuts);
+          return (
           <div
             key={`gc${i}`}
             className="gutter gutter-col"
             style={{ left: xo[i + 1] - 7, top: 0, height: size.h }}
             onPointerMove={(e) => onGutterHover(e, "col", i)}
           >
-            <div className="gutter-line" />
+            {/* pointer targets only where the boundary is a real edge —
+                spanning sections keep their cards grabbable underneath */}
+            {open.map(([y0, y1], j) => (
+              <div key={`h${j}`} className="gutter-hit" style={{ top: y0, height: y1 - y0 }} />
+            ))}
+            {open.map(([y0, y1], j) => (
+              <div key={`o${j}`} className="gutter-line" style={{ top: y0, height: y1 - y0 }} />
+            ))}
+            {cuts.map(([y0, y1], j) => (
+              <div key={`f${j}`} className="gutter-line faint" style={{ top: y0, height: y1 - y0 }} />
+            ))}
             <div
               className="gutter-knob"
               ref={(el) => {
@@ -710,15 +763,30 @@ export function GridViewport() {
               onPointerCancel={onGutterUp}
             />
           </div>
-        ))}
-        {state.grid.rows.slice(0, -1).map((_, i) => (
+          );
+        })}
+        {state.grid.rows.slice(0, -1).map((_, i) => {
+          const b = i + 1;
+          const cuts = sections
+            .filter((s) => s.r0 < b && s.r1 >= b)
+            .map((s) => [xo[s.c0], xo[s.c1 + 1]] as [number, number]);
+          const open = cutSegments(size.w, cuts);
+          return (
           <div
             key={`gr${i}`}
             className="gutter gutter-row"
             style={{ top: yo[i + 1] - 7, left: 0, width: size.w }}
             onPointerMove={(e) => onGutterHover(e, "row", i)}
           >
-            <div className="gutter-line" />
+            {open.map(([x0, x1], j) => (
+              <div key={`h${j}`} className="gutter-hit" style={{ left: x0, width: x1 - x0 }} />
+            ))}
+            {open.map(([x0, x1], j) => (
+              <div key={`o${j}`} className="gutter-line" style={{ left: x0, width: x1 - x0 }} />
+            ))}
+            {cuts.map(([x0, x1], j) => (
+              <div key={`f${j}`} className="gutter-line faint" style={{ left: x0, width: x1 - x0 }} />
+            ))}
             <div
               className="gutter-knob"
               ref={(el) => {
@@ -732,11 +800,35 @@ export function GridViewport() {
               onPointerCancel={onGutterUp}
             />
           </div>
-        ))}
+          );
+        })}
 
         {/* data-flow wires above everything */}
         <WireLayer />
       </div>
+
+      {/* trash drop target — appears while a primitive is being dragged */}
+      <AnimatePresence>
+        {state.dragHud && (
+          <motion.div
+            key="drag-trash"
+            className={"drag-trash" + (state.dragHud.overTrash ? " hot" : "")}
+            initial={{ scale: 0.4, opacity: 0, y: 40 }}
+            animate={{
+              scale: state.dragHud.overTrash ? 1.18 : 1,
+              opacity: 1,
+              y: 0,
+            }}
+            exit={{ scale: 0.5, opacity: 0, y: 30 }}
+            transition={{ type: "spring", stiffness: 420, damping: 26 }}
+          >
+            🗑
+            <span className="drag-trash-label">
+              {state.dragHud.overTrash ? "release to delete" : "drop here to delete"}
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* grid-context corner brackets */}
       <div className="ctx-corners">

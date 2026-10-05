@@ -18,7 +18,8 @@ import {
   HEADER_H,
   ROWNUM_W,
   TableMeta,
-  dropObjectIfRetargeted,
+  beginObjectDrag,
+  endObjectDrag,
   liveObjPos,
   moveTable,
   trackObjectDrag,
@@ -126,6 +127,7 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
       if ((e.target as HTMLElement).closest("button, input")) return;
       e.stopPropagation();
       if (!table.float) setObjectFloat(table.id, true); // grabbing undocks it
+      beginObjectDrag(table.id);
       const d = dragRef.current;
       d.active = true;
       d.startX = e.clientX;
@@ -156,7 +158,12 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
     if (!d.active) return;
     d.active = false;
     rootRef.current?.classList.remove("dragging");
-    if (dropObjectIfRetargeted(table.id)) return; // landed in another section
+    const action = endObjectDrag(table.id);
+    if (action === "deleted" || action === "moved") return;
+    if (action === "returned") {
+      pos.to(d.origX, d.origY); // glide back to where it was grabbed
+      return;
+    }
     moveTable(table.id, pos.x.goal, pos.y.goal);
   }, [pos, table.id]);
 

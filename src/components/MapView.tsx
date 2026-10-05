@@ -6,8 +6,9 @@ import { workbook } from "../engine/workbook";
 import {
   HEADER_H,
   MapMeta,
+  beginObjectDrag,
   bindMap,
-  dropObjectIfRetargeted,
+  endObjectDrag,
   liveObjPos,
   moveMap,
   trackObjectDrag,
@@ -153,6 +154,7 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
       if ((e.target as HTMLElement).closest("button, select")) return;
       e.stopPropagation();
       if (!meta.float) setObjectFloat(meta.id, true); // grabbing undocks it
+      beginObjectDrag(meta.id);
       const d = dragRef.current;
       d.active = true;
       d.startX = e.clientX;
@@ -181,7 +183,12 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
     if (!d.active) return;
     d.active = false;
     rootRef.current?.classList.remove("dragging");
-    if (dropObjectIfRetargeted(meta.id)) return; // landed in another section
+    const action = endObjectDrag(meta.id);
+    if (action === "deleted" || action === "moved") return;
+    if (action === "returned") {
+      pos.to(d.origX, d.origY); // glide back to where it was grabbed
+      return;
+    }
     moveMap(meta.id, pos.x.goal, pos.y.goal);
   }, [pos, meta.id]);
 

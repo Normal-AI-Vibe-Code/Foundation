@@ -321,8 +321,7 @@ body.resizing-v .section-card,
 
 /* while a card is being dragged, let it escape the section's clip and ride
    above sibling sections so it can travel to another section */
-.section-card:has(.table-anchor.dragging),
-.section-card:has(.frame-anchor.dragging) {
+.section-card:has(.dragging) {
   z-index: 45;
 }
 .section-body:has(.dragging) {
@@ -375,6 +374,9 @@ body.resizing-v .section-card,
   display: flex;
   align-items: center;
   justify-content: center;
+  /* the strip itself is pointer-transparent — only .gutter-hit segments
+     catch the mouse, so cards under a spanning section stay grabbable */
+  pointer-events: none;
 }
 
 .gutter-col {
@@ -385,9 +387,25 @@ body.resizing-v .section-card,
   height: 14px;
 }
 
+.gutter-hit {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.gutter-col .gutter-hit {
+  left: 0;
+  width: 100%;
+}
+
+.gutter-row .gutter-hit {
+  top: 0;
+  height: 100%;
+}
+
 /* the grab knob that appears on rollover and rides along the boundary */
 .gutter-knob {
   position: absolute;
+  pointer-events: auto;
   border-radius: 99px;
   background: var(--paper-raised);
   border: 1.5px solid var(--line-strong);
@@ -457,6 +475,7 @@ body.resizing-v .section-card,
 }
 
 .gutter-line {
+  position: absolute;
   border-radius: 99px;
   background: rgba(28, 27, 25, 0.1);
   transition: background 0.2s ease, transform 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);
@@ -464,18 +483,30 @@ body.resizing-v .section-card,
 
 .gutter-col .gutter-line {
   width: 2px;
-  height: 100%;
+  left: 6px;
 }
 
 .gutter-row .gutter-line {
   height: 2px;
-  width: 100%;
+  top: 6px;
+}
+
+/* where the boundary runs beneath a spanning (merged) section, the line
+   stays but whispers — the card's translucency shouldn't reveal a hard line */
+.gutter-line.faint {
+  background: rgba(28, 27, 25, 0.025);
 }
 
 .gutter:hover .gutter-line,
 .gutter:active .gutter-line {
   background: rgba(47, 111, 237, 0.55);
   transform: scale(1.6);
+}
+
+/* hovering the boundary hints its hidden stretch, so resize still reads */
+.gutter:hover .gutter-line.faint,
+.gutter:active .gutter-line.faint {
+  background: rgba(47, 111, 237, 0.2);
 }
 
 /* ============ grid chrome: frame, lines, labels, empty cells ============ */
@@ -948,6 +979,49 @@ body.rewiring {
   margin: 4px 8px;
 }
 
+/* ============ drag-to-trash target ============ */
+
+.drag-trash {
+  position: absolute;
+  right: 30px;
+  bottom: 30px;
+  min-width: 64px;
+  height: 64px;
+  padding: 0 20px;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 22px;
+  background: var(--paper-raised);
+  border: 1.5px solid var(--line-strong);
+  box-shadow: 0 10px 34px rgba(28, 27, 25, 0.18);
+  z-index: 90;
+  pointer-events: none; /* hit-testing is geometric — never block the drag */
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+}
+
+.drag-trash-label {
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.drag-trash.hot {
+  background: #e04b3a;
+  border-color: #c73a2b;
+  box-shadow:
+    0 12px 44px rgba(224, 75, 58, 0.45),
+    0 0 0 6px rgba(224, 75, 58, 0.15);
+}
+
+.drag-trash.hot .drag-trash-label {
+  color: #fff;
+}
+
 /* ============ voice / natural-language HUD ============ */
 
 .voice-hud {
@@ -980,6 +1054,17 @@ body.rewiring {
 .voice-dot.live {
   background: #e04b3a;
   animation: voice-pulse 1.2s ease-in-out infinite;
+}
+
+/* whisper is working on the utterance */
+.voice-dot.thinking {
+  background: var(--select);
+  animation: voice-think 1s ease-in-out infinite;
+}
+
+@keyframes voice-think {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(47, 111, 237, 0.4); transform: scale(1); }
+  50% { box-shadow: 0 0 0 7px rgba(47, 111, 237, 0); transform: scale(1.25); }
 }
 
 @keyframes voice-pulse {

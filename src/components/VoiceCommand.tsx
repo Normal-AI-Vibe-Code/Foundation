@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { runCommand } from "../state/nl";
+import { SttStatus, onSttStatus, sttStatus, transcribeBlob, warmSTT } from "../state/stt";
 import { sfx } from "../sound/sfx";
 
 /**
  * Hold SPACE to speak a command; the mic waveform renders live.
- * Release: if speech was recognized it runs immediately; otherwise the HUD
- * stays open with a text field (works in environments without speech
- * recognition or a microphone). Focus context comes from the store.
+ * Release: the utterance is transcribed — by the platform's speech
+ * recognition when it exists, otherwise by local Whisper (WebView2 in the
+ * Tauri shell has no Web Speech API) — and the command runs. When nothing
+ * was heard the HUD falls back to a text field.
  */
 
-type Phase = "idle" | "listening" | "typing" | "done";
+type Phase = "idle" | "listening" | "transcribing" | "typing" | "done";
 
 interface SpeechRecognitionLike {
   continuous: boolean;
@@ -44,17 +46,25 @@ export function VoiceCommand() {
   const [transcript, setTranscript] = useState("");
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
   const [micReady, setMicReady] = useState(false);
+  const [modelStatus, setModelStatus] = useState<SttStatus>(sttStatus());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const recStartRef = useRef(0);
+  const peakRef = useRef(0); // loudest mic level seen this utterance
+  const runIdRef = useRef(0); // cancels stale transcriptions
   const rafRef = useRef(0);
   const phaseRef = useRef<Phase>("idle");
   phaseRef.current = phase;
   const transcriptRef = useRef("");
   transcriptRef.current = transcript;
+
+  useEffect(() => onSttStatus(setModelStatus), []);
 
   // ----- waveform drawing -----
   const draw = useCallback(() => {
@@ -79,6 +89,7 @@ export function VoiceCommand() {
       if (data) {
         const idx = Math.floor((i / bars) * data.length * 0.5);
         v = data[idx] / 255;
+        if (data[idx] > peakRef.current) peakRef.current = data[idx];
       } else {
         // no mic: gentle idle shimmer so the HUD still breathes
         v = 0.08 + 0.05 * Math.sin(t * 3 + i * 0.7);
@@ -94,10 +105,35 @@ export function VoiceCommand() {
   }, []);
 
   // ----- start / stop listening -----
+
+  /** stop the recorder and hand back everything it captured */
+  const stopRecorder = useCallback((): Promise<Blob | null> => {
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    if (!recorder || recorder.state === "inactive") return Promise.resolve(null);
+    return new Promise((resolve) => {
+      recorder.onstop = () => {
+        const chunks = chunksRef.current;
+        chunksRef.current = [];
+        resolve(chunks.length ? new Blob(chunks, { type: recorder.mimeType }) : null);
+      };
+      try {
+        recorder.stop();
+      } catch {
+        resolve(null);
+      }
+    });
+  }, []);
+
   const stopAll = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
     recRef.current?.abort();
     recRef.current = null;
+    try {
+      if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    } catch { /* already stopped */ }
+    recorderRef.current = null;
+    chunksRef.current = [];
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     void audioCtxRef.current?.close().catch(() => {});
@@ -110,6 +146,8 @@ export function VoiceCommand() {
     setFeedback(null);
     setPhase("listening");
     sfx.recordOn();
+    peakRef.current = 0;
+    warmSTT(); // model loads in the background while the user speaks
     // speech recognition (when the platform provides it)
     const rec = makeRecognizer();
     if (rec) {
@@ -123,7 +161,7 @@ export function VoiceCommand() {
         recRef.current = rec;
       } catch { /* already started */ }
     }
-    // microphone level visualization
+    // microphone: level visualization + capture for whisper
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (phaseRef.current !== "listening") {
@@ -140,6 +178,20 @@ export function VoiceCommand() {
       src.connect(analyser);
       analyserRef.current = analyser;
       setMicReady(true);
+      // record the utterance so whisper can transcribe it on release
+      try {
+        const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+          ? "audio/webm;codecs=opus"
+          : undefined;
+        const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+        chunksRef.current = [];
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+        recorder.start(250);
+        recorderRef.current = recorder;
+        recStartRef.current = performance.now();
+      } catch { /* no recorder — typing fallback still works */ }
     } catch {
       setMicReady(false);
     }
@@ -158,18 +210,48 @@ export function VoiceCommand() {
     }, 1600);
   }, []);
 
+  const fallbackToTyping = useCallback(() => {
+    setPhase("typing");
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
   const endListening = useCallback(() => {
     sfx.recordOff();
-    stopAll();
-    const text = transcriptRef.current.trim();
-    if (text) {
-      execute(text);
-    } else {
-      // no speech captured — fall back to typing
-      setPhase("typing");
-      requestAnimationFrame(() => inputRef.current?.focus());
+    const platformText = transcriptRef.current.trim();
+    if (platformText) {
+      // the platform recognizer already heard it
+      stopAll();
+      execute(platformText);
+      return;
     }
-  }, [stopAll, execute]);
+
+    const heldMs = performance.now() - recStartRef.current;
+    const heardSomething = peakRef.current > 24; // mic level ever rose above noise
+    const recorder = recorderRef.current;
+    if (!recorder || heldMs < 350 || !heardSomething) {
+      // a tap, silence, or no mic — straight to typing
+      stopAll();
+      fallbackToTyping();
+      return;
+    }
+
+    // whisper path: finish the recording, then transcribe locally
+    const runId = ++runIdRef.current;
+    setPhase("transcribing");
+    void stopRecorder().then(async (blob) => {
+      stopAll();
+      if (runIdRef.current !== runId) return; // user cancelled
+      let text = "";
+      if (blob) {
+        try {
+          text = await transcribeBlob(blob);
+        } catch { /* model unavailable */ }
+      }
+      if (runIdRef.current !== runId || phaseRef.current !== "transcribing") return;
+      if (text) execute(text);
+      else fallbackToTyping();
+    });
+  }, [stopAll, stopRecorder, execute, fallbackToTyping]);
 
   // ----- hold-space handling -----
   useEffect(() => {
@@ -189,11 +271,20 @@ export function VoiceCommand() {
       e.preventDefault();
       endListening();
     };
+    const cancel = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || phaseRef.current !== "transcribing") return;
+      e.stopPropagation();
+      runIdRef.current++; // discard the in-flight transcription
+      setPhase("typing");
+      requestAnimationFrame(() => inputRef.current?.focus());
+    };
     window.addEventListener("keydown", down);
     window.addEventListener("keyup", up);
+    window.addEventListener("keydown", cancel, { capture: true });
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
+      window.removeEventListener("keydown", cancel, { capture: true });
       stopAll();
     };
   }, [beginListening, endListening, stopAll]);
@@ -216,6 +307,16 @@ export function VoiceCommand() {
               <canvas ref={canvasRef} className="voice-wave" width={280} height={44} />
               <div className="voice-text">
                 {transcript || (micReady ? "Listening… release space to run" : "release space to type a command")}
+              </div>
+            </>
+          )}
+          {phase === "transcribing" && (
+            <>
+              <div className="voice-dot thinking" />
+              <div className="voice-text">
+                {modelStatus === "loading"
+                  ? "downloading speech model… (first run only)"
+                  : "transcribing…"}
               </div>
             </>
           )}
