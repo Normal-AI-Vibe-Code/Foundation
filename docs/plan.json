@@ -1007,8 +1007,8 @@
       "kind": "plan",
       "milestone": "ship",
       "area": "desktop",
-      "status": "next",
-      "body": "The installed app expects a server at http://localhost:4410 and starts none, so on its own nothing in it connects (2026-11-09). Bundle the server (a Node sidecar with FTS5, or a single executable) and start it with the window, on a port outside Windows' reserved ranges; keep `Server` on the sign-in page for a hosted one."
+      "status": "review",
+      "body": "The installed app expected a server at http://localhost:4410 and started none, so on its own nothing in it connected (2026-11-09). Built the same day: the app carries a pinned Node 22.22 and the server bundled by esbuild (`scripts/desktop-server.mjs`), starts it before the window on http://localhost:31441 with its data in the app's own folder, uses a dev server on :4410 if one answers, tells the page the address and why if it couldn't start, and never leaves it running (`src-tauri/src/server.rs`). Checked with the packaged exe on Windows: dev login, the company board, one agent turn, quit and a hard kill leave nothing (`docs/evidence/2026-11-09_desktop-server/`). In review because the installers themselves weren't run (a clean machine, an upgrade over 0.3.0), and macOS and Linux haven't been built (SPEC §7)."
     },
     {
       "id": "node-upgrade-windows",

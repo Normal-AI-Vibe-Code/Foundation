@@ -34,3 +34,7 @@ docs/evidence/e2e-results/
 # Rust / Tauri build output (anywhere, including a stray src-tauri/ from building at the root)
 target/
 **/gen/schemas/
+
+# The server the desktop app carries: built by scripts/desktop-server.mjs (a Node binary and a bundle)
+apps/client/src-tauri/server/*
+!apps/client/src-tauri/server/README.md

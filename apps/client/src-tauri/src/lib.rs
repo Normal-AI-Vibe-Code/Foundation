@@ -10,9 +10,16 @@
 //! SameSite=Lax session cookie, the sync WebSocket and SSE all reach it, and its
 //! CORS already admits http://localhost:<port>. The bundled client still opens when
 //! the server is down, so the device's board copies keep working offline.
+//!
+//! Packaged, the app also runs that server itself (server.rs): a fresh install works
+//! with nothing else on the computer. The window is told where it is before the page
+//! loads (`window.__FOUNDATION_SERVER__`, read in apps/client/src/lib/api.ts), and why
+//! it isn't there if it couldn't start (`window.__FOUNDATION_SERVER_ERROR__`).
+
+mod server;
 
 use std::net::TcpListener;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 /// The packaged window's origin. Fixed, because the origin keys the device's offline
 /// board copies (IndexedDB) and localStorage: change it and they're left behind.
@@ -27,7 +34,7 @@ const PORT: u16 = match option_env!("FOUNDATION_DESKTOP_PORT") {
     None => 31440,
 };
 
-const fn parse_port(s: &str) -> u16 {
+pub(crate) const fn parse_port(s: &str) -> u16 {
     let b = s.as_bytes();
     let mut i = 0;
     let mut n: u32 = 0;
@@ -45,7 +52,7 @@ const fn parse_port(s: &str) -> u16 {
 /// then load whichever the WebView resolves first, which can be another app's page (an
 /// installed Foundation of another version did exactly that, 2026-11-08). So both must
 /// be free; a family this computer doesn't have (no IPv6) doesn't count against it.
-fn port_free(port: u16) -> bool {
+pub(crate) fn port_free(port: u16) -> bool {
     use std::io::ErrorKind::{AddrInUse, PermissionDenied};
     for host in ["127.0.0.1", "::1"] {
         if let Err(e) = TcpListener::bind((host, port)) {
@@ -79,7 +86,21 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_localhost::Builder::new(PORT).build());
     }
     builder
+        .manage(server::Sidecar::default())
         .setup(move |app| {
+            // the server first, so the page's first request has someone to answer it (dev: scripts/dev.mjs runs it)
+            let started = if !dev && port_free {
+                let resources = app.path().resource_dir()?;
+                // its data lives in the app's own folder (%APPDATA%\co.normallab.foundation on Windows);
+                // FOUNDATION_DESKTOP_HOME moves it, for a check run that mustn't touch the real one
+                let home = match std::env::var_os("FOUNDATION_DESKTOP_HOME") {
+                    Some(dir) if !dir.is_empty() => std::path::PathBuf::from(dir),
+                    _ => app.path().app_data_dir()?,
+                };
+                Some(app.state::<server::Sidecar>().start(&resources, &home, PORT))
+            } else {
+                None
+            };
             let url = if dev {
                 WebviewUrl::App("index.html".into())
             } else if port_free {
@@ -87,7 +108,15 @@ pub fn run() {
             } else {
                 WebviewUrl::External(port_taken_page().parse().expect("data url"))
             };
-            WebviewWindowBuilder::new(app, "main", url)
+            let mut window = WebviewWindowBuilder::new(app, "main", url);
+            if let Some(s) = &started {
+                window = window.initialization_script(&format!(
+                    "window.__FOUNDATION_SERVER__ = {}; window.__FOUNDATION_SERVER_ERROR__ = {};",
+                    serde_json::to_string(&s.url)?,
+                    serde_json::to_string(&s.error)?
+                ));
+            }
+            window
                 .title("Foundation")
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(960.0, 600.0)
@@ -97,8 +126,14 @@ pub fn run() {
                 .build()?;
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Foundation");
+        .build(tauri::generate_context!())
+        .expect("error while running Foundation")
+        .run(|app, event| {
+            // quitting: the server goes with the app (server.rs says what covers a crash)
+            if let RunEvent::Exit = event {
+                app.state::<server::Sidecar>().stop();
+            }
+        });
 }
 
 /// Shown when another program holds the window's port (or Windows has reserved it).

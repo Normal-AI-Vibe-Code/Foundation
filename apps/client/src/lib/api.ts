@@ -1,10 +1,12 @@
 /**
  * The client's one door to the Foundation server. In dev, Vite proxies /api,
  * /auth, /files, /mcp and /sync to the server (vite.config.ts), so the
- * session cookie is same-origin. VITE_FOUNDATION_SERVER (`.env.desktop` for
- * the packaged app) points a built or Tauri client at another server, and a
- * person can point this device elsewhere (the sign-in page's Server line,
- * kept in localStorage).
+ * session cookie is same-origin. The packaged desktop app runs its own server
+ * and says where before the page loads (`window.__FOUNDATION_SERVER__`, set
+ * by src-tauri/src/lib.rs: its own on :31441, or `npm run dev`'s on :4410
+ * when that's running). VITE_FOUNDATION_SERVER (`.env.desktop`) is what a
+ * built client uses when nothing told it, and a person can point this device
+ * elsewhere (the sign-in page's Server line, kept in localStorage).
  *
  * Two transports, one API:
  *  - **cookie**: the page and the server are one origin (the web app, dev).
@@ -22,8 +24,11 @@
 import type { AgentEvent, SearchHit, UserInfo } from "@foundation/protocol";
 
 const SERVER_KEY = "foundation-server";
-/** the server this build was made for (empty: the page's own origin) */
-export const BUILT_SERVER = (import.meta.env.VITE_FOUNDATION_SERVER as string | undefined)?.replace(/\/$/, "") ?? "";
+/** what the desktop shell put on the window before this script ran (src-tauri/src/lib.rs) */
+const shell = (typeof window === "undefined" ? {} : window) as { __FOUNDATION_SERVER__?: string; __FOUNDATION_SERVER_ERROR__?: string | null };
+
+/** the server this app came with: the desktop app's own, else the one the build names (empty: the page's own origin) */
+export const BUILT_SERVER = (shell.__FOUNDATION_SERVER__ || (import.meta.env.VITE_FOUNDATION_SERVER as string | undefined))?.replace(/\/$/, "") ?? "";
 
 function chosenServer(): string | null {
   try {
@@ -115,6 +120,16 @@ export class ApiError extends Error {
 export const SERVER_NAME = serverOrigin.replace(/^https?:\/\//, "");
 
 /**
+ * The desktop app starts its own server; when that failed it said why, and
+ * that's what the person needs to read (unless this device has been pointed
+ * at another server since). Null when that isn't the trouble.
+ */
+export function ownServerTrouble(): string | null {
+  const why = SERVER === BUILT_SERVER ? shell.__FOUNDATION_SERVER_ERROR__ : null;
+  return why ? `Foundation's own server isn't running. ${why}` : null;
+}
+
+/**
  * fetch, but a server that can't be reached says so. The browser's own error
  * is "Failed to fetch" whatever went wrong; nearly always it means the
  * Foundation server isn't running (or this device points at the wrong one),
@@ -125,7 +140,7 @@ export async function reach(input: string, init?: RequestInit): Promise<Response
     return await fetch(input, init);
   } catch (e) {
     if ((e as Error).name === "AbortError") throw e;
-    throw new ApiError(0, `Can't reach the Foundation server (${SERVER_NAME}). It isn't running, or this device points at the wrong one.`);
+    throw new ApiError(0, ownServerTrouble() ?? `Can't reach the Foundation server (${SERVER_NAME}). It isn't running, or this device points at the wrong one.`);
   }
 }
 

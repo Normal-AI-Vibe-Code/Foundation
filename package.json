@@ -23,9 +23,13 @@
     "plan:check": "node scripts/plan.mjs check",
     "kiri": "node scripts/kiri.mjs",
     "kiri:install": "node scripts/kiri.mjs install",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "desktop:server": "node scripts/desktop-server.mjs --check"
   },
   "engines": {
     "node": ">=22.16"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

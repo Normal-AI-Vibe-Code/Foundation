@@ -22,7 +22,7 @@ import { parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, listJobs, startJob } from "./jobs.ts";
-import { followRun, listSessions, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopRun } from "./agent.ts";
+import { followRun, listSessions, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { pollHandoffs } from "./vision.ts";
 import { boardPeople, boardRole, canWrite, requireWriter, setBoardRole } from "./roles.ts";
@@ -51,7 +51,7 @@ startMachineAsks();
 
 const r = new Router();
 
-r.get("/api/health", () => ({ ok: true, at: Date.now() }));
+r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 
 // ---------- auth ----------
 
@@ -656,6 +656,33 @@ migrateAllBoards();
 settleOrphanRuns();
 startHermes();
 startDigest();
+
+// Started by the desktop app (src-tauri/src/server.rs), the server lives exactly as long as the app:
+// the app holds the other end of stdin, and however the app ends (quit, crash, Task Manager) that
+// pipe closes. Stop the agents' child processes, then go.
+if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
+  let leaving = false;
+  const leave = () => {
+    if (leaving) return;
+    leaving = true;
+    try {
+      stopEveryRun();
+    } catch {
+      /* going anyway */
+    }
+    server.close();
+    setTimeout(() => process.exit(0), 150).unref();
+  };
+  process.stdin.on("end", leave).on("close", leave).on("error", leave);
+  process.stdin.resume();
+}
+
+server.on("error", (e: NodeJS.ErrnoException) => {
+  // one plain line: the desktop app shows it to the person and keeps it in its log
+  const taken = e.code === "EADDRINUSE" || e.code === "EACCES";
+  console.error(taken ? `Foundation's server can't listen on ${config.host}:${config.port} (${e.code}): another program holds that port, or Windows has reserved it.` : `Foundation's server stopped: ${e.message}`);
+  process.exit(1);
+});
 
 server.listen(config.port, config.host, () => {
   const rt = runtimes();

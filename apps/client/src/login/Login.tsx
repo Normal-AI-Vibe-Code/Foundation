@@ -27,7 +27,7 @@ import type { UserInfo } from "@foundation/protocol";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { initAsciiWind2 } from "./asciiWind2";
 import { activeBoard } from "../sync/board";
-import { authConfig, BEARER, chooseServer, devLogin, flowformBegin, flowformPoll, SERVER, serverUrl } from "../lib/api";
+import { authConfig, BEARER, chooseServer, devLogin, flowformBegin, flowformPoll, ownServerTrouble, SERVER, SERVER_NAME, serverUrl } from "../lib/api";
 
 const inDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -147,7 +147,7 @@ export function Login({
   useEffect(() => {
     authConfig()
       .then(setCfg)
-      .catch(() => setError("Can't reach the Foundation server. Start it with `npm run dev`."));
+      .catch(() => setError(ownServerTrouble() ?? (inDesktop ? `Can't reach the Foundation server (${SERVER_NAME}). It isn't running, or this device points at the wrong one.` : "Can't reach the Foundation server. Start it with `npm run dev`.")));
   }, []);
   useEffect(() => () => cancelWait.current(), []);
 
