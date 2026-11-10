@@ -23,4 +23,12 @@ What the page was told when the server couldn't start:
 On the sign-in page that reads "Foundation's own server isn't running. …" in the error line (seen on the first
 packaged run, which failed for a real reason: Tauri's `\?C:…` resource path; fixed).
 
-Not run: the installers, a clean machine, macOS, Linux.
+Later the same day the NSIS installer was run on this machine, over an installed 0.3.0 (`installed.txt`):
+
+| File | What it shows |
+|---|---|
+| `installed.txt` | What the installer put down; the installed app starting its own server, signing in, quitting clean; the dev server reused |
+| `installed_01_opened.png`, `installed_02_signed-in-board.png` | The installed app (scratch data folder): Josh signing in with Google through the browser, then the board |
+| `installed-own_01_opened.png` | The installed app on its default folders and its own server: the sign-in page, Server · localhost:31441 |
+
+Not run: the MSI, a clean machine, macOS, Linux.
