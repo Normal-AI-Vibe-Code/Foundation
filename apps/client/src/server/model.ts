@@ -1,8 +1,8 @@
 /**
  * The server switch's rules (SPEC §3 "The server switch"), pure so they're tested on their own
  * (test/serverSwitch.test.ts). Two ways for the app to have a server:
- *  - **this computer**: Foundation's own server, started from a checkout on this computer by the
- *    desktop app (`start_local_server`, lib.rs) on http://localhost:4410;
+ *  - **this computer**: Foundation's own server on http://localhost:4410, started by the desktop app
+ *    (`start_local_server`, local_server.rs): the one built into the app, or a checkout's;
  *  - **a remote server**: any Foundation reachable over http(s), by address.
  */
 
@@ -42,6 +42,29 @@ export function serverOrigin(input: string): { ok: true; origin: string } | { ok
   if (u.protocol !== "https:" && u.protocol !== "http:") return { ok: false, reason: "A server's address starts with https:// or http://." };
   if (!u.hostname) return { ok: false, reason: "That isn't an address." };
   return { ok: true, origin: u.origin };
+}
+
+/** which server "This computer" starts: the one built into the app, or a checkout's */
+export type LocalKind = "builtIn" | "checkout";
+
+/**
+ * Which kind the switch offers first: what the person picked last; else a checkout if they've
+ * started one here before (Josh's machine); else the built-in one, when this build has it.
+ */
+export function initialKind(saved: string | null, folderSaved: boolean, builtIn: boolean): LocalKind {
+  if (!builtIn) return "checkout";
+  if (saved === "builtIn" || saved === "checkout") return saved;
+  return folderSaved ? "checkout" : "builtIn";
+}
+
+/**
+ * Whether the desktop app starts this computer's server as it opens: only one a person started
+ * here and didn't stop (quitting the app stops it; Stop means "not again"), and only when the app
+ * uses this computer's server and nothing answers there already.
+ */
+export function startsAtLaunch(lastStarted: string | null, currentIsLocal: boolean, listening: boolean): LocalKind | null {
+  if (!currentIsLocal || listening) return null;
+  return lastStarted === "builtIn" || lastStarted === "checkout" ? lastStarted : null;
 }
 
 /** how the server this app uses answered its last check */

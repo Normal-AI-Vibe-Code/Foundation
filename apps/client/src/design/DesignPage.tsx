@@ -1861,15 +1861,21 @@ const SWITCH_BASE: ServerSwitchViewProps = {
   local: "running",
   localListening: true,
   localOurs: true,
+  kind: "checkout",
+  builtIn: true,
+  runningKind: "checkout",
+  runningFolder: FOLDER_DEFAULT,
   folder: FOLDER_DEFAULT,
   remote: "https://server.formresearch.ai",
 };
 const SWITCH_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps> }> = [
   { label: "Closed · connected", props: { open: false } },
   { label: "Closed · not running", props: { open: false, reach: "down", local: "stopped", localListening: false, localOurs: false } },
-  { label: "This computer, started here", props: {} },
-  { label: "Nothing running: Start", props: { reach: "down", local: "stopped", localListening: false, localOurs: false } },
-  { label: "Starting", props: { reach: "down", local: "starting", localListening: false, localOurs: false } },
+  { label: "This computer, started from a checkout", props: {} },
+  { label: "This computer, the built-in server", props: { kind: "builtIn", runningKind: "builtIn", runningFolder: "C:\\Users\\you\\AppData\\Roaming\\co.normallab.foundation" } },
+  { label: "Nothing running: the built-in server", props: { reach: "down", local: "stopped", localListening: false, localOurs: false, kind: "builtIn" } },
+  { label: "Nothing running: from a checkout", props: { reach: "down", local: "stopped", localListening: false, localOurs: false } },
+  { label: "Starting", props: { reach: "down", local: "starting", localListening: false, localOurs: false, kind: "builtIn" } },
   {
     label: "It didn't start",
     props: {
@@ -1877,12 +1883,12 @@ const SWITCH_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps
       local: "failed",
       localListening: false,
       localOurs: false,
-      message: "Foundation's server needs Node 22.16 or newer (its search needs SQLite's FTS5), and this computer has v22.13.1. Install it with winget install OpenJS.NodeJS.LTS, then open Foundation again.",
+      message: "Foundation's server needs Node 22.16 or newer (its search needs SQLite's FTS5), and this computer has v22.13.1. Install it with winget install OpenJS.NodeJS.LTS, or start the built-in server instead.",
     },
   },
   { label: "On a remote server; this computer's is running too", props: { current: "https://server.formresearch.ai", localOurs: false } },
   { label: "A remote address that isn't one", props: { current: "https://server.formresearch.ai", reach: "down", local: "stopped", localListening: false, localOurs: false, remote: "ftp://files", remoteError: "A server's address starts with https:// or http://." } },
-  { label: "In a browser on another site's server (can't start one)", props: { desktop: false, current: "https://server.formresearch.ai", local: "stopped", localListening: false, localOurs: false } },
+  { label: "In a browser on another site's server (can't start one)", props: { desktop: false, builtIn: false, current: "https://server.formresearch.ai", local: "stopped", localListening: false, localOurs: false } },
 ];
 
 function ServerSwitchDemo() {

@@ -7,7 +7,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-const root = resolve(import.meta.dirname, "../../..");
+// The repo's root when run from source. The desktop app runs a bundled copy from its install folder
+// (scripts/desktop-server.mjs) and names its own folder instead (FOUNDATION_ROOT: the app's data
+// directory), so `.env` and `data/` are looked for there, never beside the program.
+const root = process.env.FOUNDATION_ROOT ? resolve(process.env.FOUNDATION_ROOT) : resolve(import.meta.dirname, "../../..");
 
 for (const file of [resolve(root, ".env"), resolve(root, "apps/server/.env")]) {
   if (!existsSync(file)) continue;

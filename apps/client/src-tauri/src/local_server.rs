@@ -1,19 +1,23 @@
 //! The server on this computer (SPEC §3 "The server switch"): the desktop app starts Foundation's own
-//! server from a checkout when a person presses Start in the switch, bottom right. Nothing here starts
-//! on its own. It runs `node --import tsx apps/server/src/index.ts` in that folder on :4410, with no
-//! console window, its output in the app's log folder (`local-server.log`), and it's stopped when the
-//! app quits. A server that was already running (`npm run dev`, another app) is used, never started
-//! twice and never stopped from here.
+//! server when a person presses Start in the switch, bottom right, one of two kinds, both on :4410:
+//!  - **built in**: the server the app carries (server.rs), its data in the app's own folder; a
+//!    computer with no checkout and no Node has this one;
+//!  - **checkout**: `node --import tsx apps/server/src/index.ts` in a Foundation checkout, its data
+//!    the checkout's.
+//! Nothing here starts on its own. No console window; output in the app's log folder
+//! (`local-server.log`); stopped when the app quits, and gone with it however it ends (server.rs).
+//! A server that was already running (`npm run dev`, another app) is used, never started twice and
+//! never stopped from here.
 
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
 
 /// The server's port: what `.env.desktop` builds the app to ask (VITE_FOUNDATION_SERVER).
@@ -33,8 +37,23 @@ struct Slot {
 
 struct Running {
     child: Child,
+    kind: Kind,
+    /// the checkout it runs from, or the built-in server's data folder
     folder: String,
     log: PathBuf,
+    /// held for the child's whole life: the server leaves when it closes (FOUNDATION_EXIT_WITH_PARENT)
+    stdin: Option<ChildStdin>,
+    #[cfg(windows)]
+    _job: Option<crate::server::job::Job>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Kind {
+    /// the server the app carries (server.rs)
+    BuiltIn,
+    /// a Foundation checkout's own server
+    Checkout,
 }
 
 #[derive(Serialize)]
@@ -44,7 +63,12 @@ pub struct Status {
     listening: bool,
     /// this app started it and it's still running
     ours: bool,
+    /// which kind this app started
+    kind: Option<Kind>,
+    /// the checkout it runs from, or the built-in server's data folder
     folder: Option<String>,
+    /// this build carries its own server (an installed app; not `tauri dev`)
+    built_in: bool,
     /// the one we started stopped by itself: its exit and the end of its log
     exited: Option<String>,
 }
@@ -125,65 +149,107 @@ fn reap(slot: &mut Slot) {
     }
 }
 
-fn status_of(slot: &Slot) -> Status {
+fn status_of(app: &AppHandle, slot: &Slot) -> Status {
     Status {
         listening: listening(SERVER_PORT),
         ours: slot.running.is_some(),
+        kind: slot.running.as_ref().map(|r| r.kind),
         folder: slot.running.as_ref().map(|r| r.folder.clone()),
+        built_in: app.path().resource_dir().ok().and_then(|r| crate::server::builtin(&r)).is_some(),
         exited: slot.exited.clone(),
     }
 }
 
 #[tauri::command]
-pub fn local_server_status(state: State<'_, LocalServer>) -> Status {
+pub fn local_server_status(app: AppHandle, state: State<'_, LocalServer>) -> Status {
     let mut slot = state.0.lock().unwrap_or_else(|e| e.into_inner());
     reap(&mut slot);
-    status_of(&slot)
+    status_of(&app, &slot)
+}
+
+/// the built-in server's home: the app's data folder (FOUNDATION_DESKTOP_HOME moves it, for a check
+/// run that mustn't touch the real one)
+fn builtin_home(app: &AppHandle) -> Result<PathBuf, String> {
+    match std::env::var_os("FOUNDATION_DESKTOP_HOME") {
+        Some(dir) if !dir.is_empty() => Ok(PathBuf::from(dir)),
+        _ => app.path().app_data_dir().map_err(|e| e.to_string()),
+    }
 }
 
 #[tauri::command]
-pub fn start_local_server(app: AppHandle, state: State<'_, LocalServer>, folder: String) -> Result<Status, String> {
+pub fn start_local_server(app: AppHandle, state: State<'_, LocalServer>, kind: Kind, folder: Option<String>) -> Result<Status, String> {
     let mut slot = state.0.lock().unwrap_or_else(|e| e.into_inner());
     reap(&mut slot);
     // already answering (npm run dev, or ours): use it, never a second one on the same port
     if slot.running.is_some() || listening(SERVER_PORT) {
-        return Ok(status_of(&slot));
+        return Ok(status_of(&app, &slot));
     }
-    let root = check_folder(&folder)?;
-    let v = node_version()?;
-    match parse_node(&v) {
-        Some(n) if n >= NODE_NEEDS => {}
-        _ => {
-            return Err(format!(
-                "Foundation's server needs Node {}.{} or newer (its search needs SQLite's FTS5), and this computer has {}. Install it with winget install OpenJS.NodeJS.LTS, then open Foundation again.",
-                NODE_NEEDS.0,
-                NODE_NEEDS.1,
-                if v.is_empty() { "an unknown version".to_string() } else { v }
-            ))
+    let log = app.path().app_log_dir().map_err(|e| e.to_string())?.join("local-server.log");
+    let (mut cmd, shown) = match kind {
+        Kind::BuiltIn => {
+            let resources = app.path().resource_dir().map_err(|e| e.to_string())?;
+            let home = crate::server::plain(&builtin_home(&app)?);
+            (crate::server::builtin_command(&resources, &home, &log, SERVER_PORT, crate::PORT)?, home.display().to_string())
         }
-    }
-    let dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let log = dir.join("local-server.log");
-    let out = File::create(&log).map_err(|e| format!("Can't write {}: {e}", log.display()))?;
-    let err = out.try_clone().map_err(|e| e.to_string())?;
-    let child = hidden(&mut Command::new("node"))
-        .args(["--import", "tsx", "apps/server/src/index.ts"])
-        .current_dir(&root)
-        .env("FOUNDATION_PORT", SERVER_PORT.to_string())
-        .stdin(Stdio::null())
-        .stdout(out)
-        .stderr(err)
+        Kind::Checkout => {
+            let root = check_folder(folder.as_deref().unwrap_or(""))?;
+            let v = node_version()?;
+            match parse_node(&v) {
+                Some(n) if n >= NODE_NEEDS => {}
+                _ => {
+                    return Err(format!(
+                        "Foundation's server needs Node {}.{} or newer (its search needs SQLite's FTS5), and this computer has {}. Install it with winget install OpenJS.NodeJS.LTS, or start the built-in server instead.",
+                        NODE_NEEDS.0,
+                        NODE_NEEDS.1,
+                        if v.is_empty() { "an unknown version".to_string() } else { v }
+                    ))
+                }
+            }
+            let out = crate::server::open_log(&log)?;
+            let err = out.try_clone().map_err(|e| e.to_string())?;
+            let mut cmd = Command::new("node");
+            cmd.args(["--import", "tsx", "apps/server/src/index.ts"])
+                .current_dir(&root)
+                .env("FOUNDATION_PORT", SERVER_PORT.to_string())
+                .stdout(out)
+                .stderr(err);
+            (cmd, root.display().to_string())
+        }
+    };
+    // it leaves when the app's end of stdin closes, however the app ends
+    let mut child = hidden(&mut cmd)
+        .env("FOUNDATION_EXIT_WITH_PARENT", "1")
+        .stdin(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Couldn't start node: {e}"))?;
+        .map_err(|e| format!("Couldn't start the server: {e}"))?;
+    #[cfg(windows)]
+    let job = crate::server::job::Job::holding(&child);
+    let stdin = child.stdin.take();
     slot.exited = None;
-    slot.running = Some(Running { child, folder: root.display().to_string(), log });
-    Ok(status_of(&slot))
+    slot.running = Some(Running {
+        child,
+        kind,
+        folder: shown,
+        log,
+        stdin,
+        #[cfg(windows)]
+        _job: job,
+    });
+    Ok(status_of(&app, &slot))
 }
 
 /// stop the server this app started (and what it started); one it didn't start is left alone
 fn stop(slot: &mut Slot) {
     if let Some(mut r) = slot.running.take() {
+        // asked first: the server ends its agents' runs and goes when stdin closes
+        drop(r.stdin.take());
+        let t0 = std::time::Instant::now();
+        while t0.elapsed() < Duration::from_millis(1500) {
+            if matches!(r.child.try_wait(), Ok(Some(_))) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(25));
+        }
         #[cfg(windows)]
         {
             let _ = hidden(&mut Command::new("taskkill")).args(["/PID", &r.child.id().to_string(), "/T", "/F"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
@@ -194,11 +260,11 @@ fn stop(slot: &mut Slot) {
 }
 
 #[tauri::command]
-pub fn stop_local_server(state: State<'_, LocalServer>) -> Status {
+pub fn stop_local_server(app: AppHandle, state: State<'_, LocalServer>) -> Status {
     let mut slot = state.0.lock().unwrap_or_else(|e| e.into_inner());
     stop(&mut slot);
     slot.exited = None;
-    status_of(&slot)
+    status_of(&app, &slot)
 }
 
 /// the app is quitting: a server it started goes with it

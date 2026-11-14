@@ -195,6 +195,25 @@
 .server-switch-row .server-switch-field {
   flex: 1;
 }
+/* which server Start runs: built in, or a checkout's */
+.server-switch-kinds {
+  display: flex;
+  gap: var(--space-2);
+}
+.server-switch-kinds .server-switch-kind {
+  flex: 1;
+  justify-content: center;
+}
+.server-switch-kinds .server-switch-kind[aria-checked="false"] {
+  color: var(--color-dim);
+  background: transparent;
+}
+/* the pick is tinted like the In use tag: Start stays the one blue action */
+.server-switch-kinds .server-switch-kind[aria-checked="true"] {
+  background: var(--color-pulse-dim);
+  color: var(--color-pulse);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-pulse) 45%, transparent);
+}
 .server-switch-actions {
   display: flex;
   flex-wrap: wrap;

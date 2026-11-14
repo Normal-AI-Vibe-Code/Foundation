@@ -37,3 +37,7 @@ target/
 
 # The Rune renderer, built from apps/rune by `npm run rune:build` (12 MB of wasm: not checked in)
 apps/client/public/rune/
+
+# The server the desktop app carries: built by scripts/desktop-server.mjs (a Node binary and a bundle)
+apps/client/src-tauri/server/*
+!apps/client/src-tauri/server/README.md

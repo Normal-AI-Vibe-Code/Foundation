@@ -136,7 +136,9 @@ function reindexSha(sha: string) {
 }
 
 function startWorker(): Worker {
-  const w = new Worker(new URL("./extract-worker.ts", import.meta.url), {
+  // from source the worker is the .ts beside this file; bundled (the desktop app), the .mjs built beside the bundle
+  const file = import.meta.url.endsWith(".ts") ? "./extract-worker.ts" : "./extract-worker.mjs";
+  const w = new Worker(new URL(file, import.meta.url), {
     resourceLimits: { maxOldGenerationSizeMb: 768 },
     stdout: true,
     stderr: true,

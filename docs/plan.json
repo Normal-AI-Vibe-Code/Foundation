@@ -1116,8 +1116,8 @@
       "kind": "plan",
       "milestone": "ship",
       "area": "desktop",
-      "status": "next",
-      "body": "The installed app expects a server at http://localhost:4410 and starts none, so on its own nothing in it connects (2026-11-09). Bundle the server (a Node sidecar with FTS5, or a single executable) and start it with the window, on a port outside Windows' reserved ranges; keep `Server` on the sign-in page for a hosted one. (2026-11-13: the server switch, bottom right, starts one from a checkout on this computer when a person presses Start; bundling a server is still the way for a computer without a checkout.)",
+      "status": "review",
+      "body": "The installed app expected a server at http://localhost:4410 and started none (2026-11-09). Built that day on its own branch: the app carries a pinned Node 22.22 and the server bundled by esbuild (`scripts/desktop-server.mjs`), checked with the packaged exe and the NSIS installer (`docs/evidence/2026-11-09_desktop-server/`). Merged 2026-11-14 into the server switch rather than beside it (Josh: \"merge everything\"): This computer → Start offers **Built in** (that bundled server, its data in the app's own folder) or **From a checkout**, both on :4410; one a person started and didn't stop starts again when the app opens; Stop means not again. On Windows a kill-on-close Job Object and the server leaving when its stdin closes mean it never outlives the app (`src-tauri/src/server.rs`, `local_server.rs`). Checked 2026-11-14 with a check build on Windows (`docs/evidence/2026-11-14_builtin-server/`): Start, sign-in, Stop, a hard kill, the restart at launch, and a checkout. In review until an installed release with the server inside has run on a computer that never had Foundation or Node.",
       "issue": 101
     },
     {

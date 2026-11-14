@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:desktop": "node ../../scripts/rune.mjs --if-able && tsc && vite build --mode desktop",
+    "build:desktop": "node ../../scripts/rune.mjs --if-able && node ../../scripts/desktop-server.mjs && tsc && vite build --mode desktop",
     "preview": "vite preview",
     "tauri": "tauri",
     "typecheck": "tsc --noEmit",

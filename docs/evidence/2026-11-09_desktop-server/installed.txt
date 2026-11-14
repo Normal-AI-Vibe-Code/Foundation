@@ -1,0 +1,36 @@
+The NSIS installer, run on this machine over an installed 0.3.0 (2026-11-09, evening)
+
+0. Foundation_0.3.0_x64-setup.exe /S: exit 0 after 2.6 s. In %LOCALAPPDATA%\Foundation:
+   tauri-app.exe 19,190,272   uninstall.exe   server\index.mjs 2,877,937   server\extract-worker.mjs 2,416,276
+   server\node.exe 85,804,032 (SHA-256 bae898ad…c99ffb, nodejs.org's for v22.22.0 win-x64)   server\README.md
+
+1. Installed app, scratch data folder and WebView profile, FOUNDATION_DESKTOP_USE_DEV_SERVER=0 (pid 82380):
+   /api/health on :31441 after 2741 ms (first start after install): {"ok":true,"name":"foundation"}
+   server: pid 14328, parent 82380, "…\AppData\Local\Foundation\server\node.exe" --no-warnings "…\server\index.mjs"
+   page {"origin":"http://localhost:31440","server":"http://localhost:31441","error":null}
+   The script's dev login never ran: Josh, at the machine, pressed Connect with Google in the window
+   (installed_01_opened.png: "Finish signing in with Google in your browser") and finished it in the browser.
+   Then, asked from the page: me {"name":"Josh Leong","role":"admin"}, boards ["company"], 10 sections,
+   bearer kept for http://localhost:31441 (installed_02_signed-in-board.png).
+   The window was closed by hand before the script got to it, so that quit wasn't timed. Afterwards:
+   server processes 0; :31441 bindable; :31440 bindable.
+
+2. Installed app, default folders, nothing set (pid 66976). A dev server was answering on :4410 at that moment:
+   page {"origin":"http://localhost:31440","server":"http://localhost:4410","error":null}
+   no server of its own started; the board opened on the session the installed 0.3.0 already had for :4410
+   (10 sections; no picture kept, it is the dev server's real board).
+   window closed: app gone after 37 ms; server processes 0; :31441 bindable; :31440 bindable.
+
+3. Installed app, default folders, FOUNDATION_DESKTOP_USE_DEV_SERVER=0 (pid 22912):
+   /api/health on :31441 after 1210 ms: {"ok":true,"name":"foundation"}
+   server: pid 84904, parent 22912, "…\AppData\Local\Foundation\server\node.exe" --no-warnings "…\server\index.mjs"
+   page {"origin":"http://localhost:31440","server":"http://localhost:31441","error":null}
+   text: FORM INDUSTRIES Foundation · Connect with Google · Use your email · Server · localhost:31441
+   (installed-own_01_opened.png; nobody signed in: the upgrade's kept session is for :4410, not this server)
+   log: Foundation server http://localhost:31441 / data C:\Users\…\AppData\Roaming\co.normallab.foundation\data /
+        sign-in dev login / agent Claude Code (subscription)
+   window closed (server pid before: 84904): app gone after 237 ms
+   server processes 0; :31441 bindable; :31440 bindable.
+
+Not checked here: an agent turn in the installed copy (done with the built exe), the MSI, a machine that has
+never had Foundation or Node, the updater replacing a running node.exe.

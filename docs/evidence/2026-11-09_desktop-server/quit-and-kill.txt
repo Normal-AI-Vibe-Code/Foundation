@@ -1,0 +1,8 @@
+== 1. quit by closing the window ==
+before: app pid 39188, server node.exe pid 54460 (parent 39188); {"ok":true,"name":"foundation","at":1794275556640}
+app exited after 577 ms
+after: server processes left: 0; nothing answers on :31441; 31441 can be bound again
+== 2. the app killed outright (taskkill /F, not /T) ==
+before: app pid 25420, server node.exe pid 69300; {"ok":true,"name":"foundation","at":1794275565641}
+SUCCESS: The process with PID 25420 has been terminated.
+after: server processes left: 0; nothing answers on :31441; 31441 can be bound again

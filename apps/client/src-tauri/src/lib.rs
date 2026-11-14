@@ -12,6 +12,7 @@
 //! the server is down, so the device's board copies keep working offline.
 
 mod local_server;
+mod server;
 
 use std::net::TcpListener;
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};

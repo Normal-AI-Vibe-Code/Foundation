@@ -3,8 +3,10 @@
  * right to start the local server or connect to the flowform server for local testing. have it expand
  * to show both options"). Collapsed, a glass pill bottom right: a dot for whether the server this app
  * uses answers, and its address. Pressed, it opens upward into both ways to have a server:
- *  - **This computer**: Start runs Foundation's server from a checkout here (the desktop app does it,
- *    src-tauri/src/local_server.rs); once it answers, the app uses it and reloads.
+ *  - **This computer**: Start runs Foundation's server here (the desktop app does it,
+ *    src-tauri/src/local_server.rs), either the one built into the app (its data in the app's own
+ *    folder; a teammate with no checkout has this) or a checkout's; once it answers, the app uses it
+ *    and reloads. One a person started and didn't stop starts again when the app next opens.
  *  - **Remote server**: an address (Flowform's server to begin with); Connect points the app there and
  *    reloads, to sign in on that server.
  * Shown where the app can point elsewhere (the desktop app, or a page on another site's server),
@@ -17,11 +19,30 @@ import { BEARER, SERVER, chooseServer } from "../lib/api";
 import { inDesktop } from "../update/updater";
 import { useUi } from "../state/ui";
 import { answers, localStatus, startLocal, stopLocal } from "./desktop";
-import { FOLDER_DEFAULT, LOCAL_PORT, LOCAL_SERVER, REMOTE_DEFAULT, isAbsoluteFolder, isLocalServer, pillState, serverOrigin, shortAddress, type LocalPhase, type Reach } from "./model";
+import {
+  FOLDER_DEFAULT,
+  LOCAL_PORT,
+  LOCAL_SERVER,
+  REMOTE_DEFAULT,
+  initialKind,
+  isAbsoluteFolder,
+  isLocalServer,
+  pillState,
+  serverOrigin,
+  shortAddress,
+  startsAtLaunch,
+  type LocalKind,
+  type LocalPhase,
+  type Reach,
+} from "./model";
 import "./server.css";
 
 const FOLDER_KEY = "foundation-server-folder";
 const REMOTE_KEY = "foundation-server-remote";
+/** which kind "This computer" offers (the person's last pick) */
+const KIND_KEY = "foundation-server-kind";
+/** the kind a person started here and hasn't stopped: started again when the app opens */
+const LAST_KEY = "foundation-server-started";
 
 export interface ServerSwitchViewProps {
   open: boolean;
@@ -35,6 +56,13 @@ export interface ServerSwitchViewProps {
   localListening: boolean;
   /** this app started that server */
   localOurs: boolean;
+  /** which kind Start runs: the app's own server or a checkout's */
+  kind: LocalKind;
+  /** this build carries its own server (not `tauri dev`) */
+  builtIn: boolean;
+  /** the kind and folder of the one this app started */
+  runningKind?: LocalKind | null;
+  runningFolder?: string | null;
   folder: string;
   /** why starting failed, in the server's or the app's own words */
   message?: string | null;
@@ -46,6 +74,7 @@ export interface ServerSwitchViewProps {
   onStart?: () => void;
   onStop?: () => void;
   onUseLocal?: () => void;
+  onKind?: (k: LocalKind) => void;
   onFolder?: (v: string) => void;
   onRemote?: (v: string) => void;
   onConnect?: () => void;
@@ -71,11 +100,43 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
           <strong>This computer</strong>
           {currentIsLocal && <span className="server-switch-tag">In use</span>}
         </div>
+        {p.desktop && p.builtIn && !p.localListening && (
+          <div className="server-switch-kinds" role="radiogroup" aria-label="Which server to start">
+            {(
+              [
+                ["builtIn", "Built in"],
+                ["checkout", "From a checkout"],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                role="radio"
+                aria-checked={p.kind === k}
+                className="f-pill server-switch-kind"
+                disabled={starting}
+                onClick={() => p.onKind?.(k)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <p className="server-switch-lede">
           Foundation’s own server on <code>localhost:{LOCAL_PORT}</code>
-          {p.desktop ? ", started from this checkout:" : "."}
+          {p.localOurs && p.runningKind === "builtIn"
+            ? ", built into this app. Its data is in "
+            : p.localOurs && p.runningFolder
+              ? ", from "
+              : !p.desktop
+                ? "."
+                : p.kind === "builtIn"
+                  ? ", built into this app: nothing else to install. Its data stays in this app’s folder."
+                  : ", started from this checkout:"}
+          {p.localOurs && p.runningFolder && <code>{p.runningFolder}</code>}
+          {p.localOurs && p.runningKind === "builtIn" && "."}
         </p>
-        {p.desktop && (
+        {p.desktop && p.kind === "checkout" && !p.localOurs && (
           <input
             className="f-input server-switch-field server-switch-folder"
             value={p.folder}
@@ -199,6 +260,9 @@ const keep = (k: string, v: string) => {
   }
 };
 
+/** the launch check runs once per page, though the switch is mounted again as the app moves past sign-in */
+let launchChecked = false;
+
 /** the switch itself, mounted once by the app. `day` pins day tokens over the sign-in page. */
 export function ServerSwitch({ day = false }: { day?: boolean }) {
   const current = (SERVER || window.location.origin).replace(/\/$/, "");
@@ -211,6 +275,10 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
   const [ours, setOurs] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [folder, setFolder] = useState(() => read(FOLDER_KEY, FOLDER_DEFAULT));
+  const [builtIn, setBuiltIn] = useState(false);
+  const [kindPick, setKindPick] = useState<string | null>(() => read(KIND_KEY, "") || null);
+  const kind = initialKind(kindPick, read(FOLDER_KEY, "") !== "", builtIn);
+  const [running, setRunning] = useState<{ kind: LocalKind | null; folder: string | null }>({ kind: null, folder: null });
   const [remote, setRemote] = useState(() => read(REMOTE_KEY, isLocalServer(current) ? REMOTE_DEFAULT : current));
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -240,18 +308,22 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
   const refreshLocal = useCallback(async () => {
     if (inDesktop) {
       const s = await localStatus().catch(() => null);
-      if (!s) return;
+      if (!s) return null;
       setListening(s.listening);
       setOurs(s.ours);
-      if (startingRef.current) return;
+      setBuiltIn(s.builtIn);
+      setRunning({ kind: s.kind, folder: s.folder });
+      if (startingRef.current) return s;
       if (s.exited) {
         setLocal("failed");
         setMessage(s.exited);
       } else setLocal(s.listening ? "running" : "stopped");
+      return s;
     } else {
       const ok = await answers(LOCAL_SERVER, 1500);
       setListening(ok);
       setLocal(ok ? "running" : "stopped");
+      return null;
     }
   }, []);
   useEffect(() => {
@@ -278,19 +350,19 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
 
   const goLocal = () => (isLocalServer(current) ? window.location.reload() : chooseServer(LOCAL_SERVER));
 
-  const start = async () => {
+  const start = async (k: LocalKind = kind) => {
     const f = folder.trim();
-    if (!isAbsoluteFolder(f)) {
+    if (k === "checkout" && !isAbsoluteFolder(f)) {
       setLocal("failed");
       setMessage("Give the checkout's full path, like C:\\Dev\\Foundation.");
       return;
     }
-    keep(FOLDER_KEY, f);
+    if (k === "checkout") keep(FOLDER_KEY, f);
     setMessage(null);
     setLocal("starting");
     startingRef.current = true;
     try {
-      await startLocal(f);
+      await startLocal(k, k === "checkout" ? f : undefined);
       // up when it answers; a server stops by itself when it can't start (its log says why)
       const until = Date.now() + 45_000;
       while (Date.now() < until) {
@@ -298,6 +370,8 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
           startingRef.current = false;
           setLocal("running");
           setListening(true);
+          // started by a person: started again when the app next opens, until they press Stop
+          keep(LAST_KEY, k);
           goLocal();
           return;
         }
@@ -313,8 +387,28 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
     }
   };
 
+  // as the app opens: what this build carries, and the server a person started here last time, again
+  useEffect(() => {
+    if (!shown || !inDesktop || launchChecked) return;
+    launchChecked = true;
+    void refreshLocal().then((s) => {
+      const k = s ? startsAtLaunch(read(LAST_KEY, "") || null, isLocalServer(current), s.listening) : null;
+      if (!k || (k === "builtIn" && !s?.builtIn)) return;
+      setOpen(true);
+      void start(k);
+    });
+    // once per page: start reads the latest state when it runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown]);
+
   const stop = async () => {
     await stopLocal().catch(() => null);
+    // a person stopped it: not again at the next launch
+    try {
+      localStorage.removeItem(LAST_KEY);
+    } catch {
+      /* private window */
+    }
     setOurs(false);
     setListening(false);
     setLocal("stopped");
@@ -344,6 +438,10 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
         local={local}
         localListening={listening}
         localOurs={ours}
+        kind={kind}
+        builtIn={builtIn}
+        runningKind={running.kind}
+        runningFolder={running.folder}
         folder={folder}
         message={message}
         remote={remote}
@@ -352,6 +450,14 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
         onStart={() => void start()}
         onStop={() => void stop()}
         onUseLocal={goLocal}
+        onKind={(k) => {
+          setKindPick(k);
+          keep(KIND_KEY, k);
+          if (local === "failed") {
+            setLocal("stopped");
+            setMessage(null);
+          }
+        }}
         onFolder={setFolder}
         onRemote={(v) => {
           setRemote(v);

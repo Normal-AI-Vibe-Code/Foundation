@@ -3,12 +3,20 @@
  * page's other code never imports Tauri at load, so this is loaded on first use.
  */
 
+/** the two kinds of server the desktop app can start here (local_server.rs) */
+export type LocalKind = "builtIn" | "checkout";
+
 export interface LocalStatus {
   /** something answers on :4410 (this app's server, or one started another way) */
   listening: boolean;
   /** this app started it and it's still running */
   ours: boolean;
+  /** which kind this app started */
+  kind: LocalKind | null;
+  /** the checkout it runs from, or the built-in server's data folder */
   folder: string | null;
+  /** this build carries its own server (an installed app; not `tauri dev`) */
+  builtIn: boolean;
   /** the one this app started stopped by itself: its exit and the end of its log */
   exited: string | null;
 }
@@ -19,7 +27,7 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 }
 
 export const localStatus = () => call<LocalStatus>("local_server_status");
-export const startLocal = (folder: string) => call<LocalStatus>("start_local_server", { folder });
+export const startLocal = (kind: LocalKind, folder?: string) => call<LocalStatus>("start_local_server", { kind, folder: folder ?? null });
 export const stopLocal = () => call<LocalStatus>("stop_local_server");
 
 /** whether a Foundation server answers at an origin (its public /auth/config), within a few seconds */

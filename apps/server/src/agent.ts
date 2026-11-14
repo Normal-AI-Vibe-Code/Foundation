@@ -320,6 +320,17 @@ export function stopRun(id: string, userId: string) {
  * The crew-wide stop: every run this person has going on this board, helpers
  * included (a helper runs as the person who asked). Returns how many stopped.
  */
+/** The server is going (the desktop app quit): end every running turn, so no agent process outlives it. */
+export function stopEveryRun(): number {
+  let n = 0;
+  for (const r of live.values()) {
+    if (r.done || r.ctrl.signal.aborted) continue;
+    r.ctrl.abort();
+    n++;
+  }
+  return n;
+}
+
 export function stopAllRuns(boardId: string, userId: string): number {
   let n = 0;
   for (const r of live.values()) {
