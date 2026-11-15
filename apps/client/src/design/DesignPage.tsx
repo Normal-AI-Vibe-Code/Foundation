@@ -31,10 +31,15 @@ import { TOOLS } from "../shell/Tools";
 import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } from "../shell/wireGeometry";
 import { tunnelGeometry } from "../shell/wireGeometry";
 import { AppChip, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
-import type { CompanyApp, FocusItem, Goal, Mood } from "../today/model";
+import type { CompanyApp, CompanyGoal, FocusItem, Goal, Mood } from "../today/model";
 
 const NOW = Date.now();
+const SAMPLE_COMPANY: CompanyGoal[] = [
+  { id: "cg1", title: "Fly the PTHP demonstrator", detail: "First tethered hover", owner: "Ada", status: "active", progress: 0.45, dueAt: NOW + 40 * 864e5, board: "company", objectId: null },
+  { id: "cg2", title: "Every station on FactoryForm work orders", detail: "", owner: "", status: "active", progress: 0.7, dueAt: null, board: "company", objectId: null },
+];
 const SAMPLE_FOCUS: FocusItem[] = [
+  { id: "goal:cg1", kind: "goal", title: "Fly the PTHP demonstrator", why: "A company goal you carry · 45% · due 24 Dec", board: "company", boardName: "Form Industries", href: "#", at: NOW },
   { id: "ask:a", kind: "ask", title: "Upload the latest stator STEP", why: "Kai asked you for CAD · 1 d overdue", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW, tone: "bad" },
   { id: "stage:s", kind: "stage", title: "03 · CAD", why: "You own this stage · 2 to tick", board: "company", boardName: "Form Industries", href: "#", at: NOW, tone: "warn" },
   { id: "mention:m", kind: "mention", title: "@Ada can you sign off the bearing loads before Friday?", why: "You're tagged in a note on Rim drive", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW },
@@ -75,14 +80,19 @@ function TodayDemo() {
       <div className="design-today-state today-state">
         <section className="today-group">
           <h2 className="f-eyebrow">
-            Focus today <span className="today-count">5</span>
+            Company goals <span className="today-count">2</span>
+          </h2>
+          {SAMPLE_COMPANY.map((g) => (
+            <GoalRow key={g.id} goal={g} onDone={() => {}} />
+          ))}
+        </section>
+        <section className="today-group">
+          <h2 className="f-eyebrow">
+            Todos <span className="today-count">8</span>
           </h2>
           {SAMPLE_FOCUS.map((f, i) => (
             <FocusRow key={f.id} item={f} pointed={i === 2} />
           ))}
-        </section>
-        <section className="today-group">
-          <h2 className="f-eyebrow">Goals</h2>
           {SAMPLE_GOALS.map((g, i) => (
             <GoalRow key={g.id} goal={g} pointed={i === 0} />
           ))}

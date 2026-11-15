@@ -67,7 +67,7 @@ import { describeIo, ensureMachinePorts, watchMachine } from "./machineio.ts";
 import { writeDigest } from "./digest.ts";
 import { flowformCall, flowformTools } from "./flowformlink.ts";
 import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, stepTarget, travel, type CrewMember } from "./crew.ts";
-import { saveGoal, setProfile, todayFor } from "./today.ts";
+import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
 
@@ -346,7 +346,7 @@ export const TOOLS: BoardTool[] = [
   def({
     name: "today",
     description:
-      "Read the person's Today page: their goals (with ids and progress), what wants their attention (asks assigned to them, notes that tag them, stages they own, files and changes on their boards, work matching their job), their profile and the company apps. Read this before answering anything about their day, goals, priorities or what to do next.",
+      "Read the person's Today page: the company's goals (company.goals, and whether this person may set them), their own goals (with ids and progress), what wants their attention (asks assigned to them, notes that tag them, stages they own, files and changes on their boards, work matching their job), their profile and the company apps. Read this before answering anything about their day, goals, priorities or what to do next.",
     schema: z.object({}),
     run: (ctx) => todayFor(personOf(ctx)),
   }),
@@ -372,6 +372,29 @@ export const TOOLS: BoardTool[] = [
     },
   }),
   def({
+    name: "set_company_goal",
+    description:
+      "Set one of the company's goals, which everyone sees first on Today and on every Chrome new tab: add one (title, detail, who carries it, due date), or change one by id (progress 0–1, status active / done / dropped, owner, a better title). A write to the company board: only people who can change it (today's company.canSet), and only when they ask, or agree when you suggest it.",
+    schema: z.object({
+      id: z.string().optional().describe("the company goal to change (cgoal_…); omit to add one"),
+      title: z.string().max(200).optional(),
+      detail: z.string().max(2000).optional(),
+      owner: z.string().max(200).optional().describe("who carries it: a person's name or email; empty for everyone"),
+      progress: z.number().min(0).max(1).optional(),
+      status: z.enum(["active", "done", "dropped"]).optional(),
+      due: z.string().optional().describe("a date, YYYY-MM-DD"),
+      object_id: z.string().optional().describe("a card on the company board the goal is about"),
+      request_id: z.string().optional(),
+    }),
+    write: true,
+    run: (ctx, i) => {
+      const dueAt = i.due ? Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(i.due) ? `${i.due}T12:00:00` : i.due) : undefined;
+      // its board is the company's, whichever board the ask came from
+      if (!canWrite(ctx.userId, COMPANY_BOARD)) throw new HttpError(403, "View only: this person can't change the company board, so they can't set the company's goals. Say what you would change instead.");
+      return { goal: saveCompanyGoal(personOf(ctx), { id: i.id, title: i.title, detail: i.detail, owner: i.owner, progress: i.progress, status: i.status, dueAt: Number.isFinite(dueAt) ? dueAt : undefined, objectId: i.object_id }) };
+    },
+  }),
+  def({
     name: "set_profile",
     description: "Save what the person does — their title, team, and the words that describe their work (\"motors, rim drive, certification\"). Today uses the words to find work related to their job. Only when they tell you.",
     schema: z.object({ title: z.string().max(120).optional(), team: z.string().max(120).optional(), focus: z.string().max(400).optional() }),
@@ -380,7 +403,7 @@ export const TOOLS: BoardTool[] = [
   def({
     name: "point_today",
     description:
-      "On the person's Today page, point at what you're talking about: a focus item or goal by its id (e.g. 'ask:…', 'goal_…') or an app id. The page lights it up beside your words. Use it whenever your answer is about one or more specific items.",
+      "On the person's Today page, point at what you're talking about: a focus item or goal by its id (e.g. 'ask:…', 'goal_…', 'cgoal_…') or an app id. The page lights it up beside your words. Use it whenever your answer is about one or more specific items.",
     schema: z.object({ ids: z.array(z.string()).min(1).max(6) }),
     run: (_ctx, { ids }) => ({ pointed: ids }),
   }),

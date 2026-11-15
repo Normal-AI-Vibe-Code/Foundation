@@ -39,7 +39,7 @@ import { addLine, attachRecording, huddleArchive, huddleForInvite, transcriptTex
 import { boardLink, channelHistory, channelInfo, inviteText, listChannels, postMessage, shareText, SlackError, slackStatus } from "./slack.ts";
 import { appendSection, boardMaps, huddleStateOf } from "@foundation/protocol";
 import { migrateAllBoards } from "./migrate.ts";
-import { saveGoal, setProfile, todayFor, type GoalInput } from "./today.ts";
+import { saveCompanyGoal, saveGoal, setProfile, todayFor, type CompanyGoalInput, type GoalInput } from "./today.ts";
 import * as flowform from "./flowform.ts";
 import { approvePlace, bringFromPlace, listPlace, listPlaces, removePlace } from "./places.ts";
 import { beginLink, finishLink, flowformCall, flowformTools, landingPage, linkStatus, unlink } from "./flowformlink.ts";
@@ -869,6 +869,21 @@ r.post("/api/today/goals", async (req) => {
   } catch (e) {
     throw new HttpError(400, (e as Error).message);
   }
+});
+// the company's goals: Today's other door is open to viewers (their own goals), so this one checks itself
+const companyGoalRequests = new Map<string, unknown>();
+r.post("/api/today/company-goals", async (req) => {
+  const u = requireUser(req);
+  requireWriter(u, "company");
+  const g = await readJson<CompanyGoalInput & { request_id?: string }>(req);
+  const key = g.request_id ? `${u.id}:${g.request_id}` : null;
+  if (key && companyGoalRequests.has(key)) return companyGoalRequests.get(key);
+  const out = { goal: saveCompanyGoal(u, g) };
+  if (key) {
+    companyGoalRequests.set(key, out);
+    if (companyGoalRequests.size > 500) companyGoalRequests.delete(companyGoalRequests.keys().next().value!);
+  }
+  return out;
 });
 r.post("/api/today/profile", async (req) => {
   const u = requireUser(req);

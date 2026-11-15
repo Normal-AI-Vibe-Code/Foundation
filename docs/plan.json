@@ -983,6 +983,15 @@
       "issue": 108
     },
     {
+      "id": "company-goals",
+      "title": "The company's goals open Today and every Chrome new tab",
+      "kind": "plan",
+      "milestone": "today",
+      "area": "today",
+      "status": "review",
+      "body": "Company goals: the few things everyone is working towards, first on Today (above Focus today) and in Foundation for Chrome's popup, the same for everyone. Whoever can change the company board sets them (on the page, or by asking the Shiba: `set_company_goal`); a viewer reads them and the server refuses their write (HTTP and tools). A goal handed to someone (`owner`) is in their focus, right after their asks. Changes are logged on the company board. Evidence: `docs/evidence/2026-11-14_company-goals/` (SPEC §3 Today)."
+    },
+    {
       "id": "chrome-real-check",
       "title": "Load Foundation for Chrome in a real Chrome",
       "kind": "plan",

@@ -12,7 +12,12 @@
  * - files others dropped on boards they work on, and what changed there;
  * - cards and files that match their job (their profile's focus words), from the search index.
  *
- * Goals are the person's own (this table). The Airform Data Room will be a
+ * Company goals are the company's: everyone reads them on Today (and on the
+ * Chrome new tab), and anyone who can change the company board sets them. A
+ * company goal with an owner is also in that person's focus. They belong to the
+ * company board: a change is logged there, and a viewer can't make one.
+ *
+ * A person's own goals are theirs alone (the goals table). The Airform Data Room will be a
  * second source of goals and projects (SPEC §6 #19: an endpoint there, then
  * `DATAROOM_GOALS_URL` here); until then Today says it isn't connected.
  */
@@ -21,7 +26,10 @@ import { randomBytes } from "node:crypto";
 import type { UserInfo } from "@foundation/protocol";
 import { boardMaps, COMPANY_APPS, noteTextOf } from "@foundation/protocol";
 import { all, db, one, run } from "./db.ts";
-import { getBoard, listBoards } from "./boards.ts";
+import { editBoard, getBoard, listBoards } from "./boards.ts";
+import { canWrite } from "./roles.ts";
+import { HttpError } from "./http.ts";
+import { logActivity } from "@foundation/protocol";
 import { listApps } from "./apps.ts";
 import { config } from "./config.ts";
 
@@ -49,6 +57,21 @@ create table if not exists goals (
   updated_at integer not null
 );
 create index if not exists goals_user on goals(user_id, status, updated_at);
+create table if not exists company_goals (
+  id text primary key,
+  board_id text not null default 'company',
+  title text not null,
+  detail text not null default '',
+  owner text not null default '',
+  status text not null default 'active',
+  progress real not null default 0,
+  due_at integer,
+  object_id text,
+  created_by text,
+  created_at integer not null,
+  updated_at integer not null
+);
+create index if not exists company_goals_status on company_goals(status, updated_at);
 `);
 
 // ---------- the company's apps ----------
@@ -201,9 +224,95 @@ export function saveGoal(userId: string, g: GoalInput): Goal {
   return toGoal(one<GoalRow>("select * from goals where id = ?", id)!);
 }
 
+// ---------- the company's goals ----------
+
+/** the board company goals belong to: changing one is a write to it */
+export const COMPANY_BOARD = "company";
+
+export interface CompanyGoal {
+  id: string;
+  title: string;
+  detail: string;
+  /** who carries it: a name or email, matched like an ask's assignee ("" = everyone) */
+  owner: string;
+  status: Goal["status"];
+  progress: number;
+  dueAt: number | null;
+  board: string;
+  objectId: string | null;
+  createdBy: string | null;
+  updatedAt: number;
+}
+
+interface CompanyGoalRow {
+  id: string;
+  board_id: string;
+  title: string;
+  detail: string;
+  owner: string;
+  status: Goal["status"];
+  progress: number;
+  due_at: number | null;
+  object_id: string | null;
+  created_by: string | null;
+  updated_at: number;
+}
+const toCompanyGoal = (r: CompanyGoalRow): CompanyGoal => ({ id: r.id, title: r.title, detail: r.detail, owner: r.owner, status: r.status, progress: r.progress, dueAt: r.due_at, board: r.board_id, objectId: r.object_id, createdBy: r.created_by, updatedAt: r.updated_at });
+
+/** active company goals, and ones finished in the last fortnight (so a win stays in sight a while) */
+export function listCompanyGoals(includeClosed = false): CompanyGoal[] {
+  return all<CompanyGoalRow>(
+    `select * from company_goals ${includeClosed ? "" : "where status = 'active' or (status = 'done' and updated_at > ?)"}
+      order by case status when 'active' then 0 else 1 end, coalesce(due_at, 9e15), created_at`,
+    ...(includeClosed ? [] : [Date.now() - 14 * 864e5]),
+  ).map(toCompanyGoal);
+}
+
+export interface CompanyGoalInput extends GoalInput {
+  owner?: string;
+}
+
+/** whether this person may set the company's goals: whoever can change the company board */
+export const canSetCompanyGoals = (userId: string) => canWrite(userId, COMPANY_BOARD);
+
+/** add a company goal, or change one; refused for anyone who can't change the company board */
+export function saveCompanyGoal(user: Pick<UserInfo, "id" | "name">, g: CompanyGoalInput): CompanyGoal {
+  if (!canSetCompanyGoals(user.id)) throw new HttpError(403, "View only: the company's goals are set by people who can change the company board. Ask an admin.");
+  const now = Date.now();
+  const clamp = (n: number) => Math.max(0, Math.min(1, n));
+  let out: CompanyGoal;
+  let said: string;
+  if (g.id) {
+    const cur = one<CompanyGoalRow>("select * from company_goals where id = ?", g.id);
+    if (!cur) throw new HttpError(404, "no such company goal");
+    const status = g.status ?? (g.progress !== undefined && g.progress >= 1 ? "done" : cur.status);
+    run(
+      "update company_goals set title = ?, detail = ?, owner = ?, status = ?, progress = ?, due_at = ?, object_id = ?, updated_at = ? where id = ?",
+      (g.title ?? cur.title).trim().slice(0, 200) || cur.title, (g.detail ?? cur.detail).slice(0, 2000), (g.owner ?? cur.owner).trim().slice(0, 200), status,
+      clamp(g.progress ?? (status === "done" ? 1 : cur.progress)), g.dueAt === undefined ? cur.due_at : g.dueAt,
+      g.objectId === undefined ? cur.object_id : g.objectId, now, cur.id,
+    );
+    out = toCompanyGoal(one<CompanyGoalRow>("select * from company_goals where id = ?", cur.id)!);
+    said = status !== cur.status ? `marked the company goal “${out.title}” ${status}` : `updated the company goal “${out.title}” (${Math.round(out.progress * 100)}%)`;
+  } else {
+    if (!g.title?.trim()) throw new HttpError(400, "a goal needs a title");
+    const id = `cgoal_${randomBytes(5).toString("hex")}`;
+    run(
+      "insert into company_goals (id, board_id, title, detail, owner, status, progress, due_at, object_id, created_by, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      id, COMPANY_BOARD, g.title.trim().slice(0, 200), (g.detail ?? "").slice(0, 2000), (g.owner ?? "").trim().slice(0, 200), g.status ?? "active", clamp(g.progress ?? 0),
+      g.dueAt ?? null, g.objectId ?? null, user.id, now, now,
+    );
+    out = toCompanyGoal(one<CompanyGoalRow>("select * from company_goals where id = ?", id)!);
+    said = `set a company goal: “${out.title}”${out.owner ? `, carried by ${out.owner}` : ""}`;
+  }
+  // it's the company board's: the change shows in its activity, like any other write there
+  editBoard(COMPANY_BOARD, "today", (doc) => logActivity(doc, { who: user.name, role: "human", text: said, ...(out.objectId ? { objectId: out.objectId } : {}) }));
+  return out;
+}
+
 // ---------- focus ----------
 
-export type FocusKind = "ask" | "mention" | "stage" | "file" | "changes" | "related";
+export type FocusKind = "ask" | "goal" | "mention" | "stage" | "file" | "changes" | "related";
 
 export interface FocusItem {
   id: string;
@@ -283,6 +392,24 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
       href: link(a.board_id, a.panel_id ?? undefined),
       at: a.created_at,
       tone: overdue ? "bad" : "warn",
+    });
+  }
+
+  // company goals they carry
+  for (const g of listCompanyGoals()) {
+    if (g.status !== "active" || !names(user, g.owner)) continue;
+    const late = g.dueAt !== null && g.dueAt < now;
+    items.push({
+      id: `goal:${g.id}`,
+      kind: "goal",
+      title: g.title,
+      why: `A company goal you carry · ${Math.round(g.progress * 100)}%${g.dueAt ? ` · ${late ? `${ago(g.dueAt, now).replace(" ago", "")} late` : `due ${new Date(g.dueAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}` : ""}`,
+      board: g.board,
+      boardName: boardName(g.board),
+      objectId: g.objectId ?? undefined,
+      href: link(g.board, g.objectId ?? undefined),
+      at: g.updatedAt,
+      tone: late ? "bad" : undefined,
     });
   }
 
@@ -400,7 +527,7 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
     }
   }
 
-  const rank: Record<FocusKind, number> = { ask: 0, stage: 1, mention: 2, file: 3, changes: 4, related: 5 };
+  const rank: Record<FocusKind, number> = { ask: 0, goal: 1, stage: 2, mention: 3, file: 4, changes: 5, related: 6 };
   return items.sort((a, b) => rank[a.kind] - rank[b.kind] || (a.tone === "bad" ? -1 : 0) - (b.tone === "bad" ? -1 : 0) || b.at - a.at).slice(0, 24);
 }
 
@@ -409,6 +536,8 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
 export interface TodayState {
   person: { name: string; email: string; first: string };
   profile: Profile;
+  /** the company's goals, the same for everyone */
+  company: { goals: CompanyGoal[]; canSet: boolean };
   goals: Goal[];
   focus: FocusItem[];
   apps: CompanyApp[];
@@ -420,6 +549,7 @@ export function todayFor(user: UserInfo): TodayState {
   return {
     person: { name: user.name, email: user.email, first: user.name.trim().split(/\s+/)[0] || user.name },
     profile: getProfile(user.id),
+    company: { goals: listCompanyGoals(), canSet: canSetCompanyGoals(user.id) },
     goals: listGoals(user.id),
     focus: focusFor(user),
     apps: companyApps(),
@@ -438,7 +568,10 @@ export function todayDigest(t: TodayState) {
     t.profile.focus ? `Their work: ${t.profile.focus}` : "Their work: not described yet (they can tell you; save it with set_profile)",
     `Date: ${new Date(t.at).toDateString()}`,
     "",
-    `Goals (${t.goals.length}):`,
+    `Company goals (${t.company.goals.length}${t.company.canSet ? "; this person can set them" : "; this person can read them, not change them"}):`,
+    ...t.company.goals.map((g) => `- [${g.id}] ${g.title} · ${g.status} · ${Math.round(g.progress * 100)}%${g.owner ? ` · carried by ${g.owner}` : ""}${g.dueAt ? ` · due ${new Date(g.dueAt).toDateString()}` : ""}${g.detail ? ` — ${g.detail.slice(0, 160)}` : ""}`),
+    "",
+    `Their own goals (${t.goals.length}):`,
     ...t.goals.map((g) => `- [${g.id}] ${g.title} · ${g.status} · ${Math.round(g.progress * 100)}%${g.dueAt ? ` · due ${new Date(g.dueAt).toDateString()}` : ""}${g.detail ? ` — ${g.detail.slice(0, 160)}` : ""}`),
     "",
     `Focus today (${t.focus.length}):`,
