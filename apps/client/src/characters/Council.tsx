@@ -275,7 +275,7 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
         character: worn[p.user.name],
         mood: moods[p.crew.id] ?? "idle",
       }))
-    : ready.slice(0, 8).map((c) => ({ id: c.id, name: c.name, character: c, mood: "idle" as Mood }));
+    : ready.slice(0, 12).map((c) => ({ id: c.id, name: c.name, character: c, mood: "idle" as Mood }));
 
   const title = scope.kind === "section" ? (section?.name ?? "a section") : "this board";
   return (

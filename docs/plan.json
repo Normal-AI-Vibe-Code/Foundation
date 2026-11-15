@@ -1417,7 +1417,7 @@
       "milestone": "crew",
       "area": "crew",
       "status": "review",
-      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and one mesh avatar were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones."
+      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and five mesh avatars were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones."
     },
     {
       "id": "council-real-turn",
@@ -1434,8 +1434,8 @@
       "kind": "plan",
       "milestone": "crew",
       "area": "crew",
-      "status": "next",
-      "body": "Each has a sheet and a portrait on the Character studio board and no avatar. Follow `docs/characters.md` (mesh-avatar-studio: grids, the rig draft, overlays, layers, the pose review, pack) and bring each `.mavatar` into its card. Their portraits have a background: cut them out, or press *Draw the portrait* again (it now asks for a clear one)."
+      "status": "done",
+      "body": "Done 2026-11-14: Hana, Midori, Sora and Rin were rigged with mesh-avatar-studio (as Aoi was) and brought into their cards; all five sit on the council (`docs/evidence/2026-11-14_council-characters/24`, `25`). Sora's portrait was drawn again on a grey ground after Meshy's background removal took her white hair with it; Rin's eye regions were kept inside her lenses. No drawn variants (SPEC §7)."
     },
     {
       "id": "mesh-stage-on-the-board",

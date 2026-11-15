@@ -14,7 +14,7 @@ The pipeline is WildChild's (`C:\Dev\WildChild\tools\meshy_hunter_v8_pipeline.mj
 | Stage | 3D character | Mesh avatar | Credits |
 |---|---|---|---|
 | Sheet | the front view, in an A-pose | the front view, standing | 9 |
-| Views | the back and one side, turned from the sheet | a head-and-shoulders portrait, clear background | 18 / 9 |
+| Views | the back and one side, turned from the sheet | a head-and-shoulders portrait on a flat grey ground | 18 / 9 |
 | Model | a textured model from the views (`multi-image-to-3d`, Meshy 7.1, 30k triangles, 2K texture) | | 30 |
 | Skeleton | Meshy's rig (24 joints), at the height on the card | | 5 |
 | Moods | one file with a clip per mood | | 24 |
@@ -55,7 +55,7 @@ The clips' GLB is what a seat plays: it carries the skinned, textured mesh. The 
 
 The mesh stage isn't a button yet (SPEC §7): the rig is coordinates read off grids, which needs an agent with vision. In a Claude Code session, with [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio) cloned beside Foundation (`C:\Dev\mesh-avatar-studio`), Node 22.17+, Python with `uv`, and Playwright's Chromium (`npm run doctor` there says what's missing):
 
-1. **The portrait.** Download the character's portrait from its card (the *portrait* picture). It needs a clear background; one made before 2026-11-14 has a flat one, which a flood fill from the border removes (the outlines stop it).
+1. **The portrait.** Download the character's portrait from its card (the *portrait* picture) and cut its ground away: a flood fill of the ground's colour from the border, then from any enclosed patch of it (the gaps inside loops of hair), a 1 px erode and a slight blur on the alpha, cropped to what's left. The pipeline draws portraits on flat mid-grey for this. **Don't ask Meshy to remove the background**: `remove_background` took a white-haired character's hair and blouse with it.
 2. **Calibrate.** `uv run tools/vision-check.py make work/vision-check`, read the twelve markers, `… score`. It must pass (median ≤ 4 px) before anything is traced.
 3. **Project and survey.** `uv run tools/new-project.py <portrait.png> <name>`, then `uv run tools/grid.py projects/<name> --step 50 --out projects/<name>/work/grid-full.png`. **Read coordinates from the grid's labels, not from where things sit in the picture**: the grid image has margins and its own scale.
 4. **Zoomed grids** for each eye (5 px), the mouth and anything hanging: `--region x0,y0,x1,y1 --step 5`.
@@ -64,7 +64,14 @@ The mesh stage isn't a button yet (SPEC §7): the rig is coordinates read off gr
 7. **Build and review.** `uv run --with numpy --with pillow --with opencv-python-headless tools/build-layers.py projects/<name> --rig rig.draft.json`, then `npm run render-poses -- projects/<name>`: 64 images in `review/`. Closed eyes must close to one clean line; a ±30° turn must not tear; the mouth must open without pulling the chin.
 8. **Pack and bring in.** `npm run pack-avatar -- projects/<name>` → `projects/<name>.mavatar`. On the card: *Bring in the .mavatar*.
 
-Aoi took one pass (2026-11-14). Without drawn variants the closed eye keeps faint crease lines; that is the documented "good enough". The source picture stays on this machine in `projects/`, which mesh-avatar-studio never commits.
+All five of the anime set took one pass each (2026-11-14), about ten minutes apiece once the first was done. What came up:
+
+- **Keep an eye's `roi` off anything that isn't the eye.** Sora's left lashes reach her hair's outline: with the outline inside the region, a blink smeared it; clamping the region to the skin side fixed it (the lash tips then stay still).
+- **Glasses**: keep each `roi` inside its lens and the frames are untouched by a blink (Rin).
+- **Only red earrings swing** (`accessories` isolates by redness); others ride with the head.
+- Without drawn variants a closed eye keeps faint crease lines; that is the guide's documented "good enough".
+
+The source pictures stay on this machine in mesh-avatar-studio's `projects/`, which it never commits.
 
 ## Where things are
 

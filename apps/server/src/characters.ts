@@ -172,7 +172,9 @@ const PORTRAIT = [
   "Head-and-shoulders portrait of exactly the character in the first reference image: the same face, hair, colours and clothes, in the same flat style.",
   "Facing the camera squarely, head upright and not tilted, both eyes fully open and looking at the camera, mouth closed, a neutral relaxed expression,",
   "nothing in front of the face, no hands in frame, shoulders and upper chest in frame, a clear margin above the hair and at both sides.",
-  "Flat even light, no cast shadows, a plain empty background, no text, no logos, no watermark.",
+  // A flat grey ground, not a cleared one: Meshy's remove_background takes white hair and a white blouse with the
+  // background (seen 2026-11-14), while a mid-grey ground is cut away cleanly when the mesh avatar is built.
+  "Flat even light, no cast shadows, a plain flat mid-grey background with nothing on it, no text, no logos, no watermark.",
 ].join(" ");
 
 /** the prompt for one image of a character, word for word as it's sent and kept */
@@ -445,7 +447,7 @@ function plan(c: CharacterState, stage: CharacterStageKey): Plan[] {
       if (!c.files.front) throw new HttpError(400, "Draw the sheet first");
       // a turnaround is drawn from the accepted front (and the first inspiration image, for its surface)
       const refs = [c.files.front, ...c.refs.slice(0, 1)];
-      return c.form === "model" ? [image("back", refs), image("side", refs)] : [image("portrait", [c.files.front], { remove_background: true })];
+      return c.form === "model" ? [image("back", refs), image("side", refs)] : [image("portrait", [c.files.front])];
     }
     case "model": {
       if (!c.files.front) throw new HttpError(400, "Draw the sheet first");
