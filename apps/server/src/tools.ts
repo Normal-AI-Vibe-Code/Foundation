@@ -10,6 +10,7 @@
  * board so people can see what it is touching.
  */
 
+import { createCharacter } from "./characters.ts";
 import { queueHandoff } from "./vision.ts";
 import { plural } from "./words.ts";
 import { findImages, layOut } from "./construct.ts";
@@ -128,6 +129,7 @@ const portSchema = z.object({
 });
 
 const PANEL_SIZES: Record<PanelKind, [number, number]> = {
+  character: [460, 620],
   app: [720, 520],
   link: [640, 460],
   file: [420, 340],
@@ -643,6 +645,25 @@ export const TOOLS: BoardTool[] = [
       if (read) return readPlaceText(p.id, read);
       const { entries, more } = await listPlace(p.id, dir ?? "");
       return { place: p.name, dir: dir ?? "", entries: entries.slice(0, 400).map((e) => (e.dir ? { folder: e.path } : { file: e.path, size: e.size, modified: new Date(e.modified).toISOString().slice(0, 10) })), more: more + Math.max(0, entries.length - 400) };
+    },
+  }),
+  def({
+    name: "add_character",
+    description:
+      "Add a character to the board: a card for an avatar the council's agents can wear. Give it a name, the set it belongs to (anime, animals, abstract, or a new one), its form (model: a 3D character with a skeleton and a clip per mood; mesh: a drawn portrait that blinks, talks and emotes) and its identity: a line or two of who it is and what it wears. This only describes it. Drawing its sheet and everything after spends credits, so a person presses those on the card.",
+    schema: z.object({
+      name: z.string(),
+      set: z.string().optional().describe("anime | animals | abstract, or a new set's name"),
+      form: z.enum(["model", "mesh"]).optional(),
+      identity: z.string().describe("who the character is and what it wears, in a line or two"),
+      section: z.string().optional(),
+      request_id: z.string().optional(),
+    }),
+    write: true,
+    run: (ctx, input) => {
+      const c = createCharacter(ctx.boardId, { name: ctx.actor, id: ctx.userId, human: false }, input);
+      touch(ctx, c.panelId, `added the character “${c.name}”`);
+      return { id: c.panelId, character: c.id, next: "a person presses Draw the sheet on the card" };
     },
   }),
   def({

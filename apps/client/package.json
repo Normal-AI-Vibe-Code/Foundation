@@ -30,6 +30,7 @@
     "@xterm/xterm": "^5.5.0",
     "lib0": "^0.2.99",
     "maplibre-gl": "^5.24.0",
+    "mesh-avatar": "^0.8.0",
     "motion": "^12.42.2",
     "occt-import-js": "^0.0.23",
     "react": "^19.1.0",

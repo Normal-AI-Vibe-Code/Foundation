@@ -5,6 +5,8 @@
  * sources stream in after.
  */
 
+import { openCouncil } from "../lib/councilOpen";
+import { newCharacter, openCharacterStudio } from "../lib/characterStudio";
 import { keys } from "../lib/keys";
 import { openSlackBoard } from "../lib/slackBoard";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -158,6 +160,10 @@ export function CommandBar() {
       { id: "layer", glyph: "◇", label: `${getUi().agentLayer ? "Hide" : "Show"} the agent layer`, hint: "who's working on what, and how apps are wired", keys: "A", run: () => setUi({ agentLayer: !getUi().agentLayer }) },
       { id: "company", glyph: "◉", label: "Go to the company board", hint: "every app we run, live", run: () => void window.dispatchEvent(new CustomEvent("foundation:board", { detail: "company" })) },
       { id: "slack-board", glyph: "#", label: "Open the Slack board", hint: "a section for every channel, kept live", run: () => void openSlackBoard() },
+      { id: "council", glyph: "☺", label: "Council: the agents on this board", hint: "each agent as a character, in its cursor's colour", run: () => openCouncil({ kind: "board" }) },
+      ...(sec && st.allSections[sec] ? [{ id: "council-section", glyph: "☺", label: `Council: the agents in ${st.allSections[sec].name}`, hint: "who's at work in this section", run: () => openCouncil({ kind: "section", id: sec }) }] : []),
+      { id: "character-studio", glyph: "☺", label: "Open the Character studio", hint: "inspiration → sheet → 3D model or mesh avatar, for the council", run: () => void openCharacterStudio() },
+      ...(sec ? [{ id: "character", glyph: "☺", label: "Add a character to this section", hint: "a card that draws, models and animates an avatar", run: () => void newCharacter(sec) }] : []),
       { id: "note", glyph: "▤", label: "Add a note", run: () => void addNote(sec) },
       { id: "table", glyph: "⊞", label: "Add a table", run: () => void createTable(sec) },
       { id: "machine", glyph: "▣", label: "Start a machine in this section", hint: "Linux on Kiri or Docker, with a shared terminal", run: () => void startMachine(sec) },

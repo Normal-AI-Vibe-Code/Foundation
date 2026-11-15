@@ -19,6 +19,8 @@ const data = mkdtempSync(join(tmpdir(), "foundation-e2e-"));
 const SERVER_PORT = process.env.E2E_SERVER_PORT ?? "4430";
 const CLIENT_PORT = process.env.E2E_CLIENT_PORT ?? "1450";
 const SLACK_PORT = process.env.E2E_SLACK_PORT ?? "4440";
+const MESHY_PORT = process.env.E2E_MESHY_PORT ?? "4445";
+process.env.E2E_MESHY_PORT = MESHY_PORT;
 process.env.E2E_CLIENT_PORT = CLIENT_PORT;
 export const CLIENT = `http://localhost:${CLIENT_PORT}`;
 
@@ -45,6 +47,14 @@ export default defineConfig({
       ignoreHTTPSErrors: true,
     },
     {
+      // a stand-in Meshy (e2e/meshy-standin.mjs): the character pipeline runs end to end and nothing is charged
+      command: `node meshy-standin.mjs ${MESHY_PORT}`,
+      cwd: ".",
+      url: `http://127.0.0.1:${MESHY_PORT}/_sent`,
+      reuseExistingServer: false,
+      timeout: 20_000,
+    },
+    {
       command: `npx tsx src/index.ts`,
       cwd: "../../server",
       env: {
@@ -57,6 +67,9 @@ export default defineConfig({
         SLACK_API_BASE: `http://127.0.0.1:${SLACK_PORT}`,
         SLACK_USER_TOKEN: "xoxp-standin",
         SLACK_BOT_TOKEN: "xoxb-standin",
+        MESHY_API_BASE: `http://127.0.0.1:${MESHY_PORT}`,
+        MESHY_API_KEY: "msy-standin",
+        FOUNDATION_MESHY_POLL_MS: "250",
         FOUNDATION_CLAUDE_CLI: "/nonexistent/claude",
         // the crew's agents run a fixed playbook through the real board tools (no model, nothing spent)
         FOUNDATION_AGENT_SCRIPT: "1",

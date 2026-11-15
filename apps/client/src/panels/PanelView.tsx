@@ -28,6 +28,7 @@ import { HuddleBody } from "./HuddleView";
 import { SlackBody } from "./SlackView";
 import { CrewCardBody } from "../components/SectionAgents";
 import { MachineBody, machineAction } from "./MachineView";
+import { CharacterBody } from "./CharacterView";
 import { machinePage, type FromMachine, type MachinePage } from "./machinePage";
 import { sandboxFor } from "./frameSandbox";
 import { SERVER as FOUNDATION_SERVER } from "../lib/api";
@@ -59,6 +60,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   huddle: "◐",
   slack: "◇",
   crew: "✦",
+  character: "☺",
 };
 
 export const PanelView = memo(function PanelView({ panel, pos, isActive, getScale, hosted }: Props) {
@@ -114,6 +116,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <HuddleBody panel={panel} />
     ) : panel.panel === "slack" ? (
       <SlackBody panel={panel} />
+    ) : panel.panel === "character" ? (
+      <CharacterBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (

@@ -4,6 +4,8 @@
  * what Rune drew (GridViewport). One list, so the two can't drift.
  */
 
+import { openCouncil } from "../lib/councilOpen";
+import { newCharacter } from "../lib/characterStudio";
 import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { toast } from "../state/ui";
@@ -97,6 +99,9 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     { icon: "#", label: "Slack channel", action: () => addPanel(section.id, { panel: "slack", name: "Slack", ...at(420, 520) }) },
     { icon: "▣", label: "Machine", action: () => startMachine(section.id, at(760, 520)) },
     ...tellSlack,
+    { icon: "☺", label: "Council of this section", agent: true, action: () => openCouncil({ kind: "section", id: section.id }) },
+    { icon: "☺", label: "Character: 3D", action: () => void newCharacter(section.id, "model") },
+    { icon: "☺", label: "Character: mesh avatar", action: () => void newCharacter(section.id, "mesh") },
     { icon: "◨", label: "All agents on this board", action: () => openAgentsPane(section.id) },
     ...(host
       ? [{ icon: "◱", label: `Show ${host.name} as a card`, action: () => setSectionHost(section.id, null) }]

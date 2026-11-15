@@ -4,6 +4,7 @@
  * from the real tokens so it can't drift. New UI behaviour lands here first.
  */
 
+import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { durations, easings, isNight, setNight, springs } from "@foundation/ui";
@@ -1006,6 +1007,10 @@ export function DesignPage() {
         <SectionAgentsDemo />
       </Section>
 
+      <Section title="The council" note="The agents at work on a section or the whole board, seated along the foot of the window as characters (☺ in the top bar, on a section's tools, in its right-click menu, and ⌘K). A glass bar, pane radius, risen on the settle spring; seats stagger in 45 ms apart on the spring. Each seat is 124 × 156: its character from the chest up over a plinth washed in its agent's cursor colour (--color-crew-n, the same hue as its cursor and its presence dot) with a 3 px rule of that colour at the foot, what its cursor says above it on raised paper with a hairline tinted the same, and under it the colour's dot, the agent's name in 12/600 and “as <character>” in dim 11. A seat's mood is the agent's state: it waves when it arrives, thinks while it reads, works while it writes, talks when it asks you something, cheers when it's done, holds its head on an error. Pressed, a seat stands (208 × 332, head to toe on a round wash of its colour) and a card beside it says what it was asked and for whom, with Follow, Stop and the characters it can appear as (the one worn ringed in its colour). With nobody at work the seats are the bench: the characters there are, on a neutral plinth, and one waves when pointed at. Below, a composer on a pill; Ask is the violet pill, because an agent will act. 3D characters are drawn on one canvas laid over the bar, so six seats cost one renderer; the board above stays live, since only the bar takes the pointer.">
+        <CouncilDemo />
+      </Section>
+
       <Section title="Text box" note={`A note written as formatted text: what you see is what's kept. Click in it to write; a toolbar rides the card's foot while it has the caret (raised paper, card radius, 34 tall): the style (Body, Title, Heading, Subheading), bold, italic, underline, strikethrough, bulleted and numbered lists, quote, link, clear. A mark that's on is the pulse tint. ${keys("mod+B")}, ${keys("mod+I")} and ${keys("mod+U")} work as in any word processor. Under it, it is the note's own markdown in the note's shared text, so search, agents and the other renderer read it as they read any note; underline is kept as <u>. From the right-click menu (Text box), and from an empty section's Write.`}>
         <TextBoxDemo />
       </Section>
@@ -1607,6 +1612,21 @@ function SlackMarks() {
           <div className="effect-label">{label}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** the council, still: four agents, one standing (no characters are loaded here, so the seats show their marks) */
+function CouncilDemo() {
+  const seats: CouncilSeat[] = [
+    { id: "a", name: "Wren", hue: 0, status: "working", doing: "adding a table of parts", task: "Make a Supply section with the parts and hook up FactoryForm", askerName: "Ada", mine: true, mood: "working" },
+    { id: "b", name: "Kestrel", hue: 2, status: "working", doing: "reading the board", leadName: "Wren", askerName: "Ada", mood: "thinking" },
+    { id: "c", name: "Juniper", hue: 3, status: "done", doing: "", askerName: "Kai", mood: "happy" },
+    { id: "d", name: "Sorrel", hue: 1, status: "error", doing: "", askerName: "Kai", mood: "sad" },
+  ];
+  return (
+    <div data-design-council>
+      <CouncilView title="Supply" seats={seats} bench={false} characters={[]} canAsk onAsk={() => {}} onFollow={() => {}} onStop={() => {}} inline open="a" />
     </div>
   );
 }

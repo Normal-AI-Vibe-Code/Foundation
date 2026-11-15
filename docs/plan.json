@@ -1409,6 +1409,60 @@
       "status": "next",
       "body": "Measured 2026-11-13 (`docs/evidence/2026-11-13_rune-frames/`): on 300 markdown notes the web renderer holds 60 fps and Rune runs long frames on a third to a half of them (p95 83 to 150 ms). Find what makes Rune's view run again on live-only frames (about one run per camera step and per grain tick: its `CommitWhy`), keep off-screen cards out of the frame (cull in `scene.ts`, or a cache that holds), and cut or throttle Rune's accessibility mirror (12 % of a pan). Done when `e2e/rune-frames.spec.ts` shows Rune at the web renderer's p95 on 300 notes, and then holds it there.",
       "issue": 133
+    },
+    {
+      "id": "council-characters",
+      "title": "The council: agents as characters, and a studio board that makes them",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "review",
+      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and one mesh avatar were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones."
+    },
+    {
+      "id": "council-real-turn",
+      "title": "See a real agent turn sit in the council",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "next",
+      "body": "The council's seats, colours and moods were checked with the script runtime only. Run a real Claude Code turn with the council up: does it wave, think and work at the right moments, and is `doing` enough to tell reading from writing? (SPEC §7.)"
+    },
+    {
+      "id": "mesh-avatars-anime-set",
+      "title": "Rig the rest of the anime set: Hana, Midori, Sora, Rin",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "next",
+      "body": "Each has a sheet and a portrait on the Character studio board and no avatar. Follow `docs/characters.md` (mesh-avatar-studio: grids, the rig draft, overlays, layers, the pose review, pack) and bring each `.mavatar` into its card. Their portraits have a background: cut them out, or press *Draw the portrait* again (it now asks for a clear one)."
+    },
+    {
+      "id": "mesh-stage-on-the-board",
+      "title": "The mesh avatar stage as a press on the board",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "backlog",
+      "body": "Today a mesh avatar is rigged by hand in a Claude Code session with mesh-avatar-studio and brought in as a file. Make it a job a person starts from the card: an agent with vision reads the grids and writes the rig, the server builds the layers (Python, OpenCV) and renders the review poses onto the board for a person to accept. Needs uv, Python and Chromium on the server's machine, and an image model that edits inside a mask for the drawn eyes and mouths (Meshy's doesn't)."
+    },
+    {
+      "id": "council-faces-3d",
+      "title": "3D characters that blink and change expression",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "backlog",
+      "body": "Meshy's skeleton has no face bones, so a 3D seat's face never moves. Options: swap the face texture per mood (a second image pass per character), morph targets made in Blender, or a small drawn face over the model. Also: a clip for working that isn't a talking gesture."
+    },
+    {
+      "id": "council-rune-tool",
+      "title": "Rune: the council on a section's toolbar",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "design",
+      "status": "backlog",
+      "body": "The web toolbar has ☺ (the section's council); Rune's toolbar is drawn in Rust (`apps/rune/src/view.rs` `icon`) and doesn't. Add the tool to `rune/tools.ts` and draw its icon. The menu, ⌘K and the top bar already open it under Rune."
     }
   ]
 }

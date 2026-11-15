@@ -15,6 +15,7 @@
  * (shell/WindowControls.tsx), all on the one line.
  */
 
+import { toggleCouncil, useCouncilOpen } from "../lib/councilOpen";
 import { useEffect, useRef, useState } from "react";
 import { COMMANDS_GLYPH, keys } from "../lib/keys";
 import { motion, AnimatePresence } from "motion/react";
@@ -35,6 +36,7 @@ interface Props {
 
 export function TopBar({ boards, current, onSwitch, onNew, onClose, onRename }: Props) {
   const ui = useUi();
+  const council = useCouncilOpen();
   const board = useBoardTick();
   const status = board?.status ?? "connecting";
   const [menu, setMenu] = useState(false);
@@ -191,6 +193,9 @@ export function TopBar({ boards, current, onSwitch, onNew, onClose, onRename }: 
         <PresenceStack />
         <button className={`top-btn${ui.search ? " is-on" : ""}`} onClick={() => setUi({ search: !ui.search })} data-tip={`Search, drag onto the grid (${keys("mod+F")})`}>
           ⌕
+        </button>
+        <button className={`top-btn is-agent${council?.kind === "board" ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-label="Council" data-tip="Council: the agents on this board, as characters in their cursors' colours" data-council-open>
+          ☺
         </button>
         <button className={`top-btn is-agent${ui.agents ? " is-on" : ""}`} onClick={() => setUi({ agents: !ui.agents })} aria-label="Agents" data-tip="Agents on this board: who's in which section, and who works together">
           ✦

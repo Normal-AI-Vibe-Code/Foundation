@@ -1,4 +1,5 @@
 import { keys } from "../lib/keys";
+import { toggleCouncil } from "../lib/councilOpen";
 import { Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -473,6 +474,7 @@ export const SectionView = memo(function SectionView({
             {host
               ? tool(`Ask the agent about ${host.name}`, "✦", () => askAgent(`About “${host.name}”: `), "sec-agent", keys("mod+J"))
               : tool("Agents in this section: ask one, see who's at work", "✦", () => openSectionAgents(section.id, true), "sec-agent")}
+            {!host && tool("Council: this section's agents, as characters", "☺", () => toggleCouncil({ kind: "section", id: section.id }), "sec-agent sec-council")}
             {canRemove && !isOpen && tool("Remove this section…", "✕", () => setConfirming(true), "sec-remove")}
           </div>
         </div>

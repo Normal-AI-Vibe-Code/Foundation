@@ -9,6 +9,8 @@
  */
 
 import * as Y from "yjs";
+import type { CharacterState } from "./characters.ts";
+export * from "./characters.ts";
 
 // ---------- board document layout ----------
 
@@ -25,6 +27,7 @@ export const BOARD = {
   huddles: "huddles", // huddle panel id → HuddleState (schema 6: kept by the server alone, off the card)
   machineAsks: "machineAsks", // machine panel id → MachineAsk[] (commands agents asked to run; kept by the server alone, off the card)
   slack: "slack", // section id → SlackSectionState (a section kept for a Slack channel; kept by the server alone)
+  characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
 } as const;
 
 export interface GridTracks {
@@ -148,7 +151,8 @@ export type PanelKind =
   | "stage" // one step of a design pipeline (brief → concept → CAD → simulate → review → release)
   | "huddle" // a video portal: people on the board talk face to face, transcribed and archived
   | "slack" // a Slack channel on the board: read it, post to it, send it board links, invite it to a huddle
-  | "crew"; // the agents of the section it sits in: who is at work there, what each is doing, and a place to ask one
+  | "crew" // the agents of the section it sits in: who is at work there, what each is doing, and a place to ask one
+  | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
 
 export interface Port {
   id: string;
@@ -494,6 +498,7 @@ export function boardMaps(doc: Y.Doc) {
     huddles: doc.getMap<HuddleState>(BOARD.huddles),
     machineAsks: doc.getMap<MachineAsk[]>(BOARD.machineAsks),
     slack: doc.getMap<SlackSectionState>(BOARD.slack),
+    characters: doc.getMap<CharacterState>(BOARD.characters),
   };
 }
 

@@ -51,6 +51,9 @@ import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
 import { buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
+import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter } from "./characters.ts";
+import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
+import { readBody } from "./http.ts";
 import { engineImages, engineStatus, loadImage, reconcileMachine, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
@@ -664,6 +667,73 @@ r.post("/api/boards/:id/machines/load", async (req) => {
   return loadImage(req.params.id, b.fileId, u.name, b.engine);
 });
 
+// ---------- characters: the council's avatars and the pipeline that makes them (characters.ts) ----------
+
+/** every character, and who wears which: any signed-in person, on any board */
+r.get("/api/characters", (req) => {
+  requireUser(req);
+  return roster();
+});
+r.get("/api/characters/costs", async (req) => {
+  requireUser(req);
+  return characterCosts();
+});
+/** a character's file by role (thumb, clips, mavatar, front …): characters are the company's, so this doesn't ask which board */
+r.get("/api/characters/:id/files/:role", (req, res) => {
+  requireUser(req);
+  serveFile(req, res, characterFile(req.params.id, req.params.role));
+});
+/** make the Character studio board (or say where the one there is) */
+r.post("/api/characters/studio", (req) => {
+  const u = requireUser(req);
+  requireWriter(u);
+  return openStudio(u);
+});
+/** choose the character an agent name wears */
+r.post("/api/characters/avatars", async (req) => {
+  const u = requireUser(req);
+  requireWriter(u);
+  const b = await readJson<{ name?: string; character?: string | null }>(req);
+  return { avatars: setAvatar(u, b.name ?? "", b.character ?? null) };
+});
+// adding and describing a character spends nothing (gateWrites has refused viewers)
+r.post("/api/boards/:id/characters", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  return { character: createCharacter(req.params.id, { name: u.name, id: u.id, human: isPerson(req) }, await readJson<NewCharacter>(req)) };
+});
+/** an image into a set's Inspiration section (the request's body is the image) */
+r.post("/api/boards/:id/characters/inspiration", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  const mime = (req.headers["content-type"] || "").split(";")[0];
+  return addInspiration(req.params.id, req.query.get("set") ?? "Abstract", await readBody(req, 20 * 1024 * 1024), { name: (req.query.get("name") || "inspiration").slice(0, 240), mime }, u);
+});
+r.post("/api/boards/:id/characters/:panel/edit", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  return { character: editCharacter(req.params.id, req.params.panel, await readJson<NewCharacter>(req)) };
+});
+r.get("/api/boards/:id/characters/:panel/tasks", (req) => {
+  requireBoard(requireUser(req), req.params.id);
+  return { tasks: characterTasks(req.params.id, req.params.panel) };
+});
+/** a .mavatar built with mesh-avatar-studio, as the request's body */
+r.post("/api/boards/:id/characters/:panel/mavatar", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  return { character: await attachMavatar(req.params.id, req.params.panel, await readBody(req, 130 * 1024 * 1024), u) };
+});
+// every stage spends credits: a person at a browser presses it (an agent's bearer is refused)
+r.post("/api/boards/:id/characters/:panel/stages/:stage", async (req) => {
+  const u = requirePerson(req, "Spending credits on a character");
+  requireBoard(u, req.params.id);
+  const stage = req.params.stage as CharacterStageKey;
+  if (!CHARACTER_STAGES.model.includes(stage) && !CHARACTER_STAGES.mesh.includes(stage)) throw new HttpError(404, "no such stage");
+  const b = await readJson<{ confirm?: boolean }>(req);
+  return { character: await startStage(req.params.id, req.params.panel, stage, u, { confirm: b.confirm === true }) };
+});
+
 // ---------- agent ----------
 
 r.get("/api/agent/runtimes", (req) => {
@@ -894,6 +964,7 @@ migrateAllBoards();
 settleOrphanRuns();
 startHermes();
 startDigest();
+resumeCharacters();
 
 // Started by the desktop app (src-tauri/src/server.rs), the server lives exactly as long as the app:
 // the app holds the other end of stdin, and however the app ends (quit, crash, Task Manager) that

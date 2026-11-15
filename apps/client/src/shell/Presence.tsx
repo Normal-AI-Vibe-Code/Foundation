@@ -4,6 +4,7 @@
  * Agents appear the same way, in the agent violet, ringing what they touch.
  */
 
+import { openCouncil } from "../lib/councilOpen";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { activeBoard, onBoardChange, type PeerState } from "../sync/board";
 import { onCamera, onPointer } from "../state/camera";
@@ -79,7 +80,9 @@ export function PresenceStack() {
         <span
           key={p.clientId}
           className={`presence-avatar${p.user.agent ? " is-agent" : ""}`}
-          style={{ background: p.user.agent ? undefined : p.user.color, zIndex: 10 - i }}
+          // an agent with its own cursor wears that cursor's colour (the council's seats do too), and opens the council
+          style={{ background: p.user.agent ? (p.crew ? `var(--color-crew-${p.crew.hue % 6})` : undefined) : p.user.color, zIndex: 10 - i }}
+          onClick={p.crew ? () => openCouncil({ kind: "board" }) : undefined}
         >
           {p.user.agent ? "✦" : initials(p.user.name)}
         </span>

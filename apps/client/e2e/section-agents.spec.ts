@@ -65,8 +65,8 @@ test("a section at rest says agents can build in it and that it opens as a grid;
   await expect(menu).toBeVisible();
   const labels = (await menu.locator(".menu-item").allInnerTexts()).map((t) => t.replace(/^\S+\s+/, "").trim());
   expect(labels[0]).toBe("Ask an agent to build here…");
-  for (const want of ["Text box", "Markdown note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine", "Open as its own grid"]) expect(labels).toContain(want);
-  await expect(menu.locator(".menu-item.is-agent")).toHaveCount(2);
+  for (const want of ["Text box", "Markdown note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine", "Council of this section", "Open as its own grid"]) expect(labels).toContain(want);
+  await expect(menu.locator(".menu-item.is-agent")).toHaveCount(3);
   // it fits the window, whatever its length
   const m = (await menu.boundingBox())!;
   expect(m.y).toBeGreaterThanOrEqual(0);

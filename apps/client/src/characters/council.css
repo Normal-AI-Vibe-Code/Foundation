@@ -1,0 +1,410 @@
+/* The council (characters/Council.tsx) and a character drawn anywhere (characters/Avatar.tsx). Tokens only. */
+
+/* ---------- an avatar: a 3D seat, a mesh face, or a still ---------- */
+
+.avatar {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.avatar-none {
+  display: grid;
+  place-items: center;
+  color: var(--crew, var(--color-dim));
+  font: 500 var(--text-18, 18px) / 1 var(--font-sans);
+}
+.avatar-still {
+  object-fit: cover;
+  object-position: 50% 12%;
+  border-radius: var(--radius-card);
+  user-select: none;
+  animation: avatar-breathe 4.2s var(--ease-out-soft) infinite alternate;
+  transform-origin: 50% 100%;
+}
+.avatar-3d > .avatar-still,
+.avatar-mesh > .avatar-still {
+  position: absolute;
+  inset: 0;
+  animation: none;
+  opacity: 0.55;
+}
+.avatar-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.avatar-3d.is-loading > .avatar-canvas,
+.avatar-mesh.is-loading > .avatar-canvas,
+.avatar-mesh.is-failed > .avatar-canvas {
+  opacity: 0;
+}
+@keyframes avatar-breathe {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.012, 1.02);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-still {
+    animation: none;
+  }
+}
+
+/* ---------- the council ---------- */
+
+.council {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  /* above the dock (search, ask, the talk key) at the foot of the window */
+  padding: 0 var(--space-6) 72px;
+  pointer-events: none;
+}
+.council.is-inline {
+  position: relative;
+  inset: auto;
+  z-index: 0;
+  min-height: 460px;
+  padding: var(--space-5);
+}
+/* the one canvas every 3D seat is drawn on: over the bench, taking no pointer */
+.council-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+.council-bar {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "head head" "seats card" "ask ask";
+  gap: var(--space-4) var(--space-5);
+  max-width: min(1180px, 100%);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 1px solid var(--color-line);
+  color: var(--color-frost);
+  animation: council-rise var(--dur-lift) var(--ease-settle) both;
+}
+@keyframes council-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+}
+.council-head {
+  grid-area: head;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.council-title {
+  font: 600 var(--text-13, 13px) / 1.2 var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.council-title > span {
+  color: var(--color-agent);
+}
+.council-title > i {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--color-mist);
+}
+.council-count {
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+  color: var(--color-dim);
+  white-space: nowrap;
+}
+.council-close {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 400 16px / 1 var(--font-sans);
+  cursor: pointer;
+}
+.council-close:hover {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+
+.council-seats {
+  grid-area: seats;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-5);
+  min-width: 0;
+  min-height: 190px;
+}
+.council-none {
+  align-self: center;
+  max-width: 44ch;
+  margin: 0;
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  color: var(--color-mist);
+  text-align: center;
+}
+.council-seat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  animation: council-seat-in var(--dur-lift) var(--ease-spring) both;
+  animation-delay: calc(var(--i) * 45ms + 60ms);
+}
+@keyframes council-seat-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.86);
+  }
+}
+.council-figure {
+  position: relative;
+  width: 124px;
+  height: 156px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-pane);
+  transition:
+    width var(--dur-lift) var(--ease-settle),
+    height var(--dur-lift) var(--ease-settle),
+    transform var(--dur-quick) var(--ease-out-soft);
+}
+.council-figure:hover {
+  transform: translateY(-3px);
+}
+.council-figure:focus-visible {
+  outline: 2px solid var(--crew);
+  outline-offset: 2px;
+}
+.council-seat.is-up .council-figure {
+  width: 208px;
+  height: 332px;
+}
+.council-seat.is-up .avatar-still {
+  object-fit: contain;
+  object-position: 50% 100%;
+}
+/* what the seat stands on: its agent's cursor colour */
+.council-plinth {
+  position: absolute;
+  inset: 14% 4% 0;
+  border-radius: 50% 50% var(--radius-pane) var(--radius-pane) / 42% 42% var(--radius-pane) var(--radius-pane);
+  background: linear-gradient(to top, color-mix(in srgb, var(--crew) 46%, transparent), color-mix(in srgb, var(--crew) 12%, transparent) 70%, transparent);
+  box-shadow: inset 0 -3px 0 var(--crew);
+  transition: inset var(--dur-lift) var(--ease-settle);
+}
+.council-seat.is-up .council-plinth {
+  inset: 62% 6% 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--crew) 60%, transparent), color-mix(in srgb, var(--crew) 18%, transparent) 70%, transparent);
+  box-shadow: none;
+}
+.council-seat.is-spare .council-plinth {
+  box-shadow: inset 0 -2px 0 var(--color-line-strong);
+}
+.council-seat.is-done .council-figure,
+.council-seat.is-stopped .council-figure {
+  opacity: 0.72;
+}
+
+.council-says {
+  position: relative;
+  max-width: 168px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--crew) 45%, var(--color-line));
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.council-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  max-width: 180px;
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  white-space: nowrap;
+}
+.council-name > b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.council-name > i {
+  font-style: normal;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.council-dot {
+  flex: none;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--crew);
+}
+.council-seat.is-working .council-dot {
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+
+/* the standing seat's card */
+.council-card {
+  grid-area: card;
+  align-self: stretch;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  animation: council-rise var(--dur-pane) var(--ease-out-soft) both;
+}
+.council-card-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: 600 var(--text-13, 13px) / 1.2 var(--font-sans);
+}
+.council-status {
+  margin-left: auto;
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  color: var(--color-mist);
+}
+.council-status.is-error {
+  color: var(--color-bad);
+}
+.council-task,
+.council-doing,
+.council-for {
+  margin: 0;
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  color: var(--color-mist);
+  overflow-wrap: anywhere;
+}
+.council-task {
+  color: var(--color-frost);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.council-for {
+  font-size: var(--text-11);
+  color: var(--color-dim);
+}
+.council-acts {
+  display: flex;
+  gap: var(--space-3);
+}
+.council-label {
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  color: var(--color-dim);
+}
+.council-wear {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: auto;
+}
+.council-wear-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.council-wear-pick {
+  width: 38px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  overflow: hidden;
+  cursor: pointer;
+}
+.council-wear-pick .avatar-still {
+  animation: none;
+  border-radius: 0;
+}
+.council-wear-pick:hover {
+  border-color: var(--color-line-strong);
+}
+.council-wear-pick.is-on {
+  border-color: var(--crew);
+  box-shadow: 0 0 0 1px var(--crew);
+}
+
+.council-ask {
+  grid-area: ask;
+  display: flex;
+  gap: var(--space-3);
+}
+.council-ask-text {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.2 var(--font-sans);
+}
+.council-ask-text:focus {
+  outline: none;
+  border-color: var(--color-agent);
+}
+
+@media (max-width: 760px) {
+  .council-bar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "head" "seats" "card" "ask";
+  }
+  .council-card {
+    width: auto;
+  }
+  .council-seats {
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .council-bar,
+  .council-seat,
+  .council-card {
+    animation: none;
+  }
+}

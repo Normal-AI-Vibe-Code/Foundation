@@ -13,6 +13,7 @@ import { cardOf, fullscreenCard, installCardUse, modHeld } from "../lib/cardUse"
  * Esc releases an engaged app (then steps up the grid's levels).
  */
 
+import { Council } from "../characters/Council";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
@@ -254,6 +255,7 @@ export function Shell({ user }: { user: UserInfo }) {
       <AgentsPane />
       <TouchedRings />
       <SectionAgentsPanel />
+      <Council />
       <ContextMenuView />
       <CommandBar />
       <Present />
