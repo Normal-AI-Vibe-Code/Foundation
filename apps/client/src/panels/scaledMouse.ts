@@ -53,8 +53,11 @@ export function unscaleMouse(node: HTMLElement): () => void {
     });
     RESENT.add(again);
     e.stopImmediatePropagation();
-    // the press itself still focuses and selects as usual: only its coordinates change
-    if (e.type !== "mousedown") e.preventDefault();
+    // The real press is spent here too. xterm takes the caret on the press it is handed (the one sent
+    // on below) and cancels that one; left alone, the real press then did what a press on plain page
+    // does and moved focus to the page, so the terminal lost the keys the moment it got them: at any
+    // zoom but 100 % a click never let you type (2026-11-15).
+    e.preventDefault();
     (e.target ?? node).dispatchEvent(again);
   };
   const onDown = (e: MouseEvent) => {

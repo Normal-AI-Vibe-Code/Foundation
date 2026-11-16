@@ -62,7 +62,7 @@ test("Settings is a place in the shell: the side menu stays, the settings come f
   await use.getByRole("radio", { name: "Ask me on each machine" }).click();
   await expect.poll(async () => ((await (await ctx.request.get(`${CLIENT}/api/prefs`)).json()) as { prefs: { computer_use: string } }).prefs.computer_use).toBe("ask");
   // a setting can't be made up
-  expect((await ctx.request.post(`${CLIENT}/api/prefs`, { data: { computer_use: "always" } })).status()).toBe(400);
+  expect((await ctx.request.post(`${CLIENT}/api/prefs`, { data: { key: "computer_use", value: "always" } })).status()).toBe(400);
   await settle(ada, 1600);
   await ada.screenshot({ path: `${SHOTS}/settings-general-day.png` });
 

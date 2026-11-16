@@ -47,7 +47,6 @@ import { bringFlowformFile, listRooms as listFlowformRooms, liveRooms, pullRoom,
 import { beginGrant, downloadsStatus, dropSession, fileThumb } from "./flowformfiles.ts";
 import { isPerson, requirePerson } from "./auth.ts";
 import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
-import { prefsOf, setPref } from "./prefs.ts";
 import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
@@ -57,12 +56,16 @@ import { buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveS
 import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter } from "./characters.ts";
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
-import { engineImages, engineStatus, loadImage, reconcileMachine, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
+import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
+import { addDesktop, setAgentsMay } from "./machinedesktop.ts";
+import { startMachineIo } from "./machineio.ts";
+import { prefsOf, setPref } from "./prefs.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
 startFlowformSync();
 startMachineAsks();
+startMachineIo();
 // the Slack board: read in turn while the Slack app is quiet; its agents are ordinary crew runs
 startSlackLive();
 setCurator((o) => startRun(o));
@@ -661,13 +664,13 @@ r.get("/api/machines/images", async (req) => {
 // a card on screen asks: the server reads the engine and writes what's true to the board
 r.get("/api/boards/:id/machines/:panel", async (req) => {
   requireBoard(requireUser(req), req.params.id);
-  return reconcileMachine(req.params.id, req.params.panel);
+  return machineSeen(req.params.id, req.params.panel);
 });
 // everything that runs, stops or removes needs a person at a browser (gateWrites has already refused viewers)
 r.post("/api/boards/:id/machines/:panel/start", async (req) => {
   const u = requirePerson(req, "Starting a machine");
   requireBoard(u, req.params.id);
-  const b = await readJson<{ image?: string; engine?: string; ports?: number[] }>(req);
+  const b = await readJson<{ image?: string; engine?: string; ports?: number[]; desktop?: boolean }>(req);
   return { machine: await startMachine(req.params.id, req.params.panel, u.name, b) };
 });
 r.post("/api/boards/:id/machines/:panel/stop", async (req) => {
@@ -686,6 +689,19 @@ r.post("/api/boards/:id/machines/:panel/remove", async (req) => {
   const b = await readJson<{ confirm?: boolean }>(req);
   return { machine: await removeMachine(req.params.id, req.params.panel, u.name, b.confirm === true) };
 });
+// a graphical desktop inside a running machine: installing it runs third-party code, so a person does it (machinedesktop.ts)
+r.post("/api/boards/:id/machines/:panel/desktop", (req) => {
+  const u = requirePerson(req, "Adding a desktop to a machine");
+  requireBoard(u, req.params.id);
+  return { machine: addDesktop(req.params.id, req.params.panel, u).machine };
+});
+// whether agents may use that desktop: a person's leave on this machine, given and taken back from their browser
+r.post("/api/boards/:id/machines/:panel/agents", async (req) => {
+  const u = requirePerson(req, "Letting agents use a desktop");
+  requireBoard(u, req.params.id);
+  const b = await readJson<{ allow?: boolean }>(req);
+  return { machine: setAgentsMay(req.params.id, req.params.panel, u, b.allow === true) };
+});
 // an agent's command waiting on a machine's card: only a person at a browser, who can edit the board, answers it
 r.post("/api/boards/:id/machines/:panel/asks/:ask/:verdict", async (req) => {
   const verdict = req.params.verdict;
@@ -700,6 +716,16 @@ r.post("/api/boards/:id/machines/load", async (req) => {
   const b = await readJson<{ fileId?: string; engine?: string }>(req);
   if (!b.fileId) throw new HttpError(400, "name the file to load");
   return loadImage(req.params.id, b.fileId, u.name, b.engine);
+});
+
+// ---------- a person's own preferences (prefs.ts) ----------
+
+r.get("/api/prefs", (req) => ({ prefs: prefsOf(requireUser(req).id) }));
+// theirs to change, from their own browser: an agent's token reads them and can't set them
+r.post("/api/prefs", async (req) => {
+  const u = requirePerson(req, "Changing your preferences");
+  const b = await readJson<{ key?: string; value?: unknown }>(req);
+  return { prefs: setPref(u.id, b.key ?? "", b.value) };
 });
 
 // ---------- characters: the council's avatars and the pipeline that makes them (characters.ts) ----------
@@ -745,16 +771,6 @@ r.post("/api/system-grids/:key", (req) => {
   requireUser(req);
   if (!isSystemGridKey(req.params.key)) throw new HttpError(404, "No such grid");
   return openSystemGrid(req.params.key);
-});
-r.get("/api/prefs", (req) => ({ prefs: prefsOf(requireUser(req).id) }));
-r.post("/api/prefs", async (req) => {
-  const u = requirePerson(req, "Changing your settings");
-  const body = await readJson<Record<string, unknown>>(req);
-  for (const [k, v] of Object.entries(body)) {
-    const out = setPref(u.id, k, v);
-    if ("error" in out) throw new HttpError(400, out.error);
-  }
-  return { prefs: prefsOf(u.id) };
 });
 
 /** make the Character studio board (or say where the one there is) */
@@ -961,10 +977,10 @@ r.post("/api/agent/runs/:id/stop", (req) => {
  * stopping your own run, an MCP token (its tools check too), board tools
  * (runTool checks), setting roles (admins only), a socket ticket (a
  * viewer's sync socket is read-only either way), and a person's own Today
- * (their goals and profile are theirs, not a board's). The board is the
+ * and preferences (their goals, profile and settings are theirs, not a board's). The board is the
  * route's :id, or ?board=, else the person's account role decides.
  */
-const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/apps\/probe$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
+const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/apps\/probe$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
 function gateWrites(req: Req, path: string) {
   if (req.method === "GET" || req.method === "OPTIONS" || !path.startsWith("/api/")) return;
   if (READ_POSTS.some((p) => p.test(path))) return;

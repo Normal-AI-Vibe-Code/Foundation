@@ -101,6 +101,23 @@ export async function runScript(opts: { prompt: string; signal: AbortSignal; per
     return;
   }
 
+  // using a machine's desktop (machinedesktop.ts): look, open the file manager from the desktop's Home icon,
+  // go to the machine's pipes folder by keyboard, and say so. Without a person's leave the first step says why, and that's the answer.
+  const desk = /\bdesktop of “([^”]+)”/.exec(opts.prompt)?.[1];
+  if (desk) {
+    try {
+      await step("desktop_screenshot", { machine: desk });
+      await step("desktop_mouse", { machine: desk, action: "double_click", x: 69, y: 180 });
+      await step("desktop_key", { machine: desk, keys: ["ctrl+l"] });
+      await step("desktop_type", { machine: desk, text: "/foundation\n" });
+      emit({ type: "text", text: `Opened the file manager on ${desk}'s desktop and went to /foundation, where its pipes are.` });
+    } catch (e) {
+      emit({ type: "text", text: `I couldn't use ${desk}'s desktop: ${(e as Error).message}` });
+    }
+    emit({ type: "done", runtime: "script" });
+    return;
+  }
+
   const section = quoted(opts.prompt) ?? "Supply chain";
   await step("set_plan", {
     goal: `${section}: the parts on the board, with their data`,

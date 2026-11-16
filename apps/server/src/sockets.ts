@@ -1,7 +1,8 @@
 /**
  * The server's sockets — board sync (/sync/:board), huddles
- * (/huddle/:board/:id) and a machine's shared terminal
- * (/machines/:board/:panel/tty) — and how a socket proves who opens it.
+ * (/huddle/:board/:id), a machine's shared terminal
+ * (/machines/:board/:panel/tty) and its desktop (/machines/:board/:panel/vnc)
+ * — and how a socket proves who opens it.
  *
  * A browser on the server's own site sends its session cookie with the
  * upgrade, and a program (an agent, a test) can send an Authorization header.
@@ -33,6 +34,7 @@ import { HttpError, type Req } from "./http.ts";
 import { attachConnection, boardEpoch, syncAccess } from "./boards.ts";
 import { attachHuddle } from "./huddles.ts";
 import { attachTerminal } from "./machines.ts";
+import { attachDesktop } from "./machinedesktop.ts";
 import { canSeeBoard } from "./members.ts";
 import { canWrite } from "./roles.ts";
 
@@ -44,10 +46,11 @@ const ID = "[A-Za-z0-9_-]{1,64}";
 const SYNC = new RegExp(`^/sync/(${ID})$`);
 const HUDDLE = new RegExp(`^/huddle/(${ID})/(${ID})$`);
 const TTY = new RegExp(`^/machines/(${ID})/(${ID})/tty$`);
+const VNC = new RegExp(`^/machines/(${ID})/(${ID})/vnc$`);
 
 /** the board a socket path belongs to, or null if it isn't one of ours */
 export function socketBoard(path: string): string | null {
-  return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path))?.[1] ?? null;
+  return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path) ?? VNC.exec(path))?.[1] ?? null;
 }
 
 /** `POST /api/ws-ticket { path }`: a one-time ticket for that one socket */
@@ -117,9 +120,15 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
     wss.handleUpgrade(req, socket, head, (ws) => void attachTerminal(tm[1], tm[2], ws, user, canWrite(user.id, tm[1])));
     return;
   }
+  // a machine's desktop (VNC, relayed): editors get the pointer and keys, viewers the view-only screen
+  const vm = VNC.exec(url.pathname);
+  if (vm && user && canSeeBoard(user, vm[1])) {
+    wss.handleUpgrade(req, socket, head, (ws) => void attachDesktop(vm[1], vm[2], ws, user, canWrite(user.id, vm[1])));
+    return;
+  }
   const m = SYNC.exec(url.pathname);
   if (!m || !user || !canSeeBoard(user, m[1])) {
-    const known = Boolean(m || hm || tm);
+    const known = Boolean(m || hm || tm || vm);
     socket.write(`HTTP/1.1 ${known ? 401 : 404} ${known ? "Unauthorized" : "Not Found"}\r\n\r\n`);
     socket.destroy();
     return;

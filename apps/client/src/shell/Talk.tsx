@@ -20,6 +20,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { listen, voiceAvailable, type Listening } from "../lib/voice";
 import { askCrew, crewAsk, sayToAgent, stopSession, titleOf, useRecentCrewAsks, useSession } from "../state/sessions";
 import { getUi, openSession, toast } from "../state/ui";
+import { holdsKeys } from "../lib/keysHeld";
 import { crewPeers, followCrew, followingCrew, type CrewPeer } from "./Crew";
 import { stopAllOnBoard } from "./CommandBar";
 import { useBoardTick } from "./Presence";
@@ -51,7 +52,8 @@ export function talkTyping() {
  */
 let early = "";
 function holdEarlyKeys(e: KeyboardEvent) {
-  if (mode !== "typing" || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
+  // a key typed into a machine's shell or desktop is the machine's, even with the sheet open (lib/keysHeld.ts)
+  if (mode !== "typing" || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1 || holdsKeys(e.target)) return;
   const field = document.querySelector<HTMLTextAreaElement>(".talk-field");
   if (field && document.activeElement === field) return;
   e.preventDefault();

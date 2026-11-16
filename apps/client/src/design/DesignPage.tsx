@@ -100,7 +100,9 @@ import { SectionCrewView, type CrewFace } from "../components/SectionCrew";
 import { SectionAgentsChipView, SectionAgentsView } from "../components/SectionAgents";
 import { RichToolbar } from "../components/RichText";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
-import { MachineAskList } from "../panels/MachineView";
+import { KeysLine, MachineAskList } from "../panels/MachineView";
+import { AgentsMayLine, AgentUseLine, DesktopWell, ViewSwitch } from "../panels/MachineViewDesktop";
+import { IoLines } from "../panels/MachineViewIo";
 import type { MachineAsk, SlackSectionState } from "@foundation/protocol";
 import { COMMANDS_GLYPH, IS_MAC, keys } from "../lib/keys";
 import * as Y from "yjs";
@@ -849,7 +851,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <SlackMarks />
       </Section>
 
-      <Section title="Machines" note="A Linux machine or container in a section, on this computer's engine: Kiri or Docker (one wire, the Docker Engine API). The state pill leads: Running (green, breathing), Pulling and Starting (amber, with the engine's own progress), Stopped and Not started (grey), Error (red, in the engine's words), No engine (amber, a hatched well that says why). Kiri installed but asleep is not No engine: the tag says Kiri · asleep and Start wakes it first; a machine whose disk is on a sleeping Kiri is Out of reach (amber), never removed. Then the engine and its version, the image in code type, and published ports as pills that open the port as a page in the section. Start is the one blue action, and only a person presses it: an agent's proposal says so in violet. Running, the shared terminal fills the card (paper, ink, the tokens as its colours); viewers watch it under an amber View only tag. Remove asks twice. A page opened from a port follows its machine: while the machine isn't running the page's poster dims and the machine's state stands over it (the card's own pill, what happened in its words, Start it for a person and Show the machine), and it reloads by itself when the machine runs again; a removed machine, or a card taken off the board, says it's gone. An agent's command (machine_run) waits on the card under the head: violet, the agent's name, the command in code type, its why, and the time left; Run is a person's blue go-ahead beside Decline, and a viewer sees who can answer instead. Running and answered asks shrink to a line (amber running, green exit 0, red otherwise, struck through when declined or unanswered) for two minutes. Shown at 560, 400 and 260 px.">
+      <Section title="Machines" note="A Linux machine or container in a section, on this computer's engine: Kiri or Docker (one wire, the Docker Engine API). The state pill leads: Running (green, breathing), Pulling and Starting (amber, with the engine's own progress), Stopped and Not started (grey), Error (red, in the engine's words), No engine (amber, a hatched well that says why). Kiri installed but asleep is not No engine: the tag says Kiri · asleep and Start wakes it first; a machine whose disk is on a sleeping Kiri is Out of reach (amber), never removed. Then the engine and its version, the image in code type, and published ports as pills that open the port as a page in the section. Start is the one blue action, and only a person presses it: an agent's proposal says so in violet. Running, the shared terminal fills the card (paper, ink, the tokens as its colours); viewers watch it under an amber View only tag. Remove asks twice. A page opened from a port follows its machine: while the machine isn't running the page's poster dims and the machine's state stands over it (the card's own pill, what happened in its words, Start it for a person and Show the machine), and it reloads by itself when the machine runs again; a removed machine, or a card taken off the board, says it's gone. An agent's command (machine_run) waits on the card under the head: violet, the agent's name, the command in code type, its why, and the time left; Run is a person's blue go-ahead beside Decline, and a viewer sees who can answer instead. Running and answered asks shrink to a line (amber running, green exit 0, red otherwise, struck through when declined or unanswered) for two minutes. Shown at 560, 400 and 260 px. Typing (2026-11-15): a plain click in the terminal puts the caret there; while the shell (or the desktop) has the keys the well wears the 2 px in-use ring and a raised line says Keys go to this machine · Esc Esc to leave, and none of the app's shortcuts take a key. The head's Terminal · Desktop switch shows the machine's graphical desktop on the same ground: none yet is a dashed well with Add a desktop (blue, a person's press; the package manager's own progress in amber while it installs). Agents use a desktop only where a person pressed Let agents use this desktop (a plain pill: the person's decision; once given, a violet dot, who and when, and Stop). While an agent drives, a violet line says ✦ who is using this desktop and what it just did, with its last few actions under it; an agent asking without leave gets the same line with the person's button. The pipes sit above the foot on the panel ground: In ← what's wired in, the value in code type, when, and /foundation/in; Out → where it goes, the value, when, and /foundation/out; one dim line on using them from the shell. A viewer sees the same without the buttons.">
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 560, height: 320 }}>
             <div className="machine-body is-running">
@@ -916,6 +918,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           </div>
         </div>
         <MachineAsksDemo />
+        <MachineUseDemo />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
             <div className="machine-body is-pulling">
@@ -1113,6 +1116,131 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       </Section>
     </div>
     </Only.Provider>
+  );
+}
+
+/** a running machine in use (2026-11-15): where the keys go, the desktop, an agent driving it, and its pipes (640, 560, 400 as a viewer) */
+function MachineUseDemo() {
+  const now = Date.now();
+  const head = (view: "terminal" | "desktop") => (
+    <div className="machine-head">
+      <span className="machine-state is-ok">
+        <span className="f-dot is-ok is-live" />
+        Running
+      </span>
+      <span className="machine-engine">Kiri 0.1.18</span>
+      <code className="machine-image">ubuntu:24.04</code>
+      <ViewSwitch view={view} />
+    </div>
+  );
+  const foot = (
+    <div className="machine-controls">
+      <span className="f-pill">Stop</span>
+      <span className="f-pill">Restart</span>
+      <span className="machine-name">build-box</span>
+      <span className="f-pill machine-remove">Remove</span>
+    </div>
+  );
+  const acts = [
+    { by: "Kestrel", for: "Ada", did: "looked at the screen", at: now - 14_000 },
+    { by: "Kestrel", for: "Ada", did: "double-clicked (69, 180)", at: now - 9_000 },
+    { by: "Kestrel", for: "Ada", did: "pressed ctrl+l", at: now - 5_000 },
+    { by: "Kestrel", for: "Ada", did: "typed “/foundation”", at: now - 2_000 },
+  ];
+  const io = { inPreview: "hello from a note", inBytes: 18, inAt: now - 42_000, outPreview: "HELLO FROM A NOTE", outBytes: 18, outAt: now - 8_000 };
+  return (
+    <>
+      <div className="adapt-row">
+        <div className="frame-card live-specimen" style={{ width: 640, height: 400 }}>
+          <div className="machine-body is-running">
+            {head("terminal")}
+            <div className="machine-term-wrap has-keys">
+              <pre className="machine-term machine-term-specimen">
+                <span className="t-ok">build-box</span>:<span className="t-pulse">~</span># tr a-z A-Z &lt;/foundation/in &gt;/foundation/out{"\n"}
+                <span className="t-ok">build-box</span>:<span className="t-pulse">~</span># <span className="t-cursor"> </span>
+              </pre>
+              <KeysLine />
+            </div>
+            <IoLines
+              ins={[{ link: "l1", name: "Note “Input”" }]}
+              outs={[
+                { link: "l2", name: "Note “Result”" },
+                { link: "l3", name: "Chart · data" },
+              ]}
+              io={io}
+              now={now}
+              viewer={false}
+              inChoices={[{ value: "a|text", label: "Note “Spec”" }]}
+              outChoices={[{ value: "b|rows", label: "Table “Parts”" }]}
+            />
+            {foot}
+          </div>
+        </div>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 400 }}>
+          <div className="machine-body is-running">
+            {head("terminal")}
+            <div className="machine-term-wrap">
+              <pre className="machine-term machine-term-specimen">
+                <span className="t-ok">build-box</span>:<span className="t-pulse">~</span># <span className="t-cursor"> </span>
+              </pre>
+              <div className="machine-watching">View only: you're watching</div>
+            </div>
+            <IoLines ins={[]} outs={[]} now={now} viewer />
+          </div>
+        </div>
+      </div>
+      <div className="adapt-row">
+        <div className="frame-card live-specimen" style={{ width: 560, height: 360 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <AgentUseLine acts={acts} viewer={false} now={now} watching />
+            <div className="machine-desk has-keys" />
+            <div className="machine-desk-foot">
+              <AgentsMayLine may={{ by: "Ada", at: now - 3 * 60_000 }} viewer={false} now={now} />
+              <KeysLine what="this desktop" inline />
+            </div>
+          </div>
+        </div>
+        <div className="frame-card live-specimen" style={{ width: 560, height: 360 }}>
+          <div className="machine-body is-running">
+            {head("terminal")}
+            <AgentUseLine acts={[]} asked={{ by: "Wren", for: "Kai", at: now - 6_000 }} viewer={false} now={now} />
+            <div className="machine-term-wrap">
+              <pre className="machine-term machine-term-specimen">
+                <span className="t-ok">build-box</span>:<span className="t-pulse">~</span># <span className="t-cursor"> </span>
+              </pre>
+            </div>
+            <AgentsMayLine viewer={false} now={now} />
+          </div>
+        </div>
+      </div>
+      <div className="adapt-row">
+        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <DesktopWell state="none" name="build-box" viewer={false} />
+          </div>
+        </div>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <DesktopWell state="installing" detail="Setting up xfwm4 (142 of 245)" name="build-box" viewer={false} />
+          </div>
+        </div>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <DesktopWell state="error" detail="This image has neither apt nor apk: Foundation's desktop is for Ubuntu, Debian and Alpine machines." name="build-box" viewer={false} />
+          </div>
+        </div>
+        <div className="frame-card live-specimen" style={{ width: 260, height: 240 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <DesktopWell state="none" name="build-box" viewer />
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 

@@ -12,7 +12,7 @@ import type { ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { z } from "zod";
-import { TOOLS, runTool } from "./tools.ts";
+import { TOOLS, runTool, toolContent } from "./tools.ts";
 import { readBody, type Req } from "./http.ts";
 import type { UserInfo } from "@foundation/protocol";
 import { crewMember } from "./crew.ts";
@@ -32,7 +32,9 @@ function buildServer(boardId: string, user: UserInfo, crewId?: string) {
       try {
         const actor = crew ? crew.name : user.id === "agent" ? "Agent (MCP)" : `${user.name}'s agent`;
         const out = await runTool({ boardId, actor, userId: user.id, crew: crew?.id }, t.name, args);
-        return { content: [{ type: "text" as const, text: typeof out === "string" ? out : JSON.stringify(out, null, 2) }] };
+        // a picture in the result (a machine's screen) goes to the model as a picture, the rest as text
+        const { text, image } = toolContent(out);
+        return { content: [...(image ? [{ type: "image" as const, data: image.base64, mimeType: image.mime }] : []), { type: "text" as const, text }] };
       } catch (e) {
         return { isError: true, content: [{ type: "text" as const, text: (e as Error).message }] };
       }

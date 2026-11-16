@@ -21,6 +21,7 @@ import * as Y from "yjs";
 import {
   appendSection,
   boardMaps,
+  cellRef,
   describeBoard,
   findSection,
   isHostable,
@@ -28,6 +29,8 @@ import {
   logActivity,
   MACHINE_DISTROS,
   noteTextOf,
+  NOTE_PORT,
+  TABLE_PORT,
   tableCellMap,
   tableCellsOf,
   uid,
@@ -58,7 +61,9 @@ import { stageDef } from "@foundation/protocol";
 import { huddleArchive, transcriptText } from "./huddles.ts";
 import { channelHistory, channelInfo, listChannels } from "./slack.ts";
 import { describeMachines, proposeMachine, validImage } from "./machines.ts";
-import { askToRun } from "./machineasks.ts";
+import { askToRun, findMachineCard } from "./machineasks.ts";
+import { useDesktop, type DesktopAction, type DesktopResult } from "./machinedesktop.ts";
+import { describeIo, ensureMachinePorts, watchMachine } from "./machineio.ts";
 import { writeDigest } from "./digest.ts";
 import { flowformCall, flowformTools } from "./flowformlink.ts";
 import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, stepTarget, travel, type CrewMember } from "./crew.ts";
@@ -104,6 +109,43 @@ export interface BoardTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
   write?: boolean;
   run: (ctx: ToolCtx, input: z.infer<S>) => Promise<unknown> | unknown;
 }
+
+/**
+ * A picture in a tool's result, for the model to look at (a machine's
+ * screen). A result object may carry one under `_image`; the doors that can
+ * show a model a picture do (MCP image content, the API's image block) and
+ * send the rest of the result as text beside it. REST returns it as it is.
+ */
+export interface ToolImage {
+  mime: string;
+  base64: string;
+}
+export function toolContent(out: unknown, pretty = true): { text: string; image?: ToolImage } {
+  const json = (v: unknown) => (pretty ? JSON.stringify(v, null, 2) : JSON.stringify(v));
+  if (out && typeof out === "object" && "_image" in out) {
+    const { _image, ...rest } = out as { _image?: ToolImage } & Record<string, unknown>;
+    if (_image?.base64) return { text: json(rest), image: _image };
+  }
+  return { text: typeof out === "string" ? out : json(out) };
+}
+
+/** who an agent works for, for activity lines: its crew's person, or the token's (a person's own call has none) */
+function forNameOf(ctx: ToolCtx) {
+  const member = crewMember(ctx.crew);
+  return member ? member.userName : ctx.person || ctx.userId === "agent" ? undefined : userName(ctx.userId);
+}
+
+/** a desktop action's result as the tool returns it: what it did, the screen's size, and the screen as a picture */
+function desktopOut(r: DesktopResult) {
+  return {
+    machine: r.machine,
+    did: r.did,
+    screen: `${r.screen.w}x${r.screen.h}`,
+    ...(r.png ? { note: "The picture is the screen now. Coordinates are its pixels: x from the left, y from the top.", _image: { mime: "image/png", base64: r.png.toString("base64") } } : {}),
+  };
+}
+
+const desktopCtx = (ctx: ToolCtx) => ({ boardId: ctx.boardId, actor: ctx.actor, userId: ctx.userId, crew: ctx.crew, forName: forNameOf(ctx) });
 
 /** a person's display name, for "Ada's agent" lines */
 function userName(id: string) {
@@ -541,27 +583,41 @@ export const TOOLS: BoardTool[] = [
   }),
   def({
     name: "connect",
-    description: "Wire an app's output port to another app's input port. Values the source emits flow to the target (delivered to the running app via the Foundation bridge).",
+    description:
+      "Wire an app's output port to another app's input port. Values the source emits flow to the target (delivered to the running app via the Foundation bridge). A machine card has two ports: `in` (what arrives is written to /foundation/in inside the machine) and `out` (whatever the machine writes to /foundation/out). To or from a machine, the other end may also be a note (its text; port `text`) or a table (its rows, port `rows`, or one cell, e.g. port `B2`): pass the note's or table's id as the panel.",
     schema: z.object({ from_panel: z.string(), from_port: z.string(), to_panel: z.string(), to_port: z.string(), label: z.string().optional() }),
     write: true,
     run: (ctx, i) => {
+      // a machine card gets its two ports before anything is wired to them
+      for (const id of [i.from_panel, i.to_panel]) ensureMachinePorts(ctx.boardId, id);
       const link = editBoard(ctx.boardId, "agent", (doc) => {
-        const from = getPanel(doc, i.from_panel);
-        const to = getPanel(doc, i.to_panel);
+        const objects = boardMaps(doc).objects;
+        const a = objects.get(i.from_panel);
+        const b = objects.get(i.to_panel);
+        const isMachine = (o: typeof a) => o?.kind === "panel" && o.panel === "machine";
         const ensurePort = (p: PanelDoc, name: string, dir: "in" | "out") => {
-          let port = p.ports.find((x) => x.name === name || x.id === name);
+          let port = p.ports.find((x) => (x.name === name || x.id === name) && x.dir === dir) ?? p.ports.find((x) => x.name === name || x.id === name);
           if (!port) {
             port = { id: uid("port"), name, dir };
-            boardMaps(doc).objects.set(p.id, { ...p, ports: [...p.ports, port] });
+            objects.set(p.id, { ...p, ports: [...p.ports, port] });
           }
-          return port;
+          return port.id;
         };
-        const fp = ensurePort(from, i.from_port, "out");
-        const tp = ensurePort(getPanel(doc, i.to_panel), i.to_port, "in");
-        const l: LinkDoc = { id: uid("lnk"), from: { panel: from.id, port: fp.id }, to: { panel: to.id, port: tp.id }, label: i.label, createdBy: ctx.actor };
+        // a note or a table has no ports: its end names what it carries (its text, its rows, or one cell)
+        const end = (o: typeof a, id: string, port: string, dir: "in" | "out", other: typeof a) => {
+          if (o?.kind === "panel") return ensurePort(objects.get(id) as PanelDoc, port, dir);
+          if (o?.kind !== "note" && o?.kind !== "table") throw new Error(`no panel ${id}`);
+          if (!isMachine(other)) throw new Error(`“${o.name}” is a ${o.kind}: it can be wired to a machine's in or out, not to an app`);
+          return o.kind === "note" ? NOTE_PORT : cellRef(port) ? port.toUpperCase() : TABLE_PORT;
+        };
+        const fp = end(a, i.from_panel, i.from_port, "out", b);
+        const tp = end(b, i.to_panel, i.to_port, "in", a);
+        const l: LinkDoc = { id: uid("lnk"), from: { panel: i.from_panel, port: fp }, to: { panel: i.to_panel, port: tp }, label: i.label, createdBy: ctx.actor };
         boardMaps(doc).links.set(l.id, l);
         return l;
       });
+      // a machine at either end starts reading and writing its pipes now
+      for (const id of [i.from_panel, i.to_panel]) if (findMachineCard(ctx.boardId, id)?.id === id) watchMachine(ctx.boardId, id);
       touch(ctx, i.to_panel, `connected ${i.from_port} → ${i.to_port}`);
       return link;
     },
@@ -820,9 +876,24 @@ export const TOOLS: BoardTool[] = [
   def({
     name: "machines",
     description:
-      "Read the machine cards on this board: which engines (Kiri, Docker) answer here, each machine's image, state (absent, pulling, starting, running, stopped, error), published ports as URLs, and the last screen of its shared terminal (what people ran and saw).",
+      "Read the machine cards on this board: which engines (Kiri, Docker) answer here, each machine's image, state (absent, pulling, starting, running, stopped, error), published ports as URLs, the last screen of its shared terminal (what people ran and saw), whether it has a graphical desktop and whether a person has let agents use it, and its pipes: what is wired to `in` (written to /foundation/in inside it) and where `out` (what it writes to /foundation/out) goes, with the last value of each.",
     schema: z.object({}),
-    run: (ctx) => describeMachines(ctx.boardId),
+    run: async (ctx) => {
+      const d = await describeMachines(ctx.boardId);
+      const objects = boardMaps(getBoard(ctx.boardId).doc).objects;
+      return {
+        ...d,
+        machines: d.machines.map((m) => {
+          const card = objects.get(m.id) as PanelDoc;
+          const st = card.machine!;
+          return {
+            ...m,
+            desktop: st.desktop?.state === "ready" ? { screen: `${st.desktop.w ?? 1280}x${st.desktop.h ?? 800}`, agents_may_use_it: Boolean(st.agentsMay), ...(st.agentsMay ? { allowed_by: st.agentsMay.by } : { note: "a person lets agents use it on the card: Let agents use this desktop" }) } : (st.desktop?.state ?? "none: a person adds one on the card"),
+            pipes: describeIo(ctx.boardId, card),
+          };
+        }),
+      };
+    },
   }),
   def({
     name: "machine_run",
@@ -838,10 +909,58 @@ export const TOOLS: BoardTool[] = [
     }),
     write: true,
     run: (ctx, { machine, command, why, wait_s, timeout_s }) => {
-      const member = crewMember(ctx.crew);
-      const forName = member ? member.userName : ctx.person || ctx.userId === "agent" ? undefined : userName(ctx.userId);
-      return askToRun({ boardId: ctx.boardId, actor: ctx.actor, userId: ctx.userId, crew: ctx.crew, forName }, machine, command, { why, waitS: wait_s, timeoutS: timeout_s });
+      return askToRun({ boardId: ctx.boardId, actor: ctx.actor, userId: ctx.userId, crew: ctx.crew, forName: forNameOf(ctx) }, machine, command, { why, waitS: wait_s, timeoutS: timeout_s });
     },
+  }),
+  // ---------- a machine's desktop, used by an agent (machinedesktop.ts) ----------
+  def({
+    name: "desktop_screenshot",
+    description:
+      "Look at a machine's graphical desktop: returns the screen as a picture (1280×800 unless the result says otherwise). Works only on a running machine that has a desktop and where a person has pressed “Let agents use this desktop” on its card (`machines` says which). Without that leave it does nothing and says so; the card then shows the person that you asked. Take a screenshot before acting, and read coordinates off it: x from the left edge, y from the top, in the picture's pixels.",
+    schema: z.object({ machine: z.string().describe("the machine card's id, or the machine's name") }),
+    write: true,
+    run: async (ctx, { machine }) => desktopOut(await useDesktop(desktopCtx(ctx), machine, { kind: "screenshot" })),
+  }),
+  def({
+    name: "desktop_mouse",
+    description:
+      "Use the pointer on a machine's desktop: move, click, double_click, right_click, middle_click, drag (from x,y to to_x,to_y) or scroll_up / scroll_down (amount: wheel notches) at a point. Coordinates are pixels of the last screenshot. Returns the screen afterwards as a picture (look: false skips it). Same leave as desktop_screenshot: a person must have let agents use this desktop.",
+    schema: z.object({
+      machine: z.string().describe("the machine card's id, or the machine's name"),
+      action: z.enum(["move", "click", "double_click", "right_click", "middle_click", "drag", "scroll_up", "scroll_down"]),
+      x: z.number().describe("pixels from the left edge of the screen"),
+      y: z.number().describe("pixels from the top edge of the screen"),
+      to_x: z.number().optional().describe("drag: where to let go"),
+      to_y: z.number().optional(),
+      amount: z.number().int().min(1).max(30).optional().describe("scroll: wheel notches (3 by default)"),
+      look: z.boolean().optional().describe("false: don't return the screen afterwards"),
+    }),
+    write: true,
+    run: async (ctx, { machine, look, ...a }) => desktopOut(await useDesktop(desktopCtx(ctx), machine, { kind: "mouse", ...a } as DesktopAction, { look })),
+  }),
+  def({
+    name: "desktop_type",
+    description:
+      "Type text on a machine's desktop, into whatever has the keyboard there (click the field or window first). A newline in the text is Enter. For keys that aren't text (Enter alone, Tab, shortcuts) use desktop_key. Returns the screen afterwards as a picture. Same leave as desktop_screenshot.",
+    schema: z.object({
+      machine: z.string().describe("the machine card's id, or the machine's name"),
+      text: z.string().min(1).max(4000),
+      look: z.boolean().optional().describe("false: don't return the screen afterwards"),
+    }),
+    write: true,
+    run: async (ctx, { machine, text, look }) => desktopOut(await useDesktop(desktopCtx(ctx), machine, { kind: "type", text }, { look })),
+  }),
+  def({
+    name: "desktop_key",
+    description:
+      "Press keys on a machine's desktop, one after another: each is a key or a chord joined by +, e.g. [\"Return\"], [\"ctrl+c\"], [\"alt+F4\"], [\"ctrl+shift+t\"], [\"Tab\", \"Tab\", \"Return\"]. Names: Return (or Enter), Escape, Tab, BackSpace, Delete, space, Up/Down/Left/Right, Home, End, PageUp, PageDown, F1–F12, ctrl, alt, shift, super; letters and digits as themselves. Returns the screen afterwards as a picture. Same leave as desktop_screenshot.",
+    schema: z.object({
+      machine: z.string().describe("the machine card's id, or the machine's name"),
+      keys: z.array(z.string().min(1).max(60)).min(1).max(20),
+      look: z.boolean().optional().describe("false: don't return the screen afterwards"),
+    }),
+    write: true,
+    run: async (ctx, { machine, keys, look }) => desktopOut(await useDesktop(desktopCtx(ctx), machine, { kind: "key", keys }, { look })),
   }),
   // ---------- design pipelines: design → CAD → simulation → release ----------
   def({

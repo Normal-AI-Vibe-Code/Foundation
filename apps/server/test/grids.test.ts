@@ -176,11 +176,11 @@ test("an agent at work says which agent it is, so a council can seat it where th
 test("a person's settings: known keys and values only, each person their own", () => {
   const kai = upsertUser("kai@formindustries.com", "Kai");
   assert.equal(prefsOf(ada.id).computer_use, "ask");
-  assert.deepEqual(setPref(ada.id, "computer_use", "never"), { ok: true });
+  assert.equal(setPref(ada.id, "computer_use", "never").computer_use, "never");
   assert.equal(computerUseDefault(ada.id), "never");
   assert.equal(computerUseDefault(kai.id), "ask");
-  assert.match((setPref(ada.id, "computer_use", "always") as { error: string }).error, /one of: ask, never/);
-  assert.match((setPref(ada.id, "root", "yes") as { error: string }).error, /No such setting/);
+  assert.throws(() => setPref(ada.id, "computer_use", "always"), /one of: ask, never/);
+  assert.throws(() => setPref(ada.id, "root", "yes"), /no preference called/);
   assert.equal(prefsOf(ada.id).computer_use, "never");
 });
 

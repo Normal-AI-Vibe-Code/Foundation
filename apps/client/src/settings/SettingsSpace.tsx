@@ -146,7 +146,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
     const before = prefs;
     setPrefs((p) => (p ? { ...p, ...patch } : p));
     try {
-      setPrefs((await api<{ prefs: Prefs }>("/api/prefs", { method: "POST", json: patch })).prefs);
+      for (const [key, value] of Object.entries(patch)) setPrefs((await api<{ prefs: Prefs }>("/api/prefs", { method: "POST", json: { key, value } })).prefs);
     } catch (e) {
       setPrefs(before);
       toast((e as Error).message, "bad");
