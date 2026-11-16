@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-14T05:24:52.635Z",
+  "syncedAt": "2026-11-16T08:04:00.989Z",
   "columns": [
     {
       "id": "needs-you",
@@ -1099,7 +1099,8 @@
       "milestone": "ship",
       "area": "desktop",
       "status": "done",
-      "body": "Josh, 2026-11-13: \"an option button at the bottom right to start the local server or connect to the flowform server for local testing. have it expand to show both options\". A glass pill bottom right (the server in use and whether it answers) opens into This computer (Start runs Foundation's server from a checkout, C:\\Dev\\Foundation by default, on :4410; Stop; it goes when the app quits) and Remote server (an address, Flowform's server to begin with; Connect reloads onto it). Checked in the browser and on `#/design` day and night; on the installed 0.3.3 (taken as an update from CI's release): Start, Stop, and quitting the app stops a server it started. Flowform's server isn't a Foundation server, so Connect there signs nobody in until a hosted Foundation exists."
+      "body": "Josh, 2026-11-13: \"an option button at the bottom right to start the local server or connect to the flowform server for local testing. have it expand to show both options\". A glass pill bottom right (the server in use and whether it answers) opens into This computer (Start runs Foundation's server from a checkout, C:\\Dev\\Foundation by default, on :4410; Stop; it goes when the app quits) and Remote server (an address, Flowform's server to begin with; Connect reloads onto it). Checked in the browser and on `#/design` day and night; on the installed 0.3.3 (taken as an update from CI's release): Start, Stop, and quitting the app stops a server it started. Flowform's server isn't a Foundation server, so Connect there signs nobody in until a hosted Foundation exists.",
+      "issue": 135
     },
     {
       "id": "machine-in-section-tools",
@@ -1108,7 +1109,8 @@
       "milestone": "polish",
       "area": "board",
       "status": "done",
-      "body": "Josh, 2026-11-13: \"I don't see the ability also to create vms using Kiri or docker in the sections\". Machines were on main all along, but only on a section's right-click menu. Now ▣ in the section's tools and ⌘K too. Checked on a throwaway server: the tool made a card in an empty section, alpine started on Kiri (woken from asleep), the shared terminal answered (Alpine Linux, WSL2 kernel), Stop kept the disk, Remove (pressed twice) took it from Kiri."
+      "body": "Josh, 2026-11-13: \"I don't see the ability also to create vms using Kiri or docker in the sections\". Machines were on main all along, but only on a section's right-click menu. Now ▣ in the section's tools and ⌘K too. Checked on a throwaway server: the tool made a card in an empty section, alpine started on Kiri (woken from asleep), the shared terminal answered (Alpine Linux, WSL2 kernel), Stop kept the disk, Remove (pressed twice) took it from Kiri.",
+      "issue": 136
     },
     {
       "id": "desktop-starts-server",
@@ -1417,7 +1419,8 @@
       "milestone": "crew",
       "area": "crew",
       "status": "done",
-      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and five mesh avatars were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones. 2026-11-15: the eleven ship as a starter set that a new install's studio board brings in. Reworked 2026-11-15 into the council of assigned agents (card *one-interface*)."
+      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and five mesh avatars were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones. 2026-11-15: the eleven ship as a starter set that a new install's studio board brings in. Reworked 2026-11-15 into the council of assigned agents (card *one-interface*).",
+      "issue": 137
     },
     {
       "id": "council-real-turn",
@@ -1426,7 +1429,8 @@
       "milestone": "crew",
       "area": "crew",
       "status": "next",
-      "body": "The council's seats, colours and moods were checked with the script runtime only. Run a real Claude Code turn with the council up: does it wave, think and work at the right moments, and is `doing` enough to tell reading from writing? (SPEC §7.)"
+      "body": "The council's seats, colours and moods were checked with the script runtime only. Run a real Claude Code turn with the council up: does it wave, think and work at the right moments, and is `doing` enough to tell reading from writing? (SPEC §7.)",
+      "issue": 138
     },
     {
       "id": "mesh-avatars-anime-set",
@@ -1435,7 +1439,8 @@
       "milestone": "crew",
       "area": "crew",
       "status": "done",
-      "body": "Done 2026-11-14: Hana, Midori, Sora and Rin were rigged with mesh-avatar-studio (as Aoi was) and brought into their cards; all five sit on the council (`docs/evidence/2026-11-14_council-characters/24`, `25`). Sora's portrait was drawn again on a grey ground after Meshy's background removal took her white hair with it; Rin's eye regions were kept inside her lenses. No drawn variants (SPEC §7)."
+      "body": "Done 2026-11-14: Hana, Midori, Sora and Rin were rigged with mesh-avatar-studio (as Aoi was) and brought into their cards; all five sit on the council (`docs/evidence/2026-11-14_council-characters/24`, `25`). Sora's portrait was drawn again on a grey ground after Meshy's background removal took her white hair with it; Rin's eye regions were kept inside her lenses. No drawn variants (SPEC §7).",
+      "issue": 139
     },
     {
       "id": "mesh-stage-on-the-board",
@@ -1444,7 +1449,8 @@
       "milestone": "crew",
       "area": "pipeline",
       "status": "backlog",
-      "body": "Today a mesh avatar is rigged by hand in a Claude Code session with mesh-avatar-studio and brought in as a file. Make it a job a person starts from the card: an agent with vision reads the grids and writes the rig, the server builds the layers (Python, OpenCV) and renders the review poses onto the board for a person to accept. Needs uv, Python and Chromium on the server's machine, and an image model that edits inside a mask for the drawn eyes and mouths (Meshy's doesn't)."
+      "body": "Today a mesh avatar is rigged by hand in a Claude Code session with mesh-avatar-studio and brought in as a file. Make it a job a person starts from the card: an agent with vision reads the grids and writes the rig, the server builds the layers (Python, OpenCV) and renders the review poses onto the board for a person to accept. Needs uv, Python and Chromium on the server's machine, and an image model that edits inside a mask for the drawn eyes and mouths (Meshy's doesn't).",
+      "issue": 140
     },
     {
       "id": "council-faces-3d",
@@ -1453,7 +1459,8 @@
       "milestone": "crew",
       "area": "crew",
       "status": "backlog",
-      "body": "Meshy's skeleton has no face bones, so a 3D seat's face never moves. Options: swap the face texture per mood (a second image pass per character), morph targets made in Blender, or a small drawn face over the model. Also: a clip for working that isn't a talking gesture."
+      "body": "Meshy's skeleton has no face bones, so a 3D seat's face never moves. Options: swap the face texture per mood (a second image pass per character), morph targets made in Blender, or a small drawn face over the model. Also: a clip for working that isn't a talking gesture.",
+      "issue": 141
     },
     {
       "id": "council-rune-tool",
@@ -1462,7 +1469,8 @@
       "milestone": "ship",
       "area": "design",
       "status": "backlog",
-      "body": "Since 2026-11-15 Rune's section toolbar ✦ opens the section's council, but its icon is still the agent's star: draw the council's mark (three seated figures) in `apps/rune/src/view.rs` `icon`, and check the new cards (a grid inside this one, kanban, design) and the port labels under Rune."
+      "body": "Since 2026-11-15 Rune's section toolbar ✦ opens the section's council, but its icon is still the agent's star: draw the council's mark (three seated figures) in `apps/rune/src/view.rs` `icon`, and check the new cards (a grid inside this one, kanban, design) and the port labels under Rune.",
+      "issue": 142
     },
     {
       "id": "one-interface",
@@ -1471,7 +1479,8 @@
       "milestone": "polish",
       "area": "design",
       "status": "review",
-      "body": "Built 2026-11-15 (SPEC §0.5, §3; `docs/evidence/2026-11-15_one-interface/`). The shell is the whole app: Today and Settings are places in it, the side menu (Today · Grids: Recent / All Grids · Settings) is open on a first run, the server's pill is in the top bar. Settings opens on General; Agents and Avatars are tabs; Plan is a kanban card on a grid and Design language a grid of chapters. A grid dragged onto another is its child, with a section on the parent that stands for it. Agents are assigned to a section or the grid and the council seats those; it talks to all or the selected, adds agents, shows whose model each is and opens the agent on the right. No agent layer: a port says where it goes. For a person: restart this computer's server so the installed app gets the new routes, then look at it with real agents."
+      "body": "Built 2026-11-15 (SPEC §0.5, §3; `docs/evidence/2026-11-15_one-interface/`). The shell is the whole app: Today and Settings are places in it, the side menu (Today · Grids: Recent / All Grids · Settings) is open on a first run, the server's pill is in the top bar. Settings opens on General; Agents and Avatars are tabs; Plan is a kanban card on a grid and Design language a grid of chapters. A grid dragged onto another is its child, with a section on the parent that stands for it. Agents are assigned to a section or the grid and the council seats those; it talks to all or the selected, adds agents, shows whose model each is and opens the agent on the right. No agent layer: a port says where it goes. For a person: restart this computer's server so the installed app gets the new routes, then look at it with real agents.",
+      "issue": 143
     },
     {
       "id": "council-conversation",
@@ -1480,7 +1489,8 @@
       "milestone": "crew",
       "area": "crew",
       "status": "next",
-      "body": "A line to the council starts an ask per agent; replies show only as work on the grid and as activity lines in the agent's pane. Keep a thread per place (who was told what, what each answered, in order), show it in the council and the agent's pane, and let a reply go to the agent that's mid-run instead of starting a new one. Needs a real model turn and a real T3 thread to be seen in it first (*council-real-turn*)."
+      "body": "A line to the council starts an ask per agent; replies show only as work on the grid and as activity lines in the agent's pane. Keep a thread per place (who was told what, what each answered, in order), show it in the council and the agent's pane, and let a reply go to the agent that's mid-run instead of starting a new one. Needs a real model turn and a real T3 thread to be seen in it first (*council-real-turn*).",
+      "issue": 144
     },
     {
       "id": "design-grid-redrawn",
@@ -1489,7 +1499,8 @@
       "milestone": "polish",
       "area": "design",
       "status": "backlog",
-      "body": "Settings → Design language is a real grid of twelve chapter cards, but each card draws the old page's sections, which were laid out for a 1,100 px page and are taller than their section (they scroll in the card). Redraw the specimens for the card, size each section to its chapter, and drop what the grid itself now shows better (the floor, the chrome)."
+      "body": "Settings → Design language is a real grid of twelve chapter cards, but each card draws the old page's sections, which were laid out for a 1,100 px page and are taller than their section (they scroll in the card). Redraw the specimens for the card, size each section to its chapter, and drop what the grid itself now shows better (the floor, the chrome).",
+      "issue": 145
     },
     {
       "id": "kanban-of-a-grid",
@@ -1498,7 +1509,8 @@
       "milestone": "apps",
       "area": "panels",
       "status": "backlog",
-      "body": "`panel: \"kanban\"` shows Foundation's plan (`source: \"plan\"`). Give it a source of its own: columns and cards kept on the grid (a table underneath, or asks and stages by status), so any section can hold a kanban."
+      "body": "`panel: \"kanban\"` shows Foundation's plan (`source: \"plan\"`). Give it a source of its own: columns and cards kept on the grid (a table underneath, or asks and stages by status), so any section can hold a kanban.",
+      "issue": 146
     },
     {
       "id": "system-grids-reset",
@@ -1507,7 +1519,8 @@
       "milestone": "polish",
       "area": "design",
       "status": "backlog",
-      "body": "The plan and design-language grids are ordinary boards after the server lays them out: a member can move or delete their cards and nothing restores them. Check the layout when the grid is opened and add back what's missing; offer *Lay it out again* in Settings."
+      "body": "The plan and design-language grids are ordinary boards after the server lays them out: a member can move or delete their cards and nothing restores them. Check the layout when the grid is opened and add back what's missing; offer *Lay it out again* in Settings.",
+      "issue": 147
     },
     {
       "id": "stage-budget-gpu",
@@ -1516,7 +1529,8 @@
       "milestone": "polish",
       "area": "perf",
       "status": "backlog",
-      "body": "`characters/stageBudget.ts` starts at six live cards and follows the frames. It was only watched in a headless browser on software rendering (it settled at three of thirteen). Run the studio grid under `PERF_GPU=1` on this machine and set the starting budget and the thresholds from what it holds at 60 fps."
+      "body": "`characters/stageBudget.ts` starts at six live cards and follows the frames. It was only watched in a headless browser on software rendering (it settled at three of thirteen). Run the studio grid under `PERF_GPU=1` on this machine and set the starting budget and the thresholds from what it holds at 60 fps.",
+      "issue": 148
     },
     {
       "id": "machines-desktop",
@@ -1525,7 +1539,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "review",
-      "body": "Built 2026-11-15 on Kiri 0.1.18 (SPEC §3, §7; `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). A click in the terminal keeps the caret at any zoom and the app's shortcuts stand down; Terminal · Desktop on the card, with Add a desktop (XFCE over noVNC, relayed through the engine); desktop_screenshot / mouse / type / key for agents after a person's Let agents use this desktop; ports in and out through /foundation/in and /foundation/out, with a strip that says what is on each. For a person: try it in the packaged app, and with a live agent."
+      "body": "Built 2026-11-15 on Kiri 0.1.18 (SPEC §3, §7; `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). A click in the terminal keeps the caret at any zoom and the app's shortcuts stand down; Terminal · Desktop on the card, with Add a desktop (XFCE over noVNC, relayed through the engine); desktop_screenshot / mouse / type / key for agents after a person's Let agents use this desktop; ports in and out through /foundation/in and /foundation/out, with a strip that says what is on each. For a person: try it in the packaged app, and with a live agent.",
+      "issue": 149
     },
     {
       "id": "machines-live-agent",
@@ -1534,7 +1549,8 @@
       "milestone": "crew",
       "area": "machines",
       "status": "next",
-      "body": "The desktop tools were driven by an agent's token and the script runtime, never a model. Assign an agent to a section with a machine, give it leave on the card, and ask it for a real task from the council (API and subscription); see the screenshots reach it and the card say what it does. Then decide whether the council should offer the leave itself, and whether the leave should end by itself (an hour, or when the machine stops)."
+      "body": "The desktop tools were driven by an agent's token and the script runtime, never a model. Assign an agent to a section with a machine, give it leave on the card, and ask it for a real task from the council (API and subscription); see the screenshots reach it and the card say what it does. Then decide whether the council should offer the leave itself, and whether the leave should end by itself (an hour, or when the machine stops).",
+      "issue": 150
     },
     {
       "id": "kiri-exec-bugs",
@@ -1543,7 +1559,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "needs-you",
-      "body": "Found 2026-11-15 on Kiri 0.1.18 (reproductions in `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). Foundation works around both (perl or python3 clears the mask, so Ctrl+C is dead on Alpine until `apk add perl`; the server polls whether an exec still runs). Both are Kiri's to fix: file them at github.com/libracoder/kiri."
+      "body": "Found 2026-11-15 on Kiri 0.1.18 (reproductions in `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). Foundation works around both (perl or python3 clears the mask, so Ctrl+C is dead on Alpine until `apk add perl`; the server polls whether an exec still runs). Both are Kiri's to fix: file them at github.com/libracoder/kiri.",
+      "issue": 151
     },
     {
       "id": "machines-wires-drawn",
@@ -1552,7 +1569,8 @@
       "milestone": "apps",
       "area": "wires",
       "status": "backlog",
-      "body": "A machine's in and out can be wired to a note or a table; the values flow and the strip lists them, but the wire layer draws card-to-card wires only, and such a wire can only be made from the strip's picker."
+      "body": "A machine's in and out can be wired to a note or a table; the values flow and the strip lists them, but the wire layer draws card-to-card wires only, and such a wire can only be made from the strip's picker.",
+      "issue": 152
     },
     {
       "id": "machines-desktop-more",
@@ -1561,7 +1579,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "backlog",
-      "body": "Not tried: the desktop in the packaged app (and Ctrl+W / Ctrl+T in its terminal), a real Docker engine, macOS or Linux hosts. Not built: a browser in the desktop (Ubuntu's Firefox is a snap), a clipboard between it and the grid, sound, a size other than 1280 × 800, a `screen` output port."
+      "body": "Not tried: the desktop in the packaged app (and Ctrl+W / Ctrl+T in its terminal), a real Docker engine, macOS or Linux hosts. Not built: a browser in the desktop (Ubuntu's Firefox is a snap), a clipboard between it and the grid, sound, a size other than 1280 × 800, a `screen` output port.",
+      "issue": 153
     }
   ]
 }
