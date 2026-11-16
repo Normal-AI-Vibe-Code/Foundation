@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 // the version this client is built as: what it tells a server that names a minimum (src/lib/version.ts)
 const version: string = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version;
@@ -35,6 +36,8 @@ export default defineConfig(async () => ({
     watch: { ignored: ["**/src-tauri/**"] },
     proxy,
   },
+  // two pages: the app, and the page inside a machine card's Desktop view (desktop.html: noVNC in a frame)
+  build: { rollupOptions: { input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), desktop: fileURLToPath(new URL("./desktop.html", import.meta.url)) } } },
   // `vite preview` serves the production build the same way (e2e frames on the build: E2E_BUILD=1)
   preview: { proxy },
 }));

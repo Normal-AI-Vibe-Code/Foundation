@@ -239,6 +239,91 @@ export interface MachineState {
   startedBy?: string;
   /** when it entered this state */
   since?: number;
+  /** start it with a graphical desktop: added right after it first runs (a person's Start asked for it) */
+  wantDesktop?: boolean;
+  /**
+   * The graphical desktop inside it (an X server, a window manager and VNC,
+   * installed in the machine behind a person's press and reached through
+   * Foundation, never a published port). Unset: no desktop. It lives on the
+   * machine's disk, so Remove clears it.
+   */
+  desktop?: MachineDesktop;
+  /**
+   * A person let agents use this machine's desktop (look at it, move the
+   * pointer, type): who and when. Unset is the default: agents can't.
+   * Only a signed-in person who can edit the board sets it, from their
+   * browser; anyone who can edit takes it away; Remove clears it.
+   */
+  agentsMay?: { by: string; at: number };
+  /** an agent tried to use the desktop without that leave: the card offers the person the button */
+  agentAsked?: { by: string; for?: string; at: number };
+  /** what agents last did on the desktop, newest last (a few kept): the card shows who is driving */
+  agentActs?: MachineAgentAct[];
+  /** the machine's pipes: when /foundation/in was last written and /foundation/out last read, and what was in them */
+  io?: MachineIo;
+}
+
+export interface MachineDesktop {
+  state: "installing" | "ready" | "error";
+  /** install progress in the package manager's own words, or why it failed */
+  detail?: string;
+  /** who pressed Add a desktop, and when it reached this state */
+  by?: string;
+  at?: number;
+  /** the screen, in pixels */
+  w?: number;
+  h?: number;
+}
+
+export interface MachineAgentAct {
+  by: string;
+  for?: string;
+  /** what it did, in a few words: "clicked (640, 400)", "typed “hello”", "looked at the screen" */
+  did: string;
+  at: number;
+}
+
+/** how long after an agent's last action the card still says it is using the desktop */
+export const MACHINE_AGENT_ACTIVE_MS = 20_000;
+
+export interface MachineIo {
+  /** the end of what was last written to /foundation/in, and when */
+  inPreview?: string;
+  inBytes?: number;
+  inAt?: number;
+  /** the end of what /foundation/out last held, and when it was read */
+  outPreview?: string;
+  outBytes?: number;
+  outAt?: number;
+  /** why the last write or read didn't happen */
+  error?: string;
+}
+
+/** where a machine's pipes are, inside it */
+export const MACHINE_IN_PATH = "/foundation/in";
+export const MACHINE_OUT_PATH = "/foundation/out";
+/** a machine card's two ports, by name */
+export const MACHINE_IN_PORT = "in";
+export const MACHINE_OUT_PORT = "out";
+
+/**
+ * What a wire's end carries when it isn't an app's port: a note is its text
+ * (port "text"), a table its rows (port "rows": an array of arrays of the
+ * cells as typed) or one cell (port "B2"). Machines read and write these on
+ * the server (machineio.ts), so a note or a table can feed a machine and take
+ * what it prints. The wire layer draws card-to-card wires only; these are
+ * listed on the machine's card.
+ */
+export const NOTE_PORT = "text";
+export const TABLE_PORT = "rows";
+
+/** "B2" → { c: 1, r: 1 }; null when it isn't a cell */
+export function cellRef(port: string): { c: number; r: number } | null {
+  const m = /^([A-Za-z]{1,2})([1-9][0-9]{0,3})$/.exec(port.trim());
+  if (!m) return null;
+  let c = 0;
+  for (const ch of m[1].toUpperCase()) c = c * 26 + (ch.charCodeAt(0) - 64);
+  return { c: c - 1, r: Number(m[2]) - 1 };
 }
 
 /** Kiri's distro shortcuts (`kiri machine create NAME --distro ubuntu`): these images become long-lived machines */

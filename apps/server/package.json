@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "link-accounts": "tsx scripts/link-accounts.ts",
     "machines:smoke": "tsx scripts/machines-smoke.ts",
+    "machines:desktop-smoke": "tsx scripts/machines-desktop-smoke.ts",
     "test": "node --test --import tsx test/*.test.ts"
   },
   "dependencies": {

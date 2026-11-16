@@ -331,13 +331,13 @@ const LIMITS = {
 /** the long-lived loop Kiri's machines run when their image is a distro */
 const KEEP_ALIVE = ["/bin/sh", "-c", "trap 'exit 0' TERM INT; while :; do sleep 3600 & wait $!; done"];
 
-function machinePanel(boardId: string, panelId: string): PanelDoc {
+export function machinePanel(boardId: string, panelId: string): PanelDoc {
   const o = boardMaps(getBoard(boardId).doc).objects.get(panelId);
   if (!o || o.kind !== "panel" || o.panel !== "machine") throw new HttpError(404, "no such machine card on this board");
   return o;
 }
 
-function writeMachine(boardId: string, panelId: string, patch: Partial<MachineState>, activity?: { who: string; role: "human" | "agent"; text: string }) {
+export function writeMachine(boardId: string, panelId: string, patch: Partial<MachineState>, activity?: { who: string; role: "human" | "agent"; text: string; for?: string }) {
   editBoard(boardId, "machines", (doc) => {
     const m = boardMaps(doc);
     const o = m.objects.get(panelId);
@@ -366,7 +366,7 @@ interface ContainerSummary {
 const filter = (f: Record<string, string[]>) => encodeURIComponent(JSON.stringify(f));
 
 /** the container a card runs, on whichever engine has it */
-async function findContainer(boardId: string, panelId: string, prefer?: string): Promise<{ engine: EngineStatus; c: ContainerSummary } | null> {
+export async function findContainer(boardId: string, panelId: string, prefer?: string): Promise<{ engine: EngineStatus; c: ContainerSummary } | null> {
   const engines = (await engineStatus()).filter((s) => s.up);
   engines.sort((a, b) => (a.id === prefer ? -1 : b.id === prefer ? 1 : 0));
   for (const engine of engines) {
@@ -400,6 +400,29 @@ const inFlight = new Map<string, Promise<unknown>>();
 const key = (b: string, p: string) => `${b}/${p}`;
 
 /**
+ * What the machine's other parts (its desktop, machinedesktop.ts; its pipes,
+ * machineio.ts) do when a machine is seen running, has just been started by a
+ * person, or has ended. They register here, so this file needn't import them.
+ */
+export const machineHooks = {
+  /** a card on someone's screen asked and the engine says it's running (machineSeen: a heartbeat while someone looks at it) */
+  seen: [] as Array<(boardId: string, panelId: string) => void>,
+  /** a person's Start made it run */
+  started: [] as Array<(boardId: string, panelId: string, person: string) => void>,
+  /** stopped, restarting or removed: whatever was attached to it lets go */
+  ended: [] as Array<(boardId: string, panelId: string, why: "stopped" | "restarted" | "removed") => void>,
+};
+const fire = <A extends unknown[]>(list: Array<(...a: A) => void>, ...a: A) => {
+  for (const fn of list) {
+    try {
+      fn(...a);
+    } catch (e) {
+      console.error("[machines] hook failed:", (e as Error).message);
+    }
+  }
+};
+
+/**
  * Read a card's machine back from the engine and write what's true to the
  * board: running, stopped, or gone. Called whenever a card on screen asks.
  */
@@ -425,6 +448,17 @@ export async function reconcileMachine(boardId: string, panelId: string): Promis
     writeMachine(boardId, panelId, { state: "stopped", ports: undefined, detail: `${name} isn't answering here, so this machine is out of reach. Its disk is kept: Start brings ${name} back and runs it again.` });
   }
   return { machine: machinePanel(boardId, panelId).machine ?? null, engines };
+}
+
+/**
+ * A card on someone's screen asked after its machine (the card's own poll):
+ * read the engine back as reconcileMachine does and, if it runs, tell the
+ * machine's other parts someone is looking (its pipes are watched meanwhile).
+ */
+export async function machineSeen(boardId: string, panelId: string) {
+  const r = await reconcileMachine(boardId, panelId);
+  if (r.machine?.state === "running") fire(machineHooks.seen, boardId, panelId);
+  return r;
 }
 
 function splitImage(image: string) {
@@ -472,6 +506,8 @@ export interface StartInput {
   image?: string;
   engine?: string;
   ports?: number[];
+  /** add a graphical desktop once it runs (machinedesktop.ts) */
+  desktop?: boolean;
 }
 
 /**
@@ -483,7 +519,12 @@ export function startMachine(boardId: string, panelId: string, person: string, i
   const k = key(boardId, panelId);
   const running = inFlight.get(k);
   if (running) return running as Promise<MachineState>;
-  const p = doStart(boardId, panelId, person, input).finally(() => inFlight.delete(k));
+  const p = doStart(boardId, panelId, person, input)
+    .then((m) => {
+      if (m.state === "running") fire(machineHooks.started, boardId, panelId, person);
+      return m;
+    })
+    .finally(() => inFlight.delete(k));
   inFlight.set(k, p);
   return p;
 }
@@ -528,7 +569,7 @@ async function doStart(boardId: string, panelId: string, person: string, input: 
     return machinePanel(boardId, panelId).machine!;
   }
 
-  writeMachine(boardId, panelId, { image, engine: engine.id, wantPorts, state: "pulling", detail: `Looking for ${image} on ${engine.name}…`, startedBy: person, proposedBy: undefined, containerId: undefined, ports: undefined });
+  writeMachine(boardId, panelId, { image, engine: engine.id, wantPorts, ...(input.desktop ? { wantDesktop: true } : {}), state: "pulling", detail: `Looking for ${image} on ${engine.name}…`, startedBy: person, proposedBy: undefined, containerId: undefined, ports: undefined });
   const have = await engineCall(engine, "GET", `/images/${encodeURIComponent(image)}/json`).catch(() => null);
   if (!have || have.status === 404) await pull(engine, image, (detail) => writeMachine(boardId, panelId, { detail })).catch(fail);
   else if (have.status >= 400) fail(new EngineError(have.status, have.body.toString("utf8")));
@@ -586,6 +627,7 @@ async function container(boardId: string, panelId: string) {
 export async function stopMachine(boardId: string, panelId: string, person: string) {
   const { engine, c, panel } = await container(boardId, panelId);
   endTerminal(boardId, panelId, "The machine was stopped.");
+  fire(machineHooks.ended, boardId, panelId, "stopped");
   await engineJson(engine, "POST", `/containers/${c.Id}/stop?t=5`, undefined, 30_000).catch((e) => {
     if (!(e instanceof EngineError && e.status === 304)) throw e; // 304: already stopped
   });
@@ -597,6 +639,7 @@ export async function stopMachine(boardId: string, panelId: string, person: stri
 export async function restartMachine(boardId: string, panelId: string, person: string) {
   const { engine, c, panel } = await container(boardId, panelId);
   endTerminal(boardId, panelId, "The machine is restarting.");
+  fire(machineHooks.ended, boardId, panelId, "restarted");
   await engineJson(engine, "POST", `/containers/${c.Id}/restart?t=5`, undefined, 40_000);
   await reconcileAfter(boardId, panelId, engine);
   writeMachine(boardId, panelId, { detail: undefined }, { who: person, role: "human", text: `restarted the machine ${panel.machine?.name ?? panel.name}` });
@@ -608,8 +651,11 @@ export async function removeMachine(boardId: string, panelId: string, person: st
   if (!confirm) throw new HttpError(400, "Removing a machine deletes its disk. Send confirm: true to do it.");
   const { engine, c, panel } = await container(boardId, panelId);
   endTerminal(boardId, panelId, "The machine was removed.");
+  fire(machineHooks.ended, boardId, panelId, "removed");
   await engineJson(engine, "DELETE", `/containers/${c.Id}?force=1&v=1`, undefined, 30_000);
-  writeMachine(boardId, panelId, { state: "absent", containerId: undefined, ports: undefined, detail: `Removed by ${person}, with its disk. Start makes a fresh one.` }, { who: person, role: "human", text: `removed the machine ${panel.machine?.name ?? panel.name}` });
+  // its disk is gone, and with it the desktop installed there, the leave agents had to use it, and its pipes' files
+  const gone = { desktop: undefined, wantDesktop: undefined, agentsMay: undefined, agentAsked: undefined, agentActs: undefined, io: undefined };
+  writeMachine(boardId, panelId, { ...gone, state: "absent", containerId: undefined, ports: undefined, detail: `Removed by ${person}, with its disk. Start makes a fresh one.` }, { who: person, role: "human", text: `removed the machine ${panel.machine?.name ?? panel.name}` });
   return machinePanel(boardId, panelId).machine!;
 }
 
@@ -719,6 +765,50 @@ const EXEC_KEEP = 16 * 1024;
 const looksFramed = (b: Buffer) => b.length >= 8 && b[0] <= 2 && b[1] === 0 && b[2] === 0 && b[3] === 0;
 
 /**
+ * Read an exec's stream until the program has ended, feeding `take`; true if
+ * `maxMs` passed first. Docker closes the stream when the program exits. Kiri
+ * (0.1.18, on its Windows pipe) leaves it open until the client lets go: a
+ * command that took 50 ms held its caller for the whole time limit (found
+ * 2026-11-15; half-closing our side, as `docker exec` does, makes Kiri drop
+ * the stream at once, even mid-command, losing its output). So the engine is
+ * also asked whether the exec still runs, a few times a second at first, then
+ * every 700 ms; once it doesn't, what's still in flight is given a moment to
+ * land. The socket is destroyed either way.
+ */
+async function untilExecEnds(engine: Engine, execId: string, sock: Socket, take: (b: Buffer) => void, maxMs: number): Promise<boolean> {
+  let ended = false;
+  let lastData = Date.now();
+  sock.on("data", (b: Buffer) => {
+    lastData = Date.now();
+    take(b);
+  });
+  const end = () => (ended = true);
+  sock.on("end", end);
+  sock.on("close", end);
+  sock.on("error", () => sock.destroy());
+  const t0 = Date.now();
+  let wait = 40;
+  try {
+    while (!ended) {
+      if (Date.now() - t0 > maxMs) return true;
+      await new Promise((r) => setTimeout(r, wait));
+      wait = Math.min(700, Math.round(wait * 1.5));
+      if (ended) break;
+      const info = await engineJson<{ Running?: boolean }>(engine, "GET", `/exec/${execId}/json`, undefined, 5000).catch(() => null);
+      if (info && info.Running === false) {
+        // it has exited: let the last of its output arrive (quiet for 50 ms, or 400 ms at most)
+        const until = Date.now() + 400;
+        while (!ended && Date.now() < until && Date.now() - lastData < 50) await new Promise((r) => setTimeout(r, 15));
+        break;
+      }
+    }
+    return false;
+  } finally {
+    sock.destroy();
+  }
+}
+
+/**
  * Run one command in a running machine, without a terminal, and return what
  * it printed and its exit code. Only machineasks.ts calls this, after a person
  * pressed Run on the card. It never wakes an engine or starts a machine: a
@@ -779,21 +869,7 @@ export async function execOnce(boardId: string, panelId: string, command: string
     pending = pending.subarray(i);
   };
   take(head);
-  const timedOut = await new Promise<boolean>((resolve) => {
-    const cut = setTimeout(() => {
-      sock.destroy();
-      resolve(true);
-    }, (secs + 5) * 1000);
-    sock.on("data", take);
-    const done = () => {
-      clearTimeout(cut);
-      resolve(false);
-    };
-    sock.on("end", done);
-    sock.on("close", done);
-    sock.on("error", () => sock.destroy());
-  });
-  sock.destroy();
+  const timedOut = await untilExecEnds(engine, exec.Id, sock, take, (secs + 5) * 1000);
   if (pending.length && !framed) keep(pending);
   let text = Buffer.concat(kept)
     .toString("utf8")
@@ -810,6 +886,112 @@ export async function execOnce(boardId: string, panelId: string, command: string
   const exitCode = info.Running || typeof info.ExitCode !== "number" ? null : info.ExitCode;
   // `timeout -s KILL` ends it with 137 when time is up
   return { exitCode, output: text, cut: cutText, timedOut: timedOut || (exitCode === 137 && ms >= secs * 1000 - 250), ms };
+}
+
+/**
+ * An exec's output stream, taken apart: an engine frames a non-TTY stream as
+ * [stream (0-2), 0, 0, 0, size (u32 BE)] + bytes, stdout and stderr
+ * interleaved (Kiri calls the stream raw and frames it all the same, so the
+ * first bytes decide). Bytes go to `out` (stdout) or `err` as they arrive.
+ */
+export function demux(type: string | undefined, out: (b: Buffer) => void, err: (b: Buffer) => void = () => {}) {
+  let framed: boolean | null = /multiplexed/.test(type ?? "") ? true : null;
+  let pending: Buffer = Buffer.alloc(0);
+  return (b: Buffer) => {
+    pending = pending.length ? Buffer.concat([pending, b]) : b;
+    if (framed === null) {
+      if (pending.length < 8) return;
+      framed = looksFramed(pending);
+    }
+    if (!framed) {
+      out(pending);
+      pending = Buffer.alloc(0);
+      return;
+    }
+    let i = 0;
+    while (i + 8 <= pending.length) {
+      const size = pending.readUInt32BE(i + 4);
+      if (i + 8 + size > pending.length) break;
+      const body = pending.subarray(i + 8, i + 8 + size);
+      if (body.length) (pending[i] === 2 ? err : out)(body);
+      i += 8 + size;
+    }
+    pending = pending.subarray(i);
+  };
+}
+
+export interface RawResult {
+  /** null: it didn't finish in time and its exit code is unknown */
+  exitCode: number | null;
+  /** stdout, byte for byte (a picture, a file), up to maxBytes */
+  stdout: Buffer;
+  /** the end of stderr, as text */
+  stderr: string;
+  timedOut: boolean;
+  /** stdout was longer than maxBytes: the start was kept */
+  cut: boolean;
+}
+
+/**
+ * Run a program in a running machine and return its stdout as bytes. For
+ * Foundation's own plumbing — the machine's pipes (machineio.ts) and its
+ * desktop (machinedesktop.ts) — never for an agent's command (that is
+ * execOnce, behind a person's Run). `argv` is run as given, with no shell
+ * between; it never wakes an engine or starts a machine.
+ */
+export async function execRaw(
+  boardId: string,
+  panelId: string,
+  argv: string[],
+  opts: { env?: string[]; timeoutS?: number; maxBytes?: number; onStdout?: (b: Buffer) => void } = {},
+): Promise<RawResult> {
+  const panel = machinePanel(boardId, panelId);
+  const found = await findContainer(boardId, panelId, panel.machine?.engine);
+  if (!found || found.c.State !== "running") throw new HttpError(409, `${panel.machine?.name ?? panel.name} isn't running`);
+  const { engine, c } = found;
+  const secs = Math.max(1, Math.min(1800, Math.round(opts.timeoutS ?? 20)));
+  const max = opts.maxBytes ?? 4 * 1024 * 1024;
+  const exec = await engineJson<{ Id: string }>(engine, "POST", `/containers/${c.Id}/exec`, {
+    AttachStdin: false,
+    AttachStdout: true,
+    AttachStderr: true,
+    Tty: false,
+    Env: ["TERM=dumb", "DEBIAN_FRONTEND=noninteractive", ...(opts.env ?? [])],
+    Cmd: ["/bin/sh", "-c", 'if command -v timeout >/dev/null 2>&1; then exec timeout -s KILL "$0" "$@"; else exec "$@"; fi', String(secs), ...argv],
+  });
+  const t0 = Date.now();
+  const { sock, head, type } = await hijack(engine, `/exec/${exec.Id}/start`, { Detach: false, Tty: false });
+  const outs: Buffer[] = [];
+  let outBytes = 0;
+  let cut = false;
+  let errText = "";
+  const take = demux(
+    type,
+    (b) => {
+      opts.onStdout?.(b);
+      if (outBytes >= max) return void (cut = true);
+      const room = max - outBytes;
+      outs.push(b.length > room ? b.subarray(0, room) : b);
+      if (b.length > room) cut = true;
+      outBytes += Math.min(b.length, room);
+    },
+    (b) => (errText = (errText + b.toString("utf8")).slice(-2000)),
+  );
+  take(head);
+  const timedOut = await untilExecEnds(engine, exec.Id, sock, take, (secs + 5) * 1000);
+  const info = await engineJson<{ ExitCode?: number; Running?: boolean }>(engine, "GET", `/exec/${exec.Id}/json`).catch(() => ({ Running: true }) as { ExitCode?: number; Running?: boolean });
+  const exitCode = info.Running || typeof info.ExitCode !== "number" ? null : info.ExitCode;
+  return { exitCode, stdout: Buffer.concat(outs), stderr: errText, timedOut: timedOut || (exitCode === 137 && Date.now() - t0 >= secs * 1000 - 250), cut };
+}
+
+/** `sh -c script` in a running machine, its stdout as text (trimmed); throws with stderr's end when it fails */
+export async function execSh(boardId: string, panelId: string, script: string, opts: { env?: string[]; timeoutS?: number; maxBytes?: number; args?: string[] } = {}): Promise<string> {
+  const r = await execRaw(boardId, panelId, ["/bin/sh", "-c", script, "foundation", ...(opts.args ?? [])], opts);
+  if (r.exitCode !== 0) {
+    const said = (r.stderr.trim() || r.stdout.toString("utf8").trim()).split("\n").slice(-3).join(" ").slice(-300);
+    throw new HttpError(502, r.timedOut ? `it didn't finish in ${opts.timeoutS ?? 20} s${said ? `: ${said}` : ""}` : said || `exit ${r.exitCode ?? "unknown"}`);
+  }
+  return r.stdout.toString("utf8").trim();
 }
 
 // ---------- the shared terminal ----------
@@ -844,7 +1026,7 @@ function screenText(boardId: string, panelId: string) {
     .slice(-4000);
 }
 
-function hijack(e: Engine, path: string, body: unknown): Promise<{ sock: Socket; head: Buffer; type?: string }> {
+export function hijack(e: Engine, path: string, body: unknown): Promise<{ sock: Socket; head: Buffer; type?: string }> {
   return new Promise((resolve, reject) => {
     const payload = Buffer.from(JSON.stringify(body));
     const req = httpRequest({
@@ -864,6 +1046,37 @@ function hijack(e: Engine, path: string, body: unknown): Promise<{ sock: Socket;
   });
 }
 
+/**
+ * Run "$@" with no signal blocked. Kiri (0.1.18) starts a machine's processes
+ * with SIGINT, SIGTERM and SIGCHLD blocked, and a blocked signal is inherited
+ * by everything started from them: Ctrl+C printed ^C and interrupted nothing
+ * (found 2026-11-15 on Kiri for Windows: `grep SigBlk /proc/self/status` says
+ * 0000000000014002 in an exec). A shell can't change its own mask, so perl or
+ * python3 does when the image has one (Ubuntu and Debian always have perl);
+ * without either, the shell runs as it is (Alpine on Kiri: Ctrl+C stays dead).
+ * On Docker nothing is blocked and this changes nothing.
+ */
+export const UNBLOCK_FN = `unblocked() {
+  if command -v perl >/dev/null 2>&1 && perl -MPOSIX -e 1 2>/dev/null; then exec perl -MPOSIX -e 'sigprocmask(SIG_SETMASK, POSIX::SigSet->new()); exec { $ARGV[0] } @ARGV or exit 127' "$@"
+  elif command -v python3 >/dev/null 2>&1; then exec python3 -c 'import os,signal,sys; signal.pthread_sigmask(signal.SIG_SETMASK, []); os.execvp(sys.argv[1], sys.argv[1:])' "$@"
+  else exec "$@"; fi
+}`;
+
+/**
+ * The card's shell: home, a login bash (or sh), signals unblocked. Where they
+ * can't be (SIGINT is blocked: the mask's second bit, and the image has
+ * neither perl nor python3), the shell opens with a line that says so and what
+ * to install, rather than leaving Ctrl+C dead without a word.
+ */
+const SHELL_LAUNCH = `${UNBLOCK_FN}
+cd ~ 2>/dev/null || cd /
+if ! { command -v perl >/dev/null 2>&1 && perl -MPOSIX -e 1 2>/dev/null; } && ! command -v python3 >/dev/null 2>&1; then
+  case "$(sed -n 's/^SigBlk:[[:space:]]*//p' /proc/self/status 2>/dev/null)" in
+    *[2367abef]) echo "Foundation: this engine starts programs with Ctrl+C blocked, and this image has no perl or python3 to undo that. Install one (Alpine: apk add perl) and open the terminal again." ;;
+  esac
+fi
+unblocked "$(command -v bash || command -v sh)" -l`;
+
 async function openTty(boardId: string, panelId: string): Promise<Tty> {
   const { engine, c } = await container(boardId, panelId);
   if (c.State !== "running") throw new HttpError(409, "the machine isn't running");
@@ -873,7 +1086,7 @@ async function openTty(boardId: string, panelId: string): Promise<Tty> {
     AttachStderr: true,
     Tty: true,
     Env: ["TERM=xterm-256color", "COLORTERM=truecolor"],
-    Cmd: ["/bin/sh", "-c", "cd ~ 2>/dev/null || cd /; exec $(command -v bash || command -v sh) -l"],
+    Cmd: ["/bin/sh", "-c", SHELL_LAUNCH],
   });
   const { sock, head } = await hijack(engine, `/exec/${exec.Id}/start`, { Detach: false, Tty: true });
   const t: Tty = { board: boardId, panel: panelId, execId: exec.Id, engine, sock, clients: new Map(), screen: [], screenBytes: 0 };

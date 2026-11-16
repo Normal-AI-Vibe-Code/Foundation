@@ -25,7 +25,7 @@ import type { AgentEvent, AgentRuntime, UserInfo } from "@foundation/protocol";
 import { config } from "./config.ts";
 import { all, one, run } from "./db.ts";
 import { boardDigest, editBoard } from "./boards.ts";
-import { runTool, TOOLS, type ToolCtx } from "./tools.ts";
+import { runTool, toolContent, TOOLS, type ToolCtx } from "./tools.ts";
 import { canWrite } from "./roles.ts";
 import { createSession, revokeSession } from "./auth.ts";
 import { logActivity } from "@foundation/protocol";
@@ -401,8 +401,19 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
         emit({ type: "tool", name: c.name, input: c.input });
         try {
           const out = await runTool(ctx, c.name, c.input);
-          const text = typeof out === "string" ? out : JSON.stringify(out);
+          // a picture in the result (a machine's screen) goes to the model as a picture, the rest as text
+          const { text, image } = toolContent(out, false);
           emit({ type: "tool_result", name: c.name, ok: true, summary: text.slice(0, 200) });
+          if (image) {
+            return {
+              type: "tool_result" as const,
+              tool_use_id: c.id,
+              content: [
+                { type: "image" as const, source: { type: "base64" as const, media_type: image.mime as "image/png", data: image.base64 } },
+                { type: "text" as const, text: text.slice(0, 60_000) },
+              ],
+            };
+          }
           return { type: "tool_result" as const, tool_use_id: c.id, content: text.slice(0, 60_000) };
         } catch (e) {
           const message = (e as Error).message;

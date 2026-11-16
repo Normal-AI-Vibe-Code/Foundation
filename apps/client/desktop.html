@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Machine desktop</title>
+    <!-- A machine's desktop, drawn by noVNC inside a machine card (src/panels/desktopFrame.ts).
+         A page of its own, in a frame, so the board's zoom scales it like any picture while
+         noVNC measures in its own unscaled pixels. Its ground is the card's (sent by the card). -->
+    <style>
+      html,
+      body,
+      #screen {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+      }
+      #screen canvas {
+        outline: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="screen"></div>
+    <script type="module" src="/src/panels/desktopFrame.ts"></script>
+  </body>
+</html>

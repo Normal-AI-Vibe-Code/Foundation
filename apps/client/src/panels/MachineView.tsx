@@ -7,8 +7,15 @@
  * States: no engine → a hatched well that says why and how to get one.
  * Not started → pick an image (a distro, one the engine has, or a saved image
  * from the archive) and press Start. Pulling/starting → the engine's progress.
- * Running → the shared terminal, and the machine's ports as apps. Stopped →
- * Start again (the disk is kept) or Remove (it isn't).
+ * Running → the shared terminal or, by the head's switch, the machine's
+ * graphical desktop (MachineViewDesktop.tsx); its published ports as apps;
+ * and its pipes, in and out (MachineViewIo.tsx). Stopped → Start again (the
+ * disk is kept) or Remove (it isn't).
+ *
+ * Typing: a plain click in the terminal puts the caret there, the card goes
+ * "in use" and says where the keys go; every key is then the shell's (the
+ * app's shortcuts stand down: lib/keysHeld.ts) until Esc twice or a click
+ * elsewhere.
  *
  * The terminal is xterm.js. Its colours are read from the tokens (a probe
  * element resolves each one, so night mixes come through) and re-read when
@@ -28,6 +35,14 @@ import { askAgent, toast, useUi } from "../state/ui";
 import { useOnScreen } from "./PanelView";
 import { MACHINE_STATE_WORD, machineTone, portUrl } from "./machinePage";
 import { unscaleMouse } from "./scaledMouse";
+import { putInUse } from "../lib/cardUse";
+import { HOLDS_KEYS, escEscToLeave } from "../lib/keysHeld";
+import { getUi, setUi } from "../state/ui";
+import { KeysLine } from "./MachineViewBits";
+import { AgentUse, Desktop, ViewSwitch, useMachineView } from "./MachineViewDesktop";
+import { IoStrip } from "./MachineViewIo";
+
+export { KeysLine };
 
 interface EngineStatus {
   id: "kiri" | "docker";
@@ -58,6 +73,7 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
   const viewer = ui.role === "viewer";
   const m = panel.machine!;
   const [engines, setEngines] = useState<EngineStatus[] | null>(null);
+  const [view, setView] = useMachineView(panel.id);
 
   // while on screen, the server reads the engine back and writes what's true to the board
   useEffect(() => {
@@ -93,13 +109,21 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
           </span>
         )}
         {m.image && <code className="machine-image">{m.image}</code>}
+        {m.state === "running" && <ViewSwitch view={view} onView={setView} />}
         {m.state === "running" && <Ports panel={panel} m={m} />}
       </div>
       <MachineAsks panelId={panel.id} viewer={viewer} />
+      {m.state === "running" && <AgentUse panelId={panel.id} m={m} viewer={viewer} view={view} onWatch={() => setView("desktop")} />}
       {noEngine && m.state !== "running" ? (
         <NoEngine engines={engines!} />
       ) : m.state === "running" ? (
-        onScreen ? <Terminal panelId={panel.id} canType={!viewer} /> : <div className="machine-poster">{m.name} is running</div>
+        !onScreen ? (
+          <div className="machine-poster">{m.name} is running</div>
+        ) : view === "desktop" ? (
+          <Desktop panel={panel} m={m} viewer={viewer} />
+        ) : (
+          <Terminal panelId={panel.id} canType={!viewer} />
+        )
       ) : m.state === "pulling" || m.state === "starting" ? (
         <div className="machine-progress">
           <span className="f-dot is-warn is-live" />
@@ -113,6 +137,7 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
       ) : (
         <Picker panel={panel} m={m} engine={engine} viewer={viewer} />
       )}
+      {m.state === "running" && onScreen && <IoStrip panel={panel} viewer={viewer} />}
       {!noEngine && <Controls panel={panel} m={m} viewer={viewer} engine={engine} />}
     </div>
   );
@@ -313,6 +338,7 @@ function Picker({ panel, m, engine, viewer }: { panel: PanelMeta; m: MachineStat
   const [have, setHave] = useState<EngineImage[]>([]);
   const [tars, setTars] = useState<ArchiveFile[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
+  const [desk, setDesk] = useState(Boolean(m.wantDesktop));
   useEffect(() => setImage(m.image ?? ""), [m.image]);
   useEffect(() => {
     if (!engine) return;
@@ -390,18 +416,24 @@ function Picker({ panel, m, engine, viewer }: { panel: PanelMeta; m: MachineStat
         onChange={(e) => setImage(e.target.value.trim())}
         onKeyDown={(e) => e.stopPropagation()}
       />
-      <StartButton panel={panel} m={m} image={image} engine={engine} viewer={viewer} />
+      {!viewer && (
+        <label className="machine-with-desk" data-tip="Adds a graphical desktop (an X server, XFCE and VNC) once it runs: packages installed in the machine, a few minutes. Ubuntu, Debian and Alpine images. You can add it later too, from the card's Desktop view.">
+          <input type="checkbox" checked={desk} onChange={(e) => setDesk(e.target.checked)} />
+          With a desktop
+        </label>
+      )}
+      <StartButton panel={panel} m={m} image={image} engine={engine} viewer={viewer} desktop={desk} />
     </div>
   );
 }
 
-function StartButton({ panel, m, image, engine, viewer }: { panel: PanelMeta; m: MachineState; image: string; engine?: EngineStatus; viewer: boolean }) {
+function StartButton({ panel, m, image, engine, viewer, desktop }: { panel: PanelMeta; m: MachineState; image: string; engine?: EngineStatus; viewer: boolean; desktop?: boolean }) {
   const [busy, setBusy] = useState(false);
   if (viewer) return <div className="machine-note">View only: someone who can edit this board starts it.</div>;
   const start = async () => {
     setBusy(true);
     try {
-      await api(`/api/boards/${encodeURIComponent(board())}/machines/${panel.id}/start`, { method: "POST", json: { image: image || undefined, engine: engine?.id } });
+      await api(`/api/boards/${encodeURIComponent(board())}/machines/${panel.id}/start`, { method: "POST", json: { image: image || undefined, engine: engine?.id, ...(desktop ? { desktop: true } : {}) } });
     } catch (e) {
       toast((e as Error).message, "bad");
     } finally {
@@ -414,7 +446,7 @@ function StartButton({ panel, m, image, engine, viewer }: { panel: PanelMeta; m:
         {busy ? "Starting…" : `Start ${image || m.image || ""} on ${engine?.name ?? "the engine"}`}
       </button>
       <span className="machine-terms">
-        {engine?.asleep ? `Wakes ${engine.name} first · ` : ""}Pulls it if needed · ports on 127.0.0.1 only · nothing from this computer mounted
+        {engine?.asleep ? `Wakes ${engine.name} first · ` : ""}Pulls it if needed{desktop ? " · then installs a desktop in it" : ""} · ports on 127.0.0.1 only · nothing from this computer mounted
       </span>
     </div>
   );
@@ -514,6 +546,14 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
   const [note, setNote] = useState<string | null>(null);
   const [people, setPeople] = useState<string[]>([]);
   const boardId = useMemo(board, []);
+  const xterm = useRef<XTerm | null>(null);
+  // the caret is in the shell: the card says so, and it is in use (the wheel scrolls its scrollback)
+  const [hasKeys, setHasKeys] = useState(false);
+  const inUse = useUi().engaged === panelId;
+  // a click elsewhere (or anything else that ends the card's use) takes the keys back from the shell
+  useEffect(() => {
+    if (!inUse && el.current?.contains(document.activeElement)) xterm.current?.blur();
+  }, [inUse]);
   useEffect(() => {
     const node = el.current;
     if (!node) return;
@@ -531,6 +571,23 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(node);
+    xterm.current = term;
+    const onFocus = () => {
+      setHasKeys(true);
+      putInUse(panelId);
+    };
+    const onBlur = (e: FocusEvent) => {
+      if (!node.contains(e.relatedTarget as Node | null)) setHasKeys(false);
+    };
+    // the one way out by keyboard: Esc twice (a single Esc is the shell's; both still reach it)
+    const leave = escEscToLeave(() => {
+      term.blur();
+      if (getUi().engaged === panelId) setUi({ engaged: null });
+    });
+    const onEsc = (e: KeyboardEvent) => void leave(e);
+    node.addEventListener("focusin", onFocus);
+    node.addEventListener("focusout", onBlur);
+    node.addEventListener("keydown", onEsc, true);
     // xterm measures in its own pixels; the board draws it scaled, so a selection landed off by the zoom (#53)
     const offMouse = unscaleMouse(node);
     let ws: WebSocket | null = null;
@@ -614,6 +671,11 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
       offMouse();
       offNight();
       data.dispose();
+      node.removeEventListener("focusin", onFocus);
+      node.removeEventListener("focusout", onBlur);
+      node.removeEventListener("keydown", onEsc, true);
+      xterm.current = null;
+      setHasKeys(false);
       // this socket is done: its late close mustn't say "closed" over the next one (StrictMode mounts twice)
       if (ws) {
         ws.onopen = ws.onmessage = ws.onclose = null;
@@ -623,9 +685,10 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
     };
   }, [boardId, panelId, canType]);
   return (
-    <div className="machine-term-wrap">
-      {/* keys go to the shell, not the board's shortcuts */}
-      <div ref={el} className="machine-term wheel-own" onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
+    <div className={`machine-term-wrap${hasKeys ? " has-keys" : ""}`}>
+      {/* keys go to the shell, not the board's shortcuts (lib/keysHeld.ts) */}
+      <div ref={el} className="machine-term wheel-own" {...{ [HOLDS_KEYS]: "" }} onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
+      {hasKeys && canType && <KeysLine />}
       {!canType && <div className="machine-watching">View only: you're watching</div>}
       {people.length > 1 && (
         <div className="machine-people" data-tip={people.join(", ")}>
