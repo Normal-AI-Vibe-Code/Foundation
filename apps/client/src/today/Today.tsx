@@ -1,19 +1,19 @@
 /**
- * Today — the first thing a person meets, before the boards. The Shiba (the
- * agent's face, Vision's ethereal shiba) fills the room and answers in large
- * type; beside it, the page keeps the state: what wants you today, your goals,
- * and every company app. The Shiba reads the same page (the `today` tool),
- * points at what it's talking about, and changes your goals when you ask, so
- * its words and the page never disagree.
+ * Today — the first thing a person meets. It is a place inside Foundation (2026-11-15), not a
+ * page of its own: the top bar and the side menu stay, and where a grid would be, the Shiba (the
+ * agent's face, Vision's ethereal shiba) fills the paper and answers in large type, with a voice
+ * and a field to talk to it. On the right, drawn in white straight over the room, the Today
+ * panel: your todos (what wants you, then your goals) and the company's apps. The Shiba reads
+ * the same page (the `today` tool), points at what it's talking about, and changes your goals
+ * when you ask, so its words and the page never disagree.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { UserInfo } from "@foundation/protocol";
-import { isNight, setNight } from "@foundation/ui";
 import { createShiba, type OrbMood } from "@foundation/ui/shiba";
-import { NightOrb } from "../shell/NightOrb";
 import { listen, voiceAvailable, type Listening } from "../lib/voice";
-import { api, logout } from "../lib/api";
+import { api } from "../lib/api";
+import { floorInsets, useUi } from "../state/ui";
 import { ask, loadToday, newConversation, restoreConversation, saveGoal, setHeard, stopAsking, useToday, wordsLevel, type CompanyApp, type FocusItem, type Goal, type Mood } from "./model";
 import "./today.css";
 
@@ -100,7 +100,34 @@ export function GoalRow({ goal, pointed, onDone }: { goal: Goal; pointed?: boole
   );
 }
 
-/** a company app, one press away: always in Today's top bar */
+/** a company app as a row of the Today panel: its mark, its name, what it's for, whether it answers */
+export function AppRow({ app, status, pointed }: { app: CompanyApp; status?: "ok" | "warn" | "unknown"; pointed?: boolean }) {
+  const body = (
+    <>
+      <span className="today-glyph" aria-hidden>
+        {app.glyph}
+      </span>
+      <span className="today-row-text">
+        <span className="today-row-title">{app.name}</span>
+        <span className="today-row-why">{app.url ? app.role : `${app.role} · not linked yet`}</span>
+      </span>
+      {app.url && status && status !== "unknown" ? <i className="today-dot" data-tone={status} title={status === "ok" ? "Live" : "Not answering"} /> : <span />}
+    </>
+  );
+  if (!app.url)
+    return (
+      <span className="today-row today-app" data-unlinked data-pointed={pointed || undefined} data-tip="Not linked yet: ask an admin (or the Shiba) where it lives" tabIndex={0}>
+        {body}
+      </span>
+    );
+  return (
+    <a className="today-row today-app" href={app.url} target="_blank" rel="noreferrer" data-pointed={pointed || undefined}>
+      {body}
+    </a>
+  );
+}
+
+/** a company app, one press away (the chip form: the Chrome popup and `#/design`) */
 export function AppChip({ app, status, pointed }: { app: CompanyApp; status?: "ok" | "warn" | "unknown"; pointed?: boolean }) {
   const tip = app.url ? `${app.role}${status === "warn" ? " · not answering" : status === "ok" ? " · live" : ""}` : `${app.role} · not linked yet: ask an admin (or the Shiba) where it lives`;
   const body = (
@@ -139,6 +166,16 @@ const MOOD_WORD: Record<Mood, string> = { idle: "Shiba", listening: "Listening",
 
 export function Today({ user }: { user: UserInfo }) {
   const t = useToday();
+  const insets = floorInsets(useUi());
+  // under 760 px of open paper the room goes on top and the panel follows it in one scroll
+  const room = useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (!room.current) return;
+    const ro = new ResizeObserver(([e]) => setNarrow(e.contentRect.width < 760));
+    ro.observe(room.current);
+    return () => ro.disconnect();
+  }, []);
   const [draft, setDraft] = useState("");
   const [goalDraft, setGoalDraft] = useState("");
   const [status, setStatus] = useState<Record<string, "ok" | "warn">>({});
@@ -164,7 +201,6 @@ export function Today({ user }: { user: UserInfo }) {
       if (typing) return;
       if (e.key === "/") (e.preventDefault(), input.current?.focus());
       else if (e.key.toLowerCase() === "v" && !e.metaKey && !e.ctrlKey) (e.preventDefault(), toggleVoice());
-      else if (e.key.toLowerCase() === "b" && !e.metaKey && !e.ctrlKey) window.location.hash = "#/board";
       else if (e.key === "Escape" && listening.current) (listening.current.cancel(), (listening.current = null), setHeard(null));
     };
     window.addEventListener("keydown", key);
@@ -229,29 +265,9 @@ export function Today({ user }: { user: UserInfo }) {
   const earlier = t.exchanges.slice(-4, last ? -1 : undefined);
 
   return (
-    <div className="today" data-mood={t.mood}>
+    <div ref={room} className={`today${narrow ? " is-narrow" : ""}`} data-mood={t.mood} style={{ left: insets.left, top: insets.top, right: insets.right }}>
       <ShibaRoom mood={t.mood} levels={wordsLevel} />
       <div className="today-veil" aria-hidden />
-
-      <header className="today-top">
-        <span className="f-eyebrow">Today</span>
-        <nav className="today-chips" aria-label="Company apps">
-          {today?.apps.filter((a) => a.id !== "foundation").map((a) => <AppChip key={a.id} app={a} status={a.connector ? (status[a.connector] ?? "unknown") : undefined} pointed={pointed.has(a.id)} />)}
-        </nav>
-        <span className="today-top-spacer" />
-        {t.exchanges.length > 0 && (
-          <button className="f-pill today-ghost" onClick={newConversation} data-tip="Start a new conversation with the Shiba">
-            New conversation
-          </button>
-        )}
-        <a className="f-pill is-primary" href="#/board" data-tip="The boards" data-kbd="B">
-          ▦ Boards
-        </a>
-        <NightOrb onToggle={() => setNight(!isNight())} />
-        <button className="today-me" style={{ background: user.color }} data-tip={`${user.name} · sign out`} onClick={() => void logout().then(() => location.reload())} aria-label="Sign out">
-          {user.name.slice(0, 1).toUpperCase()}
-        </button>
-      </header>
 
       <main className="today-words">
         {earlier.length > 0 && (
@@ -293,21 +309,21 @@ export function Today({ user }: { user: UserInfo }) {
             {running ? "Stop" : "Ask"}
           </button>
         </form>
+        {t.exchanges.length > 0 && (
+          <button className="today-ghost" onClick={newConversation} data-tip="Start a new conversation with the Shiba">
+            New conversation
+          </button>
+        )}
       </main>
 
-      <aside className="today-state" aria-label="Your day">
+      <aside className="today-state" aria-label="Today">
+        <h2 className="today-panel-title">Today</h2>
         <section className="today-group">
           <h2 className="f-eyebrow">
-            Focus today <span className="today-count">{today?.focus.length ?? "…"}</span>
+            Todos <span className="today-count">{today ? today.focus.length + active.length : "…"}</span>
           </h2>
           {today && today.focus.length === 0 && <p className="today-empty">Nothing is waiting on you. Asks, notes that tag you, stages you own and new files on your boards will show up here.</p>}
           {today?.focus.map((f) => <FocusRow key={f.id} item={f} pointed={pointed.has(f.id)} />)}
-        </section>
-
-        <section className="today-group">
-          <h2 className="f-eyebrow">
-            Goals <span className="today-count">{active.length}</span>
-          </h2>
           {today?.goals.map((g) => <GoalRow key={g.id} goal={g} pointed={pointed.has(g.id)} onDone={() => void saveGoal({ id: g.id, status: "done", progress: 1 })} />)}
           <form
             className="today-add"
@@ -319,11 +335,15 @@ export function Today({ user }: { user: UserInfo }) {
               void saveGoal({ title });
             }}
           >
-            <input value={goalDraft} onChange={(e) => setGoalDraft(e.target.value)} placeholder="Add a goal…" aria-label="Add a goal" />
+            <input value={goalDraft} onChange={(e) => setGoalDraft(e.target.value)} placeholder="Add a todo…" aria-label="Add a todo" />
           </form>
           {today && <p className="today-source" data-connected={today.sources.dataroom.connected || undefined}>{today.sources.dataroom.note}</p>}
         </section>
 
+        <section className="today-group">
+          <h2 className="f-eyebrow">Apps</h2>
+          {today?.apps.filter((a) => a.id !== "foundation").map((a) => <AppRow key={a.id} app={a} status={a.connector ? (status[a.connector] ?? "unknown") : undefined} pointed={pointed.has(a.id)} />)}
+        </section>
       </aside>
     </div>
   );

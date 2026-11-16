@@ -27,8 +27,6 @@ export interface SessionTab {
 }
 
 export interface UiState {
-  /** the meta layer: agents, presence rings, app port wires */
-  agentLayer: boolean;
   command: boolean;
   presenting: boolean;
   view: "grid" | "company";
@@ -40,7 +38,10 @@ export interface UiState {
   paneW: number;
   /** "spaces": every space, by recent or by project folder · "info": the open space's own people and activity */
   paneView: "spaces" | "info";
-  spacesView: "recent" | "folders";
+  /** how the side menu lists grids: by when this device last opened each, or all of them as a tree (grids inside grids) */
+  spacesView: "recent" | "all";
+  /** a strip the open place lays under the top bar (Settings' tabs over a grid): the grid frames itself below it */
+  strip: number;
   /** the top bar's tabs: the spaces open in this window (board ids), in order */
   spaces: string[];
   /** sessions opened in this window, and the one showing in the session column (null: none) */
@@ -59,6 +60,8 @@ export interface UiState {
   agents: boolean;
   agentsW: number;
   agentsAt: string | null;
+  /** an agent's own pane on the right (characters/AgentInfo.tsx), opened from a council; it takes the agents pane's place and width */
+  agentInfo: boolean;
   /** cards the showing session touched — ringed on the grid */
   touched: string[];
   /** my role on the board that's showing: a viewer reads, and edits snap back */
@@ -74,11 +77,11 @@ export const WIDTHS = {
 };
 
 const KEY = "foundation-floor";
-type Stored = Pick<UiState, "pane" | "paneW" | "paneView" | "spacesView" | "spaces" | "sessions" | "session" | "sessionW" | "search" | "searchW" | "agents" | "agentsW">;
+type Stored = Pick<UiState, "pane" | "paneW" | "paneView" | "spaces" | "sessions" | "session" | "sessionW" | "search" | "searchW" | "agents" | "agentsW">;
 
-function stored(): Partial<Stored> {
+function stored(): Partial<Stored> & { spacesView?: string } {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Stored> & { tabs?: SessionTab[]; tab?: string | null };
+    const s = JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Stored> & { spacesView?: string; tabs?: SessionTab[]; tab?: string | null };
     // before spaces, sessions were the top bar's tabs
     if (s.sessions === undefined && Array.isArray(s.tabs)) s.sessions = s.tabs;
     // the old key, from before the floor
@@ -94,16 +97,17 @@ const clampW = (v: number | undefined, w: { min: number; max: number; initial: n
   typeof v === "number" && isFinite(v) ? Math.max(w.min, Math.min(w.max, v)) : w.initial;
 
 let ui: UiState = {
-  agentLayer: false,
   command: false,
   presenting: false,
   view: "grid",
   engaged: null,
   toast: null,
-  pane: s0.pane ?? false,
+  // the side menu is open the first time (2026-11-15): it is how you get to a grid
+  pane: s0.pane ?? true,
   paneW: clampW(s0.paneW, WIDTHS.pane),
   paneView: s0.paneView === "info" ? "info" : "spaces",
-  spacesView: s0.spacesView === "folders" ? "folders" : "recent",
+  spacesView: s0.spacesView === "recent" ? "recent" : "all",
+  strip: 0,
   spaces: Array.isArray(s0.spaces) ? s0.spaces.filter((id) => typeof id === "string").slice(0, 24) : [],
   sessions: Array.isArray(s0.sessions) ? s0.sessions.filter((t) => t && typeof t.id === "string").slice(0, 12) : [],
   session: null,
@@ -114,6 +118,7 @@ let ui: UiState = {
   agents: (s0.agents ?? false) && !s0.search,
   agentsW: clampW(s0.agentsW, WIDTHS.agents),
   agentsAt: null,
+  agentInfo: false,
   touched: [],
   role: "member",
 };
@@ -132,11 +137,12 @@ export function setUi(patch: Partial<UiState>) {
   ui = { ...ui, ...patch };
   if (patch.session !== undefined && patch.session !== before.session) ui.touched = patch.touched ?? [];
   // one pane on the right: the one just opened takes the other's place
-  if (ui.agents && !before.agents) ui.search = false;
-  else if (ui.search && !before.search) ui.agents = false;
+  if (ui.agentInfo && !before.agentInfo) ui.search = ui.agents = false;
+  else if (ui.agents && !before.agents) ((ui.search = false), (ui.agentInfo = false));
+  else if (ui.search && !before.search) ui.agents = ui.agentInfo = false;
   if (!ui.agents) ui.agentsAt = null;
   // opening a session or search (or widening one) on a narrow screen: the side pane gives way
-  const opened = (ui.session && !before.session) || (ui.search && !before.search) || (ui.agents && !before.agents) || ui.sessionW > before.sessionW || ui.searchW > before.searchW || ui.agentsW > before.agentsW;
+  const opened = (ui.session && !before.session) || (ui.search && !before.search) || (ui.agents && !before.agents) || (ui.agentInfo && !before.agentInfo) || ui.sessionW > before.sessionW || ui.searchW > before.searchW || ui.agentsW > before.agentsW;
   if (opened && ui.pane && patch.pane === undefined && typeof window !== "undefined") {
     const f = floorInsets(ui);
     if (window.innerWidth - f.left - f.right < MIN_PAPER) ui.pane = false;
@@ -152,7 +158,7 @@ export function setUi(patch: Partial<UiState>) {
   }
   if ((["pane", "paneW", "paneView", "spacesView", "spaces", "sessions", "session", "sessionW", "search", "searchW", "agents", "agentsW"] as const).some((k) => k in patch)) {
     try {
-      const keep: Stored = { pane: ui.pane, paneW: ui.paneW, paneView: ui.paneView, spacesView: ui.spacesView, spaces: ui.spaces, sessions: ui.sessions, session: ui.session, sessionW: ui.sessionW, search: ui.search, searchW: ui.searchW, agents: ui.agents, agentsW: ui.agentsW };
+      const keep: Stored & { spacesView: string } = { pane: ui.pane, paneW: ui.paneW, paneView: ui.paneView, spacesView: ui.spacesView, spaces: ui.spaces, sessions: ui.sessions, session: ui.session, sessionW: ui.sessionW, search: ui.search, searchW: ui.searchW, agents: ui.agents, agentsW: ui.agentsW };
       localStorage.setItem(KEY, JSON.stringify(keep));
     } catch { /* private window */ }
   }
@@ -191,7 +197,7 @@ if (typeof window !== "undefined") {
 export function floorInsets(u: UiState = ui) {
   if (u.presenting) return { left: 0, top: 0, right: 0, bottom: 0 };
   const session = u.session ? u.sessionW : 0;
-  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR, right: u.search ? u.searchW : u.agents ? u.agentsW : 0, bottom: 0 };
+  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR + u.strip, right: u.search ? u.searchW : u.agents || u.agentInfo ? u.agentsW : 0, bottom: 0 };
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;

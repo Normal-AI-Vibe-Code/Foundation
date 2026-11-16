@@ -21,6 +21,7 @@ import { Avatar } from "../characters/Avatar";
 import type { Framing } from "../characters/actor";
 import { characterFilePath, type RosterCharacter } from "../characters/roster";
 import { useOnScreen } from "./PanelView";
+import { useStage } from "../characters/stageBudget";
 import "./character.css";
 
 const board = () => activeBoard()?.boardId ?? "";
@@ -108,10 +109,11 @@ const STAGE_WORDS: Record<CharacterStageKey, { name: string; press: (form: Chara
 function Thumb({ character, role, label }: { character: CharacterState; role: string; label: string }) {
   const id = (character.files as Record<string, string | undefined>)[role];
   const src = useFileSrc(id ? characterFilePath(character.id, role) : null);
-  if (!id) return null;
+  const [broken, setBroken] = useState(false);
+  if (!id || broken) return null;
   return (
     <figure className="char-thumb" data-char-file={role}>
-      {src ? <img src={src} alt={`${character.name}, ${label}`} draggable={false} /> : <span />}
+      {src ? <img src={src} alt={`${character.name}, ${label}`} draggable={false} onError={() => setBroken(true)} /> : <span />}
       <figcaption>{label}</figcaption>
     </figure>
   );
@@ -121,18 +123,18 @@ function Pick({ item, on, disabled, onToggle }: { item: Inspiration; on: boolean
   const src = useFileSrc(item.src);
   return (
     <button type="button" className={`char-pick${on ? " is-on" : ""}`} aria-pressed={on} disabled={disabled && !on} data-tip={on ? "Drawn from this · press to leave it out" : disabled ? "Five at most reach the image model" : "Draw from this"} onClick={onToggle}>
-      {src && <img src={src} alt={item.name} draggable={false} />}
+      {src && <img src={src} alt={item.name} draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />}
     </button>
   );
 }
 
-// One card plays at a time: a live character is a WebGL context, and a studio board has a card for every
-// character. The card under the pointer takes the stage; the others hold their still.
-let stageOwner: (() => void) | null = null;
 
 export function CharacterBody({ panel }: { panel: PanelMeta }) {
   const host = useRef<HTMLDivElement>(null);
+  // every card draws itself: the ones on screen at a size worth it play (as many as the frames allow:
+  // characters/stageBudget.ts), and a card without a place holds its picture, never an empty frame
   const onScreen = useOnScreen(host, 0.3);
+  const { live, take: takeStage } = useStage(onScreen);
   const c = useCharacter(panel.id);
   const ui = useUi();
   const viewer = ui.role === "viewer";
@@ -143,20 +145,6 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [identity, setIdentity] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
-  const [live, setLive] = useState(false);
-  const release = useRef(() => setLive(false));
-  const takeStage = () => {
-    if (stageOwner === release.current) return;
-    stageOwner?.();
-    stageOwner = release.current;
-    setLive(true);
-  };
-  useEffect(() => {
-    const mine = release.current;
-    return () => {
-      if (stageOwner === mine) stageOwner = null;
-    };
-  }, []);
   const inspiration = useInspiration(c?.set ?? "");
 
   if (!c)
@@ -206,8 +194,8 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
   return (
     <div ref={host} className="char-body wheel-own" data-character-card={c.name} data-character-ready={c.ready || undefined} onPointerEnter={takeStage} onPointerMove={takeStage}>
       <div className="char-view">
-        {onScreen && (c.ready || c.files.thumb || c.files.front) ? (
-          <Avatar character={c.ready && live ? entry : { ...entry, files: { thumb: c.files.thumb ?? c.files.front, front: c.files.front, portrait: c.files.portrait } }} mood={mood} framing={c.ready ? framing : "full"} />
+        {c.ready || c.files.thumb || c.files.front || c.files.portrait ? (
+          <Avatar character={entry} mood={mood} framing={c.ready ? framing : "full"} still={!(c.ready && live)} />
         ) : (
           <p className="char-note">{c.files.front ? "" : "Nothing drawn yet. Say who it is, pick its inspiration, and draw the sheet."}</p>
         )}

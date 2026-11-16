@@ -15,14 +15,15 @@ import { WIDTHS, setUi, useUi } from "../state/ui";
 import { api } from "../lib/api";
 import { initials, useBoardTick, usePeers } from "./Presence";
 import { FloorEdge } from "./FloorEdge";
-import { ago, folderPaths, paneSpring } from "./SidePane";
+import { ago, isSystemGrid, paneSpring } from "./SidePane";
+import { wouldLoop } from "../lib/grids";
 import { KIND_GLYPH, KIND_NAME, type BoardRow } from "./Shell";
 
 interface Props {
   user: UserInfo;
   space: BoardRow | null;
   boards: BoardRow[];
-  onUpdate(id: string, patch: { name?: string; folder?: string | null }): void;
+  onUpdate(id: string, patch: { name?: string; parent?: string | null }): void;
 }
 
 export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
@@ -35,13 +36,13 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
         <motion.aside key="info" className="side-pane space-info floor-pane" style={{ width: ui.paneW }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={paneSpring} aria-label={`About ${space.name}`}>
           <div className="pane-scroll">
             <section className="pane-group">
-              <div className="pane-eyebrow">This space</div>
+              <div className="pane-eyebrow">This grid</div>
               <input
                 key={space.id + space.name}
                 className="info-name"
                 defaultValue={space.name}
                 readOnly={!canEdit}
-                aria-label="The space's name"
+                aria-label="The grid's name"
                 onBlur={(e) => {
                   const name = e.target.value.trim();
                   if (name && name !== space.name) onUpdate(space.id, { name });
@@ -57,15 +58,18 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
                 <dd>
                   <span className="pane-glyph">{KIND_GLYPH[kind]}</span> {KIND_NAME[kind]}
                 </dd>
-                <dt>Folder</dt>
+                <dt>Inside</dt>
                 <dd>
-                  <select className="info-pick" value={space.folder ?? ""} disabled={!canEdit} aria-label="The space's folder" onChange={(e) => onUpdate(space.id, { folder: e.target.value || null })}>
-                    <option value="">No folder</option>
-                    {folderPaths(boards, space.folder ? [space.folder] : []).map((f) => (
-                      <option key={f} value={f}>
-                        {f.replace(/\//g, " › ")}
-                      </option>
-                    ))}
+                  <select className="info-pick" value={space.parent ?? ""} disabled={!canEdit} aria-label="The grid this one is inside" onChange={(e) => onUpdate(space.id, { parent: e.target.value || null })}>
+                    <option value="">No grid (the top of All Grids)</option>
+                    {boards
+                      .filter((b) => b.kind !== "page" && !isSystemGrid(b.id) && !wouldLoop(space.id, b.id, boards))
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
                   </select>
                 </dd>
                 {kind === "page" && space.url && (

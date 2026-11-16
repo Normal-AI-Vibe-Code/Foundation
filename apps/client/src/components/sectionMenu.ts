@@ -33,7 +33,7 @@ import {
   type Section,
 } from "../state/store";
 import { openAgentsPane } from "./SectionCrew";
-import { keepAgentsCard, openSectionAgents } from "./SectionAgents";
+import { keepAgentsCard } from "./SectionAgents";
 import { setUi } from "../state/ui";
 import type { MenuItem } from "./ContextMenu";
 
@@ -76,7 +76,7 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
   }));
   return [
     // an agent first: the section is somewhere agents build with you
-    { icon: "✦", label: "Ask an agent to build here…", agent: true, action: () => openSectionAgents(section.id, true) },
+    { icon: "⚇", label: "Council: ask this section's agents…", agent: true, action: () => openCouncil({ kind: "section", id: section.id }) },
     { divider: true },
     { heading: "Add" },
     { icon: "¶", label: "Text box", action: () => addTextBox(section.id, at(480, 320)) },
@@ -99,10 +99,9 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     { icon: "#", label: "Slack channel", action: () => addPanel(section.id, { panel: "slack", name: "Slack", ...at(420, 520) }) },
     { icon: "▣", label: "Machine", action: () => startMachine(section.id, at(760, 520)) },
     ...tellSlack,
-    { icon: "☺", label: "Council of this section", agent: true, action: () => openCouncil({ kind: "section", id: section.id }) },
     { icon: "☺", label: "Character: 3D", action: () => void newCharacter(section.id, "model") },
     { icon: "☺", label: "Character: mesh avatar", action: () => void newCharacter(section.id, "mesh") },
-    { icon: "◨", label: "All agents on this board", action: () => openAgentsPane(section.id) },
+    { icon: "◨", label: "All agents on this grid", action: () => openAgentsPane(section.id) },
     ...(host
       ? [{ icon: "◱", label: `Show ${host.name} as a card`, action: () => setSectionHost(section.id, null) }]
       : hostable

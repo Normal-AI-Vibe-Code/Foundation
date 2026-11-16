@@ -83,7 +83,7 @@ export async function askT3(user: UserInfo, input: { board: string; section: str
   // its place on the board first: a board that's full says so before anything is spent
   let member: CrewMember;
   try {
-    member = joinCrew({ boardId: input.board, userId: user.id, userName: user.name, runId: `t3:${Date.now()}:${Math.random()}`, task: text, name: agent.name });
+    member = joinCrew({ boardId: input.board, userId: user.id, userName: user.name, runId: `t3:${Date.now()}:${Math.random()}`, task: text, name: agent.name, via: `t3:${agent.id}` });
   } catch (e) {
     throw new HttpError(409, (e as Error).message);
   }

@@ -575,7 +575,7 @@ export function T3BlockView({ host, viewer, admin = false, busy, section, asking
 }
 
 /** Foundation's T3, read while the pane is open (every 3 s; faster while it starts) */
-function T3Block({ viewer, admin, section }: { viewer: boolean; admin: boolean; section: { id: string; name: string } | null }) {
+export function T3Block({ viewer, admin, section }: { viewer: boolean; admin: boolean; section: { id: string; name: string } | null }) {
   const [host, setHost] = useState<T3Host | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);

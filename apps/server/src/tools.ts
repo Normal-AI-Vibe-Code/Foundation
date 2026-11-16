@@ -130,6 +130,9 @@ const portSchema = z.object({
 
 const PANEL_SIZES: Record<PanelKind, [number, number]> = {
   character: [460, 620],
+  grid: [720, 520],
+  kanban: [1480, 980],
+  design: [1180, 900],
   app: [720, 520],
   link: [640, 460],
   file: [420, 340],

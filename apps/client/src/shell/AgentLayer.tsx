@@ -12,10 +12,11 @@
  * crossings are recomputed only when the set of routes changes.
  */
 
+import { usePortHover } from "./portHover";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LinkDoc } from "@foundation/protocol";
 import { addLink, applyWireClip, getState, gridSize, objectWorldRect, removeLink, subscribe, uid, updatePanel, usePanel, wireBackstage, wireClipRect, type PanelMeta } from "../state/store";
-import { toast, useUi } from "../state/ui";
+import { toast } from "../state/ui";
 import { useActiveBoard } from "./Presence";
 import { toWorld, camera } from "../state/camera";
 import { polyline, route, routeSides, tunnelGeometry, typesCompatible, type P } from "./wireGeometry";
@@ -248,7 +249,8 @@ export const PortWires = memo(function PortWires() {
   countRender("PortWires");
   // the wires and what they show, not the cards: a drag, a keystroke or a pointer elsewhere renders nothing
   const slice = useStoreSlice(portWiresSlice);
-  const ui = useUi();
+  // the port under the pointer: its wires light up, wherever they run
+  const onPort = usePortHover();
   const peerFocus = usePeerFocus(useActiveBoard());
   const d = useDrag();
   const groups = useRef(new Map<string, SVGGElement>());
@@ -388,7 +390,7 @@ export const PortWires = memo(function PortWires() {
 
   return (
     <>
-      <svg className={`port-layer${ui.agentLayer ? " is-on" : ""}${d ? " is-dragging" : ""}`} width={size.w} height={size.h} style={{ overflow: "visible" }}>
+      <svg className={`port-layer${d ? " is-dragging" : ""}`} width={size.w} height={size.h} style={{ overflow: "visible" }}>
         {[...agentFocus.entries()].map(([id, a]) => (
           <g key={`ring-${id}`} className="agent-ring">
             <rect
@@ -408,7 +410,7 @@ export const PortWires = memo(function PortWires() {
           return (
             <g
               key={l.id}
-              className={`pipe${live ? " is-live" : ""}${selected === l.id ? " is-selected" : ""}${hover?.id === l.id ? " is-hover" : ""}${backstage ? " is-backstage" : ""}`}
+              className={`pipe${live ? " is-live" : ""}${selected === l.id ? " is-selected" : ""}${hover?.id === l.id || (onPort && ((l.from.panel === onPort.panel && l.from.port === onPort.port) || (l.to.panel === onPort.panel && l.to.port === onPort.port))) ? " is-hover" : ""}${backstage ? " is-backstage" : ""}`}
               style={{ ["--wire-tone" as string]: toneOf(type) }}
               ref={(el) => {
                 if (el) groups.current.set(l.id, el);

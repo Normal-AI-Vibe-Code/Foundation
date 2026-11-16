@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { AgentPill } from "../characters/AgentPill";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { workbook, parseImageRaw, isLinkRaw, IMG_PREFIX } from "../engine/workbook";
@@ -579,9 +580,7 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
             </button>
           )}
           {table.createdBy && (
-            <span className="card-maker is-inline" data-tip={`Made by ${table.createdBy}, an agent`}>
-              ✦ {table.createdBy}
-            </span>
+            <AgentPill name={table.createdBy} tip={`Made by ${table.createdBy}, an agent`} className="is-inline" />
           )}
           <div className="header-actions">
             <button

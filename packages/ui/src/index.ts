@@ -89,6 +89,27 @@ export function onNight(fn: Listener): () => void {
   return () => listeners.delete(fn);
 }
 
+/** what was chosen: day, night, or nothing yet (the app follows the system until the orb or Settings says otherwise) */
+export function nightChoice(): "day" | "night" | "system" {
+  try {
+    const v = localStorage.getItem(KEY);
+    return v === "1" ? "night" : v === "0" ? "day" : "system";
+  } catch {
+    return "system";
+  }
+}
+
+/** choose day or night for good, or go back to following the system */
+export function chooseNight(choice: "day" | "night" | "system") {
+  if (choice !== "system") return setNight(choice === "night");
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* private mode */
+  }
+  setNight(window.matchMedia("(prefers-color-scheme: dark)").matches, false);
+}
+
 /** First launch follows the OS; after that the orb's choice is remembered. */
 export function initNight() {
   let stored: string | null = null;

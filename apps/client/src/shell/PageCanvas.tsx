@@ -11,7 +11,7 @@
 import { floorInsets, useUi } from "../state/ui";
 import { SERVER as FOUNDATION_SERVER } from "../lib/api";
 import { sandboxFor } from "../panels/frameSandbox";
-import type { BoardRow } from "./Shell";
+import type { BoardRow } from "../lib/grids";
 
 export function PageCanvas({ space }: { space: BoardRow }) {
   const ui = useUi();

@@ -1,20 +1,21 @@
 import { cardOf, fullscreenCard, installCardUse, modHeld } from "../lib/cardUse";
 /**
- * The Foundation shell: the open space's canvas edge to edge (a grid, a deck
- * or a web page), and the floor drawn on its paper — the top bar (the spaces
- * pane's fold, a tab per open space, tools), the left pane (every space by
- * recent or project folder; or the open space's own people and activity), a
- * session with the agent beside the canvas (opened from the bottom bar), and
- * search at the right — then the layers above: the agent layer, ⌘K,
- * presentation mode, the repo drawer and toasts.
+ * The Foundation shell: the whole app once you're signed in. The open place fills the paper edge
+ * to edge — a grid (or a deck, or a web page), Today, or Settings (lib/place.ts) — and the floor is
+ * drawn on it: the top bar (the side menu's fold, a tab per open grid, tools, the server), the side
+ * menu (Today, every grid by recent or as the tree of grids inside grids, Settings; or the open
+ * grid's own people and activity), a session with the agent beside the canvas (opened from the
+ * bottom bar), and search at the right — then the layers above: the council, ⌘K, presentation
+ * mode, the repo drawer and toasts.
  *
- * Keys (⌘ is Ctrl off a Mac, and lib/keys.ts labels it so): ⌘K commands · ⌘F search · ⌘\ spaces pane · ⌘I this space · ⌘J the agent ·
- * ⌘1…9 the tabs · ⌘W close the tab · A agent layer · P present · ⌘U upload ·
+ * Keys (⌘ is Ctrl off a Mac, and lib/keys.ts labels it so): ⌘K commands · ⌘F search · ⌘\ side menu · ⌘I this grid · ⌘J the agent ·
+ * ⌘1…9 the tabs · ⌘W close the tab · P present · ⌘U upload ·
  * Esc releases an engaged app (then steps up the grid's levels).
  */
 
-import { Council } from "../characters/Council";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Council, CouncilPreload } from "../characters/Council";
+import { AgentInfoPane } from "../characters/AgentInfo";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
 import { GridViewport } from "../components/GridViewport";
@@ -30,7 +31,12 @@ import { Present } from "./Present";
 import { RepoDrawer } from "./RepoDrawer";
 import { HuddlePip } from "./HuddlePip";
 import { UploadTray } from "./UploadTray";
-import { SidePane } from "./SidePane";
+import { SidePane, isSystemGrid } from "./SidePane";
+import { Today } from "../today/Today";
+import { SettingsSpace, SETTINGS_GRIDS } from "../settings/SettingsSpace";
+import { goGrid, placeOf } from "../lib/place";
+import { loadGrids, useGrids, type SpaceKind } from "../lib/grids";
+export { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "../lib/grids";
 import { SpaceInfo } from "./SpaceInfo";
 import { PageCanvas } from "./PageCanvas";
 import { api } from "../lib/api";
@@ -44,42 +50,24 @@ function typing(e: KeyboardEvent) {
   return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 }
 
-/** what a space's canvas is: the grid, a deck of slides (a grid whose sections are the slides), or a web page */
-export type SpaceKind = "grid" | "deck" | "page";
-export const KIND_GLYPH: Record<SpaceKind, string> = { grid: "▦", deck: "▶", page: "◳" };
-export const KIND_NAME: Record<SpaceKind, string> = { grid: "Grid space", deck: "Presentation", page: "Web page" };
+/** the grid this device had open last (never one of Foundation's own, which Settings opens) */
+const lastGrid = () => new URLSearchParams(window.location.search).get("board") || localStorage.getItem("foundation-board") || "company";
 
-/** a space: one board, its canvas kind, and where it's filed */
-export interface BoardRow {
-  id: string;
-  name: string;
-  role: "admin" | "member" | "viewer";
-  kind?: SpaceKind;
-  /** its project folder, "/"-separated; null when loose */
-  folder?: string | null;
-  /** a page space's address */
-  url?: string | null;
-  updated_at?: number;
-}
-
-export function Shell({ user }: { user: UserInfo }) {
+export function Shell({ user, route }: { user: UserInfo; route: string }) {
   const ui = useUi();
+  const place = useMemo(() => placeOf(route), [route]);
+  /** Settings' Plan and Design language are grids of Foundation's own: on those tabs the grid is what shows */
+  const systemGrid = place.kind === "settings" ? (SETTINGS_GRIDS[place.tab] ?? null) : null;
   // cards take input only when asked: ⌘/Ctrl-click, ⌘↵ / Ctrl+Enter full screen (lib/cardUse.ts)
   useEffect(() => installCardUse(), []);
   const board = useSyncExternalStore(onBoardChange, activeBoard);
-  // the board list is kept on the device too, so names (and roles) show offline
-  const [boards, setBoards] = useState<BoardRow[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("foundation-boards") ?? "[]") as BoardRow[];
-    } catch {
-      return [];
-    }
-  });
+  // every grid (lib/grids.ts): kept on the device too, so names (and roles) show offline
+  const boards = useGrids();
   const fileRef = useRef<HTMLInputElement>(null);
 
   // join the board named in the URL, or the company board
   useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get("board") || localStorage.getItem("foundation-board") || "company";
+    const id = lastGrid();
     joinBoard(id, user);
     noteSpaceOpen(id);
     const onSwitch = (e: Event) => switchBoard((e as CustomEvent<string>).detail);
@@ -93,19 +81,38 @@ export function Shell({ user }: { user: UserInfo }) {
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const load = () =>
-      api<{ boards: BoardRow[] }>("/api/boards")
-        .then((r) => {
-          setBoards(r.boards);
-          try {
-            localStorage.setItem("foundation-boards", JSON.stringify(r.boards));
-          } catch { /* private window */ }
-        })
-        .catch(() => {});
-    void load();
+    const load = () => void loadGrids();
+    load();
     window.addEventListener("foundation:boards", load);
     return () => window.removeEventListener("foundation:boards", load);
   }, [board?.boardId]);
+
+  // Settings → Plan / Design language: Foundation's own grid takes the canvas (the server makes it the first
+  // time), and the grid that was open comes back when the tab is left. It gets no tab and isn't remembered.
+  useEffect(() => {
+    if (systemGrid) {
+      let live = true;
+      void api<{ id: string }>(`/api/system-grids/${systemGrid}`, { method: "POST", json: {} })
+        .then((r) => {
+          if (!live) return;
+          joinBoard(r.id, user);
+          requestSnap({ kind: "all" });
+        })
+        .catch((e: Error) => toast(e.message, "bad"));
+      return () => {
+        live = false;
+      };
+    }
+    const at = activeBoard()?.boardId;
+    if (at && isSystemGrid(at)) {
+      joinBoard(lastGrid(), user);
+      requestSnap({ kind: "all" });
+    }
+  }, [systemGrid, user]);
+  // the strip Settings lays under the top bar: a grid there frames itself below it
+  useEffect(() => {
+    setUi({ strip: systemGrid ? 52 : 0 });
+  }, [systemGrid]);
 
   // my role on this board: a viewer reads (the server drops their writes; edits snap back here)
   const role = boards.find((b) => b.id === board?.boardId)?.role ?? (user.role === "viewer" ? "viewer" : "member");
@@ -134,6 +141,7 @@ export function Shell({ user }: { user: UserInfo }) {
   }, [board?.boardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const switchBoard = (id: string) => {
+    goGrid();
     localStorage.setItem("foundation-board", id);
     const url = new URL(window.location.href);
     url.searchParams.set("board", id);
@@ -143,15 +151,15 @@ export function Shell({ user }: { user: UserInfo }) {
     requestSnap({ kind: "all" });
   };
 
-  /** a new space, opened in a new tab: a grid at once; a web page asks for its address first */
-  const newSpace = async (kind: SpaceKind = "grid", folder: string | null = null) => {
+  /** a new grid, opened in a new tab (inside `parent` when one is named): a grid at once; a web page asks for its address first */
+  const newSpace = async (kind: SpaceKind = "grid", parent: string | null = null) => {
     let url: string | undefined;
     if (kind === "page") {
       url = window.prompt("The page's web address")?.trim();
       if (!url) return;
     }
     try {
-      const { id } = await api<{ id: string }>("/api/boards", { method: "POST", json: { kind, folder, url } });
+      const { id } = await api<{ id: string }>("/api/boards", { method: "POST", json: { kind, parent, url } });
       window.dispatchEvent(new Event("foundation:boards"));
       switchBoard(id);
     } catch (e) {
@@ -160,8 +168,7 @@ export function Shell({ user }: { user: UserInfo }) {
   };
 
   /** rename a space or move it between folders; the list reloads from the server */
-  const updateSpace = async (id: string, patch: { name?: string; folder?: string | null }) => {
-    setBoards((bs) => bs.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  const updateSpace = async (id: string, patch: { name?: string; parent?: string | null }) => {
     try {
       await api(`/api/boards/${encodeURIComponent(id)}`, { method: "POST", json: patch });
     } catch (e) {
@@ -219,8 +226,7 @@ export function Shell({ user }: { user: UserInfo }) {
         e.stopPropagation();
         setUi({ engaged: null });
       } else if (!mod && !typing(e) && !talkTyping() && !getUi().command && !getUi().presenting) {
-        if (e.key === "a" || e.key === "A") setUi({ agentLayer: !getUi().agentLayer });
-        else if (e.key === "v" || e.key === "V") toggleTalk();
+        if (e.key === "v" || e.key === "V") toggleTalk();
         else if (e.key === "p" || e.key === "P") setUi({ presenting: true });
       }
     };
@@ -242,17 +248,24 @@ export function Shell({ user }: { user: UserInfo }) {
 
   const current = board?.boardId ?? "";
   const space = boards.find((b) => b.id === current) ?? null;
+  // away from the grids (Today, a Settings page), no grid is "the open one": its tab isn't current and its tools rest
+  const onGrid = place.kind === "grid";
+  const away = !onGrid && !systemGrid;
 
   return (
-    <div className={`app shell${space?.kind === "page" ? " is-page-space" : ""}${ui.agentLayer ? " agent-layer-on" : ""}${ui.presenting ? " presenting" : ""}`} onContextMenu={(e) => e.preventDefault()}>
-      <GridViewport boardName={space?.name} />
-      {space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
-      {!ui.presenting && <TopBar boards={boards} current={current} onSwitch={switchBoard} onNew={newSpace} onClose={closeSpace} onRename={(id, name) => void updateSpace(id, { name })} />}
-      {!ui.presenting && ui.paneView === "spaces" && <SidePane user={user} boards={boards} current={current} onSwitch={switchBoard} onNew={newSpace} onUpdate={updateSpace} onUpload={() => fileRef.current?.click()} />}
-      {!ui.presenting && ui.paneView === "info" && <SpaceInfo user={user} space={space} boards={boards} onUpdate={updateSpace} />}
+    <div className={`app shell is-place-${place.kind}${away ? " is-away" : ""}${space?.kind === "page" ? " is-page-space" : ""}${ui.presenting ? " presenting" : ""}`} onContextMenu={(e) => e.preventDefault()}>
+      <GridViewport boardName={space?.name ?? (systemGrid === "plan" ? "The plan" : systemGrid === "design" ? "Design language" : undefined)} />
+      {onGrid && space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
+      {place.kind === "today" && !ui.presenting && <Today user={user} />}
+      {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}
+      {!ui.presenting && <TopBar boards={boards} current={onGrid ? current : ""} place={place} onSwitch={switchBoard} onNew={newSpace} onClose={closeSpace} onRename={(id, name) => void updateSpace(id, { name })} />}
+      {!ui.presenting && (ui.paneView === "spaces" || !onGrid) && <SidePane user={user} boards={boards} current={current} place={place} onSwitch={switchBoard} onNew={newSpace} />}
+      {!ui.presenting && ui.paneView === "info" && onGrid && <SpaceInfo user={user} space={space} boards={boards} onUpdate={updateSpace} />}
       <SessionView />
       <SearchPane />
       <AgentsPane />
+      <AgentInfoPane />
+      <CouncilPreload />
       <TouchedRings />
       <SectionAgentsPanel />
       <Council />

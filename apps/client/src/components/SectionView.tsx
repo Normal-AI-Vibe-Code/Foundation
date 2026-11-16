@@ -1,5 +1,7 @@
 import { keys } from "../lib/keys";
-import { toggleCouncil } from "../lib/councilOpen";
+import { CouncilGlyph } from "../characters/CouncilGlyph";
+import { SectionCouncilChip } from "../characters/SectionCouncilChip";
+import { openCouncil, toggleCouncil } from "../lib/councilOpen";
 import { Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -49,13 +51,12 @@ import { MediaView } from "./MediaView";
 import { PANEL_GLYPH, PanelActions, PanelView } from "../panels/PanelView";
 import { SlackMark } from "./SlackMark";
 import { SectionCrew } from "./SectionCrew";
-import { SectionAgentsChip, openSectionAgents } from "./SectionAgents";
 import { FullscreenButton } from "./Fullscreen";
 import { isHostable } from "@foundation/protocol";
 import { isPanel } from "../state/store";
 import { ingest, ingestDrop } from "../lib/ingest";
 import { SectionEmpty } from "../panels/SectionEmpty";
-import { askAgent, setUi } from "../state/ui";
+import { setUi } from "../state/ui";
 import { openContextMenu } from "./ContextMenu";
 import { sectionMenuItems } from "./sectionMenu";
 import { countRender } from "../state/renders";
@@ -310,7 +311,7 @@ export const SectionView = memo(function SectionView({
   };
 
   // one toolbar button: its label rolls over (shell/Tip.tsx), never a native title
-  const tool = (tip: string, glyph: string, onClick: () => void, cls = "", kbd?: string) => (
+  const tool = (tip: string, glyph: React.ReactNode, onClick: () => void, cls = "", kbd?: string) => (
     <button className={"sec-tool " + cls} data-tip={tip} data-kbd={kbd} aria-label={tip} onClick={onClick}>
       {glyph}
     </button>
@@ -423,7 +424,7 @@ export const SectionView = memo(function SectionView({
         {/* at rest, what a section is: somewhere agents build with you, and a grid of its own to open */}
         {!mini && (
           <span className="section-rest">
-            <SectionAgentsChip sectionId={section.id} sectionName={section.name} />
+            <SectionCouncilChip sectionId={section.id} sectionName={section.name} />
             {!host && (
               <button
                 type="button"
@@ -471,10 +472,7 @@ export const SectionView = memo(function SectionView({
                 : tool(isGrid ? "Open its grid" : "Open as its own grid", "⤢", () => openLevel(section.id))}
           </div>
           <div className="sec-group">
-            {host
-              ? tool(`Ask the agent about ${host.name}`, "✦", () => askAgent(`About “${host.name}”: `), "sec-agent", keys("mod+J"))
-              : tool("Agents in this section: ask one, see who's at work", "✦", () => openSectionAgents(section.id, true), "sec-agent")}
-            {!host && tool("Council: this section's agents, as characters", "☺", () => toggleCouncil({ kind: "section", id: section.id }), "sec-agent sec-council")}
+            {tool("Council: this section's agents. Talk to them, add more", <CouncilGlyph size={14} />, () => toggleCouncil({ kind: "section", id: section.id }), "sec-agent sec-council")}
             {canRemove && !isOpen && tool("Remove this section…", "✕", () => setConfirming(true), "sec-remove")}
           </div>
         </div>
@@ -584,7 +582,7 @@ export const SectionView = memo(function SectionView({
             onUpload={() => fileRef.current?.click()}
             onNote={() => addNote(section.id)}
             onText={() => addTextBox(section.id)}
-            onAsk={() => openSectionAgents(section.id, true)}
+            onAsk={() => openCouncil({ kind: "section", id: section.id })}
             onFocus={() => setActiveSection(section.id)}
           />
         )}

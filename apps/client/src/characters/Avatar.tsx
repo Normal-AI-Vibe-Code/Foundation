@@ -20,25 +20,40 @@ interface Props {
   framing: Framing;
   /** lean toward something, in radians (a seat turns to the middle of the table) */
   turn?: number;
+  /** hold its picture instead of playing (a card that has no place on the stage right now) */
+  still?: boolean;
 }
 
-export function Avatar({ character, mood, framing, turn = 0 }: Props) {
+/** the best picture a character has for a framing, among the ones it really has (never a role the server would 404) */
+export function stillRole(c: Pick<RosterCharacter, "files" | "form">, framing: Framing): string | null {
+  const f = c.files as Record<string, string | undefined>;
+  const order = framing === "full" ? ["front", "thumb", "portrait"] : c.form === "mesh" ? ["portrait", "thumb", "front"] : ["thumb", "front", "portrait"];
+  return order.find((r) => f[r]) ?? null;
+}
+
+export function Avatar({ character, mood, framing, turn = 0, still = false }: Props) {
   if (!character) return <div className="avatar avatar-none" aria-hidden="true">✦</div>;
+  if (still) return <Still character={character} role={stillRole(character, framing) ?? "thumb"} />;
   if (character.form === "model" && character.files.clips) return <ModelAvatar character={character} mood={mood} framing={framing} turn={turn} />;
   // a mesh avatar is its portrait; head to toe, it's the sheet standing still
   if (character.form === "mesh" && character.files.mavatar && framing === "bust") return <MeshAvatarView character={character} mood={mood} />;
-  return <Still character={character} role={framing === "full" && character.files.front ? "front" : character.files.portrait ? "portrait" : character.files.thumb ? "thumb" : "front"} mood={mood} />;
+  return <Still character={character} role={stillRole(character, framing) ?? "thumb"} mood={mood} />;
 }
 
 /** a character's picture by role, breathing a little so a still seat isn't dead */
 export function Still({ character, role, mood }: { character: RosterCharacter; role: string; mood?: Mood }) {
-  const has = Boolean((character.files as Record<string, string | undefined>)[role]);
-  const src = useFileSrc(has ? characterFilePath(character.id, role) : null);
-  if (!src) return <div className="avatar avatar-none" aria-hidden="true">✦</div>;
-  return <img className={`avatar avatar-still${mood ? ` is-${mood}` : ""}`} src={src} alt={character.name} draggable={false} />;
+  const files = character.files as Record<string, string | undefined>;
+  // the role asked for, or the nearest picture there is
+  const use = files[role] ? role : (["thumb", "portrait", "front"].find((r) => files[r]) ?? null);
+  const src = useFileSrc(use ? characterFilePath(character.id, use) : null);
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [src]);
+  // nothing drawn yet, still fetching, or a picture that didn't load: the agent's mark, never a broken image
+  if (!src || broken) return <div className="avatar avatar-none" aria-hidden="true">✦</div>;
+  return <img className={`avatar avatar-still${mood ? ` is-${mood}` : ""}`} src={src} alt={character.name} draggable={false} onError={() => setBroken(true)} />;
 }
 
-function ModelAvatar({ character, mood, framing, turn }: Required<Props> & { character: RosterCharacter }) {
+function ModelAvatar({ character, mood, framing, turn }: Required<Omit<Props, "still">> & { character: RosterCharacter }) {
   const shared = useContext(StageContext);
   const host = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);

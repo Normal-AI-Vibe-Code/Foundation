@@ -1727,7 +1727,6 @@ body.is-presenting .empty-cell {
     opacity: 1;
   }
 }
-.port-layer.is-on .pipe,
 .pipe.is-hover,
 .pipe.is-selected {
   --pipe-opacity: 1;
@@ -1971,8 +1970,7 @@ body.is-presenting .empty-cell {
   cursor: grab;
 }
 .port.is-connected,
-.panel-card:hover .port,
-.panel-card.show-ports .port {
+.panel-card:hover .port {
   opacity: 1;
 }
 .port.has-value {
@@ -1995,24 +1993,65 @@ body.is-connecting .port-in.is-snap {
   transform: scale(1.45);
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--wire-tone) 32%, transparent);
 }
+/* what a port says under the pointer: what it is, what is on it now, and where it goes (shell/portHover.tsx) */
 .port-label {
   position: absolute;
   top: 50%;
   translate: 0 -50%;
   display: flex;
-  align-items: baseline;
-  gap: 6px;
-  white-space: nowrap;
-  font: 600 10.5px / 1 var(--font-sans);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 150px;
+  max-width: 320px;
+  font: 600 var(--text-11) / 1.25 var(--font-sans);
   color: var(--color-frost);
-  background: var(--glass-fill-strong);
-  border: 1px solid var(--glass-edge);
-  box-shadow: var(--shadow-sheet);
-  padding: 4px 7px;
+  background: var(--color-raise);
+  border: 1px solid color-mix(in srgb, var(--wire-tone) 40%, var(--color-line));
+  box-shadow: var(--shadow-lift);
+  padding: 7px 9px;
   border-radius: var(--radius-card);
   opacity: 0;
   transition: opacity var(--dur-quick) var(--ease-out-soft);
   pointer-events: none;
+  text-align: left;
+}
+.port-label-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.port-dir {
+  color: var(--color-dim);
+  font-weight: 500;
+}
+.port-link {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-weight: 400;
+  color: var(--color-mist);
+  white-space: nowrap;
+  max-width: 100%;
+}
+.port-link b {
+  color: var(--color-frost);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.port-link em {
+  font-style: normal;
+  color: var(--color-dim);
+}
+.port-link-arrow {
+  color: var(--wire-tone);
+  font-weight: 700;
+}
+.port-link.is-none {
+  color: var(--color-dim);
+  white-space: normal;
 }
 .port-label i {
   font-style: normal;
@@ -2020,11 +2059,14 @@ body.is-connecting .port-in.is-snap {
   color: var(--wire-tone);
 }
 .port-label .port-value {
-  font: 400 10.5px / 1 var(--font-code);
+  font: 400 var(--text-11) / 1.35 var(--font-code);
   color: var(--color-mist);
-  max-width: 220px;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .port-label .port-hint {
   font-weight: 400;
@@ -2039,16 +2081,9 @@ body.is-connecting .port-in.is-snap {
 .port:hover .port-label {
   opacity: 1;
 }
-.panel-card.show-ports .port-label {
-  opacity: 0.92;
-}
-.panel-card.show-ports .port-label .port-value,
-.panel-card.show-ports .port-label .port-hint {
-  display: none;
-}
-.panel-card.show-ports .port:hover .port-label .port-value,
-.panel-card.show-ports .port:hover .port-label .port-hint {
-  display: inline;
+/* over everything else on the card while it's read */
+.port:hover {
+  z-index: 9;
 }
 
 /* live frames */

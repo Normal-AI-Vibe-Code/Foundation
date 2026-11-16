@@ -5,9 +5,7 @@ import "@foundation/ui/tokens.css";
 import { Login } from "./login/Login";
 import { Shell } from "./shell/Shell";
 import { DesignPage } from "./design/DesignPage";
-import { Today } from "./today/Today";
 import { Privacy } from "./privacy/Privacy";
-import { SettingsPage } from "./settings/SettingsPage";
 import { Tip } from "./shell/Tip";
 import { WindowControls } from "./shell/WindowControls";
 import { ServerSwitch } from "./server/ServerSwitch";
@@ -38,13 +36,12 @@ function useHashRoute() {
 }
 
 /**
- * Today is home: signed in, a person meets the Shiba and their day first
- * (`/` or `#/today`); the boards are `#/board`, and any link into a board
- * (`?board=…`, `?focus=…`) goes straight there.
+ * Sign-in gate → the shell, which is the whole app (2026-11-15): Today (home, `#/today`),
+ * the grids (`#/board`, and any `?board=…` / `?focus=…` link) and Settings (`#/settings/<tab>`)
+ * are places inside it, so the top bar and the side menu never leave (lib/place.ts).
  *
- * Sign-in gate → the shell. #/design is the living design language page;
- * #/design/sign-in shows the sign-in page even when signed in. #/settings
- * (signed in) holds the plan board and what the server is connected to.
+ * #/design is the design language as a reference page of its own (open without a sign-in; Settings →
+ * Design language shows it as a grid); #/design/sign-in shows the sign-in page even when signed in.
  * #/privacy is open to anyone (the Chrome Web Store links to it).
  *
  * The sign-in page stays over the shell until its dissolve has run, so
@@ -92,22 +89,10 @@ function App() {
       </>
     );
   }
-  if (user && route.startsWith("#/settings")) {
-    return (
-      <>
-        <SettingsPage route={route} />
-        <UpdateShelf />
-        <ServerSwitch />
-        <WindowControls />
-        <Tip />
-      </>
-    );
-  }
-  const q = new URLSearchParams(window.location.search);
-  const home = !q.has("board") && !q.has("focus") && (route === "" || route === "#" || route === "#/" || route.startsWith("#/today"));
+  const signedOut = preview || !user || veil;
   return (
     <>
-      {user && (home ? <Today user={user} /> : <Shell user={user} />)}
+      {user && <Shell user={user} route={preview ? "#/board" : route} />}
       {(preview || !user || veil) && (
         <Login
           arriving={veil && arrive && !!user}
@@ -125,7 +110,8 @@ function App() {
       )}
       {/* over the sign-in page (always day), the card wears day too */}
       <UpdateShelf day={preview || !user || veil} />
-      <ServerSwitch day={preview || !user || veil} />
+      {/* signed in, the server's pill is in the top bar; before that there's no bar, so it keeps the corner */}
+      {signedOut && <ServerSwitch day />}
       <WindowControls day={preview || !user || veil} />
       <Tip />
     </>

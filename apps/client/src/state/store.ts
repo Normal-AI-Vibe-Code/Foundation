@@ -2065,6 +2065,9 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   slack: [420, 520],
   crew: [380, 440],
   character: [460, 620],
+  grid: [720, 520],
+  kanban: [1480, 980],
+  design: [1180, 900],
 };
 
 export function addPanel(

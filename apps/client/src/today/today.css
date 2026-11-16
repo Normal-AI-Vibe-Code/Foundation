@@ -1,11 +1,13 @@
 /* Today — the Shiba's room, with the person's day beside it (DESIGN §5 "Today"). On tokens only. */
 
 .today {
-  position: fixed;
-  inset: 0;
+  /* a place in the shell: it fills the open paper (the shell sets left, top and right from the floor) */
+  position: absolute;
+  bottom: 0;
+  z-index: 35;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
-  grid-template-rows: 56px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--color-void);
   color: var(--color-frost);
   font-family: var(--font-sans);
@@ -53,6 +55,12 @@
   inset: 0;
   pointer-events: none;
   background:
+    linear-gradient(to left, color-mix(in srgb, var(--color-room-shade) 66%, transparent), color-mix(in srgb, var(--color-room-shade) 38%, transparent) 300px, transparent min(640px, 56%)),
+    linear-gradient(to top, color-mix(in srgb, var(--color-void) 62%, transparent), transparent 52%),
+    color-mix(in srgb, var(--color-void) calc(var(--night) * 58%), transparent);
+}
+.today.is-narrow .today-veil {
+  background:
     linear-gradient(to top, color-mix(in srgb, var(--color-void) 62%, transparent), transparent 52%),
     color-mix(in srgb, var(--color-void) calc(var(--night) * 58%), transparent);
 }
@@ -89,13 +97,17 @@
   text-decoration: none;
 }
 .today-ghost {
-  flex: none;
-  white-space: nowrap;
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
   background: transparent;
-  border-color: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
 }
 .today-ghost:hover {
-  border-color: var(--color-line-strong);
+  color: var(--color-frost);
+  text-decoration: underline;
 }
 .today-me {
   width: 28px;
@@ -111,7 +123,7 @@
 
 .today-words {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
   position: relative;
   align-self: end;
   display: flex;
@@ -241,23 +253,45 @@
 
 /* ---------- the day, beside it ---------- */
 
+/* the Today panel: no card, no glass. White type straight over the room, on the shade the veil lays down its right side */
 .today-state {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
   position: relative;
-  margin: 0 var(--space-5) var(--space-5) 0;
-  padding: var(--space-5) var(--space-5) var(--space-6);
+  padding: var(--space-6) var(--space-6) var(--space-7) var(--space-5);
   overflow: auto;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
-  background: var(--glass-fill-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-edge);
-  border-radius: var(--radius-pane);
-  box-shadow: var(--shadow-glass);
+}
+.today:not(.is-narrow) .today-state {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 80%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 60%, transparent);
+  --color-moss: color-mix(in srgb, var(--color-over-room) 72%, transparent);
+  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+  --color-raise: color-mix(in srgb, var(--color-over-room) 12%, transparent);
+  --color-line: color-mix(in srgb, var(--color-over-room) 22%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-over-room) 40%, transparent);
+  --color-pulse: var(--color-over-room);
+  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  color: var(--color-frost);
+}
+.today-panel-title {
+  margin: 0;
+  font: 300 var(--text-32) / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+.today-app {
+  grid-template-columns: 28px minmax(0, 1fr) 8px;
+  align-items: center;
+}
+.today-app[data-unlinked] {
+  opacity: 0.62;
+}
+.today-app .today-row-title {
+  -webkit-line-clamp: 1;
 }
 .today-group {
   display: flex;
@@ -541,48 +575,24 @@ a.today-chip:active {
 
 /* ---------- narrow: the room on top, the day below, one scroll ---------- */
 
-@media (max-width: 900px) {
-  .today {
-    display: block;
-    overflow: auto;
-  }
-  .shiba-room,
-  .today-veil {
-    position: absolute;
-    height: 78vh;
-    bottom: auto;
-  }
-  .today-top {
-    height: 56px;
-    padding: 0 var(--space-5);
-  }
-  .today-words {
-    min-height: calc(78vh - 56px);
-    justify-content: flex-end;
-    padding: var(--space-6) var(--space-5) var(--space-6);
-  }
-  .today-state {
-    margin: 0 var(--space-5) var(--space-5);
-    overflow: visible;
-  }
+.today.is-narrow {
+  display: block;
+  overflow: auto;
 }
-@media (max-width: 900px) {
-  .today-top {
-    flex-wrap: wrap;
-    height: auto;
-    padding-top: var(--space-3);
-  }
-  .today-chips {
-    order: 9;
-    flex-basis: 100%;
-    margin-left: 0;
-  }
+.today.is-narrow .shiba-room,
+.today.is-narrow .today-veil {
+  position: absolute;
+  height: 78vh;
+  bottom: auto;
 }
-@media (max-width: 520px) {
-  .today-top .f-eyebrow,
-  .today-ghost {
-    display: none;
-  }
+.today.is-narrow .today-words {
+  min-height: 78vh;
+  justify-content: flex-end;
+  padding: var(--space-6) var(--space-5) var(--space-6);
+}
+.today.is-narrow .today-state {
+  padding: var(--space-5);
+  overflow: visible;
 }
 
 @media (prefers-reduced-motion: reduce) {

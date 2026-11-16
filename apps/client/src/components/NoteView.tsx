@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgentPill } from "../characters/AgentPill";
 import {
   NoteMeta,
   moveNote,
@@ -86,9 +87,7 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
     >
       <div style={{ height: note.h }} className="note-inner">
         {note.createdBy && !editing && (
-          <span className="card-maker" data-tip={`Written by ${note.createdBy}, an agent`}>
-            ✦ {note.createdBy}
-          </span>
+          <AgentPill name={note.createdBy} tip={`Written by ${note.createdBy}, an agent`} />
         )}
         {!editing && carets.length > 0 && (
           <div className="note-writers" aria-label="Writing here now">

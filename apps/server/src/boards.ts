@@ -16,7 +16,7 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import type { WebSocket } from "ws";
-import { boardMaps, describeBoard, logActivity, noteTextOf, tableCellsOf, type ObjectDoc } from "@foundation/protocol";
+import { appendSection, boardMaps, describeBoard, logActivity, noteTextOf, readTracks, tableCellsOf, uid, type ObjectDoc, type PanelDoc } from "@foundation/protocol";
 import { all, indexDoc, one, run, unindexDoc } from "./db.ts";
 
 const MSG_SYNC = 0;
@@ -57,10 +57,12 @@ export interface BoardRow {
   folder: string | null;
   /** a page space's address */
   url: string | null;
+  /** the grid this one sits inside (a grid of grids); null at the top */
+  parent: string | null;
 }
 
 export function listBoards(): BoardRow[] {
-  return all<Omit<BoardRow, "kind"> & { kind: string | null }>("select id, name, updated_at, kind, folder, url from boards order by updated_at desc").map((b) => ({
+  return all<Omit<BoardRow, "kind"> & { kind: string | null }>("select id, name, updated_at, kind, folder, url, parent from boards order by updated_at desc").map((b) => ({
     ...b,
     kind: SPACE_KINDS.includes(b.kind as SpaceKind) ? (b.kind as SpaceKind) : "grid",
   }));
@@ -106,7 +108,12 @@ export function createBoardRow(name: string, opts: { kind?: SpaceKind; folder?: 
 
 /** rename a space, move it to a folder (null: out of any), or point a page space somewhere else */
 export function updateBoardRow(id: string, patch: { name?: string; folder?: string | null; url?: string }) {
-  if (patch.name !== undefined) run("update boards set name = ? where id = ?", patch.name, id);
+  if (patch.name !== undefined) {
+    run("update boards set name = ? where id = ?", patch.name, id);
+    // the section that stands for it in its parent grid wears its name
+    const parent = one<{ parent: string | null }>("select parent from boards where id = ?", id)?.parent;
+    if (parent) linkChildGrid(parent, id, patch.name);
+  }
   if (patch.folder !== undefined) run("update boards set folder = ? where id = ?", patch.folder, id);
   if (patch.url !== undefined) run("update boards set url = ? where id = ?", patch.url, id);
 }
@@ -285,7 +292,7 @@ export function attachConnection(boardId: string, ws: WebSocket, readOnly = fals
  * everyone, the sender included, gets the correction. Without this, someone with edit rights could
  * make a fake ask appear on a machine card or rewrite who is in a huddle.
  */
-export const SERVER_MAPS = ["huddles", "machineAsks", "slack", "characters"] as const;
+export const SERVER_MAPS = ["huddles", "machineAsks", "slack", "characters", "agents"] as const;
 function guardServerMaps(board: Board) {
   for (const name of SERVER_MAPS) {
     const map = board.doc.getMap<unknown>(name);
@@ -366,4 +373,76 @@ export function syncAccess(said: string | null, epoch: string, writer: boolean):
   if (said && said !== epoch) return "refuse";
   if (said === null || !writer) return "read";
   return "write";
+}
+
+// ---------- grids of grids (2026-11-15) ----------
+
+/** the card that stands for a child grid on its parent, and the section that holds it */
+function childLink(doc: Y.Doc, childId: string) {
+  const m = boardMaps(doc);
+  const card = [...m.objects.values()].find((o) => o.kind === "panel" && o.panel === "grid" && o.board === childId) as PanelDoc | undefined;
+  return { m, card, section: card ? m.sections.get(card.sectionId) : undefined };
+}
+
+/**
+ * A child grid shows on its parent as a section of its own that stands for it (the section hosts a "grid"
+ * card: its name, what's in it, a press opens it). Made once, renamed with the child; the server keeps it,
+ * so two people filing the same grid don't each make one.
+ */
+function linkChildGrid(parentId: string, childId: string, name: string) {
+  editBoard(parentId, "system", (doc) => {
+    const { m, card, section } = childLink(doc, childId);
+    if (card) {
+      if (card.name !== name) m.objects.set(card.id, { ...card, name });
+      if (section && section.host === card.id && section.name !== name) m.sections.set(section.id, { ...section, name });
+      return;
+    }
+    const sec = appendSection(doc, name);
+    const panel: PanelDoc = { id: uid("pnl"), kind: "panel", panel: "grid", sectionId: sec.id, name, x: 0, y: 0, float: false, bornAt: Date.now(), w: 720, h: 520, ports: [], board: childId };
+    m.objects.set(panel.id, panel);
+    m.sections.set(sec.id, { ...sec, host: panel.id });
+  });
+}
+
+/** take a child's card off the grid it left; the section it stood in goes too when it was a column of its own with nothing else in it */
+function unlinkChildGrid(parentId: string, childId: string) {
+  editBoard(parentId, "system", (doc) => {
+    const { m, card, section } = childLink(doc, childId);
+    if (!card) return;
+    m.objects.delete(card.id);
+    if (!section) return;
+    const others = [...m.objects.values()].some((o) => o.sectionId === section.id);
+    const inner = [...m.sections.values()].some((s) => s.parent === section.id);
+    const siblings = [...m.sections.values()].filter((s) => !s.parent && s.id !== section.id);
+    const tracks = readTracks(doc);
+    const wholeColumn = !section.parent && section.c0 === section.c1 && section.r0 === 0 && section.r1 === tracks.rows.length - 1 && !siblings.some((s) => s.c0 <= section.c0 && s.c1 >= section.c0);
+    if (!others && !inner && wholeColumn && siblings.length > 0) {
+      m.sections.delete(section.id);
+      m.grid.set("tracks", { ...tracks, cols: tracks.cols.filter((_, i) => i !== section.c0) });
+      for (const s of siblings) if (s.c0 > section.c0) m.sections.set(s.id, { ...s, c0: s.c0 - 1, c1: s.c1 - 1 });
+    } else m.sections.set(section.id, { ...section, host: undefined });
+  });
+}
+
+/**
+ * Put a grid inside another (or, with null, back at the top). Refused when it would make a loop.
+ * The parent grid gets a section that stands for the child; the one it left loses its.
+ */
+export function setBoardParent(id: string, parent: string | null): { ok: true } | { error: string } {
+  const rows = new Map(listBoards().map((b) => [b.id, b]));
+  const me = rows.get(id);
+  if (!me) return { error: "No such grid" };
+  if (parent !== null) {
+    const p = rows.get(parent);
+    if (!p) return { error: "No such grid to put it in" };
+    if (p.kind === "page") return { error: "A web page can't hold grids" };
+    for (let at: string | null = parent, n = 0; at && n < 64; at = rows.get(at)?.parent ?? null, n++) {
+      if (at === id) return { error: parent === id ? "A grid can't go inside itself" : `${p.name} is inside ${me.name} already` };
+    }
+  }
+  if (me.parent === parent) return { ok: true };
+  if (me.parent && rows.has(me.parent)) unlinkChildGrid(me.parent, id);
+  run("update boards set parent = ? where id = ?", parent, id);
+  if (parent) linkChildGrid(parent, id, me.name);
+  return { ok: true };
 }

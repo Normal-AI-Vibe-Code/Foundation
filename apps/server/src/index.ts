@@ -14,7 +14,7 @@ import { config } from "./config.ts";
 import { one } from "./db.ts";
 import { HttpError, json, readJson, Router, sse, type Req } from "./http.ts";
 import { clearSession, createSession, googleAuthUrl, googleCallback, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
-import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, updateBoardRow, type SpaceKind } from "./boards.ts";
+import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
@@ -46,6 +46,9 @@ import { boardIdFor } from "./flowform-import.ts";
 import { bringFlowformFile, listRooms as listFlowformRooms, liveRooms, pullRoom, roomFiles, startFlowformSync } from "./flowform-live.ts";
 import { beginGrant, downloadsStatus, dropSession, fileThumb } from "./flowformfiles.ts";
 import { isPerson, requirePerson } from "./auth.ts";
+import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
+import { prefsOf, setPref } from "./prefs.ts";
+import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
@@ -231,7 +234,7 @@ r.post("/api/boards/:id/people", async (req) => {
 });
 r.post("/api/boards", async (req) => {
   requireWriter(requireUser(req));
-  const body = await readJson<{ name?: string; kind?: string; folder?: string | null; url?: string }>(req);
+  const body = await readJson<{ name?: string; kind?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
   const kind: SpaceKind = SPACE_KINDS.includes(body.kind as SpaceKind) ? (body.kind as SpaceKind) : "grid";
   const url = kind === "page" ? cleanPageUrl(body.url) : null;
   if (kind === "page" && !url) throw new HttpError(400, "A page space needs a web address (http or https)");
@@ -255,6 +258,11 @@ r.post("/api/boards", async (req) => {
       });
     }
   }
+  if (body.parent) {
+    requireWriter(requireUser(req), String(body.parent));
+    const out = setBoardParent(id, String(body.parent));
+    if ("error" in out) throw new HttpError(400, out.error);
+  }
   return { id };
 });
 // rename a space, move it between project folders, or re-point a page space: anyone who can write it
@@ -263,7 +271,7 @@ r.post("/api/boards/:id", async (req) => {
   const id = req.params.id;
   if (!listBoards().some((b) => b.id === id)) throw new HttpError(404, "No such space");
   requireWriter(u, id);
-  const body = await readJson<{ name?: string; folder?: string | null; url?: string }>(req);
+  const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
   const patch: { name?: string; folder?: string | null; url?: string } = {};
   if (body.name !== undefined) {
     const name = String(body.name).trim().slice(0, 80);
@@ -277,7 +285,34 @@ r.post("/api/boards/:id", async (req) => {
     patch.url = url;
   }
   updateBoardRow(id, patch);
+  // a grid of grids: put it inside another (which must be one this person can write too), or back at the top
+  if (body.parent !== undefined) {
+    const parent = body.parent === null || body.parent === "" ? null : String(body.parent);
+    if (parent) requireWriter(u, parent);
+    const out = setBoardParent(id, parent);
+    if ("error" in out) throw new HttpError(400, out.error);
+  }
   return { board: listBoards().find((b) => b.id === id) };
+});
+/** what a grid holds, for the card that stands for it on its parent: its sections (top level), how many cards in each */
+r.get("/api/boards/:id/outline", (req) => {
+  const id = req.params.id;
+  requireBoard(requireUser(req), id);
+  const row = listBoards().find((b) => b.id === id);
+  if (!row) throw new HttpError(404, "No such grid");
+  const m = boardMaps(getBoard(id).doc);
+  const all = [...m.sections.values()];
+  const cards = [...m.objects.values()];
+  // a section's cards: its own, and those of every section inside it
+  const within = (sec: string): string[] => [sec, ...all.filter((s) => s.parent === sec).flatMap((s) => within(s.id))];
+  const sections = all
+    .filter((s) => !s.parent)
+    .sort((a, b) => a.r0 - b.r0 || a.c0 - b.c0)
+    .map((s) => {
+      const ids = new Set(within(s.id));
+      return { id: s.id, name: s.name, cards: cards.filter((o) => ids.has(o.sectionId)).length, grids: ids.size - 1 };
+    });
+  return { sections, cards: cards.length, updatedAt: row.updated_at };
 });
 r.get("/api/boards/:id/presence", (req) => {
   requireBoard(requireUser(req), req.params.id);
@@ -683,6 +718,45 @@ r.get("/api/characters/:id/files/:role", (req, res) => {
   requireUser(req);
   serveFile(req, res, characterFile(req.params.id, req.params.role));
 });
+// ---------- agents assigned to a section or a grid: who is on its council (posted.ts) ----------
+
+r.get("/api/agents/available", (req) => {
+  requireUser(req);
+  return availableAgents();
+});
+r.post("/api/boards/:id/agents", async (req) => {
+  const u = requireUser(req);
+  requireWriter(u, req.params.id);
+  const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
+  if (!place || !agent) throw new HttpError(400, "place (a section id, or * for the grid) and agent required");
+  return { agents: postAgent(req.params.id, place, agent, u) };
+});
+r.post("/api/boards/:id/agents/remove", async (req) => {
+  const u = requireUser(req);
+  requireWriter(u, req.params.id);
+  const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
+  if (!place || !agent) throw new HttpError(400, "place and agent required");
+  return { agents: unpostAgent(req.params.id, place, agent, u) };
+});
+
+// ---------- Foundation's own grids (the plan, the design language) and a person's settings ----------
+
+r.post("/api/system-grids/:key", (req) => {
+  requireUser(req);
+  if (!isSystemGridKey(req.params.key)) throw new HttpError(404, "No such grid");
+  return openSystemGrid(req.params.key);
+});
+r.get("/api/prefs", (req) => ({ prefs: prefsOf(requireUser(req).id) }));
+r.post("/api/prefs", async (req) => {
+  const u = requirePerson(req, "Changing your settings");
+  const body = await readJson<Record<string, unknown>>(req);
+  for (const [k, v] of Object.entries(body)) {
+    const out = setPref(u.id, k, v);
+    if ("error" in out) throw new HttpError(400, out.error);
+  }
+  return { prefs: prefsOf(u.id) };
+});
+
 /** make the Character studio board (or say where the one there is) */
 r.post("/api/characters/studio", (req) => {
   const u = requireUser(req);

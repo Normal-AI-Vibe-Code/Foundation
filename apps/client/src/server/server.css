@@ -255,3 +255,39 @@ html[data-server-switch] .upload-tray-place {
 html[data-server-switch] .huddle-pip ~ .upload-tray-place {
   bottom: calc(76px + var(--h-pill) + var(--space-4));
 }
+
+/* ---------- in the top bar (signed in): a quiet pill, its panel dropping down from it ---------- */
+
+.server-switch-place.is-bar {
+  position: relative;
+  z-index: auto;
+  inset: auto;
+  pointer-events: auto;
+}
+.is-bar .server-switch {
+  position: relative;
+}
+.is-bar .server-switch-pill {
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.is-bar .server-switch-pill:hover {
+  background: var(--color-pulse-dim);
+}
+.is-bar .server-switch-pill[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+.is-bar .server-switch-addr {
+  max-width: 132px;
+}
+.is-bar .server-switch-lift,
+.is-bar .server-switch[data-still] .server-switch-panel {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + var(--space-3));
+  right: 0;
+  transform-origin: top right;
+}

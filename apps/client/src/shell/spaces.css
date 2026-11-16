@@ -388,3 +388,84 @@
     scrollbar-color: color-mix(in srgb, var(--color-frost) 50%, transparent) transparent;
   }
 }
+
+/* ---------- the side menu (2026-11-15): Today, grids (recent, or the tree of grids inside grids), Settings ---------- */
+
+.pane-place.is-current {
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.pane-glyph.is-agent,
+.tab-glyph.is-agent {
+  color: var(--color-agent);
+}
+.pane-low {
+  flex: none;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
+}
+.grid-caret {
+  flex: none;
+  width: 16px;
+  height: 24px;
+  margin-right: -4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-dim);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  cursor: pointer;
+  transition: rotate var(--dur-quick) var(--ease-out-soft);
+}
+.grid-caret.is-open {
+  rotate: 90deg;
+}
+.grid-caret.is-none {
+  cursor: default;
+}
+.grid-caret:hover {
+  color: var(--color-frost);
+}
+.space-row[draggable="true"] .space-open {
+  cursor: pointer;
+}
+.space-row.is-dragging {
+  opacity: 0.4;
+}
+/* a grid held over another: the one that would take it rings, as a section does under a carried card */
+.space-row.is-over .space-open {
+  box-shadow:
+    0 0 0 2px var(--color-pulse),
+    0 0 0 6px var(--color-pulse-dim);
+  background: var(--color-raise);
+}
+.pane-seg-btn.is-over {
+  box-shadow: 0 0 0 2px var(--color-pulse);
+  color: var(--color-frost);
+}
+.grid-top-drop {
+  margin: var(--space-3) var(--space-2) 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  color: var(--color-dim);
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+  text-align: center;
+}
+.grid-top-drop.is-over {
+  border-color: var(--color-pulse);
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+/* the place you're in when it isn't a grid: a tab that can't be closed */
+.tab.is-place .tab-main {
+  cursor: default;
+}
+
+/* away from the grids (Today, a Settings page) the grid's own chrome rests */
+.shell.is-away .hud,
+.shell.is-away .world-mask,
+.shell.is-away .level-bar,
+.shell.is-away .crew-guide {
+  visibility: hidden;
+}

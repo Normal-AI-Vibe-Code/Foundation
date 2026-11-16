@@ -84,6 +84,8 @@ export interface CrewPresence {
   lead?: string;
   leadName?: string;
   task: string;
+  /** which agent it is: "claude" (the server's own) or "t3:<id>" (one of this computer's) */
+  via?: string;
   doing: string;
   /** where it's aiming; cell ("B3") or port when it points at something precise (point_at) */
   target: { id: string; kind: "object" | "section"; cell?: string; port?: string } | null;

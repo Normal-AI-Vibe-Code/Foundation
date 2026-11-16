@@ -40,7 +40,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ];
 
 /** the release notes, bundled: every docs/blog/<version>.md, read as text at build time */
-const POSTS = releasesFrom(import.meta.glob("../../../../docs/blog/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>);
+export const POSTS = releasesFrom(import.meta.glob("../../../../docs/blog/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>);
 
 export function SettingsPage({ route }: { route: string }) {
   const tab: Tab = route.startsWith("#/settings/services") ? "services" : route.startsWith("#/settings/places") ? "places" : route.startsWith("#/settings/releases") ? "releases" : route.startsWith("#/settings/renderer") ? "renderer" : "plan";
@@ -111,7 +111,7 @@ export interface NewCardInput {
   request_id: string;
 }
 
-function PlanTab() {
+export function PlanTab() {
   const [plan, setPlan] = useState<Plan>(PLAN);
   const [canMove, setCanMove] = useState(false);
   /** where the board came from: the copy bundled with the app, or the server's file */
@@ -752,7 +752,7 @@ interface Integrations {
   agent: { subscription: boolean; subscriptionNote?: string | null; api: boolean; model: string };
 }
 
-function ServicesTab() {
+export function ServicesTab() {
   const [s, setS] = useState<Integrations | null>(null);
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {

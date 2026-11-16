@@ -1,14 +1,13 @@
 /**
- * The top bar, drawn on the floor. Left to right: the spaces pane's fold, a
- * tab for every space open in this window, ＋ (a new grid space; its caret
- * offers the other canvases: a presentation, a web page), then the tools on
- * the right — the people here, search, the command bar, the agent layer,
- * present — and the day/night orb.
+ * The top bar, drawn on the floor. Left to right: the side menu's fold, the place you're in when
+ * it isn't a grid (Today, Settings), a tab for every grid open in this window, ＋ (a new grid; its
+ * caret offers the other canvases: a presentation, a web page), then the tools on the right — the
+ * people here, search, the council, the agents, the command bar, present — the server this app
+ * uses (2026-11-15: it lives here, not in a corner), and the day/night orb.
  *
- * A tab is a space: a board whose canvas is a grid, a deck or a web page.
- * Nothing else makes a tab. The open space's tab carries its sync dot and its
- * own button (ⓘ) for the space's people and activity: what belongs to this
- * space, not to the app. A session with the agent opens from the bottom bar.
+ * A tab is a grid: a board whose canvas is a grid, a deck or a web page. The open grid's tab
+ * carries its sync dot and its own button (ⓘ) for the grid's people and activity: what belongs to
+ * this grid, not to the app. A session with the agent opens from the bottom bar.
  *
  * In the desktop app this is the window's title bar too: its open stretch
  * moves the window, and minimize, maximize and close sit past its right end
@@ -23,18 +22,23 @@ import { isNight, setNight } from "@foundation/ui";
 import { setUi, useUi } from "../state/ui";
 import { PresenceStack, useBoardTick } from "./Presence";
 import { NightOrb } from "./NightOrb";
-import { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "./Shell";
+import { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "../lib/grids";
+import type { Place } from "../lib/place";
+import { ServerSwitch } from "../server/ServerSwitch";
+import { CouncilGlyph } from "../characters/CouncilGlyph";
 
 interface Props {
   boards: BoardRow[];
+  /** the open grid ("" when the place isn't a grid) */
   current: string;
+  place: Place;
   onSwitch(id: string): void;
   onNew(kind?: SpaceKind): void;
   onClose(id: string): void;
   onRename(id: string, name: string): void;
 }
 
-export function TopBar({ boards, current, onSwitch, onNew, onClose, onRename }: Props) {
+export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRename }: Props) {
   const ui = useUi();
   const council = useCouncilOpen();
   const board = useBoardTick();
@@ -66,16 +70,20 @@ export function TopBar({ boards, current, onSwitch, onNew, onClose, onRename }: 
       <button
         className={`top-btn pane-fold${spacesOpen ? " is-on" : ""}`}
         onClick={() => setUi(spacesOpen ? { pane: false } : { pane: true, paneView: "spaces" })}
-        data-tip={spacesOpen ? "Fold the spaces pane" : "Spaces: recent and project folders"}
+        data-tip={spacesOpen ? "Fold the side menu" : "The side menu: Today, your grids, Settings"}
         data-kbd={keys("mod+\\")}
       >
         <PaneGlyph />
       </button>
-      <button className="top-btn is-agent" onClick={() => window.location.assign("/#/today")} data-tip="Today and the Shiba">
-        ◌
-      </button>
-
-      <nav className="tabs" aria-label="Open spaces">
+      <nav className="tabs" aria-label="Open grids">
+        {place.kind !== "grid" && (
+          <div className="tab is-space is-place is-current" data-place-tab={place.kind}>
+            <span className="tab-main">
+              <span className={`tab-glyph${place.kind === "today" ? " is-agent" : ""}`}>{place.kind === "today" ? "◌" : "⚙"}</span>
+              <span className="tab-title">{place.kind === "today" ? "Today" : "Settings"}</span>
+            </span>
+          </div>
+        )}
         <AnimatePresence initial={false}>
           {tabs.map((b, i) => {
             const on = b.id === current;
@@ -116,7 +124,7 @@ export function TopBar({ boards, current, onSwitch, onNew, onClose, onRename }: 
                 ) : (
                   <button
                     className="tab-main"
-                    onClick={() => !on && onSwitch(b.id)}
+                    onClick={() => (!on || place.kind !== "grid") && onSwitch(b.id)}
                     onDoubleClick={() => !viewer && on && setRenaming(b.id)}
                     data-tip={on ? `${KIND_NAME[kind]} · double-click to rename` : `${b.name} · ${KIND_NAME[kind]}`}
                     data-kbd={i < 9 ? keys(`mod+${i + 1}`) : undefined}
@@ -159,10 +167,10 @@ export function TopBar({ boards, current, onSwitch, onNew, onClose, onRename }: 
       </nav>
       {!viewer && (
         <div className="tab-new-wrap" ref={menuRef}>
-          <button className="top-btn tab-new" onClick={() => onNew("grid")} data-tip="New grid space">
+          <button className="top-btn tab-new" onClick={() => onNew("grid")} data-tip="New grid">
             ＋
           </button>
-          <button className={`top-btn tab-new-more${menu ? " is-on" : ""}`} onClick={() => setMenu((m) => !m)} aria-label="Other kinds of space" data-tip="A presentation or a web page">
+          <button className={`top-btn tab-new-more${menu ? " is-on" : ""}`} onClick={() => setMenu((m) => !m)} aria-label="Other kinds of grid" data-tip="A presentation or a web page">
             <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden>
               <path d="M1 2.5l3 3 3-3" />
             </svg>
@@ -190,25 +198,23 @@ export function TopBar({ boards, current, onSwitch, onNew, onClose, onRename }: 
       )}
 
       <div className="top-tools">
-        <PresenceStack />
+        {place.kind === "grid" && <PresenceStack />}
         <button className={`top-btn${ui.search ? " is-on" : ""}`} onClick={() => setUi({ search: !ui.search })} data-tip={`Search, drag onto the grid (${keys("mod+F")})`}>
           ⌕
         </button>
-        <button className={`top-btn is-agent${council?.kind === "board" ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-label="Council" data-tip="Council: the agents on this board, as characters in their cursors' colours" data-council-open>
-          ☺
+        <button className={`top-btn is-agent${council?.kind === "board" ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-label="Council" data-tip="Council: this grid's agents, as characters. Talk to them, add more" data-council-open>
+          <CouncilGlyph />
         </button>
-        <button className={`top-btn is-agent${ui.agents ? " is-on" : ""}`} onClick={() => setUi({ agents: !ui.agents })} aria-label="Agents" data-tip="Agents on this board: who's in which section, and who works together">
+        <button className={`top-btn is-agent${ui.agents ? " is-on" : ""}`} onClick={() => setUi({ agents: !ui.agents })} aria-label="Agents" data-tip="Agents on this grid: who's in which section, and who works together">
           ✦
         </button>
         <button className="top-btn" onClick={() => setUi({ command: true })} data-tip={`Commands, open an app (${keys("mod+K")})`}>
           {COMMANDS_GLYPH}
         </button>
-        <button className={`top-btn is-agent${ui.agentLayer ? " is-on" : ""}`} onClick={() => setUi({ agentLayer: !ui.agentLayer })} data-tip="Agent layer (A)">
-          ◇
-        </button>
         <button className="top-btn" onClick={() => setUi({ presenting: true })} data-tip="Present (P)">
           ▶
         </button>
+        <ServerSwitch where="bar" />
         <NightOrb onToggle={() => setNight(!isNight())} />
       </div>
     </header>

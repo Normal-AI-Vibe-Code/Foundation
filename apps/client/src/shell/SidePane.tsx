@@ -1,174 +1,157 @@
 /**
- * The spaces pane, drawn on the floor (the paper and its dots run underneath;
- * the cards stop at its hairline). Folded by the top bar's first button or
- * ⌘\, resized by its right edge.
+ * The side menu, drawn on the floor (the paper and its dots run underneath; the cards stop at its
+ * hairline). Folded by the top bar's first button or ⌘\, resized by its right edge. It is open the
+ * first time Foundation runs: it is how you get to a grid.
  *
- * It is where every space is found, whatever its canvas: **Recent** lists them
- * by when this device last opened each, **Folders** files them in project
- * folders (a folder is a path a space carries, "Fans/Rim drive", so a folder
- * exists while something is in it; one made here waits on this device until
- * then). A press opens the space in a tab. Below: the app's own things
- * (release & plan, tools) and you.
+ * Top to bottom: **Today**; then **Grids**, listed two ways: **Recent** (every grid by when this
+ * device last opened it, a grid inside another saying which) and **All Grids** (the tree: a grid
+ * can hold grids). Drag a grid onto another and it becomes its child, here and on the parent grid
+ * itself, where a section stands for it (the server keeps that link: boards.ts). Drag it onto
+ * "All Grids" to bring it back to the top. Then **Settings**, and you.
  *
- * What belongs to the open space (its people, its activity) is the other pane
- * (SpaceInfo.tsx), opened from the space's tab. Sessions with the agent open
- * from the bottom bar.
+ * What belongs to the open grid (its people, its activity) is the other pane (SpaceInfo.tsx),
+ * opened from the grid's tab.
  */
 
-import { keys } from "../lib/keys";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
-import { appendSectionLocal, requestSnap } from "../state/store";
-import { WIDTHS, setUi, spaceOpenedAt, useUi } from "../state/ui";
+import { WIDTHS, setUi, spaceOpenedAt, toast, useUi } from "../state/ui";
 import { logout } from "../lib/api";
+import { KIND_GLYPH, KIND_NAME, childrenOf, fileGrid, parentOf, wouldLoop, type BoardRow, type SpaceKind } from "../lib/grids";
+import { goSettings, goToday, type Place } from "../lib/place";
 import { initials } from "./Presence";
-import { copyMcpCommand } from "./CommandBar";
 import { FloorEdge } from "./FloorEdge";
-import { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "./Shell";
 
 interface Props {
   user: UserInfo;
   boards: BoardRow[];
   current: string;
+  place: Place;
   onSwitch(id: string): void;
-  onNew(kind?: SpaceKind, folder?: string | null): void;
-  onUpdate(id: string, patch: { name?: string; folder?: string | null }): void;
-  onUpload(): void;
+  onNew(kind?: SpaceKind, parent?: string | null): void;
 }
 
 export const paneSpring = { type: "spring", stiffness: 340, damping: 34 } as const;
 
-const EMPTY_FOLDERS = "foundation-folders";
-/** folders made on this device that nothing is in yet */
-function emptyFolders(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(EMPTY_FOLDERS) ?? "[]");
-    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
+/** grids Foundation keeps for itself (the plan, the design language): reached from Settings, not listed */
+export const isSystemGrid = (id: string) => id.startsWith("foundation-");
 
-/** every folder path there is, parents included, sorted: from the spaces and from the ones waiting on this device */
-export function folderPaths(boards: BoardRow[], extra: string[] = []): string[] {
-  const all = new Set<string>();
-  for (const f of [...boards.map((b) => b.folder), ...extra]) {
-    if (!f) continue;
-    const parts = f.split("/");
-    for (let i = 1; i <= parts.length; i++) all.add(parts.slice(0, i).join("/"));
-  }
-  return [...all].sort((a, b) => a.localeCompare(b));
-}
+const DRAG = "application/x-foundation-grid";
 
-export function SidePane({ user, boards, current, onSwitch, onNew, onUpdate, onUpload }: Props) {
+export function SidePane({ user, boards, current, place, onSwitch, onNew }: Props) {
   const ui = useUi();
   const viewer = user.role === "viewer";
-  const [extra, setExtra] = useState(emptyFolders);
   const [shut, setShut] = useState<Set<string>>(() => new Set());
-  const [moving, setMoving] = useState<string | null>(null);
+  /** the grid being dragged, and the row (or "top") it's over */
+  const [drag, setDrag] = useState<string | null>(null);
+  const [over, setOver] = useState<string | null>(null);
 
+  const listed = useMemo(() => boards.filter((b) => !isSystemGrid(b.id)), [boards]);
   const recent = useMemo(() => {
     const at = spaceOpenedAt();
-    return [...boards].sort((a, b) => (at[b.id] ?? b.updated_at ?? 0) - (at[a.id] ?? a.updated_at ?? 0));
-    // re-sorted when the open space changes (it just became the most recent)
-  }, [boards, current]); // eslint-disable-line react-hooks/exhaustive-deps
-  const folders = folderPaths(boards, extra);
-  const loose = boards.filter((b) => !b.folder).sort((a, b) => a.name.localeCompare(b.name));
+    return [...listed].sort((a, b) => (at[b.id] ?? b.updated_at ?? 0) - (at[a.id] ?? a.updated_at ?? 0));
+    // re-sorted when the open grid changes (it just became the most recent)
+  }, [listed, current]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const addFolder = (parent: string | null) => {
-    const name = window.prompt(parent ? `A folder inside ${parent.split("/").pop()}` : "Name the project folder")?.replace(/\//g, " ").trim();
-    if (!name) return;
-    const next = [...new Set([...extra, parent ? `${parent}/${name}` : name])];
-    setExtra(next);
-    try {
-      localStorage.setItem(EMPTY_FOLDERS, JSON.stringify(next));
-    } catch { /* private window */ }
-    setUi({ spacesView: "folders" });
+  const canTake = (into: string | null) => !!drag && (into === null ? !!parentOf(boards.find((b) => b.id === drag)!, listed) : !wouldLoop(drag, into, listed) && listed.find((b) => b.id === into)?.kind !== "page" && boards.find((b) => b.id === drag)?.parent !== into);
+  const drop = async (into: string | null) => {
+    const id = drag;
+    setDrag(null);
+    setOver(null);
+    if (!id || !canTake(into)) return;
+    const me = listed.find((b) => b.id === id);
+    const err = await fileGrid(id, into);
+    if (err) return toast(err, "bad");
+    if (into) {
+      setShut((s) => {
+        const n = new Set(s);
+        n.delete(into);
+        return n;
+      });
+      setUi({ spacesView: "all" });
+      toast(`${me?.name ?? "The grid"} is inside ${listed.find((b) => b.id === into)?.name ?? "it"} now`, "ok");
+    } else toast(`${me?.name ?? "The grid"} is back at the top of All Grids`, "ok");
   };
 
-  const row = (b: BoardRow, depth = 0) => (
-    <div key={b.id} className={`space-row${b.id === current ? " is-current" : ""}`} style={{ paddingLeft: depth * 14 }} data-space-drop={b.id} data-space-name={b.name} data-space-kind={b.kind ?? "grid"}>
-      <button className="pane-row space-open" onClick={() => onSwitch(b.id)} data-tip={`${KIND_NAME[b.kind ?? "grid"]}${b.folder ? ` · ${b.folder.replace(/\//g, " › ")}` : ""}`}>
-        <span className="pane-glyph">{b.id === "company" ? "◉" : KIND_GLYPH[b.kind ?? "grid"]}</span>
-        <span className="pane-label">{b.name}</span>
-        {ui.spacesView === "recent" && b.folder && <span className="pane-when">{b.folder.split("/").pop()}</span>}
-      </button>
-      {!viewer && b.role !== "viewer" && (
-        <button className={`space-move${moving === b.id ? " is-on" : ""}`} onClick={() => setMoving(moving === b.id ? null : b.id)} aria-label={`Move ${b.name} to a folder`} data-tip="Move to a folder">
-          ▱
-        </button>
-      )}
-      {moving === b.id && (
-        <select
-          className="space-move-pick"
-          autoFocus
-          defaultValue={b.folder ?? ""}
-          aria-label={`Folder for ${b.name}`}
-          onBlur={() => setMoving(null)}
-          onChange={(e) => {
-            onUpdate(b.id, { folder: e.target.value || null });
-            setMoving(null);
-            setUi({ spacesView: "folders" });
-          }}
-        >
-          <option value="">No folder</option>
-          {folders.map((f) => (
-            <option key={f} value={f}>
-              {f.replace(/\//g, " › ")}
-            </option>
-          ))}
-        </select>
-      )}
-    </div>
-  );
+  const dragProps = (b: BoardRow) =>
+    viewer || b.role === "viewer"
+      ? {}
+      : {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => {
+            e.dataTransfer.setData(DRAG, b.id);
+            e.dataTransfer.effectAllowed = "move";
+            setDrag(b.id);
+          },
+          onDragEnd: () => {
+            setDrag(null);
+            setOver(null);
+          },
+        };
+  const dropProps = (into: string | null) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!canTake(into)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (over !== (into ?? "top")) setOver(into ?? "top");
+    },
+    onDragLeave: () => over === (into ?? "top") && setOver(null),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      void drop(into);
+    },
+  });
 
-  // the tree: a folder row, then (unless shut) its spaces and its folders, one step in
-  const tree = (path: string, depth: number): React.ReactNode => {
-    const open = !shut.has(path);
-    const kids = folders.filter((f) => f.startsWith(path + "/") && f.split("/").length === path.split("/").length + 1);
-    const here = boards.filter((b) => b.folder === path).sort((a, b) => a.name.localeCompare(b.name));
+  const row = (b: BoardRow, depth: number, tree: boolean): React.ReactNode => {
+    const kids = tree ? childrenOf(b.id, listed) : [];
+    const open = !shut.has(b.id);
+    const parent = parentOf(b, listed);
+    const kind = b.kind ?? "grid";
     return (
-      <div key={path} className="folder">
-        <div className="space-row is-folder" style={{ paddingLeft: depth * 14 }}>
-          <button
-            className="pane-row space-open"
-            aria-expanded={open}
-            onClick={() =>
-              setShut((s) => {
-                const n = new Set(s);
-                if (n.has(path)) n.delete(path);
-                else n.add(path);
-                return n;
-              })
-            }
-          >
-            <span className={`pane-glyph folder-caret${open ? " is-open" : ""}`}>›</span>
-            <span className="pane-label">{path.split("/").pop()}</span>
-            <span className="pane-when">{boards.filter((b) => b.folder === path || b.folder?.startsWith(path + "/")).length || ""}</span>
+      <div key={b.id} className="grid-node">
+        <div
+          className={`space-row${b.id === current && place.kind === "grid" ? " is-current" : ""}${drag === b.id ? " is-dragging" : ""}${over === b.id ? " is-over" : ""}`}
+          style={{ paddingLeft: depth * 14 }}
+          data-space-drop={b.id}
+          data-space-name={b.name}
+          data-space-kind={kind}
+          data-grid-row={b.id}
+          {...dragProps(b)}
+          {...dropProps(b.id)}
+        >
+          {tree && kids.length > 0 ? (
+            <button
+              className={`grid-caret${open ? " is-open" : ""}`}
+              aria-expanded={open}
+              aria-label={open ? `Fold ${b.name}` : `Unfold ${b.name}`}
+              onClick={() =>
+                setShut((s) => {
+                  const n = new Set(s);
+                  if (n.has(b.id)) n.delete(b.id);
+                  else n.add(b.id);
+                  return n;
+                })
+              }
+            >
+              ›
+            </button>
+          ) : (
+            tree && <span className="grid-caret is-none" aria-hidden />
+          )}
+          <button className="pane-row space-open" onClick={() => onSwitch(b.id)} data-tip={`${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : " · drag onto a grid to put it inside"}`}>
+            <span className="pane-glyph">{b.id === "company" ? "◉" : KIND_GLYPH[kind]}</span>
+            <span className="pane-label">{b.name}</span>
+            {!tree && parent && <span className="pane-when">{parent.name}</span>}
+            {tree && kids.length > 0 && <span className="pane-when">{kids.length}</span>}
           </button>
-          {!viewer && (
-            <>
-              <button className="space-move" onClick={() => addFolder(path)} aria-label={`New folder in ${path}`} data-tip="New folder inside">
-                ▱
-              </button>
-              <button className="space-move" onClick={() => onNew("grid", path)} aria-label={`New grid space in ${path}`} data-tip="New grid space here">
-                ＋
-              </button>
-            </>
+          {tree && !viewer && b.role !== "viewer" && kind !== "page" && (
+            <button className="space-move" onClick={() => onNew("grid", b.id)} aria-label={`New grid inside ${b.name}`} data-tip="New grid inside">
+              ＋
+            </button>
           )}
         </div>
-        {open && (
-          <>
-            {kids.map((k) => tree(k, depth + 1))}
-            {here.map((b) => row(b, depth + 1))}
-            {kids.length === 0 && here.length === 0 && (
-              <div className="pane-empty" style={{ paddingLeft: (depth + 1) * 14 + 8 }}>
-                Empty. Move a space here, or ＋ a new one.
-              </div>
-            )}
-          </>
-        )}
+        {tree && open && kids.map((k) => row(k, depth + 1, true))}
       </div>
     );
   };
@@ -176,60 +159,49 @@ export function SidePane({ user, boards, current, onSwitch, onNew, onUpdate, onU
   return (
     <AnimatePresence initial={false}>
       {ui.pane && (
-        <motion.aside key="pane" className="side-pane floor-pane" style={{ width: ui.paneW }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={paneSpring}>
+        <motion.aside key="pane" className="side-pane floor-pane" style={{ width: ui.paneW }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={paneSpring} aria-label="Foundation menu">
           <div className="pane-scroll">
             <section className="pane-group">
+              <button className={`pane-row pane-place${place.kind === "today" ? " is-current" : ""}`} onClick={goToday} data-place="today">
+                <span className="pane-glyph is-agent">◌</span>
+                <span className="pane-label">Today</span>
+              </button>
+            </section>
+
+            <section className="pane-group">
               <div className="pane-eyebrow">
-                Spaces
+                Grids
                 {!viewer && (
                   <span className="pane-eyebrow-acts">
-                    <button className="pane-eyebrow-act" onClick={() => addFolder(null)} aria-label="New project folder" data-tip="New project folder">
-                      ▱
-                    </button>
-                    <button className="pane-eyebrow-act" onClick={() => onNew("grid")} aria-label="New grid space" data-tip="New grid space">
+                    <button className="pane-eyebrow-act" onClick={() => onNew("grid")} aria-label="New grid" data-tip="New grid">
                       ＋
                     </button>
                   </span>
                 )}
               </div>
-              <div className="pane-seg" role="tablist" aria-label="How spaces are listed">
-                {(["recent", "folders"] as const).map((v) => (
-                  <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}`} onClick={() => setUi({ spacesView: v })}>
-                    {v === "recent" ? "Recent" : "Folders"}
+              <div className="pane-seg" role="tablist" aria-label="How grids are listed">
+                {(["recent", "all"] as const).map((v) => (
+                  <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${v === "all" && over === "top" ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} {...(v === "all" ? dropProps(null) : {})}>
+                    {v === "recent" ? "Recent" : "All Grids"}
                   </button>
                 ))}
               </div>
-              {ui.spacesView === "recent" ? (
-                recent.map((b) => row(b))
-              ) : (
-                <>
-                  {folders.filter((f) => !f.includes("/")).map((f) => tree(f, 0))}
-                  {folders.length > 0 && loose.length > 0 && <div className="pane-sub">Not in a folder</div>}
-                  {loose.map((b) => row(b))}
-                  {folders.length === 0 && <div className="pane-empty">No project folders yet. ▱ above makes one; ▱ on a space files it.</div>}
-                </>
+              {ui.spacesView === "recent" ? recent.map((b) => row(b, 0, false)) : childrenOf(null, listed).map((b) => row(b, 0, true))}
+              {listed.length === 0 && <div className="pane-empty">No grids yet. ＋ above makes one.</div>}
+              {drag && parentOf(boards.find((b) => b.id === drag)!, listed) && (
+                <div className={`grid-top-drop${over === "top" ? " is-over" : ""}`} {...dropProps(null)}>
+                  Drop here to bring it to the top
+                </div>
               )}
-            </section>
-
-            <section className="pane-group">
-              <div className="pane-eyebrow">Release & plan</div>
-              <PaneRow glyph="⌗" label="App floorplan" onClick={openFloorplan} />
-              <PaneRow glyph="◇" label="The plan" onClick={() => (window.location.hash = "#/settings/plan")} />
-              <PaneRow glyph="¶" label="What's new" onClick={() => (window.location.hash = "#/settings/releases")} />
-            </section>
-
-            <section className="pane-group">
-              <div className="pane-eyebrow">Tools</div>
-              <PaneRow glyph="◌" label="Today and the Shiba" onClick={() => window.location.assign("/#/today")} />
-              <PaneRow glyph="⇪" label="Upload files" kbd={keys("mod+U")} onClick={onUpload} />
-              <PaneRow glyph="▥" label="New section" onClick={() => appendSectionLocal("New section")} />
-              <PaneRow glyph="⊡" label="Fit the board" kbd="0" onClick={() => requestSnap({ kind: "all" })} />
-              <PaneRow glyph="⌁" label="Connect Claude Code" onClick={() => void copyMcpCommand()} />
-              <PaneRow glyph="◐" label="Design language" onClick={() => (window.location.hash = "#/design")} />
-              <PaneRow glyph="⚙" label="Settings" onClick={() => (window.location.hash = "#/settings")} />
             </section>
           </div>
 
+          <section className="pane-group pane-low">
+            <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
+              <span className="pane-glyph">⚙</span>
+              <span className="pane-label">Settings</span>
+            </button>
+          </section>
           <footer className="pane-foot">
             <span className="me-avatar" style={{ background: user.color }} title={user.email}>
               {initials(user.name)}
@@ -248,7 +220,7 @@ export function SidePane({ user, boards, current, onSwitch, onNew, onUpdate, onU
             </span>
           </footer>
 
-          <FloorEdge side="right" value={ui.paneW} {...WIDTHS.pane} onChange={(w) => setUi({ paneW: w })} label="Spaces pane" />
+          <FloorEdge side="right" value={ui.paneW} {...WIDTHS.pane} onChange={(w) => setUi({ paneW: w })} label="Foundation menu" />
         </motion.aside>
       )}
     </AnimatePresence>
@@ -256,26 +228,11 @@ export function SidePane({ user, boards, current, onSwitch, onNew, onUpdate, onU
 }
 
 /**
- * Release & plan. The floorplan is a map of Foundation's own code (every part,
- * file and connection, in plain words), made with the floorplan plugin and
- * exported to `public/floorplan.html` — a static page the client serves.
- * Rebuild it after a release: see docs/floorplan.md.
+ * The floorplan is a map of Foundation's own code (every part, file and connection, in plain words),
+ * made with the floorplan plugin and exported to `public/floorplan.html` — a static page the client
+ * serves. Rebuild it after a release: see docs/floorplan.md. Linked from Settings → Plan.
  */
 export const FLOORPLAN_URL = "/floorplan.html";
-
-function openFloorplan() {
-  window.open(FLOORPLAN_URL, "_blank", "noopener");
-}
-
-function PaneRow({ glyph, label, kbd, onClick }: { glyph: string; label: string; kbd?: string; onClick(): void }) {
-  return (
-    <button className="pane-row" onClick={onClick}>
-      <span className="pane-glyph">{glyph}</span>
-      <span className="pane-label">{label}</span>
-      {kbd && <span className="f-kbd">{kbd}</span>}
-    </button>
-  );
-}
 
 export function ago(at: number) {
   const s = Math.max(1, Math.round((Date.now() - at) / 1000));

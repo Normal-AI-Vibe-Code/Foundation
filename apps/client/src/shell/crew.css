@@ -457,6 +457,22 @@
   font: 600 var(--text-11) / 1 var(--font-sans);
   white-space: nowrap;
 }
+/* with the picture of the character the agent wears (characters/AgentPill.tsx): a still, never a live avatar */
+.card-maker {
+  gap: 4px;
+}
+.card-maker.has-face {
+  height: 22px;
+  padding: 0 8px 0 2px;
+}
+.card-maker-face {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  object-position: 50% 14%;
+  background: var(--color-raise);
+}
 .card-maker.is-inline {
   position: static;
   flex-shrink: 0;

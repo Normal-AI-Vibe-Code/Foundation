@@ -56,6 +56,9 @@
   --color-agent: color-mix(in srgb, #8f76ee calc(var(--night-hard) * 100%), #6b5bd6);
   /* text and marks on a solid state, accent or person colour: white in any room (the fills are saturated) */
   --color-on-fill: color-mix(in srgb, #121212 calc(var(--night-hard) * 100%), #fff);
+  /* type drawn straight over a picture or the Shiba's room (Today's panel): white in any room, on --color-room-shade */
+  --color-over-room: #fff;
+  --color-room-shade: #14110c;
   /* a gloss on a raised bead (ports): stays light at night, like the highlight inside --shadow-lift */
   --color-highlight: rgb(255 255 255 / 0.6);
   --color-agent-dim: color-mix(in srgb, rgb(143 118 238 / 0.16) calc(var(--night-hard) * 100%), rgb(107 91 214 / 0.1));

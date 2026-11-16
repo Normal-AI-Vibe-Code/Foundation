@@ -5,6 +5,7 @@
  * sources stream in after.
  */
 
+import { goSettings, goToday } from "../lib/place";
 import { openCouncil } from "../lib/councilOpen";
 import { newCharacter, openCharacterStudio } from "../lib/characterStudio";
 import { keys } from "../lib/keys";
@@ -15,7 +16,7 @@ import type { SearchHit } from "@foundation/protocol";
 import { isNight, setNight } from "@foundation/ui";
 import { api, logout, search } from "../lib/api";
 import { addNote, addPanel, appendSectionLocal, createTable, getState, requestSnap, startMachine, updatePanel } from "../state/store";
-import { askAgent, getUi, setUi, toast, useUi } from "../state/ui";
+import { askAgent, setUi, toast, useUi } from "../state/ui";
 import { activeBoard } from "../sync/board";
 import { snippetHtml } from "../lib/snippet";
 import { stopAllCrew } from "../state/sessions";
@@ -156,12 +157,11 @@ export function CommandBar() {
     if (term && !looksLikeUrl(term))
       list.push({ id: "pipeline-named", glyph: "◆", label: `Start a design pipeline: “${term}”`, hint: "Brief → Concept → CAD → Simulate → Review → Release", run: () => startPipeline(term) });
     list.push(
-      { id: "present", glyph: "▶", label: "Present this board", keys: "P", run: () => setUi({ presenting: true }) },
-      { id: "layer", glyph: "◇", label: `${getUi().agentLayer ? "Hide" : "Show"} the agent layer`, hint: "who's working on what, and how apps are wired", keys: "A", run: () => setUi({ agentLayer: !getUi().agentLayer }) },
-      { id: "company", glyph: "◉", label: "Go to the company board", hint: "every app we run, live", run: () => void window.dispatchEvent(new CustomEvent("foundation:board", { detail: "company" })) },
+      { id: "present", glyph: "▶", label: "Present this grid", keys: "P", run: () => setUi({ presenting: true }) },
+      { id: "company", glyph: "◉", label: "Go to the company grid", hint: "every app we run, live", run: () => void window.dispatchEvent(new CustomEvent("foundation:board", { detail: "company" })) },
       { id: "slack-board", glyph: "#", label: "Open the Slack board", hint: "a section for every channel, kept live", run: () => void openSlackBoard() },
-      { id: "council", glyph: "☺", label: "Council: the agents on this board", hint: "each agent as a character, in its cursor's colour", run: () => openCouncil({ kind: "board" }) },
-      ...(sec && st.allSections[sec] ? [{ id: "council-section", glyph: "☺", label: `Council: the agents in ${st.allSections[sec].name}`, hint: "who's at work in this section", run: () => openCouncil({ kind: "section", id: sec }) }] : []),
+      { id: "council", glyph: "⚇", label: "Council: the agents on this grid", hint: "each agent as a character, in its cursor's colour", run: () => openCouncil({ kind: "board" }) },
+      ...(sec && st.allSections[sec] ? [{ id: "council-section", glyph: "⚇", label: `Council: the agents in ${st.allSections[sec].name}`, hint: "who's at work in this section", run: () => openCouncil({ kind: "section", id: sec }) }] : []),
       { id: "character-studio", glyph: "☺", label: "Open the Character studio", hint: "inspiration → sheet → 3D model or mesh avatar, for the council", run: () => void openCharacterStudio() },
       ...(sec ? [{ id: "character", glyph: "☺", label: "Add a character to this section", hint: "a card that draws, models and animates an avatar", run: () => void newCharacter(sec) }] : []),
       { id: "note", glyph: "▤", label: "Add a note", run: () => void addNote(sec) },
@@ -173,10 +173,10 @@ export function CommandBar() {
       { id: "pipeline", glyph: "◆", label: "Start a design pipeline…", hint: "design → CAD → simulation → release, panel by panel", run: () => askAgent("Start a design pipeline for ") },
       { id: "vision", glyph: "◈", label: "Design something with Vision…", run: () => askAgent("Brief Vision: design ") },
       { id: "stop-crew", glyph: "■", label: "Stop all my agents on this board", hint: "the crew-wide stop, helpers too", run: () => void stopAllOnBoard() },
-      { id: "connect", glyph: "⌁", label: "Connect Claude Code / Codex to this board", hint: "copies an MCP command", run: copyMcpCommand },
-      { id: "design", glyph: "◐", label: "Design language", hint: "tokens, type, motion, effects", run: () => {
-          window.location.hash = "#/design";
-        } },
+      { id: "connect", glyph: "⌁", label: "Connect Claude Code / Codex to this grid", hint: "copies an MCP command; more in Settings → Agents", run: copyMcpCommand },
+      { id: "today", glyph: "◌", label: "Today", hint: "the Shiba, your todos, the company's apps", run: () => goToday() },
+      { id: "settings", glyph: "⚙", label: "Settings", hint: "appearance, agents, avatars, the plan, releases", run: () => goSettings() },
+      { id: "design", glyph: "◐", label: "Design language", hint: "tokens, type, motion, effects", run: () => goSettings("design") },
       { id: "night", glyph: isNight() ? "☀" : "☾", label: isNight() ? "Day" : "Night", run: () => setNight(!isNight()) },
       { id: "logout", glyph: "⏻", label: "Sign out", run: async () => {
           await logout();

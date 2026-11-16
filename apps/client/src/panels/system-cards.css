@@ -1,0 +1,128 @@
+/* Foundation's own cards: a grid inside this one, a kanban, a chapter of the design language. On tokens only. */
+
+/* ---------- a grid inside this one ---------- */
+
+.grid-link {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-7);
+  container-type: inline-size;
+  overflow: hidden;
+}
+.grid-link.is-gone {
+  justify-content: center;
+  align-items: center;
+  color: var(--color-dim);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.grid-link-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.grid-link-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  font: 600 var(--text-32) / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+.grid-link-glyph {
+  color: var(--color-pulse);
+  font-size: var(--text-24);
+}
+.grid-link-facts {
+  color: var(--color-mist);
+  font: 400 var(--text-14) / 1.4 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.grid-link-go {
+  margin-top: var(--space-3);
+}
+.grid-link-open:hover .grid-link-name {
+  color: var(--color-pulse);
+}
+.grid-link-sections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2) var(--space-5);
+}
+.grid-link-sections li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+}
+.grid-link-sec {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grid-link-count {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-12);
+}
+.grid-link-sections .grid-link-more {
+  background: transparent;
+  color: var(--color-dim);
+}
+.grid-link-kids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* ---------- kanban ---------- */
+
+.kanban-card,
+.design-card {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-void);
+}
+.kanban-card {
+  padding: var(--space-6) var(--space-6) var(--space-5);
+}
+.kanban-card .kb {
+  min-height: 0;
+  flex: 1 1 0;
+}
+.kanban-note {
+  margin: auto;
+  color: var(--color-dim);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+
+/* ---------- a chapter of the design language ---------- */
+
+.design-card {
+  overflow: auto;
+  user-select: text;
+}
+.design-card .design-page.is-chapter {
+  height: auto;
+  overflow: visible;
+  padding: var(--space-6) var(--space-7) var(--space-7);
+  background: transparent;
+}

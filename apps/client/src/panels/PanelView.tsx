@@ -10,13 +10,15 @@
  * once engaged (click), so panning the grid over them stays smooth.
  */
 
+import { PortLabel, portHoverProps } from "../shell/portHover";
+import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
 import { CadPreview } from "../cad/CadPreview";
 import { MODEL_EXT } from "../cad/model";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { drawnScale, isHosted, MINI_HEADER, emitPort, getState, subscribe, inputValue, movePanel, removePanel, requestSnap, resizePanel, sectionBodyRect, updatePanel, usePanel, type PanelMeta } from "../state/store";
 import { ObjectFrame } from "../components/ObjectFrame";
 import { beginConnect, beginDetach, usePortLayout } from "../shell/AgentLayer";
-import { describeValue, landingsOf, toneOf } from "../shell/ports";
+import { landingsOf, toneOf } from "../shell/ports";
 import { api, fetchFile, uploadFile } from "../lib/api";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
 import { askAgent, toast, useUi } from "../state/ui";
@@ -61,11 +63,13 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   slack: "◇",
   crew: "✦",
   character: "☺",
+  grid: "▦",
+  kanban: "▥",
+  design: "◐",
 };
 
 export const PanelView = memo(function PanelView({ panel, pos, isActive, getScale, hosted }: Props) {
   countRender("PanelView");
-  const ui = useUi();
   const layout = usePortLayout(panel);
   const fullscreen = useFullscreenCard() === panel.id;
   const ports = (
@@ -84,13 +88,9 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
             data-type={p.type ?? "json"}
             style={{ top: l.y, height: l.height, ["--wire-tone" as string]: toneOf(p.type) }}
             onPointerDown={(e) => (p.dir === "out" ? beginConnect(e, panel.id, p.id) : connected ? beginDetach(e, panel.id, p.id) : undefined)}
+            {...portHoverProps(panel.id, p.id)}
           >
-            <span className="port-label">
-              <b>{p.name}</b>
-              <i>{p.type ?? "json"}</i>
-              <span className="port-value">{describeValue(value)}</span>
-              <span className="port-hint">{p.dir === "out" ? "drag to connect" : connected ? "drag to re-route" : "drop a wire here"}</span>
-            </span>
+            <PortLabel panel={panel} port={p} hint={p.dir === "out" ? "drag to connect it to another card" : connected ? "drag to re-route" : "drop a wire here"} />
           </div>
         );
       })}
@@ -118,6 +118,12 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <SlackBody panel={panel} />
     ) : panel.panel === "character" ? (
       <CharacterBody panel={panel} />
+    ) : panel.panel === "grid" ? (
+      <GridLinkBody panel={panel} />
+    ) : panel.panel === "kanban" ? (
+      <KanbanBody panel={panel} />
+    ) : panel.panel === "design" ? (
+      <DesignBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (
@@ -133,14 +139,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
     const hostedPorts = panel.ports.map((p) => {
       const mine = landings.filter((l) => l.port === p.id);
       const value = p.dir === "out" ? panel.outputs?.[p.id] : inputValue(panel.id, p.id);
-      const label = (
-        <span className="port-label">
-          <b>{p.name}</b>
-          <i>{p.type ?? "json"}</i>
-          <span className="port-value">{describeValue(value)}</span>
-          <span className="port-hint">{p.dir === "out" ? "drag to connect" : "drag to re-route"}</span>
-        </span>
-      );
+      const label = <PortLabel panel={panel} port={p} hint={p.dir === "out" ? "drag to connect it to another card" : "drag to re-route"} />;
       if (!mine.length || !bodyRect) {
         const l = layout.get(p.id);
         if (!l) return null;
@@ -153,6 +152,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
             data-type={p.type ?? "json"}
             style={{ top: l.y, height: l.height, ["--wire-tone" as string]: toneOf(p.type) }}
             onPointerDown={(e) => (p.dir === "out" ? beginConnect(e, panel.id, p.id) : undefined)}
+            {...portHoverProps(panel.id, p.id)}
           >
             {label}
           </div>
@@ -167,6 +167,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
           data-type={p.type ?? "json"}
           style={{ left: l.x - bodyRect.x - 7, right: "auto", top: l.y - bodyRect.y, height: 14, ["--wire-tone" as string]: toneOf(p.type) }}
           onPointerDown={(e) => (p.dir === "out" ? beginConnect(e, panel.id, p.id) : beginDetach(e, panel.id, p.id))}
+          {...portHoverProps(panel.id, p.id)}
         >
           {label}
         </div>
@@ -174,7 +175,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
     });
     return (
       <div
-        className={`hosted-app fs-able panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}${ui.agentLayer ? " show-ports" : ""}`}
+        className={`hosted-app fs-able panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}`}
         data-panel-id={panel.id}
         data-obj-id={panel.id}
       >
@@ -201,7 +202,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       onRemove={() => removePanel(panel.id)}
       headerExtras={extras}
       bodyClass={`panel-body panel-${panel.panel}`}
-      cardClass={`panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}${ui.agentLayer ? " show-ports" : ""}`}
+      cardClass={`panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}`}
       data={{ "panel-id": panel.id }}
       openUrl={panel.url}
       overlay={panel.ports.length ? <div className="port-rail">{ports}</div> : null}
@@ -213,8 +214,11 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
   );
 });
 
-/** a panel's own actions: repo, MCP, open, ask — in its hover bar, or in its host section's toolbar (which has its own ✦) */
-export function PanelActions({ panel, ask = true }: { panel: PanelMeta; ask?: boolean }) {
+/**
+ * A panel's own actions: repo, MCP, open — in its hover bar, or in its host section's toolbar. No agent
+ * button here (2026-11-15): agents work at the level of the section, and are spoken to on its council.
+ */
+export function PanelActions({ panel }: { panel: PanelMeta; ask?: boolean }) {
   const tip = (label: string) => ({ "data-tip": label, "aria-label": label });
   return (
     <>
@@ -233,11 +237,7 @@ export function PanelActions({ panel, ask = true }: { panel: PanelMeta; ask?: bo
           ↗
         </button>
       )}
-      {ask && (
-        <button className="icon-btn is-agent" {...tip(`Ask the agent about ${panel.name}`)} onClick={() => askAgent(`About “${panel.name}”: `)}>
-          ✦
-        </button>
-      )}
+
     </>
   );
 }

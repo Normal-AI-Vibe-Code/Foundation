@@ -5,7 +5,9 @@
  */
 
 import { CouncilView, type CouncilSeat } from "../characters/Council";
-import { useEffect, useRef, useState } from "react";
+import { AgentInfoBody } from "../characters/AgentInfo";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { DesignChapter } from "@foundation/protocol";
 import { motion } from "motion/react";
 import { durations, easings, isNight, setNight, springs } from "@foundation/ui";
 import { initAsciiWind2 } from "../login/asciiWind2";
@@ -125,13 +127,39 @@ const TYPE = [
   { size: 11, weight: 600, label: "Eyebrow 11 · .22em caps", font: "var(--font-sans)", sample: "COMPANY", eyebrow: true },
 ];
 
-export function DesignPage() {
+/** which of the page's sections make up each chapter of the design grid (protocol DESIGN_CHAPTERS), by title */
+export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
+  foundations: ["The mark", "Surfaces", "Ink & accents", "Type", "Shape"],
+  controls: ["Controls", "Key labels", "Panels that adapt"],
+  motion: ["Motion", "Effects"],
+  floor: ["The floor", "Chrome on call", "Server switch", "Desktop updates"],
+  cards: ["Using a card", "Adding files", "Text box", "Writing together"],
+  search: ["Out of search, into the hand"],
+  live: ["Huddles and Slack", "The Slack board"],
+  machines: ["Machines"],
+  agents: ["The crew", "Agents in a section", "Agents in the section"],
+  council: ["The council"],
+  today: ["Today and the Shiba"],
+  own: ["Plan board", "Release notes", "Rune renderer"],
+};
+/** when set, only these sections draw (a chapter's card on the design grid) */
+const Only = createContext<Set<string> | null>(null);
+
+/**
+ * The design language. As a page of its own (`#/design`) it is every section in one scroll, under its
+ * head. On the design grid each chapter is a card: `chapter` draws just that chapter's sections, bare.
+ */
+export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
   const wind = useRef<HTMLDivElement>(null);
   const [replay, setReplay] = useState(0);
-  useEffect(() => initAsciiWind2(wind.current!, "wind"), []);
+  useEffect(() => (wind.current ? initAsciiWind2(wind.current, "wind") : undefined), []);
+  const only = useMemo(() => (chapter ? new Set(CHAPTER_SECTIONS[chapter] ?? []) : null), [chapter]);
 
   return (
-    <div className="design-page">
+    <Only.Provider value={only}>
+    <div className={`design-page${chapter ? " is-chapter" : ""}`}>
+      {!chapter && (
+      <>
       <header className="design-head">
         <Mark size={28} />
         <div>
@@ -149,6 +177,8 @@ export function DesignPage() {
         Warm printed paper, ink, one federal blue — shared with Vision, the Data Room, FactoryForm and Creation. The work brings the colour; colour means state.
         Agents wear violet. Everything floats on glass over a living grid. This page renders the real tokens; <code>DESIGN.md</code> is the contract.
       </p>
+      </>
+      )}
 
       <Section title="The mark" note="Four panels on a grid: two full rows over a row split in two. Blue on paper and glass; the white original on a solid fill or dark ground.">
         <div className="mark-specimens">
@@ -1072,6 +1102,7 @@ export function DesignPage() {
         </div>
       </Section>
     </div>
+    </Only.Provider>
   );
 }
 
@@ -1619,19 +1650,35 @@ function SlackMarks() {
 /** the council, still: four agents, one standing (no characters are loaded here, so the seats show their marks) */
 function CouncilDemo() {
   const seats: CouncilSeat[] = [
-    { id: "a", name: "Wren", hue: 0, status: "working", doing: "adding a table of parts", task: "Make a Supply section with the parts and hook up FactoryForm", askerName: "Ada", mine: true, mood: "working" },
-    { id: "b", name: "Kestrel", hue: 2, status: "working", doing: "reading the board", leadName: "Wren", askerName: "Ada", mood: "thinking" },
-    { id: "c", name: "Juniper", hue: 3, status: "done", doing: "", askerName: "Kai", mood: "happy" },
-    { id: "d", name: "Sorrel", hue: 1, status: "error", doing: "", askerName: "Kai", mood: "sad" },
+    { id: "a", name: "Wren", agentName: "Claude", agentKey: "claude", provider: "claude", where: "cloud", service: "Claude Code on the server, on its Claude subscription", tools: true, place: "sec", postedBy: "Ada", hue: 0, status: "working", doing: "adding a table of parts", task: "Make a Supply section with the parts and hook up FactoryForm", askerName: "Ada", mine: true, mood: "working" },
+    { id: "b", name: "Codex", agentName: "Codex", agentKey: "t3:codex", provider: "chatgpt", where: "cloud", service: "ChatGPT Plus, signed in on this computer", tools: true, place: "sec", postedBy: "Ada", hue: 2, status: "idle", mood: "idle" },
+    { id: "c", name: "Kimi", agentName: "Kimi", agentKey: "t3:kimi", provider: "kimi", where: "local", service: "a model server on this computer (127.0.0.1:11434)", model: "kimi-k3", tools: true, place: "sec", postedBy: "Kai", hue: 3, status: "done", mood: "happy" },
+    { id: "d", name: "DeepSeek", agentName: "DeepSeek", agentKey: "t3:deepseek", provider: "deepseek", where: "cloud", service: "api.deepseek.com, on your key", tools: false, place: "sec", postedBy: "Kai", hue: 1, status: "error", mood: "sad" },
   ];
+  const available = {
+    t3: "running",
+    agents: [
+      { key: "claude", name: "Claude", provider: "claude", where: "cloud" as const, service: "Claude Code on the server, on its Claude subscription", tools: true, ready: true },
+      { key: "t3:gemini", name: "Gemini", provider: "gemini", where: "cloud" as const, service: "signed in on this computer", tools: true, ready: true },
+      { key: "t3:grok", name: "Grok", provider: "grok", where: "cloud" as const, service: "signed in on this computer", tools: false, ready: false, why: "needs signing in on this computer" },
+    ],
+  };
   return (
     <div data-design-council>
-      <CouncilView title="Supply" seats={seats} bench={false} characters={[]} canAsk onAsk={() => {}} onFollow={() => {}} onStop={() => {}} inline open="a" />
+      <CouncilView title="Supply" seats={seats} selected={["b"]} canAsk available={available} onSelect={() => {}} onSay={() => {}} onAddOpen={() => {}} onAdd={() => {}} onDetails={() => {}} detailsOpen inline adding />
+      <div className="design-agent-info agents-pane agent-info">
+        <header className="agents-head">
+          Codex <span className="agents-head-n">at rest</span>
+        </header>
+        <AgentInfoBody seat={seats[1]} seats={seats} sectionId={null} viewer={false} still />
+      </div>
     </div>
   );
 }
 
 function Section({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
+  const only = useContext(Only);
+  if (only && !only.has(title)) return null;
   return (
     <section className="design-section">
       <div className="design-section-head">

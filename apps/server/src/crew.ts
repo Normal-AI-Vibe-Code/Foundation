@@ -68,6 +68,8 @@ export interface CrewState {
     lead?: string;
     leadName?: string;
     task: string;
+    /** which agent this is: "claude" (the server's own) or "t3:<id>" (one of this computer's). A council seats it where that agent is assigned */
+    via: string;
     doing: string;
     target: CrewTarget | null;
     guide: CrewGuide | null;
@@ -152,7 +154,7 @@ function pickHue(boardId: string, seed: string) {
 }
 
 /** an agent arrives on the board: a name, a colour and a presence everyone sees */
-export function joinCrew(opts: { boardId: string; userId: string; userName: string; runId: string; task: string; lead?: CrewMember; /** its own name (a T3 agent: "Kimi"); a second one on the board is "Kimi 2" */ name?: string }): CrewMember {
+export function joinCrew(opts: { boardId: string; userId: string; userName: string; runId: string; task: string; lead?: CrewMember; /** its own name (a T3 agent: "Kimi"); a second one on the board is "Kimi 2" */ name?: string; /** the agent's key ("t3:<id>"); the server's own when absent */ via?: string }): CrewMember {
   if (opts.lead && opts.lead.left) throw new Error("the agent that called for help has finished");
   if (crewOn(opts.boardId).length >= MAX_CREW_PER_BOARD) throw new Error(`this board already has ${MAX_CREW_PER_BOARD} agents working; wait for one to finish`);
   const board = getBoard(opts.boardId);
@@ -189,6 +191,7 @@ export function joinCrew(opts: { boardId: string; userId: string; userName: stri
         lead: opts.lead?.id,
         leadName: opts.lead?.name,
         task: opts.task.slice(0, 200),
+        via: opts.via ?? "claude",
         doing: opts.lead ? `called in by ${opts.lead.name}` : "reading the ask",
         target: null,
         guide: null,

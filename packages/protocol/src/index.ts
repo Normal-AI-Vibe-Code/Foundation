@@ -28,7 +28,38 @@ export const BOARD = {
   machineAsks: "machineAsks", // machine panel id → MachineAsk[] (commands agents asked to run; kept by the server alone, off the card)
   slack: "slack", // section id → SlackSectionState (a section kept for a Slack channel; kept by the server alone)
   characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
+  agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
 } as const;
+
+/** the place that means "the whole grid" in the board's `agents` map */
+export const GRID_PLACE = "*";
+
+/**
+ * An agent assigned to a section or a grid (2026-11-15): it stays on that place's council until it's
+ * taken off, at work or not. `key` names it: "claude" is the server's own agent, "t3:<id>" one of this
+ * computer's. What it is (service, where it runs) is the server's reading of it when it was assigned.
+ */
+export interface PostedAgent {
+  key: string;
+  name: string;
+  /** whose model it is: claude, chatgpt, kimi, deepseek, gemini, grok, cursor, agent */
+  provider: string;
+  /** cloud: what it's asked goes to a service · local: a model on the server's computer */
+  where: "cloud" | "local";
+  /** the service in a few words: the plan it's signed in to, the host it talks to */
+  service: string;
+  model?: string;
+  /** it can read and write the grid (false: it works in a folder of its own) */
+  tools: boolean;
+  by: string;
+  byName: string;
+  at: number;
+}
+
+export function postedAgentsOf(doc: Y.Doc, place: string): PostedAgent[] {
+  const v = doc.getMap<PostedAgent[]>(BOARD.agents).get(place);
+  return Array.isArray(v) ? v : [];
+}
 
 export interface GridTracks {
   cols: number[];
@@ -71,7 +102,7 @@ export interface SectionDoc {
 export const BOARD_SCHEMA = 6;
 
 /** Panel kinds a section can host — whole apps, not artifacts. */
-export const HOSTABLE_KINDS = ["app", "link", "machine", "connector"] as const;
+export const HOSTABLE_KINDS = ["app", "link", "machine", "connector", "grid", "kanban", "design"] as const;
 
 export function isHostable(kind: string): boolean {
   return (HOSTABLE_KINDS as readonly string[]).includes(kind);
@@ -152,6 +183,9 @@ export type PanelKind =
   | "huddle" // a video portal: people on the board talk face to face, transcribed and archived
   | "slack" // a Slack channel on the board: read it, post to it, send it board links, invite it to a huddle
   | "crew" // the agents of the section it sits in: who is at work there, what each is doing, and a place to ask one
+  | "grid" // a grid inside this one (2026-11-15): the section that holds it stands for a child grid and opens it
+  | "kanban" // a kanban board: columns of cards moved between them (the plan is one)
+  | "design" // a chapter of the design language, live on its tokens
   | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
 
 export interface Port {
@@ -176,6 +210,10 @@ export interface PanelDoc extends ObjectBaseDoc {
   mime?: string;
   text?: string;
   ports: Port[];
+  /** the child grid a "grid" card stands for (a board id); kept by the server when a grid is put inside another */
+  board?: string;
+  /** what a "kanban" card shows ("plan": Foundation's own plan) or which chapter a "design" card draws */
+  source?: string;
   /** connector id for panel === "connector" */
   connector?: string;
   /** Slack channel id — a "slack" card's channel, or the channel a huddle was opened for */
@@ -499,6 +537,7 @@ export function boardMaps(doc: Y.Doc) {
     machineAsks: doc.getMap<MachineAsk[]>(BOARD.machineAsks),
     slack: doc.getMap<SlackSectionState>(BOARD.slack),
     characters: doc.getMap<CharacterState>(BOARD.characters),
+    agents: doc.getMap<PostedAgent[]>(BOARD.agents),
   };
 }
 
@@ -769,5 +808,6 @@ export interface UserInfo {
   role: "admin" | "member" | "viewer";
 }
 export * from "./apps.ts";
+export * from "./design.ts";
 
 export { belowMinimum, compareVersions, isVersion } from "./version.ts";

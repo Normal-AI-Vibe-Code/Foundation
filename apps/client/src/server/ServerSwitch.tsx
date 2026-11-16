@@ -70,6 +70,8 @@ export interface ServerSwitchViewProps {
   remoteError?: string | null;
   /** a still for #/design: no glass motion */
   still?: boolean;
+  /** in the top bar: the panel drops down from the pill instead of rising from the corner */
+  drop?: boolean;
   onToggle?: () => void;
   onStart?: () => void;
   onStop?: () => void;
@@ -208,7 +210,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
   );
 
   return (
-    <div className="server-switch" data-open={p.open || undefined} data-still={p.still || undefined}>
+    <div className="server-switch" data-open={p.open || undefined} data-still={p.still || undefined} data-drop={p.drop || undefined}>
       {p.still ? (
         p.open && panel
       ) : (
@@ -217,7 +219,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
             <motion.div
               key="panel"
               className="server-switch-lift"
-              initial={{ opacity: 0, y: 10, scale: 0.96 }}
+              initial={{ opacity: 0, y: p.drop ? -8 : 10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.14 } }}
               transition={{ type: "spring", ...springs.pop }}
@@ -229,7 +231,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
       )}
       <button
         type="button"
-        className="server-switch-pill f-glass"
+        className={`server-switch-pill${p.drop ? "" : " f-glass"}`}
         aria-expanded={p.open}
         aria-controls="server-switch-panel"
         data-tip={p.open ? undefined : "The server this app uses: start one here, or connect to another"}
@@ -238,7 +240,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
         <i className="server-switch-dot" data-tone={pill.tone} />
         <span className="server-switch-addr">{shortAddress(p.current)}</span>
         <span className="server-switch-caret" aria-hidden>
-          {p.open ? "▾" : "▴"}
+          {p.open !== !!p.drop ? "▾" : "▴"}
         </span>
       </button>
     </div>
@@ -263,10 +265,15 @@ const keep = (k: string, v: string) => {
 /** the launch check runs once per page, though the switch is mounted again as the app moves past sign-in */
 let launchChecked = false;
 
-/** the switch itself, mounted once by the app. `day` pins day tokens over the sign-in page. */
-export function ServerSwitch({ day = false }: { day?: boolean }) {
+/**
+ * The switch itself. Signed in, it sits in the top bar (`where="bar"`, 2026-11-15: always there, so the
+ * server this app talks to is never a mystery); before that there is no bar, and it keeps the bottom-right
+ * corner wherever the app can point at another server. `day` pins day tokens over the sign-in page.
+ */
+export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean; where?: "corner" | "bar" }) {
   const current = (SERVER || window.location.origin).replace(/\/$/, "");
-  const shown = inDesktop || BEARER;
+  const bar = where === "bar";
+  const shown = bar || inDesktop || BEARER;
   const ui = useUi();
   const [open, setOpen] = useState(false);
   const [reach, setReach] = useState<Reach>("checking");
@@ -286,10 +293,10 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
 
   // the corner is shared: the call chip and the upload tray move up while the switch is there (server.css)
   useEffect(() => {
-    if (!shown || ui.presenting) return;
+    if (!shown || bar || ui.presenting) return;
     document.documentElement.setAttribute("data-server-switch", "");
     return () => document.documentElement.removeAttribute("data-server-switch");
-  }, [shown, ui.presenting]);
+  }, [shown, bar, ui.presenting]);
 
   // does the server this app uses answer? now, then every 15 s (5 s while open)
   useEffect(() => {
@@ -429,8 +436,9 @@ export function ServerSwitch({ day = false }: { day?: boolean }) {
   // beside the search pane when it's open, not over its clipboard
   const right = 16 + (!day && ui.search ? ui.searchW : 0);
   return (
-    <div ref={root} className={`server-switch-place${day ? " f-day" : ""}`} style={{ right }}>
+    <div ref={root} className={`server-switch-place${bar ? " is-bar" : ""}${day ? " f-day" : ""}`} style={bar ? undefined : { right }}>
       <ServerSwitchView
+        drop={bar}
         open={open}
         current={current}
         reach={reach}

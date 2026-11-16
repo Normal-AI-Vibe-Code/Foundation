@@ -14,12 +14,35 @@ const emit = () => subs.forEach((f) => f());
 
 export function openCouncil(scope: CouncilScope) {
   open = scope;
+  selected = NONE;
   emit();
+}
+
+// the seats a line goes to (and the one the agent's pane shows); none: everyone
+const NONE: string[] = [];
+let selected: string[] = NONE;
+
+/** press a seat: it joins or leaves the ones spoken to. `only`: it alone (the agent's pane, moving between agents) */
+export function selectSeat(id: string, only = false) {
+  selected = only ? [id] : selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
+  if (!selected.length) selected = NONE;
+  emit();
+}
+export const councilSelection = () => selected;
+export function useCouncilSelection(): string[] {
+  return useSyncExternalStore(
+    (fn) => {
+      subs.add(fn);
+      return () => subs.delete(fn);
+    },
+    () => selected,
+  );
 }
 
 export function closeCouncil() {
   if (!open) return;
   open = null;
+  selected = NONE;
   emit();
 }
 

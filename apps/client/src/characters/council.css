@@ -24,12 +24,44 @@
   animation: avatar-breathe 4.2s var(--ease-out-soft) infinite alternate;
   transform-origin: 50% 100%;
 }
+/* materialising: while the character loads, its silhouette stands in its place, a light passing over it;
+   the character then fades in over it and the silhouette goes */
 .avatar-3d > .avatar-still,
 .avatar-mesh > .avatar-still {
   position: absolute;
   inset: 0;
-  animation: none;
-  opacity: 0.55;
+  animation: avatar-shimmer 1.5s var(--ease-out-soft) infinite;
+  filter: brightness(0);
+  opacity: 0.32;
+  -webkit-mask-image: linear-gradient(105deg, #000 30%, rgb(0 0 0 / 0.45) 50%, #000 70%);
+  mask-image: linear-gradient(105deg, #000 30%, rgb(0 0 0 / 0.45) 50%, #000 70%);
+  -webkit-mask-size: 300% 100%;
+  mask-size: 300% 100%;
+}
+.is-night .avatar-3d > .avatar-still,
+.is-night .avatar-mesh > .avatar-still {
+  filter: brightness(0) invert(1);
+  opacity: 0.26;
+}
+@keyframes avatar-shimmer {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+  to {
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+}
+.avatar-3d.is-live > .avatar-canvas,
+.avatar-mesh.is-live > .avatar-canvas {
+  animation: avatar-arrive var(--dur-lift) var(--ease-out-soft) both;
+}
+@keyframes avatar-arrive {
+  from {
+    opacity: 0;
+    filter: brightness(0.2) blur(3px);
+  }
 }
 .avatar-canvas {
   position: absolute;
@@ -63,18 +95,14 @@
   position: fixed;
   inset: 0;
   z-index: 90;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  /* above the dock (search, ask, the talk key) at the foot of the window */
-  padding: 0 var(--space-6) 72px;
   pointer-events: none;
 }
 .council.is-inline {
   position: relative;
   inset: auto;
   z-index: 0;
-  min-height: 460px;
+  display: flex;
+  justify-content: center;
   padding: var(--space-5);
 }
 /* the one canvas every 3D seat is drawn on: over the bench, taking no pointer */
@@ -86,24 +114,44 @@
   z-index: 2;
   pointer-events: none;
 }
+/* the panel: placed by `translate` (Council.tsx: under the top bar in the middle of the open paper, or on top of
+   its section), so the arrival's transform is its own */
 .council-bar {
-  position: relative;
+  position: absolute;
+  left: 0;
+  top: 0;
   z-index: 1;
   pointer-events: auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "head head" "seats card" "ask ask";
-  gap: var(--space-4) var(--space-5);
-  max-width: min(1180px, 100%);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "head" "seats" "ask";
+  gap: var(--space-4);
+  min-width: min(420px, calc(100vw - 32px));
+  max-width: min(1040px, calc(100vw - 32px));
   padding: var(--space-4) var(--space-5) var(--space-5);
   border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
   color: var(--color-frost);
-  animation: council-rise var(--dur-lift) var(--ease-settle) both;
+  animation: council-drop var(--dur-lift) var(--ease-settle) both;
+}
+.council.is-inline .council-bar {
+  position: relative;
+  animation: none;
+}
+/* the grid's council comes down from the top bar; a section's comes up out of the section */
+@keyframes council-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
+}
+.council-place.is-section .council-bar {
+  animation-name: council-rise;
 }
 @keyframes council-rise {
   from {
     opacity: 0;
-    transform: translateY(28px);
+    transform: translateY(20px) scale(0.97);
   }
 }
 .council-head {
@@ -132,20 +180,33 @@
   color: var(--color-dim);
   white-space: nowrap;
 }
-.council-close {
+.council-title > span {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: var(--space-2);
+}
+.council-head-acts {
   margin-left: auto;
-  width: 22px;
-  height: 22px;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.council-tool {
+  width: 24px;
+  height: 24px;
   border: 0;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--color-mist);
-  font: 400 16px / 1 var(--font-sans);
+  font: 400 var(--text-16) / 1 var(--font-sans);
   cursor: pointer;
 }
-.council-close:hover {
+.council-tool:hover {
   background: var(--color-pulse-dim);
   color: var(--color-frost);
+}
+.council-tool.is-on {
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
 }
 
 .council-seats {
@@ -202,13 +263,28 @@
   outline: 2px solid var(--crew);
   outline-offset: 2px;
 }
-.council-seat.is-up .council-figure {
-  width: 208px;
-  height: 332px;
+/* selected: the line you write goes to this one */
+.council-seat.is-selected .council-figure {
+  box-shadow:
+    0 0 0 2px var(--crew),
+    0 0 0 6px color-mix(in srgb, var(--crew) 22%, transparent);
 }
-.council-seat.is-up .avatar-still {
-  object-fit: contain;
-  object-position: 50% 100%;
+/* whose model it is: a bead at its top right, floating a little */
+.council-provider {
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  z-index: 3;
+  animation: council-float 3.6s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i, 0) * -0.7s);
+}
+@keyframes council-float {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-4px);
+  }
 }
 /* what the seat stands on: its agent's cursor colour */
 .council-plinth {
@@ -219,14 +295,14 @@
   box-shadow: inset 0 -3px 0 var(--crew);
   transition: inset var(--dur-lift) var(--ease-settle);
 }
-.council-seat.is-up .council-plinth {
-  inset: 62% 6% 0;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--crew) 60%, transparent), color-mix(in srgb, var(--crew) 18%, transparent) 70%, transparent);
-  box-shadow: none;
+/* at rest: assigned here, not at work. Its colour waits, quieter */
+.council-seat.is-idle .council-plinth {
+  background: linear-gradient(to top, color-mix(in srgb, var(--crew) 24%, transparent), color-mix(in srgb, var(--crew) 6%, transparent) 70%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--crew) 55%, var(--color-line-strong));
 }
-.council-seat.is-spare .council-plinth {
-  box-shadow: inset 0 -2px 0 var(--color-line-strong);
+.council-seat.is-idle .council-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--crew);
 }
 .council-seat.is-done .council-figure,
 .council-seat.is-stopped .council-figure {
@@ -280,33 +356,10 @@
   animation: f-breathe 2.4s var(--ease-out-soft) infinite;
 }
 
-/* the standing seat's card */
-.council-card {
-  grid-area: card;
-  align-self: stretch;
-  width: 250px;
+.council-acts {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-pane);
-  background: var(--color-raise);
-  animation: council-rise var(--dur-pane) var(--ease-out-soft) both;
-}
-.council-card-name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font: 600 var(--text-13, 13px) / 1.2 var(--font-sans);
-}
-.council-status {
-  margin-left: auto;
-  font: 500 var(--text-11) / 1 var(--font-sans);
-  color: var(--color-mist);
-}
-.council-status.is-error {
-  color: var(--color-bad);
 }
 .council-task,
 .council-doing,
@@ -327,51 +380,143 @@
   font-size: var(--text-11);
   color: var(--color-dim);
 }
-.council-acts {
-  display: flex;
-  gap: var(--space-3);
+/* ＋ another agent: a seat-sized dashed place, and the agents that could take it */
+.council-add {
+  position: relative;
 }
-.council-label {
-  font: 600 var(--text-11) / 1.2 var(--font-sans);
+.council-add-btn {
+  width: 84px;
+  height: 156px;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-pane);
+  background: transparent;
   color: var(--color-dim);
-}
-.council-wear {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: auto;
-}
-.council-wear-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.council-wear-pick {
-  width: 38px;
-  height: 46px;
-  padding: 0;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-panel);
-  overflow: hidden;
+  font: 300 var(--text-24) / 1 var(--font-sans);
   cursor: pointer;
 }
-.council-wear-pick .avatar-still {
-  animation: none;
-  border-radius: 0;
+.council-add-btn:hover,
+.council-add-btn.is-on {
+  border-color: var(--color-agent);
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
 }
-.council-wear-pick:hover {
-  border-color: var(--color-line-strong);
+.council-add .council-name b {
+  font-weight: 500;
+  color: var(--color-mist);
 }
-.council-wear-pick.is-on {
-  border-color: var(--crew);
-  box-shadow: 0 0 0 1px var(--crew);
+.council-add-menu {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: calc(100% + var(--space-3));
+  width: 320px;
+  max-height: 320px;
+  overflow: auto;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line);
+  text-align: left;
+}
+.council-seats > .council-add:first-child .council-add-menu {
+  right: auto;
+  left: calc(100% + var(--space-3));
+}
+.council-add-item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.council-add-item:hover:not(:disabled) {
+  background: var(--color-agent-dim);
+}
+.council-add-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.council-add-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+  color: var(--color-mist);
+}
+.council-add-text b {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.council-add-why {
+  color: var(--color-warn);
+}
+.council-add-state {
+  color: var(--color-agent);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+}
+.council-add-item:disabled .council-add-state {
+  color: var(--color-dim);
+}
+.council-add-note,
+.council-add-more {
+  margin: 0;
+  padding: var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-align: left;
+}
+.council-add-more {
+  border-top: 1px solid var(--color-line);
+  cursor: pointer;
+}
+.council-add-more:hover {
+  color: var(--color-pulse);
 }
 
 .council-ask {
   grid-area: ask;
   display: flex;
+  align-items: center;
   gap: var(--space-3);
+}
+.council-to {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  max-width: 40%;
+  color: var(--color-dim);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  white-space: nowrap;
+}
+.council-to b {
+  color: var(--color-agent);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.council-to-all {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-mist);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .council-ask-text {
   flex: 1;
@@ -389,13 +534,6 @@
 }
 
 @media (max-width: 760px) {
-  .council-bar {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "head" "seats" "card" "ask";
-  }
-  .council-card {
-    width: auto;
-  }
   .council-seats {
     overflow-x: auto;
     justify-content: flex-start;
@@ -404,7 +542,159 @@
 @media (prefers-reduced-motion: reduce) {
   .council-bar,
   .council-seat,
-  .council-card {
+  .council-provider,
+  .avatar-3d > .avatar-still,
+  .avatar-mesh > .avatar-still {
     animation: none;
   }
+}
+
+/* ---------- an agent's own pane, on the right (characters/AgentInfo.tsx) ---------- */
+
+.agent-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
+.agent-info-figure {
+  position: relative;
+  align-self: center;
+  width: 190px;
+  height: 250px;
+}
+.agent-info-figure .council-plinth {
+  inset: 58% 4% 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--crew) 55%, transparent), color-mix(in srgb, var(--crew) 16%, transparent) 70%, transparent);
+  box-shadow: none;
+}
+.agent-info-figure .avatar-still {
+  object-fit: contain;
+  object-position: 50% 100%;
+}
+.agent-info-figure .council-provider {
+  top: 0;
+  right: 6px;
+}
+.agent-info-others {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.agent-info-other {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.agent-info-other.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+  cursor: default;
+}
+.agent-info-facts {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.agent-info-facts dt {
+  color: var(--color-dim);
+}
+.agent-info-facts dd {
+  margin: 0;
+  color: var(--color-frost);
+  overflow-wrap: anywhere;
+}
+.agent-info-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.agent-info-pick {
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+}
+.agent-info-now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-agent-dim);
+}
+.agent-info-off {
+  color: var(--color-bad);
+}
+.agent-info-did h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+}
+.agent-info-did p {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.agent-info-did time {
+  flex: none;
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-11);
+}
+.agent-info-say {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+}
+.agent-info-say:focus-within {
+  border-color: var(--color-agent);
+}
+.agent-info-say textarea {
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+}
+.agent-info-say-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+}
+.design-agent-info {
+  position: relative;
+  width: 360px;
+  margin: var(--space-5) auto 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
 }
