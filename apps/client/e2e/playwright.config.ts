@@ -69,6 +69,8 @@ export default defineConfig({
         SLACK_BOT_TOKEN: "xoxb-standin",
         MESHY_API_BASE: `http://127.0.0.1:${MESHY_PORT}`,
         MESHY_API_KEY: "msy-standin",
+        // the checks make their own characters: no starter set
+        FOUNDATION_STARTER_DIR: "",
         FOUNDATION_MESHY_POLL_MS: "250",
         FOUNDATION_CLAUDE_CLI: "/nonexistent/claude",
         // the crew's agents run a fixed playbook through the real board tools (no model, nothing spent)

@@ -27,6 +27,7 @@ process.env.FOUNDATION_DATA_DIR = mkdtempSync(join(tmpdir(), "foundation-charact
 process.env.FOUNDATION_CREW_TRAVEL_MS = "0";
 process.env.FOUNDATION_MESHY_POLL_MS = "15";
 process.env.MESHY_API_KEY = "msy-test-key";
+process.env.FOUNDATION_STARTER_DIR = ""; // no starter set, except where a test names one
 import { png } from "./fixtures/png.ts";
 
 // ---------- a stand-in Meshy ----------
@@ -326,6 +327,36 @@ test("people can't write the characters map: only the server says what a charact
   assert.deepEqual(state(mochi.panelId), was, "the forged state didn't stay");
   ws.close();
   wss.close();
+});
+
+test("the starter set walks onto a studio board ready, and nothing is sent to Meshy for it", async () => {
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const dir = join(process.env.FOUNDATION_DATA_DIR!, "starter-fixture");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "bao-front.png"), png(30, 40, [220, 200, 90]));
+  writeFileSync(join(dir, "bao-clips.glb"), Buffer.from("glTF starter clips"));
+  writeFileSync(join(dir, "manifest.json"), JSON.stringify({ version: 1, characters: [
+    { name: "Bao", set: "animals", form: "model", identity: "A steamed bun with legs.", height: 0.5, files: { front: { file: "bao-front.png", mime: "image/png" }, thumb: { file: "bao-front.png", mime: "image/png" }, clips: { file: "bao-clips.glb", mime: "model/gltf-binary" }, back: { file: "../../etc/passwd", mime: "image/png" } } },
+  ] }));
+  const before = sent.length;
+  process.env.FOUNDATION_STARTER_DIR = dir;
+  try {
+    assert.equal(await chars.seedStarter(BOARD, ada), 1);
+  } finally {
+    process.env.FOUNDATION_STARTER_DIR = "";
+  }
+  const bao = chars.roster().characters.find((c) => c.name === "Bao")!;
+  assert.equal(bao.ready, true);
+  assert.deepEqual(Object.keys(bao.stages), ["sheet", "views", "model", "rig", "clips"]);
+  assert.ok(Object.values(bao.stages).every((s) => s.state === "done"));
+  assert.deepEqual(Object.keys(bao.files).sort(), ["clips", "front", "thumb"], "a file outside the starter folder is left out");
+  assert.equal(bao.files.front, bao.files.thumb);
+  assert.equal(one<{ name: string }>("select name from files where id = ?", bao.files.clips)?.name, "Bao clips.glb");
+  assert.equal(sent.length, before);
+  // the skeleton can't be fitted again here: Meshy never made this model on this install
+  await assert.rejects(() => chars.startStage(BOARD, bao.panelId, "rig", ada), /Make the model first/);
+  // with no starter folder, nothing happens
+  assert.equal(await chars.seedStarter(BOARD, ada), 0);
 });
 
 test("a character whose card is gone leaves the roster", () => {

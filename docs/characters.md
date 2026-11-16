@@ -73,6 +73,10 @@ All five of the anime set took one pass each (2026-11-14), about ten minutes api
 
 The source pictures stay on this machine in mesh-avatar-studio's `projects/`, which it never commits.
 
+## The starter set
+
+Every install starts with the eleven characters made on 2026-11-14: `apps/server/starter/characters` holds a manifest and each one's pictures and playable file, and the server brings them onto the Character studio board the first time it's made (no key, nothing spent). To change the set, make or retire characters on this computer's studio board and run `node scripts/characters-export.mjs` (every ready character; or name the ones to keep). It re-encodes the pictures as JPEG when `uv` with Pillow is to hand. `FOUNDATION_STARTER_DIR` points the server at another folder; empty turns the set off (the checks run that way).
+
 ## Where things are
 
 | | |

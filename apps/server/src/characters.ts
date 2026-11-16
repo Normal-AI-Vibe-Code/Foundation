@@ -25,6 +25,7 @@
  *  - people can't write the `characters` map (boards.ts SERVER_MAPS).
  */
 
+import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
@@ -320,7 +321,66 @@ export function openStudio(user: UserInfo): { id: string; made: boolean } {
     });
     logActivity(doc, { who: user.name, role: "human", text: "made the Character studio: inspiration and characters, a column for each set" });
   });
+  // the board opens at once; the starter set walks on a moment later
+  void seedStarter(id, user).catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`));
   return { id, made: true };
+}
+
+// ---------- the starter set ----------
+
+interface StarterCharacter {
+  name: string;
+  set: string;
+  form: CharacterForm;
+  identity: string;
+  height: number;
+  files: Partial<Record<keyof CharacterFiles, { file: string; mime: string }>>;
+}
+
+/**
+ * Where the starter set is: characters made on Meshy once (2026-11-14) and kept with the code
+ * (`apps/server/starter/characters`, written by scripts/characters-export.mjs), so an install has a
+ * council to seat without spending anything. Beside the bundled server in the desktop app, beside
+ * `src` from source. FOUNDATION_STARTER_DIR names another folder; empty turns it off.
+ */
+function starterDir(): string | null {
+  const named = process.env.FOUNDATION_STARTER_DIR;
+  const tries = named !== undefined ? [named] : [join(import.meta.dirname, "starter", "characters"), join(import.meta.dirname, "..", "starter", "characters")];
+  return tries.find((d) => d && existsSync(join(d, "manifest.json"))) ?? null;
+}
+
+/**
+ * Bring the starter set onto a newly made studio board: a card each, in its set's Characters section, its
+ * pictures and its playable file in the archive, every stage marked done. Nothing is sent to Meshy. Meshy
+ * never made these on this install, so a stage that builds on Meshy's copy (the skeleton, the moods)
+ * can't be done again from here without making the model again.
+ */
+export async function seedStarter(boardId: string, user: UserInfo): Promise<number> {
+  const dir = starterDir();
+  if (!dir) return 0;
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { characters?: StarterCharacter[] };
+  let n = 0;
+  for (const s of manifest.characters ?? []) {
+    const made = createCharacter(boardId, { name: "Foundation", id: user.id, human: false }, { name: s.name, set: s.set, form: s.form, identity: s.identity, height: s.height });
+    const files: CharacterFiles = {};
+    for (const [role, f] of Object.entries(s.files) as Array<[keyof CharacterFiles, { file: string; mime: string }]>) {
+      // only a plain file name from the manifest's own folder
+      if (!/^[a-z0-9][a-z0-9._-]*$/i.test(f.file)) continue;
+      const body = await readFile(join(dir, f.file)).catch(() => null);
+      if (!body) continue;
+      const ext = /\.[a-z0-9]+$/i.exec(f.file)?.[0] ?? "";
+      files[role] = (await storeFile(body, { name: role === "mavatar" ? `${s.name}.mavatar` : `${s.name} ${role === "front" ? "sheet" : role}${ext}`, mime: f.mime, boardId, userId: user.id, about: `the character ${s.name}, from Foundation's starter set` })).id;
+    }
+    const row = rowById(made.id);
+    if (!row) continue;
+    const c = stateOf(row);
+    c.files = files;
+    for (const stage of CHARACTER_STAGES[c.form]) c.stages[stage] = { state: "done", by: "the starter set" };
+    keep(row, c);
+    n++;
+  }
+  if (n) editBoard(boardId, "characters", (doc) => logActivity(doc, { who: "Foundation", role: "system", text: `brought in the starter set: ${n} characters, ready for the council` }));
+  return n;
 }
 
 /** an image for a set's Inspiration section: into the archive, and onto the board as a picture */

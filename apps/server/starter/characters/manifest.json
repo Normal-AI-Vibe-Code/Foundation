@@ -1,0 +1,305 @@
+{
+  "version": 1,
+  "madeAt": "2026-11-16",
+  "characters": [
+    {
+      "name": "Mochi",
+      "set": "animals",
+      "form": "model",
+      "identity": "A cheerful shiba inu mascot standing upright on two legs: a big round head with a cream muzzle and cheeks, small pointed ears, small black dot eyes and a gentle closed smile, orange-tan fur with a cream chest, belly and paws, a short curled tail, and a small teal neckerchief. Soft matte fur with gentle painted shading. Chunky vinyl-toy proportions, about two and a half heads tall, with short simple arms and legs.",
+      "height": 0.7,
+      "files": {
+        "front": {
+          "file": "mochi-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "back": {
+          "file": "mochi-back.jpg",
+          "mime": "image/jpeg"
+        },
+        "side": {
+          "file": "mochi-side.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "mochi-thumb.jpg",
+          "mime": "image/jpeg"
+        },
+        "clips": {
+          "file": "mochi-clips.glb",
+          "mime": "model/gltf-binary"
+        }
+      }
+    },
+    {
+      "name": "Sage",
+      "set": "animals",
+      "form": "model",
+      "identity": "A calm young snow monkey standing upright on two legs: soft fluffy cream-tan fur, a bare peach-pink face with large round ears, small dark eyes with a serene look and a closed mouth, wearing a simple cream linen wrap tied at the waist. Soft fluffy fur in warm light colours. Chunky vinyl-toy proportions, about two and a half heads tall, with short simple arms and legs.",
+      "height": 0.7,
+      "files": {
+        "front": {
+          "file": "sage-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "back": {
+          "file": "sage-back.jpg",
+          "mime": "image/jpeg"
+        },
+        "side": {
+          "file": "sage-side.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "sage-thumb.jpg",
+          "mime": "image/jpeg"
+        },
+        "clips": {
+          "file": "sage-clips.glb",
+          "mime": "model/gltf-binary"
+        }
+      }
+    },
+    {
+      "name": "Ember",
+      "set": "abstract",
+      "form": "model",
+      "identity": "A fuzzy coral-red flame creature: a soft tufted body shaped like a small three-pointed flame, tiny black dot eyes and a small line mouth on the front of the body, two smooth glossy red arms ending in rounded mitten hands, and two short glossy red legs in rounded boots. The body is the head; the arms and legs are clearly separate from it.",
+      "height": 0.6,
+      "files": {
+        "front": {
+          "file": "ember-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "back": {
+          "file": "ember-back.jpg",
+          "mime": "image/jpeg"
+        },
+        "side": {
+          "file": "ember-side.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "ember-thumb.jpg",
+          "mime": "image/jpeg"
+        },
+        "clips": {
+          "file": "ember-clips.glb",
+          "mime": "model/gltf-binary"
+        }
+      }
+    },
+    {
+      "name": "Shade",
+      "set": "abstract",
+      "form": "model",
+      "identity": "A smooth white gumdrop character: a rounded egg-shaped body that is also its head, wearing oversized translucent green sunglasses, a small closed smile, short stubby white arms and short white legs with rounded feet, and a small rounded green tuft on top of the head. Smooth matte surfaces in white and fresh green.",
+      "height": 0.6,
+      "files": {
+        "front": {
+          "file": "shade-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "back": {
+          "file": "shade-back.jpg",
+          "mime": "image/jpeg"
+        },
+        "side": {
+          "file": "shade-side.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "shade-thumb.jpg",
+          "mime": "image/jpeg"
+        },
+        "clips": {
+          "file": "shade-clips.glb",
+          "mime": "model/gltf-binary"
+        }
+      }
+    },
+    {
+      "name": "Scout",
+      "set": "abstract",
+      "form": "model",
+      "identity": "A small vinyl-toy explorer child: a round head with a simple face of two dot eyes and a small smile, a mustard-yellow hooded raincoat with two small round bear ears on the hood (hood up), orange shorts, grey socks and chunky grey boots. No backpack and nothing in the hands. Smooth matte toy surfaces. Chunky vinyl-toy proportions, about two and a half heads tall, with short simple arms and legs.",
+      "height": 0.8,
+      "files": {
+        "front": {
+          "file": "scout-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "back": {
+          "file": "scout-back.jpg",
+          "mime": "image/jpeg"
+        },
+        "side": {
+          "file": "scout-side.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "scout-thumb.jpg",
+          "mime": "image/jpeg"
+        },
+        "clips": {
+          "file": "scout-clips.glb",
+          "mime": "model/gltf-binary"
+        }
+      }
+    },
+    {
+      "name": "Yuki",
+      "set": "abstract",
+      "form": "model",
+      "identity": "A small sleepy spirit child: a smooth round head with a straight-cut white bob and blunt bangs, two tiny pink cat ears, small closed curved eyes and a tiny mouth, soft blush on the cheeks, wearing a plain sage-green cloak dress to the knees with short sleeves, and small white shoes. Smooth matte clay-like surfaces in white and sage green. Chunky vinyl-toy proportions, about two and a half heads tall, with short simple arms and legs.",
+      "height": 0.7,
+      "files": {
+        "front": {
+          "file": "yuki-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "back": {
+          "file": "yuki-back.jpg",
+          "mime": "image/jpeg"
+        },
+        "side": {
+          "file": "yuki-side.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "yuki-thumb.jpg",
+          "mime": "image/jpeg"
+        },
+        "clips": {
+          "file": "yuki-clips.glb",
+          "mime": "model/gltf-binary"
+        }
+      }
+    },
+    {
+      "name": "Aoi",
+      "set": "anime",
+      "form": "mesh",
+      "identity": "A cool young woman with a sharp white chin-length bob with a side part, pale skin, blue-grey eyes with a thin red eyeliner flick, one red geometric drop earring on each ear, wearing a black sleeveless turtleneck, slim black trousers and black ankle boots. Flat graphic anime illustration: clean vector-like shapes, cobalt blue and white with one red accent.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "aoi-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "aoi-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "aoi-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "aoi-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Hana",
+      "set": "anime",
+      "form": "mesh",
+      "identity": "A warm young woman with long straight light-brown hair and wispy bangs, hazel eyes, soft blush, colour-block drop earrings in orange, blue and yellow, wearing an oversized warm-grey sweatshirt, cream wide trousers and white sneakers. Soft flat anime illustration with gentle gradients, cream and warm grey.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "hana-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "hana-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "hana-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "hana-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Midori",
+      "set": "anime",
+      "form": "mesh",
+      "identity": "A quiet young woman with very long straight black-green hair parted in the middle, large green eyes, pale skin with a faint blush, small pale-green drop earrings, wearing a leaf-green turtleneck jumper, a long dark-green skirt and dark shoes. Flat graphic anime illustration in layered greens with clean shapes.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "midori-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "midori-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "midori-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "midori-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Sora",
+      "set": "anime",
+      "form": "mesh",
+      "identity": "A gentle young woman with long wavy white hair, sky-blue eyes, rosy cheeks, wearing a white high-collared blouse with soft full sleeves, a long pale-blue skirt and white shoes. Flat graphic anime illustration in sky blue and white with fine line highlights in the hair.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "sora-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "sora-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "sora-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "sora-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Rin",
+      "set": "anime",
+      "form": "mesh",
+      "identity": "A bright young woman with a short dark-brown bob and straight bangs, brown eyes behind large round light-blue glasses, a small smile kept closed, wearing a rust-brown knitted jumper, loose dark-grey trousers and white sneakers. Soft flat anime illustration with simple shapes, cream, rust and teal.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "rin-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "rin-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "rin-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "rin-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    }
+  ]
+}

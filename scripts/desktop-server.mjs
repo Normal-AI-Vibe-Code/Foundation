@@ -18,7 +18,7 @@
 // and the hashes below from that release's SHASUMS256.txt.
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -172,6 +172,9 @@ async function check() {
 const node = await pinnedNode();
 mkdirSync(OUT, { recursive: true });
 await bundle();
+// the characters every install starts with (apps/server/starter; the server looks for them beside index.mjs)
+rmSync(join(OUT, "starter"), { recursive: true, force: true });
+if (existsSync(join(root, "apps/server/starter"))) cpSync(join(root, "apps/server/starter"), join(OUT, "starter"), { recursive: true });
 copyFileSync(node, join(OUT, NODE_NAME));
 if (!win) chmodSync(join(OUT, NODE_NAME), 0o755);
 probe(join(OUT, NODE_NAME));
