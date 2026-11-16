@@ -9,6 +9,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { MOOD_FACES, type Mood } from "@foundation/protocol";
 import { useFileSrc } from "../lib/fileSrc";
+import { useCutout } from "./cutout";
 import { Actor, AvatarStage, type Framing } from "./actor";
 import { characterBytes, characterFilePath, type RosterCharacter } from "./roster";
 
@@ -45,7 +46,9 @@ export function Still({ character, role, mood }: { character: RosterCharacter; r
   const files = character.files as Record<string, string | undefined>;
   // the role asked for, or the nearest picture there is
   const use = files[role] ? role : (["thumb", "portrait", "front"].find((r) => files[r]) ?? null);
-  const src = useFileSrc(use ? characterFilePath(character.id, use) : null);
+  const file = useFileSrc(use ? characterFilePath(character.id, use) : null);
+  // without its flat ground (characters/cutout.ts): the figure alone, so a silhouette is a figure and not a box
+  const src = useCutout(file);
   const [broken, setBroken] = useState(false);
   useEffect(() => setBroken(false), [src]);
   // nothing drawn yet, still fetching, or a picture that didn't load: the agent's mark, never a broken image

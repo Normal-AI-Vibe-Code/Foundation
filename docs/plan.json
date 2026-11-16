@@ -1352,12 +1352,12 @@
     },
     {
       "id": "posted-agents",
-      "title": "Agents posted to a section: they stay in its group, with a brief and a subscription",
+      "title": "An assigned agent's brief: standing instructions, a model and a budget for its seat",
       "kind": "plan",
       "milestone": "crew",
       "area": "agent",
       "status": "backlog",
-      "body": "Today a section's group is whoever aims there now (section-agents). A person posts an agent to a section: a name, a brief, the Claude subscription or key it runs on, and what it's bound to (the section's cards, a machine, an app and its GitHub repo). Stored on the board, so its face stays in the group when idle, marked as resident, not visiting; free agents still come and go. Settings → Services lists the subscriptions. Needs agent-consent-and-tokens.",
+      "body": "Since 2026-11-15 a person assigns agents to a section or a grid and they stay on its council (`posted.ts`). What a seat doesn't carry yet: a brief the agent reads before every ask there, a model choice for that seat, a subscription or budget, and a refresh of what the agent is when it's re-pointed on this computer.",
       "issue": 123
     },
     {
@@ -1416,8 +1416,8 @@
       "kind": "plan",
       "milestone": "crew",
       "area": "crew",
-      "status": "review",
-      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and five mesh avatars were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones. 2026-11-15: the eleven ship as a starter set that a new install's studio board brings in."
+      "status": "done",
+      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and five mesh avatars were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones. 2026-11-15: the eleven ship as a starter set that a new install's studio board brings in. Reworked 2026-11-15 into the council of assigned agents (card *one-interface*)."
     },
     {
       "id": "council-real-turn",
@@ -1462,7 +1462,61 @@
       "milestone": "ship",
       "area": "design",
       "status": "backlog",
-      "body": "The web toolbar has ☺ (the section's council); Rune's toolbar is drawn in Rust (`apps/rune/src/view.rs` `icon`) and doesn't. Add the tool to `rune/tools.ts` and draw its icon. The menu, ⌘K and the top bar already open it under Rune."
+      "body": "Since 2026-11-15 Rune's section toolbar ✦ opens the section's council, but its icon is still the agent's star: draw the council's mark (three seated figures) in `apps/rune/src/view.rs` `icon`, and check the new cards (a grid inside this one, kanban, design) and the port labels under Rune."
+    },
+    {
+      "id": "one-interface",
+      "title": "One interface: Today and Settings inside the shell, grids of grids, a council of assigned agents",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Built 2026-11-15 (SPEC §0.5, §3; `docs/evidence/2026-11-15_one-interface/`). The shell is the whole app: Today and Settings are places in it, the side menu (Today · Grids: Recent / All Grids · Settings) is open on a first run, the server's pill is in the top bar. Settings opens on General; Agents and Avatars are tabs; Plan is a kanban card on a grid and Design language a grid of chapters. A grid dragged onto another is its child, with a section on the parent that stands for it. Agents are assigned to a section or the grid and the council seats those; it talks to all or the selected, adds agents, shows whose model each is and opens the agent on the right. No agent layer: a port says where it goes. For a person: restart this computer's server so the installed app gets the new routes, then look at it with real agents."
+    },
+    {
+      "id": "council-conversation",
+      "title": "The council as a conversation: what each agent said back, in the council",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "next",
+      "body": "A line to the council starts an ask per agent; replies show only as work on the grid and as activity lines in the agent's pane. Keep a thread per place (who was told what, what each answered, in order), show it in the council and the agent's pane, and let a reply go to the agent that's mid-run instead of starting a new one. Needs a real model turn and a real T3 thread to be seen in it first (*council-real-turn*)."
+    },
+    {
+      "id": "design-grid-redrawn",
+      "title": "The design language as a grid: specimens redrawn at card width, sections sized to their chapters",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "backlog",
+      "body": "Settings → Design language is a real grid of twelve chapter cards, but each card draws the old page's sections, which were laid out for a 1,100 px page and are taller than their section (they scroll in the card). Redraw the specimens for the card, size each section to its chapter, and drop what the grid itself now shows better (the floor, the chrome)."
+    },
+    {
+      "id": "kanban-of-a-grid",
+      "title": "A kanban card for a grid's own work, not only the plan",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "panels",
+      "status": "backlog",
+      "body": "`panel: \"kanban\"` shows Foundation's plan (`source: \"plan\"`). Give it a source of its own: columns and cards kept on the grid (a table underneath, or asks and stages by status), so any section can hold a kanban."
+    },
+    {
+      "id": "system-grids-reset",
+      "title": "Foundation's own grids: put the plan and design cards back when someone removes them",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "design",
+      "status": "backlog",
+      "body": "The plan and design-language grids are ordinary boards after the server lays them out: a member can move or delete their cards and nothing restores them. Check the layout when the grid is opened and add back what's missing; offer *Lay it out again* in Settings."
+    },
+    {
+      "id": "stage-budget-gpu",
+      "title": "Measure how many character cards play at once on a real GPU",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "backlog",
+      "body": "`characters/stageBudget.ts` starts at six live cards and follows the frames. It was only watched in a headless browser on software rendering (it settled at three of thirteen). Run the studio grid under `PERF_GPU=1` on this machine and set the starting budget and the thresholds from what it holds at 60 fps."
     }
   ]
 }

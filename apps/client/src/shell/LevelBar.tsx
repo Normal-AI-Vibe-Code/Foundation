@@ -30,7 +30,7 @@ export function LevelBar({ boardName }: { boardName?: string }) {
           exit={{ opacity: 0, y: -8 }}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
         >
-          <button className="level-back" onClick={levelUp} data-tip={path.length > 1 ? `Back to ${path[path.length - 2].name}` : "Back to the board"} data-kbd="Esc">
+          <button className="level-back" onClick={levelUp} data-tip={path.length > 1 ? `Back to ${path[path.length - 2].name}` : "Back to the grid"} data-kbd="Esc">
             <span aria-hidden>⤡</span>
           </button>
           <button className="level-step" onClick={() => openLevel(null)}>

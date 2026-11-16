@@ -88,7 +88,7 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
             {user.role === "admin" && <People board={space.id} me={user.id} />}
             <Activity />
           </div>
-          <FloorEdge side="right" value={ui.paneW} {...WIDTHS.pane} onChange={(w) => setUi({ paneW: w })} label="This space's pane" />
+          <FloorEdge side="right" value={ui.paneW} {...WIDTHS.pane} onChange={(w) => setUi({ paneW: w })} label="This grid's pane" />
         </motion.aside>
       )}
     </AnimatePresence>
@@ -177,7 +177,7 @@ function People({ board, me }: { board: string; me: string }) {
               className={`person-role-pick${p.role === "viewer" ? " is-viewer" : ""}`}
               value={p.onBoard ? p.role : "default"}
               disabled={p.id === me}
-              aria-label={`${p.name} on this space`}
+              aria-label={`${p.name} on this grid`}
               onChange={(e) => void set(p.id, e.target.value === "default" ? null : (e.target.value as "member" | "viewer"))}
             >
               <option value="default">{p.account === "viewer" ? "Viewer (account)" : "Member (account)"}</option>

@@ -3,64 +3,6 @@
   "madeAt": "2026-11-16",
   "characters": [
     {
-      "name": "Mochi",
-      "set": "animals",
-      "form": "model",
-      "identity": "A cheerful shiba inu mascot standing upright on two legs: a big round head with a cream muzzle and cheeks, small pointed ears, small black dot eyes and a gentle closed smile, orange-tan fur with a cream chest, belly and paws, a short curled tail, and a small teal neckerchief. Soft matte fur with gentle painted shading. Chunky vinyl-toy proportions, about two and a half heads tall, with short simple arms and legs.",
-      "height": 0.7,
-      "files": {
-        "front": {
-          "file": "mochi-front.jpg",
-          "mime": "image/jpeg"
-        },
-        "back": {
-          "file": "mochi-back.jpg",
-          "mime": "image/jpeg"
-        },
-        "side": {
-          "file": "mochi-side.jpg",
-          "mime": "image/jpeg"
-        },
-        "thumb": {
-          "file": "mochi-thumb.jpg",
-          "mime": "image/jpeg"
-        },
-        "clips": {
-          "file": "mochi-clips.glb",
-          "mime": "model/gltf-binary"
-        }
-      }
-    },
-    {
-      "name": "Sage",
-      "set": "animals",
-      "form": "model",
-      "identity": "A calm young snow monkey standing upright on two legs: soft fluffy cream-tan fur, a bare peach-pink face with large round ears, small dark eyes with a serene look and a closed mouth, wearing a simple cream linen wrap tied at the waist. Soft fluffy fur in warm light colours. Chunky vinyl-toy proportions, about two and a half heads tall, with short simple arms and legs.",
-      "height": 0.7,
-      "files": {
-        "front": {
-          "file": "sage-front.jpg",
-          "mime": "image/jpeg"
-        },
-        "back": {
-          "file": "sage-back.jpg",
-          "mime": "image/jpeg"
-        },
-        "side": {
-          "file": "sage-side.jpg",
-          "mime": "image/jpeg"
-        },
-        "thumb": {
-          "file": "sage-thumb.jpg",
-          "mime": "image/jpeg"
-        },
-        "clips": {
-          "file": "sage-clips.glb",
-          "mime": "model/gltf-binary"
-        }
-      }
-    },
-    {
       "name": "Ember",
       "set": "abstract",
       "form": "model",
@@ -297,6 +239,106 @@
         },
         "mavatar": {
           "file": "rin-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Mochi",
+      "set": "animals",
+      "form": "mesh",
+      "identity": "A cheerful shiba inu: orange-tan fur with a cream muzzle, cheeks, chest and eyebrow spots, small pointed ears with pink insides, a black nose. Fluffy and round, sitting upright with its front paws together. Flat storybook illustration with soft grainy shading and clean shapes, in warm orange and cream. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "mochi-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "mochi-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "mochi-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "mochi-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Sage",
+      "set": "animals",
+      "form": "mesh",
+      "identity": "A calm young snow monkey: soft fluffy cream-tan fur around a bare peach-pink face, large round pink ears, a small flat nose. Sitting upright, serene. Soft painterly illustration in warm peach and cream with gentle light. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "sage-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "sage-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "sage-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "sage-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Kumo",
+      "set": "animals",
+      "form": "mesh",
+      "identity": "A dreamy cream-white shiba inu puppy: very soft pale cream fur with faint tan on the ears and back, small rounded ears, a brown nose, round cheeks. Sitting upright, fluffy as a cloud. Soft pastel illustration with gentle warm light, cream and pale apricot. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "kumo-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "kumo-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "kumo-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "kumo-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Taro",
+      "set": "animals",
+      "form": "mesh",
+      "identity": "A plump red shiba inu drawn in a soft gouache brush style: deep orange-red fur on the head, ears and back, a wide cream face, chest and belly, small triangular ears, a small black nose, white eyebrow dots. Sitting upright and proud. Hand-painted gouache illustration with visible soft brush texture, orange-red and cream. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "taro-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "taro-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "taro-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "taro-mavatar.mavatar",
           "mime": "application/zip"
         }
       }

@@ -237,7 +237,7 @@ r.post("/api/boards", async (req) => {
   const body = await readJson<{ name?: string; kind?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
   const kind: SpaceKind = SPACE_KINDS.includes(body.kind as SpaceKind) ? (body.kind as SpaceKind) : "grid";
   const url = kind === "page" ? cleanPageUrl(body.url) : null;
-  if (kind === "page" && !url) throw new HttpError(400, "A page space needs a web address (http or https)");
+  if (kind === "page" && !url) throw new HttpError(400, "A web page needs an address (http or https)");
   let name = (body.name ?? "").trim().slice(0, 80);
   if (!name) {
     // an unnamed space takes a name nothing else has: "Untitled grid", then "Untitled grid 2"…
@@ -269,13 +269,13 @@ r.post("/api/boards", async (req) => {
 r.post("/api/boards/:id", async (req) => {
   const u = requireUser(req);
   const id = req.params.id;
-  if (!listBoards().some((b) => b.id === id)) throw new HttpError(404, "No such space");
+  if (!listBoards().some((b) => b.id === id)) throw new HttpError(404, "No such grid");
   requireWriter(u, id);
   const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
   const patch: { name?: string; folder?: string | null; url?: string } = {};
   if (body.name !== undefined) {
     const name = String(body.name).trim().slice(0, 80);
-    if (!name) throw new HttpError(400, "A space needs a name");
+    if (!name) throw new HttpError(400, "A grid needs a name");
     patch.name = name;
   }
   if (body.folder !== undefined) patch.folder = cleanFolder(body.folder);

@@ -15,6 +15,7 @@ import { dirname, extname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import * as Y from "yjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const data = resolve(root, process.env.FOUNDATION_DATA_DIR ?? "data");
@@ -24,7 +25,17 @@ const ROLES = ["front", "back", "side", "portrait", "thumb", "clips", "mavatar"]
 
 const db = new DatabaseSync(join(data, "foundation.db"), { readOnly: true });
 const boards = new Set(db.prepare("select board_id from character_boards").all().map((b) => b.board_id));
-const rows = db.prepare("select board_id, state from characters order by created_at").all().filter((r) => boards.has(r.board_id));
+// a character whose card was taken off the grid is retired: its record stays (so do its files), but it isn't one of the set
+const cards = new Map();
+const onGrid = (boardId, panelId) => {
+  if (!cards.has(boardId)) {
+    const doc = new Y.Doc();
+    for (const u of db.prepare("select update_blob from board_updates where board_id = ? order by seq").all(boardId)) Y.applyUpdate(doc, u.update_blob);
+    cards.set(boardId, new Set(doc.getMap("objects").keys()));
+  }
+  return cards.get(boardId).has(panelId);
+};
+const rows = db.prepare("select board_id, panel_id, state from characters order by created_at").all().filter((r) => boards.has(r.board_id) && onGrid(r.board_id, r.panel_id));
 const file = db.prepare("select name, mime, sha256 from files where id = ?");
 
 rmSync(out, { recursive: true, force: true });

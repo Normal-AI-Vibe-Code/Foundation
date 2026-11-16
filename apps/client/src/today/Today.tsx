@@ -238,7 +238,7 @@ export function Today({ user }: { user: UserInfo }) {
   // the words in the room
   let eyebrow = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
   let line = today ? greeting(first, today.focus.filter((f) => f.kind !== "related").length) : `Hello, ${first}.`;
-  let sub: string | null = "Ask me about your day, your goals, or anything on the boards. Press / to type, V to talk.";
+  let sub: string | null = "Ask me about your day, your goals, or anything on your grids. Press / to type, V to talk.";
   if (t.heard !== null) {
     eyebrow = "Listening";
     line = t.heard || "I'm listening.";
@@ -322,7 +322,7 @@ export function Today({ user }: { user: UserInfo }) {
           <h2 className="f-eyebrow">
             Todos <span className="today-count">{today ? today.focus.length + active.length : "…"}</span>
           </h2>
-          {today && today.focus.length === 0 && <p className="today-empty">Nothing is waiting on you. Asks, notes that tag you, stages you own and new files on your boards will show up here.</p>}
+          {today && today.focus.length === 0 && <p className="today-empty">Nothing is waiting on you. Asks, notes that tag you, stages you own and new files on your grids will show up here.</p>}
           {today?.focus.map((f) => <FocusRow key={f.id} item={f} pointed={pointed.has(f.id)} />)}
           {today?.goals.map((g) => <GoalRow key={g.id} goal={g} pointed={pointed.has(g.id)} onDone={() => void saveGoal({ id: g.id, status: "done", progress: 1 })} />)}
           <form

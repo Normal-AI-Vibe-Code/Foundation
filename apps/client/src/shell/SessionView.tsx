@@ -75,7 +75,7 @@ function SessionHistory({ onPick }: { onPick(): void }) {
   };
   return (
     <div className="session-history">
-      <div className="pane-eyebrow is-agent">Sessions on this space</div>
+      <div className="pane-eyebrow is-agent">Sessions on this grid</div>
       {lists.sessions.length === 0 && <div className="pane-empty">None yet. What you ask here is kept, with its goal, its steps and what it changed.</div>}
       {lists.sessions.slice(0, 10).map((s) => (
         <button key={s.id} className={`pane-row is-session${ui.session === s.id ? " is-current" : ""}`} onClick={() => pick({ id: s.id, kind: "agent", title: s.title })}>

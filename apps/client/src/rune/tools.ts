@@ -30,8 +30,8 @@ import {
   type PanelMeta,
   type Section,
 } from "../state/store";
-import { askAgent, setUi } from "../state/ui";
-import { openSectionAgents } from "../lib/sectionAgentsOpen";
+import { setUi } from "../state/ui";
+import { openCouncil } from "../lib/councilOpen";
 import type { SectionMenuContext } from "../components/sectionMenu";
 
 /** `icon`: a name apps/rune/src/view.rs draws · `gap`: starts a new group */
@@ -90,7 +90,7 @@ export function runSectionTool(id: string, which: string) {
   const st = getState();
   const s = st.sections[id];
   if (!s) return;
-  const { host, hostable, upload } = sectionContext(st, s);
+  const { hostable, upload } = sectionContext(st, s);
   const acts: Record<string, () => void> = {
     unhost: () => setSectionHost(id, null),
     fill: () => hostable && setSectionHost(id, hostable.id),
@@ -107,7 +107,8 @@ export function runSectionTool(id: string, which: string) {
     frame: () => requestSnap({ kind: "section", id }),
     up: () => levelUp(),
     open: () => openLevel(id),
-    ask: () => (host ? askAgent(`About “${host.name}”: `) : openSectionAgents(s.id, true)),
+    // agents are the section's: its council (2026-11-15), whether it holds cards or hosts an app
+    ask: () => openCouncil({ kind: "section", id: s.id }),
     remove: () => requestRemoveSection(id),
   };
   acts[which]?.();

@@ -171,7 +171,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         </div>
         <div className="capsule-spacer" />
         <NightOrb onToggle={() => setNight(!isNight())} />
-        <a className="f-pill" href="#/">
+        <a className="f-pill" href="#/board">
           ← Back to the grid
         </a>
       </header>

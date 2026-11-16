@@ -1,6 +1,6 @@
 # Characters: how the council's avatars are made
 
-The council (☺) seats each agent at work as a character. Characters are made on the **Character studio** board (⌘K → *Open the Character studio*), a stage at a time. This is how, what each stage sends, and what was learned making the first eleven on 2026-11-14.
+The council (☺) seats each agent at work as a character. Characters are made on the **Character studio** board (⌘K → *Open the Character studio*), a stage at a time. This is how, what each stage sends, and what was learned making the first eleven on 2026-11-14 and the animal set again, as mesh avatars, on 2026-11-15.
 
 The pipeline is WildChild's (`C:\Dev\WildChild\tools\meshy_hunter_v8_pipeline.mjs`) with the Vision Archive's rules about lineage; the mesh avatars are [mesh-avatar-studio](https://github.com/shinshin86/mesh-avatar-studio)'s.
 
@@ -73,9 +73,18 @@ All five of the anime set took one pass each (2026-11-14), about ten minutes api
 
 The source pictures stay on this machine in mesh-avatar-studio's `projects/`, which it never commits.
 
+### Animal faces (2026-11-15: Mochi, Kumo, Taro the shibas and Sage the snow monkey)
+
+The animal set was first made as rigged 3D (Mochi, Sage) and remade as mesh avatars from the animal photos, two passes each at most. Say in the character's words that it faces the viewer **with both eyes open and the mouth closed**: the references all have their eyes shut, and a mesh avatar can't blink an eye that was never drawn open.
+
+- **Eyes.** Trace `opening` to the inside edge of the dark rim, or for a rimless solid eye to its true outer edge. Never inset it into the dark: an inset leaves light specks at the seam when the eye is open. A round eye closes to its lower arc (a "U"), and the lid is filled smooth, which shows a little on textured fur. Keep `roi` off the brow spots and the cream muzzle, even if that leaves only 5–8 px of margin.
+- **Mouth.** The engine paints the open mouth along one parabola and never moves the nose. For a shiba's "w" mouth, set a short line through its two low points (`halfLen` about half the drawn width, a small positive `bow`) so the mouth opens under the peak, which stays as the upper lip. Put `brow` on the eyebrow spots so expressions move them.
+- **Ears** ride with the head (`strands` and `accessories` stay empty). A full-body figure (Taro) takes `body.hip`, so its feet stay planted when the body sways.
+- **Cut-out and packing.** Pale or spiky fur on grey needs a flood tolerance of about 60, checked on a light background and not only a dark one (Sage's fur tips kept a grey fringe at 22). `pack-avatar` refuses to overwrite an existing `.mavatar`: delete the old one before repacking.
+
 ## The starter set
 
-Every install starts with the eleven characters made on 2026-11-14: `apps/server/starter/characters` holds a manifest and each one's pictures and playable file, and the server brings them onto the Character studio board the first time it's made (no key, nothing spent). To change the set, make or retire characters on this computer's studio board and run `node scripts/characters-export.mjs` (every ready character; or name the ones to keep). It re-encodes the pictures as JPEG when `uv` with Pillow is to hand. `FOUNDATION_STARTER_DIR` points the server at another folder; empty turns the set off (the checks run that way).
+Every install starts with the thirteen characters there are (four abstract 3D, five anime and four animal mesh avatars, as of 2026-11-15): `apps/server/starter/characters` holds a manifest and each one's pictures and playable file, and the server brings them onto the Character studio board the first time it's made (no key, nothing spent). To change the set, make or retire characters on this computer's studio board and run `node scripts/characters-export.mjs` (every ready character whose card is still on the grid; or name the ones to keep). A character whose card was removed is retired: its record and files stay, and it leaves the set. It re-encodes the pictures as JPEG when `uv` with Pillow is to hand. `FOUNDATION_STARTER_DIR` points the server at another folder; empty turns the set off (the checks run that way).
 
 ## Where things are
 

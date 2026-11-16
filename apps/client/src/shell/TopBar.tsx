@@ -138,7 +138,7 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
                       </span>
                     )}
                     {on && viewer && (
-                      <span className="view-only" title="You can read this space, ask the agent about it and present it. An admin can make you a member.">
+                      <span className="view-only" title="You can read this grid, ask the agent about it and present it. An admin can make you a member.">
                         View only
                       </span>
                     )}
@@ -148,8 +148,8 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
                   <button
                     className={`tab-info${infoOpen ? " is-on" : ""}`}
                     onClick={() => setUi(infoOpen ? { pane: false } : { pane: true, paneView: "info" })}
-                    aria-label="This space: people and activity"
-                    data-tip={infoOpen ? "Fold this space's pane" : "This space: people and activity"}
+                    aria-label="This grid: people and activity"
+                    data-tip={infoOpen ? "Fold this grid's pane" : "This grid: people and activity"}
                     data-kbd={keys("mod+I")}
                   >
                     <InfoGlyph />
