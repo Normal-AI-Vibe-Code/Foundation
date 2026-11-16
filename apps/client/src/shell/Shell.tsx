@@ -35,6 +35,7 @@ import { SpaceInfo } from "./SpaceInfo";
 import { PageCanvas } from "./PageCanvas";
 import { api } from "../lib/api";
 import { ingest } from "../lib/ingest";
+import { holdsKeys } from "../lib/keysHeld";
 import { getState, requestSnap } from "../state/store";
 import { closeSpaceTab, getUi, noteSpaceOpen, setUi, toast, toggleSession, useUi } from "../state/ui";
 import { activeBoard, joinBoard, onBoardChange } from "../sync/board";
@@ -181,6 +182,8 @@ export function Shell({ user }: { user: UserInfo }) {
   // global keys
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // the caret is in a machine's shell or desktop: every key is the machine's (lib/keysHeld.ts)
+      if (holdsKeys(e.target)) return;
       const mod = e.metaKey || e.ctrlKey;
       // in a text box, ⌘I and ⌘U are italic and underline, as in any word processor
       const writing = !!(e.target as HTMLElement | null)?.closest?.(".rich-text");
