@@ -2078,8 +2078,12 @@ body.is-connecting .port-in.is-snap {
 .port-out .port-label {
   left: 18px;
 }
-.port:hover .port-label {
+.port:hover .port-label,
+.port-label.is-open {
   opacity: 1;
+}
+.port:has(.port-label.is-open) {
+  z-index: 9;
 }
 /* over everything else on the card while it's read */
 .port:hover {

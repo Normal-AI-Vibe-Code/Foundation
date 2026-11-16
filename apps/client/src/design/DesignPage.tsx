@@ -6,6 +6,9 @@
 
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
+import { PROVIDER_NAME, ProviderMark } from "../characters/providers";
+import { Group, Row, Seg } from "../settings/SettingsSpace";
+import "../panels/system-cards.css";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DesignChapter } from "@foundation/protocol";
 import { motion } from "motion/react";
@@ -140,7 +143,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   agents: ["The crew", "Agents in a section", "Agents in the section"],
   council: ["The council"],
   today: ["Today and the Shiba"],
-  own: ["Plan board", "Release notes", "Rune renderer"],
+  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Rune renderer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
 const Only = createContext<Set<string> | null>(null);
@@ -1041,6 +1044,13 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <CouncilDemo />
       </Section>
 
+      <Section
+        title="Settings, and grids inside grids"
+        note="Settings is a place inside Foundation: the side menu stays, a strip of tabs sits under the top bar, and the first tab is the settings themselves, as groups of rows on paper (the name in 13/600, what it means in mist 12, the choice at the right as a segmented pill). Plan and Design language are grids. A grid can sit inside another: in the side menu's All Grids it's a row one step in under its parent, and on the parent grid a section stands for it (a card with its name, what it holds and Open the grid). Whose model an agent is shows as a bead in the ink: Claude, ChatGPT, Kimi, DeepSeek, Gemini, Grok, Cursor, a local model."
+      >
+        <SettingsDemo />
+      </Section>
+
       <Section title="Text box" note={`A note written as formatted text: what you see is what's kept. Click in it to write; a toolbar rides the card's foot while it has the caret (raised paper, card radius, 34 tall): the style (Body, Title, Heading, Subheading), bold, italic, underline, strikethrough, bulleted and numbered lists, quote, link, clear. A mark that's on is the pulse tint. ${keys("mod+B")}, ${keys("mod+I")} and ${keys("mod+U")} work as in any word processor. Under it, it is the note's own markdown in the note's shared text, so search, agents and the other renderer read it as they read any note; underline is kept as <u>. From the right-click menu (Text box), and from an empty section's Write.`}>
         <TextBoxDemo />
       </Section>
@@ -1648,6 +1658,83 @@ function SlackMarks() {
 }
 
 /** the council, still: four agents, one standing (no characters are loaded here, so the seats show their marks) */
+/** Settings' rows, a grid that stands for a child grid, and the provider beads */
+function SettingsDemo() {
+  const [scheme, setScheme] = useState("system");
+  const [use, setUse] = useState("ask");
+  return (
+    <div className="design-settings" data-design-settings>
+      <div className="set-page">
+        <Group title="Appearance">
+          <Row name="Colour scheme" detail="Day is paper and ink; night is greys and white.">
+            <Seg
+              label="Colour scheme"
+              value={scheme}
+              options={[
+                { id: "day", label: "Day" },
+                { id: "night", label: "Night" },
+                { id: "system", label: "Follow the system" },
+              ]}
+              onChange={setScheme}
+            />
+          </Row>
+        </Group>
+        <Group title="Agents on this computer" note="Nothing that runs code or spends money starts without a person.">
+          <Row name="Using a machine's desktop" detail="An agent can drive a machine's desktop only after you allow it on that machine's card.">
+            <Seg
+              label="Using a machine's desktop"
+              value={use}
+              options={[
+                { id: "ask", label: "Ask me on each machine" },
+                { id: "never", label: "Never" },
+              ]}
+              onChange={setUse}
+            />
+          </Row>
+          <Row name="Starting a machine" detail="Always a person's press, from a browser." />
+        </Group>
+      </div>
+      <div className="design-settings-side">
+        <div className="design-grid-link">
+          <div className="grid-link">
+            <div className="grid-link-open">
+              <span className="grid-link-eyebrow f-eyebrow">A grid inside this one</span>
+              <span className="grid-link-name">
+                <span className="grid-link-glyph">▦</span>
+                Rim drive
+              </span>
+              <span className="grid-link-facts">3 sections · 14 cards · 1 grid inside</span>
+              <span className="grid-link-go f-pill is-accent">Open the grid →</span>
+            </div>
+            <ul className="grid-link-sections">
+              <li>
+                <span className="grid-link-sec">Stator</span>
+                <span className="grid-link-count">6</span>
+              </li>
+              <li>
+                <span className="grid-link-sec">Bearings</span>
+                <span className="grid-link-count">5</span>
+              </li>
+              <li>
+                <span className="grid-link-sec">Test plan</span>
+                <span className="grid-link-count">▦ 2</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <div className="design-providers">
+          {(["claude", "chatgpt", "kimi", "deepseek", "gemini", "grok", "cursor", "local", "agent"] as const).map((p) => (
+            <span key={p} className="design-provider">
+              <ProviderMark provider={p} size={24} />
+              {PROVIDER_NAME[p]}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CouncilDemo() {
   const seats: CouncilSeat[] = [
     { id: "a", name: "Wren", agentName: "Claude", agentKey: "claude", provider: "claude", where: "cloud", service: "Claude Code on the server, on its Claude subscription", tools: true, place: "sec", postedBy: "Ada", hue: 0, status: "working", doing: "adding a table of parts", task: "Make a Supply section with the parts and hook up FactoryForm", askerName: "Ada", mine: true, mood: "working" },

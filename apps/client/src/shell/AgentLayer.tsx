@@ -12,7 +12,7 @@
  * crossings are recomputed only when the set of routes changes.
  */
 
-import { usePortHover } from "./portHover";
+import { portHover, sayValue, setPortHover, usePortHover } from "./portHover";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LinkDoc } from "@foundation/protocol";
 import { addLink, applyWireClip, getState, gridSize, objectWorldRect, removeLink, subscribe, uid, updatePanel, usePanel, wireBackstage, wireClipRect, type PanelMeta } from "../state/store";
@@ -21,7 +21,7 @@ import { useActiveBoard } from "./Presence";
 import { toWorld, camera } from "../state/camera";
 import { polyline, route, routeSides, tunnelGeometry, typesCompatible, type P } from "./wireGeometry";
 import { allCrossings, publishRoutes, routesVersion, unpublishRoutes } from "./routeRegistry";
-import { cardRects, describeValue, endRect, obstaclesFor, portLayout, portPoint, portSide, toneOf } from "./ports";
+import { cardRects, endRect, obstaclesFor, portLayout, portPoint, portSide, toneOf } from "./ports";
 import { countRender } from "../state/renders";
 import { parsePairs, portWiresSlice, useStoreSlice } from "../state/slices";
 import type { BoardSync } from "../sync/board";
@@ -443,11 +443,25 @@ export const PortWires = memo(function PortWires() {
                   e.stopPropagation();
                   setSelected(l.id);
                 }}
-                onPointerEnter={(e) => {
-                  const w = toWorld(e.clientX - camera.left, e.clientY - camera.top);
-                  setHover({ id: l.id, x: w.x, y: w.y });
+                // a wire's hit area lies over the ports it lands on: where a port is under the pointer, the port
+                // answers (its own label: what's on it, where it goes), not the wire
+                onPointerMove={(e) => {
+                  const port = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.classList.contains("port")) as HTMLElement | undefined;
+                  if (port?.dataset.panel && port.dataset.portId) {
+                    setPortHover({ panel: port.dataset.panel, port: port.dataset.portId });
+                    if (hover) setHover(null);
+                    return;
+                  }
+                  if (portHover()) setPortHover(null);
+                  if (hover?.id !== l.id) {
+                    const w = toWorld(e.clientX - camera.left, e.clientY - camera.top);
+                    setHover({ id: l.id, x: w.x, y: w.y });
+                  }
                 }}
-                onPointerLeave={() => setHover(null)}
+                onPointerLeave={() => {
+                  setHover(null);
+                  setPortHover(null);
+                }}
               />
             </g>
           );
@@ -463,16 +477,20 @@ export const PortWires = memo(function PortWires() {
 function PipeTip({ link, x, y }: { link: LinkDoc; x: number; y: number }) {
   const from = usePanel(link.from.panel);
   const to = usePanel(link.to.panel);
-  const type = from?.ports.find((p) => p.id === link.from.port)?.type;
+  const fromPort = from?.ports.find((p) => p.id === link.from.port);
+  const toPort = to?.ports.find((p) => p.id === link.to.port);
+  const type = fromPort?.type;
   return (
     <div className="pipe-tip" style={{ transform: `translate3d(${x}px, ${y}px, 0) scale(${1 / camera.scale})` }}>
       <b>
         {link.label ?? "data"} <i style={{ color: toneOf(type) }}>{type ?? "json"}</i>
       </b>
       <span>
-        {from?.name} → {to?.name}
+        out of <b>{from?.name}</b>
+        {fromPort ? ` (${fromPort.name})` : ""} → into <b>{to?.name}</b>
+        {toPort ? ` (${toPort.name})` : ""}
       </span>
-      <span className="pipe-tip-value">{describeValue(from?.outputs?.[link.from.port])}</span>
+      <span className="pipe-tip-value">{sayValue(from?.outputs?.[link.from.port])}</span>
       <span className="pipe-tip-hint">click to select · ⌫ removes</span>
     </div>
   );

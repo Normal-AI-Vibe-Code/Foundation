@@ -20,7 +20,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { CLIENT, person, settle } from "./helpers";
 
-const SHOTS = "../../docs/evidence/2026-11-13_agents-in-sections";
+const SHOTS = "../../docs/evidence/2026-11-15_one-interface/section-agents";
 let ada: Page;
 let kai: Page;
 let board = "";
@@ -52,21 +52,23 @@ test.beforeAll(async ({ browser }) => {
   });
 });
 
-test("a section at rest says agents can build in it and that it opens as a grid; the menu leads with both", async () => {
+test("a section at rest wears its council's mark and says it opens as a grid; the menu leads with the council", async () => {
   const sections = await ada.locator(".section-card[data-section-id]").count();
   expect(sections).toBeGreaterThan(0);
   await expect(ada.locator(".section-card[data-section-id] .sec-agents-chip")).toHaveCount(sections);
   await expect(ada.locator(".section-card[data-section-id] .sec-rest-open")).toHaveCount(sections);
-  await expect(ada.locator(`.section-card[data-section-id="${section.id}"] .sec-agents-chip`)).toHaveText(/Agents/);
+  await expect(ada.locator(`.section-card[data-section-id="${section.id}"] .sec-agents-chip`)).toHaveText(/Council/);
+  // no card wears an agent button of its own: agents are the section's
+  await expect(ada.locator(".frame-header .icon-btn.is-agent")).toHaveCount(0);
 
   const box = (await ada.locator(`.section-card[data-section-id="${section.id}"]`).boundingBox())!;
   await ada.mouse.click(box.x + 40, box.y + 90, { button: "right" });
   const menu = ada.locator(".context-menu");
   await expect(menu).toBeVisible();
   const labels = (await menu.locator(".menu-item").allInnerTexts()).map((t) => t.replace(/^\S+\s+/, "").trim());
-  expect(labels[0]).toBe("Ask an agent to build here…");
-  for (const want of ["Text box", "Markdown note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine", "Council of this section", "Open as its own grid"]) expect(labels).toContain(want);
-  await expect(menu.locator(".menu-item.is-agent")).toHaveCount(3);
+  expect(labels[0]).toBe("Council: ask this section's agents…");
+  for (const want of ["Text box", "Markdown note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine", "Open as its own grid"]) expect(labels).toContain(want);
+  await expect(menu.locator(".menu-item.is-agent")).toHaveCount(2);
   // it fits the window, whatever its length
   const m = (await menu.boundingBox())!;
   expect(m.y).toBeGreaterThanOrEqual(0);
@@ -133,60 +135,64 @@ test("a text box is written as formatted text and kept as the note's markdown; t
   await kai.screenshot({ path: `${SHOTS}/02_kai-text-box-at-rest.png` });
 });
 
-test("the chip opens the section's agents in its corner; an ask from there brings an agent in, for everyone", async () => {
+test("the chip brings the section's council up on top of it; a line from there brings an agent in, for everyone", async () => {
   const chip = (p: Page) => p.locator(`.section-card[data-section-id="${section.id}"] .sec-agents-chip`);
   // the tools take the corner under the pointer, so the mark at rest is pressed from elsewhere
   await ada.mouse.move(700, 880);
   await settle(ada, 400);
   await chip(ada).dispatchEvent("click");
-  const panel = ada.locator(".sa-panel");
-  await expect(panel).toBeVisible();
-  await expect(panel.locator(".sa-title")).toContainText(section.name);
-  await expect(panel.locator(".sa-none")).toBeVisible();
-  await expect(panel.locator(".t3-ask-text")).toBeFocused();
-  // it stands inside the window, in the section's top-right corner
+  const council = ada.locator(".council-place.is-section .council");
+  await expect(council).toBeVisible();
+  await expect(council.locator(".council-title")).toContainText(section.name);
+  await expect(council).toHaveAttribute("data-council", "0");
+  // it stands inside the window, over the section, under the top bar
+  await settle(ada, 700);
   const sec = (await ada.locator(`.section-card[data-section-id="${section.id}"]`).boundingBox())!;
-  const pb = (await panel.boundingBox())!;
-  expect(pb.x + pb.width).toBeLessThanOrEqual(Math.min(1440, sec.x + sec.width) + 1);
-  expect(pb.y).toBeGreaterThanOrEqual(44);
-  await ada.screenshot({ path: `${SHOTS}/03_panel-nobody-here.png` });
+  const bar = (await council.locator(".council-bar").boundingBox())!;
+  const mid = bar.x + bar.width / 2;
+  expect(mid).toBeGreaterThan(Math.max(0, sec.x) - 1);
+  expect(mid).toBeLessThan(Math.min(1440, sec.x + sec.width) + 1);
+  expect(bar.y).toBeGreaterThanOrEqual(44);
+  await ada.screenshot({ path: `${SHOTS}/03_council-nobody-here.png` });
 
-  await ada.keyboard.type("make a table of the parts, and get help");
-  await ada.keyboard.press("Enter");
+  await council.locator(".council-ask-text").fill("make a table of the parts, and get help");
+  await council.locator(".council-ask-text").press("Enter");
   await expect(chip(ada)).toHaveClass(/is-working/, { timeout: 20_000 });
   await expect(chip(ada)).toContainText("at work");
   await expect(chip(kai)).toHaveClass(/is-working/, { timeout: 20_000 });
-  await expect(panel.locator("[data-agent-row]").first()).toBeVisible();
-  await expect(panel.locator(".crew-row-btn", { hasText: "Stop" }).first()).toBeVisible();
-  await ada.screenshot({ path: `${SHOTS}/04_panel-agent-at-work.png` });
+  await expect(council.locator(".council-seat:not(.council-add)").first()).toBeVisible();
+  await ada.screenshot({ path: `${SHOTS}/04_council-agent-at-work.png` });
 
-  // when the work is done the chip rests, and the panel says what agents made here
+  // when the work is done the chip rests; what the agent made is on the section, in its name
   await expect(chip(ada)).not.toHaveClass(/is-working/, { timeout: 60_000 });
-  await expect(panel.locator(".sa-line").first()).toBeVisible();
-  await expect(panel.locator(".sa-who").first()).toContainText("✦");
   const made = await ada.evaluate((sid) => {
     const st = (window as unknown as { __foundation: Store & { getState(): { tables: Record<string, { sectionId: string; createdBy?: string }> } } }).__foundation.getState() as unknown as { tables: Record<string, { sectionId: string; createdBy?: string }> };
     return Object.values(st.tables).filter((t) => t.sectionId === sid && t.createdBy).length;
   }, section.id);
   expect(made).toBeGreaterThan(0);
+  await expect(ada.locator("[data-agent-pill]").first()).toBeVisible();
+  await ada.keyboard.press("Escape");
+  await expect(council).toHaveCount(0);
   await settle(ada, 2600);
-  await ada.screenshot({ path: `${SHOTS}/05_panel-made-here.png` });
+  await ada.screenshot({ path: `${SHOTS}/05_made-here.png` });
 });
 
-test("Keep here puts the agents on the board as a card, for everyone; the section opens as its own grid", async () => {
-  await ada.locator(".sa-head .crew-row-btn", { hasText: "Keep here" }).click();
-  await expect(ada.locator(".sa-panel")).toHaveCount(0);
+test("the menu's Agents card puts the section's agents on the grid as a card, for everyone; the section opens as its own grid", async () => {
+  const addCard = async () => {
+    const box = (await ada.locator(`.section-card[data-section-id="${section.id}"]`).boundingBox())!;
+    // on the section's own paper, clear of its cards and inside the window
+    // in the section's own margin, left of its cards (a press on a card opens the card's menu instead)
+    await ada.mouse.click(box.x + 8, Math.min(box.y + box.height / 2, 600), { button: "right" });
+    // the menu redraws while the board settles after the agent's work: press the item where it stands
+    await ada.locator(".context-menu .menu-item", { hasText: "Agents card" }).first().dispatchEvent("click");
+  };
+  await addCard();
   await expect(ada.locator(".panel-card.kind-crew")).toHaveCount(1);
   await expect(kai.locator(".panel-card.kind-crew")).toHaveCount(1);
   await expect(kai.locator(".kind-crew .sa-card-head")).toContainText(section.name);
   await expect(kai.locator(".kind-crew .t3-ask-text")).toBeVisible();
   // a second card isn't made
-  await ada.evaluate((sid) => {
-    const w = window as unknown as { __foundation: Store };
-    void w;
-    document.querySelector<HTMLElement>(`.section-card[data-section-id="${sid}"] .sec-agents-chip`)?.click();
-  }, section.id);
-  await ada.locator(".sa-head .crew-row-btn", { hasText: "Keep here" }).click();
+  await addCard();
   await expect(ada.locator(".panel-card.kind-crew")).toHaveCount(1);
   await settle(kai, 1500);
   await kai.screenshot({ path: `${SHOTS}/06_kai-agents-card.png` });

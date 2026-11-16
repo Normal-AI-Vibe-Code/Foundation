@@ -8,33 +8,50 @@
 import { expect, test } from "@playwright/test";
 import { CLIENT, settle } from "./helpers";
 
-test("Today is home: focus, goals, apps, the Shiba, and the way to the boards", async ({ browser }) => {
+test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps in its panel, and the way to a grid and back", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "light" });
   const res = await context.request.post(`${CLIENT}/auth/dev`, { data: { name: "Tess Today", email: "tess@normal.dev" } });
   expect(res.ok()).toBeTruthy();
   // something asked of Tess on the company board
   const ask = await context.request.post(`${CLIENT}/api/asks`, { data: { board: "company", assignee: "tess@normal.dev", prompt: "Upload the e2e stator STEP", kind: "cad_upload" } });
   expect(ask.ok()).toBeTruthy();
-  await context.addInitScript(() => localStorage.setItem("foundation-floor", JSON.stringify({ pane: false, tabs: [], tab: null, search: false })));
   const page = await context.newPage();
 
+  // a first run (nothing remembered on this device): Today, with the side menu open and the top bar there
   await page.goto("/?rafshim");
   await expect(page.locator(".today")).toBeVisible();
+  await expect(page.locator(".top-bar")).toBeVisible();
+  await expect(page.locator(".side-pane")).toBeVisible();
+  await expect(page.locator('.side-pane [data-place="today"]')).toHaveClass(/is-current/);
+  await expect(page.locator(".top-bar [data-place-tab=today]")).toBeVisible();
+  await expect(page.locator(".side-pane .pane-seg-btn")).toHaveText(["Recent", "All Grids"]);
   await expect(page.locator(".today-line")).toContainText("Tess");
   await expect(page.locator(".shiba-room")).toBeVisible();
+  // the room starts where the side menu ends
+  const pane = (await page.locator(".side-pane").boundingBox())!;
+  const room = (await page.locator(".today").boundingBox())!;
+  expect(Math.abs(room.x - (pane.x + pane.width))).toBeLessThan(2);
+  expect(room.y).toBe(44);
 
-  // the ask, linking to its card on the board
+  // the Today panel: no card, white type over the room
+  const panel = page.locator(".today-state");
+  await expect(panel.locator(".today-panel-title")).toHaveText("Today");
+  const look = await panel.evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, ink: getComputedStyle(el.querySelector(".today-panel-title")!).color }));
+  expect(look.bg).toBe("rgba(0, 0, 0, 0)");
+  expect(look.ink).toBe("rgb(255, 255, 255)");
+
+  // the ask, among the todos, linking to its card on the board
   const row = page.locator(".today-row", { hasText: "Upload the e2e stator STEP" });
   await expect(row).toBeVisible();
   expect(await row.getAttribute("href")).toMatch(/^\/\?board=company&focus=/);
 
-  // the company's apps, always in the top bar; HyperForm says it isn't linked
-  for (const name of ["BomForm", "FactoryForm", "HyperForm", "Vision"]) await expect(page.locator(".today-chip", { hasText: name })).toBeVisible();
-  await expect(page.locator(".today-chip[data-unlinked]", { hasText: "HyperForm" })).toBeVisible();
+  // the company's apps, in the panel; HyperForm says it isn't linked
+  for (const name of ["BomForm", "FactoryForm", "HyperForm", "Vision"]) await expect(panel.locator(".today-app", { hasText: name })).toBeVisible();
+  await expect(panel.locator(".today-app[data-unlinked]", { hasText: "HyperForm" })).toBeVisible();
 
-  // a goal added here is kept
-  await page.getByLabel("Add a goal").fill("Ship Today to the team");
-  await page.getByLabel("Add a goal").press("Enter");
+  // a todo added here is kept
+  await page.getByLabel("Add a todo").fill("Ship Today to the team");
+  await page.getByLabel("Add a todo").press("Enter");
   await expect(page.locator(".today-goal", { hasText: "Ship Today to the team" })).toBeVisible();
   await page.reload();
   const goal = page.locator(".today-goal", { hasText: "Ship Today to the team" });
@@ -42,7 +59,7 @@ test("Today is home: focus, goals, apps, the Shiba, and the way to the boards", 
   await goal.getByRole("button").click();
   await expect(goal).toHaveAttribute("data-done", "true");
   await settle(page);
-  await page.screenshot({ path: "../../docs/evidence/2026-11-11_today-shiba/e2e-today.png" });
+  await page.screenshot({ path: "../../docs/evidence/2026-11-15_one-interface/today/e2e-today.png" });
 
   // the Shiba (the script runtime here: it reads Today, points, and says what's first):
   // its words are about the ask, and the ask's row lights up beside them
@@ -51,11 +68,12 @@ test("Today is home: focus, goals, apps, the Shiba, and the way to the boards", 
   await expect(page.locator(".today-line")).toContainText("Upload the e2e stator STEP", { timeout: 15_000 });
   await expect(row).toHaveAttribute("data-pointed", "true");
 
-  // to the boards and back
-  await page.getByRole("link", { name: /Boards/ }).click();
+  // to a grid from the side menu, and back
+  await page.locator('.side-pane [data-grid-row="company"] .space-open').click();
   await expect(page).toHaveURL(/#\/board$/);
   await expect(page.locator(".today")).toHaveCount(0);
-  await page.locator('.top-bar [data-tip="Today and the Shiba"]').click();
+  await expect(page.locator(".side-pane")).toBeVisible();
+  await page.locator('.side-pane [data-place="today"]').click();
   await expect(page.locator(".today")).toBeVisible();
 
   // a link into the board goes straight there, not to Today

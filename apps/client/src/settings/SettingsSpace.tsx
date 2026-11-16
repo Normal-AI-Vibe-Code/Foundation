@@ -89,7 +89,7 @@ export function SettingsSpace({ place, user }: { place: Extract<Place, { kind: "
 
 // ---------------------------------------------------------------- parts
 
-function Group({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+export function Group({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="set-group">
       <div className="set-group-head">
@@ -101,7 +101,7 @@ function Group({ title, note, children }: { title: string; note?: string; childr
   );
 }
 
-function Row({ name, detail, children }: { name: string; detail?: React.ReactNode; children?: React.ReactNode }) {
+export function Row({ name, detail, children }: { name: string; detail?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="set-row">
       <div className="set-row-text">
@@ -114,7 +114,7 @@ function Row({ name, detail, children }: { name: string; detail?: React.ReactNod
 }
 
 /** a choice among a few: the settings tabs' own segmented pill */
-function Seg<T extends string>({ value, options, onChange, label, disabled }: { value: T; options: Array<{ id: T; label: string }>; onChange(v: T): void; label: string; disabled?: boolean }) {
+export function Seg<T extends string>({ value, options, onChange, label, disabled }: { value: T; options: Array<{ id: T; label: string }>; onChange(v: T): void; label: string; disabled?: boolean }) {
   return (
     <div className="set-seg" role="radiogroup" aria-label={label}>
       {options.map((o) => (

@@ -294,3 +294,40 @@
     var(--shadow-sheet),
     0 0 0 1px var(--color-line-strong);
 }
+
+/* ---------- #/design: settings rows, a grid that stands for a child, the provider beads ---------- */
+
+.design-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+.design-settings-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.design-grid-link {
+  height: 300px;
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  box-shadow: var(--shadow-sheet), 0 0 0 1px var(--color-line);
+}
+.design-providers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+}
+.design-provider {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+}
+@media (max-width: 900px) {
+  .design-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

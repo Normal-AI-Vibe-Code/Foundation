@@ -92,15 +92,23 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
   useEffect(() => {
     if (systemGrid) {
       let live = true;
+      let tick: ReturnType<typeof setInterval> | undefined;
       void api<{ id: string }>(`/api/system-grids/${systemGrid}`, { method: "POST", json: {} })
         .then((r) => {
           if (!live) return;
           joinBoard(r.id, user);
-          requestSnap({ kind: "all" });
+          // frame it once it has synced (its sections are there), under Settings' strip
+          const t0 = Date.now();
+          tick = setInterval(() => {
+            if (activeBoard()?.boardId !== r.id || (!Object.keys(getState().sections).length && Date.now() - t0 < 8000)) return;
+            clearInterval(tick);
+            requestSnap({ kind: "all" });
+          }, 150);
         })
         .catch((e: Error) => toast(e.message, "bad"));
       return () => {
         live = false;
+        clearInterval(tick);
       };
     }
     const at = activeBoard()?.boardId;
