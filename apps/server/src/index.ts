@@ -57,7 +57,7 @@ import { addInspiration, attachMavatar, characterFile, characterTasks, costs as 
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
 import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
-import { addDesktop, setAgentsMay } from "./machinedesktop.ts";
+import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
 import { startMachineIo } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 
@@ -690,9 +690,12 @@ r.post("/api/boards/:id/machines/:panel/remove", async (req) => {
   return { machine: await removeMachine(req.params.id, req.params.panel, u.name, b.confirm === true) };
 });
 // a graphical desktop inside a running machine: installing it runs third-party code, so a person does it (machinedesktop.ts)
-r.post("/api/boards/:id/machines/:panel/desktop", (req) => {
+r.post("/api/boards/:id/machines/:panel/desktop", async (req) => {
   const u = requirePerson(req, "Adding a desktop to a machine");
   requireBoard(u, req.params.id);
+  // { stop: true }: a person ends an install that is going (or one the card still shows from before a restart)
+  const b = await readJson<{ stop?: boolean }>(req).catch(() => ({}) as { stop?: boolean });
+  if (b.stop === true) return { machine: await stopDesktopInstall(req.params.id, req.params.panel, u) };
   return { machine: addDesktop(req.params.id, req.params.panel, u).machine };
 });
 // whether agents may use that desktop: a person's leave on this machine, given and taken back from their browser

@@ -16,7 +16,9 @@
  *
  * Rules:
  *  - **Add a desktop** installs packages into the machine (apt on Ubuntu and
- *    Debian, apk on Alpine; both tried on Kiri 0.1.18). That is third-party
+ *    Debian, apk on Alpine; all three tried on Kiri 0.1.18). Any other image
+ *    is told so at once, by name; a machine that can't reach its package
+ *    servers, or isn't root, is told that. A person can Stop an install. That is third-party
  *    code, so only a person does it, from their browser session, never a
  *    bearer (the route asks requirePerson). Progress is the package manager's
  *    own lines. The desktop lives on the machine's disk: Stop keeps it, Remove
@@ -57,23 +59,62 @@ const APT = "xvfb x11vnc xfce4-session xfwm4 xfce4-panel xfdesktop4 xfce4-termin
 const APK = "xvfb x11vnc xfce4 xfce4-terminal dbus dbus-x11 xdotool scrot socat font-dejavu adwaita-icon-theme";
 const NEEDS = "Xvfb x11vnc xfce4-session xdotool scrot socat";
 
-/** exit 42: no recipe for this image. Everything it prints is progress, in the package manager's words. */
+/** a process and everything under it, children first (no pkill in a bare Ubuntu; /proc, grep and sed are everywhere) */
+const TREE_FN = `tree() { for c in $(grep -l "^PPid:[[:space:]]*$1\$" /proc/[0-9]*/status 2>/dev/null | sed 's#^/proc/##; s#/status$##'); do tree "$c"; done; echo "$1"; }`;
+const PID_FILE = `${DIR}/install.pid`;
+/** end the install whose pid is on file, if it is still one of ours (its command line names the pid file) */
+const END_INSTALL = `
+${TREE_FN}
+old=$(cat ${PID_FILE} 2>/dev/null)
+if [ -n "$old" ] && [ "$old" != "$$" ] && grep -q install.pid "/proc/$old/cmdline" 2>/dev/null; then kill -KILL $(tree "$old") 2>/dev/null; echo "Stopped an install that was still going"; fi
+`;
+
+/**
+ * Everything it prints is progress, in the package manager's words, or the
+ * reason it can't go on, in ours. exit 42: no recipe for this image (Fedora,
+ * Rocky, Arch and openSUSE, tried on Kiri 2026-11-17: said at once, nothing
+ * touched). exit 43: not root. An install left running by a Foundation that
+ * restarted is ended first, a dpkg it cut short is finished, and apt waits for
+ * a lock instead of failing on it.
+ */
 const INSTALL = `
 have() { for b in ${NEEDS}; do command -v "$b" >/dev/null 2>&1 || return 1; done; }
 if have; then echo "Already installed"; exit 0; fi
+os=$(. /etc/os-release 2>/dev/null; echo "\${PRETTY_NAME:-This image}")
+if [ "$(id -u)" != 0 ]; then
+  echo "Not root: this machine runs its programs as $(id -un 2>/dev/null || id -u), and installing a desktop needs root. Nothing was changed."
+  exit 43
+fi
+mkdir -p ${DIR}
+${END_INSTALL}
+echo $$ > ${PID_FILE}
 if command -v apt-get >/dev/null 2>&1; then
   echo "Reading the package lists"
-  apt-get update 2>&1 || exit 1
-  apt-get install -y --no-install-recommends ${APT} 2>&1 || exit 1
+  dpkg --configure -a >/dev/null 2>&1
+  apt-get -o DPkg::Lock::Timeout=120 update 2>&1 || exit 1
+  apt-get -o DPkg::Lock::Timeout=120 install -y --no-install-recommends ${APT} 2>&1 || exit 1
 elif command -v apk >/dev/null 2>&1; then
   apk add --no-cache ${APK} 2>&1 || exit 1
 else
-  echo "This image has neither apt nor apk: Foundation's desktop is for Ubuntu, Debian and Alpine machines."
+  echo "No recipe: $os has neither apt nor apk, and Foundation's desktop installs only on Ubuntu, Debian and Alpine machines. Nothing was changed."
   exit 42
 fi
+rm -f ${PID_FILE}
 have || { echo "The packages went in, but the desktop's programs aren't all there."; exit 1; }
 echo "Installed"
 `;
+
+/** a person's Stop: end the install's whole tree (the package manager and what it started) */
+const STOP_INSTALL = `
+${END_INSTALL}
+rm -f ${PID_FILE}
+`;
+
+/** how long the package manager may say nothing before the card says so, and how often that is looked at */
+const QUIET_MS = Number(process.env.FOUNDATION_DESKTOP_QUIET_MS) || 60_000;
+const BEAT_MS = Math.min(15_000, Math.max(20, Math.round(QUIET_MS / 4)));
+/** lines that mean the machine couldn't reach its package servers (apt's and apk's words) */
+const NO_NETWORK = /Temporary failure resolving|Could not resolve|Failed to fetch|Could not connect to|Unable to connect to|Network is unreachable|temporary error \(try again later\)|DNS lookup error|network error|Connection timed out/i;
 
 /**
  * Bring the desktop up if it isn't (after a restart, nothing of it runs) and
@@ -109,6 +150,10 @@ xdotool getdisplaygeometry
 `;
 
 const installing = new Map<string, Promise<MachineState>>();
+/** the installs going on in this server, so a person's Stop can mark one as theirs to end */
+const running = new Map<string, { stopped: boolean }>();
+const STOPPED = "The install was stopped.";
+const quietFor = (ms: number) => (ms < 120_000 ? `${Math.round(ms / 1000)} s` : `${Math.round(ms / 60_000)} min`);
 
 function runningCard(boardId: string, panelId: string): PanelDoc & { machine: MachineState } {
   const panel = machinePanel(boardId, panelId);
@@ -118,10 +163,11 @@ function runningCard(boardId: string, panelId: string): PanelDoc & { machine: Ma
 }
 
 /** one line of what the package manager is doing, for the card */
-export function installProgress(line: string, seen: { total?: number; done: number }): string | null {
+export function installProgress(line: string, seen: { total?: number; done: number; noNetwork?: string }): string | null {
   const l = line.trim();
   if (!l) return null;
   let m: RegExpExecArray | null;
+  if (!seen.noNetwork && NO_NETWORK.test(l)) seen.noNetwork = l.replace(/^(W|E|Err:\d+|WARNING|ERROR):?\s*/, "").slice(0, 160);
   if ((m = /(\d+) newly installed/.exec(l))) seen.total = Number(m[1]);
   if ((m = /^\((\d+)\/(\d+)\) Installing (\S+)/.exec(l))) {
     seen.total = Number(m[2]);
@@ -134,7 +180,7 @@ export function installProgress(line: string, seen: { total?: number; done: numb
   }
   if ((m = /^Get:\d+ \S+ \S+ \S+ (\S+)/.exec(l))) return `Downloading ${m[1]}${seen.total ? ` (${seen.total} packages)` : ""}`;
   if ((m = /^Unpacking (\S+)/.exec(l))) return `Unpacking ${m[1].replace(/:.*$/, "")}`;
-  if (/^(Reading the package lists|Already installed|Installed|This image has neither|The packages went in)/.test(l)) return l;
+  if (/^(Reading the package lists|Already installed|Installed|No recipe:|Not root:|Stopped an install|The packages went in)/.test(l)) return l;
   if (/^(E:|ERROR:|Err:)/.test(l)) return l.slice(0, 200);
   return null;
 }
@@ -157,52 +203,107 @@ function install(boardId: string, panelId: string, person: { name: string }): { 
   const going = installing.get(k);
   if (going) return { machine: panel.machine, done: going };
   writeMachine(boardId, panelId, { desktop: { state: "installing", detail: "Starting…", by: person.name, at: Date.now() }, wantDesktop: undefined });
+  const run = { stopped: false };
+  running.set(k, run);
   const done = (async () => {
-    const seen = { done: 0 };
+    const seen: { total?: number; done: number; noNetwork?: string } = { done: 0 };
     let last = 0;
     let said = "";
     let partial = "";
+    let heard = Date.now();
+    const started = machinePanel(boardId, panelId).machine?.desktop?.at ?? Date.now();
+    const show = (detail: string) => writeMachine(boardId, panelId, { desktop: { state: "installing", detail, by: person.name, at: started } });
     const say = (line: string) => {
       const p = installProgress(line, seen);
       if (!p) return;
       said = p;
       if (Date.now() - last < 700) return;
       last = Date.now();
-      writeMachine(boardId, panelId, { desktop: { state: "installing", detail: p, by: person.name, at: machinePanel(boardId, panelId).machine?.desktop?.at ?? Date.now() } });
+      show(p);
     };
+    // a package manager that has gone quiet (a mirror that stopped answering, a lock): the card says for how long
+    const beat = setInterval(() => {
+      const quiet = Date.now() - heard;
+      if (quiet < QUIET_MS || run.stopped) return;
+      try {
+        show(`${said || "Starting…"} · no word from the package manager for ${quietFor(quiet)}`);
+      } catch {
+        /* the card is gone */
+      }
+    }, BEAT_MS);
     try {
       const r = await execRaw(boardId, panelId, ["/bin/sh", "-c", INSTALL], {
         timeoutS: 1500,
         maxBytes: 64 * 1024,
+        // packages go in as root, whoever the image's own user is
+        user: "0",
         onStdout: (b) => {
+          heard = Date.now();
           partial += b.toString("utf8");
           const lines = partial.split(/\r?\n/);
           partial = lines.pop() ?? "";
           lines.forEach(say);
         },
-      });
+      }).finally(() => clearInterval(beat));
+      if (run.stopped) throw new Error(STOPPED);
       if (r.exitCode !== 0) {
-        const why = r.exitCode === 42 ? said : r.timedOut ? "The install was still going after 25 minutes and was stopped." : `The install failed (${r.exitCode === null ? "no exit code" : `exit ${r.exitCode}`}): ${said || r.stderr.trim().split("\n").at(-1) || "the package manager said nothing"}`;
+        const code = r.exitCode === null ? "no exit code" : `exit ${r.exitCode}`;
+        const why =
+          r.exitCode === 42 || r.exitCode === 43
+            ? said
+            : r.timedOut
+              ? "The install was still going after 25 minutes and was stopped."
+              : seen.noNetwork
+                ? `The machine couldn't reach its package servers, so the desktop wasn't installed (${seen.noNetwork}). Check the machine's network from its terminal (${/apk|alpine/i.test(seen.noNetwork) ? "apk update" : "apt-get update"}), then try again.`
+                : `The install failed (${code}): ${said || r.stderr.trim().split("\n").at(-1) || "the package manager said nothing"}`;
         throw new Error(why);
       }
       writeMachine(boardId, panelId, { desktop: { state: "installing", detail: "Starting the desktop…", by: person.name, at: Date.now() } });
       const size = await bringUp(boardId, panelId);
       writeMachine(boardId, panelId, { desktop: { state: "ready", by: person.name, at: Date.now(), ...size } }, { who: person.name, role: "human", text: `added a desktop to the machine ${panel.machine.name}` });
     } catch (e) {
+      clearInterval(beat);
       const why = (e as Error).message;
       // the machine may have stopped or gone meanwhile: say so only if its card is still there
       try {
-        writeMachine(boardId, panelId, { desktop: { state: "error", detail: why.slice(0, 300), by: person.name, at: Date.now() } }, { who: person.name, role: "human", text: `couldn't add a desktop to ${panel.machine.name}: ${why.slice(0, 140)}` });
+        // a person's Stop has already put the card back to "no desktop yet"
+        if (!run.stopped) writeMachine(boardId, panelId, { desktop: { state: "error", detail: why.slice(0, 400), by: person.name, at: Date.now() } }, { who: person.name, role: "human", text: `couldn't add a desktop to ${panel.machine.name}: ${why.slice(0, 140)}` });
       } catch {
         /* the card is gone */
       }
       throw e;
     }
     return machinePanel(boardId, panelId).machine!;
-  })().finally(() => installing.delete(k));
+  })().finally(() => {
+    // a stopped install has already been let go (a press after the Stop starts a new one)
+    if (installing.get(k) === done) installing.delete(k);
+    if (running.get(k) === run) running.delete(k);
+  });
   installing.set(k, done);
   done.catch(() => {});
   return { machine: machinePanel(boardId, panelId).machine!, done };
+}
+
+/**
+ * A person pressed Stop on an install: end it in the machine (the package
+ * manager and everything it started) and put the card back to "no desktop
+ * yet". What was already unpacked stays on the machine's disk; Add a desktop
+ * picks up from there. Also the way out of an "installing" this server knows
+ * nothing about.
+ */
+export async function stopDesktopInstall(boardId: string, panelId: string, person: { id: string; name: string }): Promise<MachineState> {
+  if (!canWrite(person.id, boardId)) throw new HttpError(403, `View only: someone who can edit “${boardId}” stops an install`);
+  const panel = machinePanel(boardId, panelId);
+  if (!panel.machine) throw new HttpError(404, "this card has no machine");
+  if (panel.machine.desktop?.state !== "installing") return panel.machine;
+  const run = running.get(key(boardId, panelId));
+  if (run) run.stopped = true;
+  // let go of it now: the engine takes a moment to notice its exec has ended, and a press meanwhile must start afresh
+  installing.delete(key(boardId, panelId));
+  running.delete(key(boardId, panelId));
+  if (panel.machine.state === "running") await execRaw(boardId, panelId, ["/bin/sh", "-c", STOP_INSTALL], { timeoutS: 15, maxBytes: 4096, user: "0" }).catch(() => {});
+  writeMachine(boardId, panelId, { desktop: undefined }, { who: person.name, role: "human", text: `stopped adding a desktop to ${panel.machine.name}` });
+  return machinePanel(boardId, panelId).machine!;
 }
 
 const upAt = new Map<string, number>();

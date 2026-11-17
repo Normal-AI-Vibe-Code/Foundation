@@ -31,6 +31,7 @@ process.env.FOUNDATION_DATA_DIR = mkdtempSync(join(tmpdir(), "foundation-desk-")
 process.env.FOUNDATION_ADMIN_EMAILS = "";
 process.env.FOUNDATION_CREW_TRAVEL_MS = "0";
 process.env.FOUNDATION_MACHINE_IO_MS = "3600000"; // the pipes are ticked by hand here
+process.env.FOUNDATION_DESKTOP_QUIET_MS = "80"; // an install that says nothing for 80 ms has gone quiet
 
 // ---------- a stand-in Engine API, and the machine behind it ----------
 
@@ -42,10 +43,15 @@ interface Box {
   Labels: Record<string, string>;
   desktop: boolean;
   files: Map<string, Buffer>;
+  /** an install that hangs (a mirror that never answers): called to end it */
+  hung?: () => void;
 }
 const engine = {
   boxes: new Map<string, Box>(),
-  execs: new Map<string, { box: Box; body: { Tty?: boolean; AttachStdin?: boolean; Cmd?: string[] }; exitCode: number | null }>(),
+  execs: new Map<string, { box: Box; body: { Tty?: boolean; AttachStdin?: boolean; Cmd?: string[]; User?: string }; exitCode: number | null }>(),
+  /** the user each install's exec asked to run as */
+  installUsers: [] as Array<string | undefined>,
+  stops: 0,
   seq: 0,
   /** what xdotool was asked to do, in order */
   xdo: [] as string[][],
@@ -67,7 +73,7 @@ function png(w = 1280, h = 800) {
 }
 
 /** what a program run without a terminal does in the stand-in machine */
-function run(box: Box, argv: string[]): { out: Array<[1 | 2, Buffer | string]>; code: number } {
+function run(box: Box, argv: string[]): { out: Array<[1 | 2, Buffer | string]>; code: number; hang?: boolean } {
   const script = argv[0] === "/bin/sh" && argv[1] === "-c" ? argv[2] : "";
   const args = argv.slice(4);
   if (argv[0] === "xdotool") {
@@ -79,14 +85,33 @@ function run(box: Box, argv: string[]): { out: Array<[1 | 2, Buffer | string]>; 
     engine.xdo.push(["typed", ...args]);
     return { out: [], code: 0 };
   }
-  if (script.includes("apt-get install")) {
+  if (script.includes("Reading the package lists")) {
     engine.installs++;
-    if (/^fedora/.test(box.Image)) return { out: [[1, "This image has neither apt nor apk: Foundation's desktop is for Ubuntu, Debian and Alpine machines.\n"]], code: 42 };
+    if (/^fedora/.test(box.Image)) return { out: [[1, "No recipe: Fedora Linux 42 (Container Image) has neither apt nor apk, and Foundation's desktop installs only on Ubuntu, Debian and Alpine machines. Nothing was changed.\n"]], code: 42 };
+    // an engine that ignores the user an exec asks for, on an image whose own user isn't root
+    if (/rootless/.test(box.Name)) return { out: [[1, "Not root: this machine runs its programs as app, and installing a desktop needs root. Nothing was changed.\n"]], code: 43 };
+    // apt with no DNS, in Ubuntu 24.04's words on Kiri (2026-11-17)
+    if (/nonet/.test(box.Name)) {
+      return {
+        out: [[1, "Reading the package lists\nIgn:1 http://archive.ubuntu.com/ubuntu noble InRelease\nErr:1 http://archive.ubuntu.com/ubuntu noble InRelease\n  Temporary failure resolving 'archive.ubuntu.com'\nReading package lists...\nW: Failed to fetch http://archive.ubuntu.com/ubuntu/dists/noble/InRelease  Temporary failure resolving 'archive.ubuntu.com'\nE: Unable to locate package xvfb\n"]],
+        code: 100,
+      };
+    }
+    // a mirror that never answers: one line, then nothing, until something ends it
+    if (/stuck/.test(box.Name) && !box.files.has("unstuck")) return { out: [[1, "Reading the package lists\n"]], code: 137, hang: true };
     box.desktop = true;
     return {
       out: [[1, "Reading the package lists\nGet:1 http://archive.ubuntu.com/ubuntu noble/main amd64 xvfb amd64 2:21.1 [877 kB]\n0 upgraded, 3 newly installed, 0 to remove\nUnpacking xvfb (2:21.1) ...\nSetting up xvfb (2:21.1) ...\nSetting up x11vnc (0.9.16) ...\nSetting up xfwm4 (4.18) ...\nInstalled\n"]],
       code: 0,
     };
+  }
+  // a person's Stop: the install's tree is killed
+  if (script.includes("kill -KILL") && script.includes("install.pid")) {
+    engine.stops++;
+    const was = Boolean(box.hung);
+    box.hung?.();
+    box.hung = undefined;
+    return { out: was ? [[1, "Stopped an install that was still going\n"]] : [], code: 0 };
   }
   if (script.includes("getdisplaygeometry") && script.includes("Xvfb")) {
     return box.desktop ? { out: [[1, "1280 800\n"]], code: 0 } : { out: [[2, "no desktop is installed in this machine (Xvfb is missing)\n"]], code: 3 };
@@ -184,12 +209,22 @@ fake.on("upgrade", (req: IncomingMessage, sock: Socket) => {
     return;
   }
   // execRaw's wrapper: sh -c '<timeout…>' <secs> argv…
+  if ((cmd[6] ?? "").includes("Reading the package lists")) engine.installUsers.push(x.body.User);
   const r = run(x.box, cmd.slice(4));
   for (const [stream, data] of r.out) {
     const f = frame(stream, Buffer.isBuffer(data) ? data : Buffer.from(data));
     // a frame split across writes, the way a socket can deliver it
     sock.write(f.subarray(0, 5));
     sock.write(f.subarray(5));
+  }
+  if (r.hang) {
+    // still running, saying nothing, until it is killed
+    sock.on("error", () => {});
+    x.box.hung = () => {
+      x.exitCode = r.code;
+      sock.end();
+    };
+    return;
   }
   x.exitCode = r.code;
   sock.end();
@@ -298,10 +333,82 @@ test("an image with no recipe says so; the card keeps the reason and the button"
   await assert.rejects(desk.addDesktop(BOARD, fed, ada).done, /neither apt nor apk/);
   const d = panelOf(fed).machine!.desktop!;
   assert.equal(d.state, "error");
-  assert.match(d.detail ?? "", /Ubuntu, Debian and Alpine/);
+  // by name, and what it does install on: the card's words are the whole reason
+  assert.equal(d.detail, "No recipe: Fedora Linux 42 (Container Image) has neither apt nor apk, and Foundation's desktop installs only on Ubuntu, Debian and Alpine machines. Nothing was changed.");
   // a machine that isn't running can't take one
   await machines.stopMachine(BOARD, fed, "Ada");
   assert.throws(() => desk.addDesktop(BOARD, fed, ada), /isn't running/);
+});
+
+test("packages go in as root; where they can't, the card says the machine isn't root", async () => {
+  // every install so far asked the engine for root, whatever the image's own user is
+  assert.ok(engine.installUsers.length > 0);
+  assert.ok(engine.installUsers.every((u) => u === "0"), `installs ran as ${JSON.stringify(engine.installUsers)}`);
+  const card = await machine("Rootless box");
+  await assert.rejects(desk.addDesktop(BOARD, card, ada).done, /Not root/);
+  const d = panelOf(card).machine!.desktop!;
+  assert.equal(d.state, "error");
+  assert.equal(d.detail, "Not root: this machine runs its programs as app, and installing a desktop needs root. Nothing was changed.");
+  await machines.removeMachine(BOARD, card, "Ada", true);
+});
+
+test("a machine that can't reach its package servers: the card says that, not the package it couldn't find", async () => {
+  const card = await machine("Nonet box");
+  await assert.rejects(desk.addDesktop(BOARD, card, ada).done, /couldn't reach its package servers/);
+  const d = panelOf(card).machine!.desktop!;
+  assert.equal(d.state, "error");
+  assert.equal(d.detail, "The machine couldn't reach its package servers, so the desktop wasn't installed (Temporary failure resolving 'archive.ubuntu.com'). Check the machine's network from its terminal (apt-get update), then try again.");
+  assert.doesNotMatch(d.detail ?? "", /Unable to locate package/);
+  // apk's words for the same thing
+  const seen: { done: number; noNetwork?: string } = { done: 0 };
+  desk.installProgress("WARNING: fetching https://dl-cdn.alpinelinux.org/alpine/v3.22/main: temporary error (try again later)", seen);
+  assert.match(seen.noNetwork ?? "", /temporary error/);
+  await machines.removeMachine(BOARD, card, "Ada", true);
+});
+
+test("an install that goes quiet says for how long; a person stops it, and the next press starts afresh", async () => {
+  const card = await machine("Stuck box");
+  const first = desk.addDesktop(BOARD, card, ada);
+  let failed = "";
+  first.done.catch((e: Error) => (failed = e.message));
+  // nothing from the package manager: the card says so, with what it last said
+  for (let i = 0; i < 300 && !/no word from the package manager/.test(panelOf(card).machine?.desktop?.detail ?? ""); i++) await new Promise((r) => setTimeout(r, 10));
+  const quiet = panelOf(card).machine!.desktop!;
+  assert.equal(quiet.state, "installing");
+  assert.match(quiet.detail ?? "", /^Reading the package lists · no word from the package manager for \d+ s$/);
+  // a viewer can't stop it
+  await assert.rejects(() => desk.stopDesktopInstall(BOARD, card, vic), /View only/);
+  assert.equal(engine.stops, 0);
+  // a person who can edit does: the install's processes are ended in the machine, and the card is back to no desktop
+  await desk.stopDesktopInstall(BOARD, card, ada);
+  assert.equal(engine.stops, 1);
+  assert.equal(panelOf(card).machine?.desktop, undefined, "back to “no desktop yet”, not an error");
+  assert.equal(activity().at(-1)!.text, "stopped adding a desktop to stuck-box");
+  for (let i = 0; i < 300 && !failed; i++) await new Promise((r) => setTimeout(r, 10));
+  assert.equal(failed, "The install was stopped.");
+  assert.equal(panelOf(card).machine?.desktop, undefined, "the stopped install wrote no error over the card");
+  // Stop again is nothing; a press now is a new install (the mirror answers this time)
+  await desk.stopDesktopInstall(BOARD, card, ada);
+  assert.equal(engine.stops, 1);
+  boxOf(card).files.set("unstuck", Buffer.alloc(0));
+  const before = engine.installs;
+  const again = await desk.addDesktop(BOARD, card, ada).done;
+  assert.equal(engine.installs, before + 1);
+  assert.equal(again.desktop?.state, "ready");
+  await machines.removeMachine(BOARD, card, "Ada", true);
+});
+
+test("an install this server knows nothing about (it restarted): the card says so, and Stop clears it too", async () => {
+  const card = await machine("Orphan box");
+  machines.writeMachine(BOARD, card, { desktop: { state: "installing", detail: "Setting up xfwm4 (142 of 245)", by: "Ada", at: Date.now() - 60_000 } });
+  await machines.machineSeen(BOARD, card);
+  const d = panelOf(card).machine!.desktop!;
+  assert.equal(d.state, "error");
+  assert.match(d.detail ?? "", /interrupted \(Foundation restarted\)/);
+  machines.writeMachine(BOARD, card, { desktop: { state: "installing", detail: "Setting up xfwm4 (142 of 245)", by: "Ada", at: Date.now() } });
+  await desk.stopDesktopInstall(BOARD, card, ada);
+  assert.equal(panelOf(card).machine?.desktop, undefined);
+  await machines.removeMachine(BOARD, card, "Ada", true);
 });
 
 test("Start with a desktop: it is added once the machine runs", async () => {
