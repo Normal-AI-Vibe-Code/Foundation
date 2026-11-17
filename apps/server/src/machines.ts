@@ -209,10 +209,12 @@ export async function engineStatus(fresh = false): Promise<EngineStatus[]> {
     engineCandidates().map(async (e): Promise<EngineStatus> => {
       if (!/^https?:/.test(e.at) && !e.at.startsWith("\\\\") && !existsSync(e.at)) return { ...e, up: false, error: `${e.name} isn't running here (no socket at ${e.at})` };
       try {
-        const v = await engineJson<{ Version?: string; ApiVersion?: string; Os?: string; Platform?: { Name?: string } }>(e, "GET", "/version", undefined, 2500);
+        const v = await engineJson<{ Version?: string; ApiVersion?: string; Os?: string; Platform?: { Name?: string }; Components?: { Name?: string; Version?: string }[] }>(e, "GET", "/version", undefined, 2500);
         // a docker.sock that is really Kiri (Kiri links /var/run/docker.sock to itself) says so
         const isKiri = e.id === "kiri" || /kiri/i.test(v.Platform?.Name ?? "");
-        return { ...e, ...(isKiri ? { id: "kiri" as const, name: "Kiri" } : {}), up: true, version: v.Version, api: v.ApiVersion, os: v.Os };
+        // Kiri from 0.2.0 answers Version with the Docker version it matches (27.5.1); its own is the "Kiri" component
+        const version = (isKiri ? v.Components?.find((c) => c.Name === "Kiri")?.Version : undefined) ?? v.Version;
+        return { ...e, ...(isKiri ? { id: "kiri" as const, name: "Kiri" } : {}), up: true, version, api: v.ApiVersion, os: v.Os };
       } catch (err) {
         return { ...e, up: false, error: (err as Error).message };
       }
