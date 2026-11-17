@@ -1,0 +1,274 @@
+/* A collection (panels/CollectionView.tsx): folded, a stack of the newest things it gathered; opened, a grid of
+   tiles that drag out as copies. On tokens only. */
+
+.coll-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  /* the sides stay clear of the card's two ports */
+  padding: var(--space-4) var(--space-5);
+  min-width: 0;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.coll-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.coll-kind {
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.3 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.coll-kind > i {
+  margin-left: var(--space-1);
+  font-style: normal;
+  color: var(--color-mist);
+  font-variant-numeric: tabular-nums;
+}
+.coll-from {
+  flex: none;
+  margin: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-11) / 1.45 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- empty ---------- */
+
+.coll-empty {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-paper);
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-dim);
+}
+.coll-empty > span {
+  font-size: var(--text-24);
+  color: var(--color-line-strong);
+}
+.coll-empty > p {
+  margin: 0;
+  max-width: 28ch;
+  font: 400 var(--text-11) / 1.5 var(--font-sans);
+}
+
+/* ---------- folded: a stack ---------- */
+
+.coll-stack {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.coll-stack > ul {
+  position: absolute;
+  /* room above and to the right for the fan (four cards behind, 16 × 10 px apart when it opens) */
+  inset: calc(var(--space-3) + 44px) calc(var(--space-6) + 64px) var(--space-7) var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.coll-stack .coll-tile {
+  position: absolute;
+  inset: 0;
+  /* the newest on top, the rest fanned behind it */
+  z-index: calc(10 - var(--i));
+  transform: translate(calc(var(--i) * 9px), calc(var(--i) * -7px)) rotate(calc(var(--i) * 2.2deg));
+  transition: transform var(--dur-lift) var(--ease-spring);
+}
+.coll-stack:hover .coll-tile {
+  transform: translate(calc(var(--i) * 16px), calc(var(--i) * -10px)) rotate(calc(var(--i) * 3.4deg));
+}
+.coll-stack .coll-pic {
+  height: 100%;
+  aspect-ratio: auto !important;
+}
+.coll-stack .coll-pic > img {
+  object-fit: cover;
+}
+.coll-stack-n {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  text-align: center;
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1.3 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- a tile ---------- */
+
+.coll-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  user-select: none;
+}
+.coll-pic {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+}
+.coll-pic > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.coll-pic > i {
+  font-style: normal;
+  font-size: var(--text-32);
+  color: var(--color-dim);
+}
+.coll-tile.kind-character .coll-pic {
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px color-mix(in srgb, var(--color-agent) 40%, var(--color-line));
+}
+.coll-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.coll-words > b,
+.coll-words > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.coll-words > b {
+  font: 600 var(--text-12) / 1.3 var(--font-sans);
+}
+.coll-words > span {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+}
+.coll-tile.is-movable {
+  cursor: grab;
+}
+.coll-tile.is-movable:hover .coll-pic {
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line-strong);
+}
+/* a copy is out on the pointer: the tile stays (the collection keeps it), quieter */
+.coll-tile.is-lending {
+  opacity: 0.45;
+}
+.coll-out {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--glass-fill-strong);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.coll-tile:hover .coll-out,
+.coll-out:focus-visible {
+  opacity: 1;
+}
+
+/* ---------- opened: a grid ---------- */
+
+.coll-grid {
+  flex: 1 1 0;
+  min-height: 0;
+  margin: 0 calc(var(--space-2) * -1);
+  padding: var(--space-2);
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  align-content: start;
+  gap: var(--space-4) var(--space-3);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.coll-grid .coll-pic {
+  aspect-ratio: 3 / 4;
+  max-height: 220px;
+}
+
+/* ---------- foot: where it lays out ---------- */
+
+.coll-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.coll-into {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.3 var(--font-sans);
+}
+.coll-into > select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--h-pill);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1 var(--font-sans);
+}
+.coll-go {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-pulse);
+  font: 600 var(--text-11) / 1.3 var(--font-sans);
+  cursor: pointer;
+}
+
+/* the ghost of a tile on its way out: carry.ts's ghost, at the tile's size */
+.collection-ghost .carry-copy {
+  pointer-events: none;
+}
+.collection-ghost .coll-out {
+  display: none;
+}

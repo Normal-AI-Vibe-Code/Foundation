@@ -1,0 +1,431 @@
+/* A character's card (panels/CharacterView.tsx): a sheet. Its parts sit under eyebrows, a hairline between
+   each. Tokens only. The card is read at 260, 400 and 560 wide: it is a container, and its type and
+   pictures answer to its own width, not the window's. */
+
+.char-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-5) var(--space-4);
+  overflow-y: auto;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  container: char / inline-size;
+}
+.char-note {
+  margin: auto;
+  max-width: 30ch;
+  color: var(--color-dim);
+  text-align: center;
+}
+
+/* ---------- the head: the stage, the name, what it is ---------- */
+
+.char-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-5);
+}
+.char-view {
+  position: relative;
+  flex: none;
+  height: 250px;
+  display: flex;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+  overflow: hidden;
+}
+.char-view .avatar-still,
+.char-view-still {
+  object-fit: contain;
+  object-position: 50% 50%;
+  border-radius: 0;
+  animation: none;
+}
+.char-view-still {
+  width: 100%;
+  height: 100%;
+}
+/* the name is a title, and a field: no box until it is pointed at or written in */
+.char-name {
+  margin: var(--space-4) calc(var(--space-3) * -1) 0;
+  padding: var(--space-1) var(--space-3);
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-frost);
+  font: 600 22px / 1.2 var(--font-sans);
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+}
+.char-name:not(:read-only):hover {
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.char-name:not(:read-only):focus {
+  outline: none;
+  background: var(--color-pulse-dim);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+.char-name:read-only {
+  outline: none;
+  cursor: default;
+}
+/* quiet tags: a line of words, a dot between */
+.char-tags {
+  margin: var(--space-1) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1.5 var(--font-sans);
+}
+.char-tag + .char-tag::before {
+  content: "·";
+  margin-right: var(--space-3);
+  color: var(--color-dim);
+}
+.char-tag.is-ready {
+  color: var(--color-agent);
+}
+.char-tag.is-pending {
+  color: var(--color-warn);
+}
+.char-tag.is-archived,
+.char-tag.is-making {
+  color: var(--color-dim);
+}
+.char-moods {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.char-mood {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.char-mood:hover {
+  border-color: var(--color-line-strong);
+  color: var(--color-frost);
+}
+.char-mood.is-on {
+  border-color: var(--color-agent);
+  background: var(--color-agent-dim);
+  color: var(--color-frost);
+}
+.char-frame {
+  margin-left: auto;
+}
+
+/* ---------- a part: an eyebrow over what it holds, a hairline above ---------- */
+
+.char-part {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0 var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+.char-eyebrow {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.char-aside,
+.char-said {
+  color: var(--color-dim);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: right;
+}
+.char-said.is-saved {
+  color: var(--color-ok);
+  font-weight: 600;
+}
+.char-said.is-dirty {
+  color: var(--color-mist);
+}
+.char-hint {
+  margin: 0;
+  color: var(--color-dim);
+}
+
+/* ---------- who it is: formatted text on the card's own paper ---------- */
+
+.char-words-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 calc(var(--space-3) * -1);
+}
+/* the note's own type (.note-rendered), set for a field that is part of the card: no box, no scroll of its
+   own (it grows with its words), six lines at least */
+.char-words.note-rendered {
+  height: auto;
+  min-height: calc(6 * 1.5 * var(--text-14) + 2 * var(--space-3));
+  padding: var(--space-3);
+  overflow: visible;
+  border-radius: var(--radius-card);
+  color: var(--color-frost);
+  font-size: var(--text-14);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.char-words[contenteditable="true"]:hover {
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.char-words[contenteditable="true"]:focus {
+  background: var(--color-pulse-dim);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+.char-words[contenteditable="false"] {
+  cursor: default;
+}
+.char-words.note-rendered > :first-child {
+  margin-top: 0;
+}
+.char-words.note-rendered > :last-child {
+  margin-bottom: 0;
+}
+/* the text box's toolbar, in the card's flow under the field (a narrow card scrolls it sideways) */
+.char-words-bar {
+  display: flex;
+  padding: 0 var(--space-3);
+  min-width: 0;
+}
+.char-words-bar .rich-bar {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+/* ---------- stages ---------- */
+
+.char-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.char-stage {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: 34px;
+}
+.char-stage-mark {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  font: 600 10px / 1 var(--font-sans);
+  color: var(--color-mist);
+}
+.char-stage.is-done .char-stage-mark {
+  border-color: var(--color-ok);
+  background: var(--color-ok);
+  color: var(--color-on-fill);
+}
+.char-stage.is-failed .char-stage-mark {
+  border-color: var(--color-bad);
+  color: var(--color-bad);
+}
+.char-stage.is-running .char-stage-mark {
+  border-color: var(--color-agent);
+  color: var(--color-agent);
+}
+.char-stage.is-optional .char-stage-mark {
+  border-style: dashed;
+}
+.char-stage.is-later {
+  opacity: 0.55;
+}
+.char-stage-words {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.char-stage-words > b {
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.char-stage-words > span {
+  color: var(--color-mist);
+  font-size: var(--text-11);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.char-stage.is-failed .char-stage-words > span {
+  color: var(--color-bad);
+}
+.char-progress {
+  display: block;
+  height: 2px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--color-agent) var(--p), var(--color-line) var(--p));
+}
+
+/* ---------- pictures ---------- */
+
+.char-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--space-3);
+}
+.char-thumb {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.char-thumb > img,
+.char-thumb > span {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+}
+/* the expressions sheet is read, not glanced at: the card's whole width, nothing cropped */
+.char-thumb.is-large > img,
+.char-thumb.is-large > span {
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+}
+.char-thumb > figcaption {
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+  color: var(--color-dim);
+}
+
+/* ---------- drawn from ---------- */
+
+.char-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.char-pick {
+  width: 44px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.char-pick > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.char-pick:hover:not(:disabled) {
+  opacity: 1;
+}
+.char-pick.is-on {
+  opacity: 1;
+  border-color: var(--color-agent);
+  box-shadow: 0 0 0 1px var(--color-agent);
+}
+.char-pick:disabled {
+  cursor: default;
+}
+
+/* ---------- a person's word on it, and the foot ---------- */
+
+.char-approval {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.char-approval > span {
+  flex: 1 1 14ch;
+  min-width: 0;
+}
+.char-approval[data-char-approval="pending"] {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.char-body:has([data-char-approval="archived"]) .char-view {
+  opacity: 0.5;
+}
+.char-foot {
+  flex: none;
+  margin-top: auto;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+  color: var(--color-dim);
+}
+.char-foot:empty {
+  display: none;
+}
+
+/* ---------- a narrow card (260): the stage shorter, a stage's button under its words ---------- */
+
+@container char (max-width: 300px) {
+  .char-view {
+    height: 180px;
+  }
+  .char-name {
+    font-size: 18px;
+  }
+  .char-stage {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+  .char-stage > .f-pill {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .char-eyebrow {
+    flex-wrap: wrap;
+  }
+}
+/* a wide card (560): the stage taller, the words a comfortable measure */
+@container char (min-width: 500px) {
+  .char-view {
+    height: 300px;
+  }
+  .char-words.note-rendered {
+    max-width: 68ch;
+  }
+}

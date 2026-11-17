@@ -1,0 +1,320 @@
+/*
+ * @foundation/ui — Form Industries' one design language, as Foundation wears it.
+ *
+ * Adopted from Vision's @pacific/ui (the canonical source, itself ported from
+ * the Airform Data Room — ADR-011): warm printed paper, ink, one federal blue;
+ * physicality in the interaction; glass floating over the canvas; a day→night
+ * engine that colour-mixes every token toward a navy night. DESIGN.md at the
+ * repo root is the contract; this file is its executable half. The living
+ * page is the Design view (⌘K → "Design language").
+ *
+ * Night is a deliberate act (the orb), not the OS — except that the very
+ * first launch follows prefers-color-scheme so dark-room users aren't flashed.
+ *
+ * One backdrop-filter per composited region. Write -webkit-backdrop-filter
+ * before backdrop-filter.
+ */
+
+@import "@fontsource-variable/hanken-grotesk/index.css";
+
+@property --night {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+@property --night-hard {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+/* .f-day re-declares every token with night pinned off: a surface that is
+   always paper, whatever the room (the sign-in page). */
+:root,
+.f-day {
+  /* surfaces — paper by day, graphite by night (greys only: the work brings the colour) */
+  --color-void: color-mix(in srgb, #0f0f10 calc(var(--night) * 100%), #f6f3ec);
+  --color-abyss: color-mix(in srgb, #171718 calc(var(--night) * 100%), #fcfbf7);
+  --color-panel: color-mix(in srgb, #131314 calc(var(--night) * 100%), #efece3);
+  --color-raise: color-mix(in srgb, #1f1f21 calc(var(--night) * 100%), #ffffff);
+
+  /* ink, lines and accents flip hard at the midpoint so contrast holds */
+  --color-line: color-mix(in srgb, rgb(255 255 255 / 0.12) calc(var(--night-hard) * 100%), rgb(32 30 25 / 0.14));
+  --color-line-strong: color-mix(in srgb, rgb(255 255 255 / 0.26) calc(var(--night-hard) * 100%), rgb(32 30 25 / 0.26));
+  --color-frost: color-mix(in srgb, #ededed calc(var(--night-hard) * 100%), #201e19);
+  --color-mist: color-mix(in srgb, #a3a3a3 calc(var(--night-hard) * 100%), #5f5b51);
+  --color-dim: color-mix(in srgb, #6f6f6f calc(var(--night-hard) * 100%), #8a8577);
+  --color-pulse: color-mix(in srgb, #f2f2f2 calc(var(--night-hard) * 100%), #325bb4);
+  --color-volt: color-mix(in srgb, #c4c4c4 calc(var(--night-hard) * 100%), #27488f);
+  --color-pulse-dim: color-mix(in srgb, rgb(255 255 255 / 0.1) calc(var(--night-hard) * 100%), rgb(50 91 180 / 0.1));
+  --color-moss: color-mix(in srgb, #8c8c8c calc(var(--night-hard) * 100%), #2e5d43);
+  --color-ok: color-mix(in srgb, #d9d9d9 calc(var(--night-hard) * 100%), #2e7d54);
+  --color-warn: color-mix(in srgb, #f5c542 calc(var(--night-hard) * 100%), #a16207);
+  --color-bad: color-mix(in srgb, #f27a3a calc(var(--night-hard) * 100%), #b3261e);
+
+  /* Foundation's two additions: the agent layer and the data wires */
+  --color-agent: color-mix(in srgb, #8f76ee calc(var(--night-hard) * 100%), #6b5bd6);
+  /* text and marks on a solid state, accent or person colour: white in any room (the fills are saturated) */
+  --color-on-fill: color-mix(in srgb, #121212 calc(var(--night-hard) * 100%), #fff);
+  /* type drawn straight over a picture or the Shiba's room (Today's panel): white in any room, on --color-room-shade */
+  --color-over-room: #fff;
+  --color-room-shade: #14110c;
+  /* a gloss on a raised bead (ports): stays light at night, like the highlight inside --shadow-lift */
+  --color-highlight: rgb(255 255 255 / 0.6);
+  --color-agent-dim: color-mix(in srgb, rgb(143 118 238 / 0.16) calc(var(--night-hard) * 100%), rgb(107 91 214 / 0.1));
+  /* the crew: six agents told apart, all from the agent's violet family (an agent is always violet) */
+  --color-crew-0: var(--color-agent);
+  --color-crew-1: color-mix(in srgb, #7b8cf4 calc(var(--night-hard) * 100%), #4f5fd0);
+  --color-crew-2: color-mix(in srgb, #c084f0 calc(var(--night-hard) * 100%), #9a4fc4);
+  --color-crew-3: color-mix(in srgb, #e07ac0 calc(var(--night-hard) * 100%), #a8488f);
+  --color-crew-4: color-mix(in srgb, #a99bff calc(var(--night-hard) * 100%), #4a3fa8);
+  --color-crew-5: color-mix(in srgb, #b0a8e8 calc(var(--night-hard) * 100%), #6f6aa8);
+  --color-wire: var(--color-pulse);
+  --color-wire-formula: var(--color-ok);
+
+  /* data-viz slots, in order */
+  --viz-1: color-mix(in srgb, #3f97d6 calc(var(--night-hard) * 100%), #325bb4);
+  --viz-2: color-mix(in srgb, #c97a1c calc(var(--night-hard) * 100%), #c07a10);
+  --viz-3: color-mix(in srgb, #27a877 calc(var(--night-hard) * 100%), #2e7d54);
+  --viz-4: color-mix(in srgb, #8f76ee calc(var(--night-hard) * 100%), #6b5bd6);
+  --viz-5: color-mix(in srgb, #2ab0be calc(var(--night-hard) * 100%), #1f8f9c);
+  --viz-6: color-mix(in srgb, #d8628f calc(var(--night-hard) * 100%), #b3476e);
+  --viz-7: color-mix(in srgb, #8ea0b8 calc(var(--night-hard) * 100%), #64748b);
+  --viz-8: color-mix(in srgb, #b39cff calc(var(--night-hard) * 100%), #8b7ae6);
+
+  /* type */
+  --font-display: "Lufga", "Hanken Grotesk Variable", "Hanken Grotesk", system-ui, sans-serif;
+  --font-sans: "Hanken Grotesk Variable", "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-code: "Cascadia Code", "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* the ASCII wind's own stack, so page characters and wind glyphs share one face */
+  --font-grid: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --text-11: 11px;
+  --text-12: 12px;
+  --text-13: 13px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-20: 20px;
+  --text-24: 24px;
+  --text-32: 32px;
+  /* the Shiba's words on Today: the one size above 32, for a voice set in type */
+  --text-40: 40px;
+  --track-caps: 0.08em;
+  --track-eyebrow: 0.22em;
+
+  /* space: 2 4 8 12 16 24 32 */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+
+  /* radii discipline: paper 3 · card 5 · pane 8 · pill 999 — nothing in between; corners stay quiet */
+  --radius-paper: 3px;
+  --radius-card: 5px;
+  --radius-pane: 8px;
+  --radius-pill: 999px;
+
+  /* heights */
+  --h-pill: 28px;
+  --h-control: 32px;
+  --h-bar: 48px;
+
+  /* shadows */
+  --shadow-sheet: 0 4px 12px -6px rgb(15 18 22 / 0.12), 0 1px 0 0 rgb(15 18 22 / 0.05);
+  --shadow-lift: 0 1px 0 rgb(255 255 255 / 0.6) inset, 0 1px 0 rgb(32 30 25 / 0.06), 0 14px 28px -12px rgb(32 30 25 / 0.3);
+  --shadow-glass: inset 0 1px 0 rgb(255 255 255 / 0.38), 0 14px 40px -18px rgb(0 0 0 / 0.5);
+  --shadow-pane: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 24px 50px -20px rgb(0 0 0 / 0.5);
+
+  /* glass */
+  --glass-fill: color-mix(in srgb, var(--color-abyss) 72%, transparent);
+  --glass-fill-strong: color-mix(in srgb, var(--color-abyss) 86%, transparent);
+  --glass-edge: color-mix(in srgb, var(--color-frost) 14%, transparent);
+  --glass-blur: blur(18px) saturate(1.4);
+
+  /* motion — CSS easings; springs live in motion.ts */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-move: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.22, 1.4, 0.36, 1);
+  --ease-settle: cubic-bezier(0.22, 1.3, 0.36, 1);
+  --dur-press: 80ms;
+  --dur-quick: 160ms;
+  --dur-pane: 280ms;
+  --dur-lift: 350ms;
+  --dur-rise: 800ms;
+
+  color-scheme: light;
+}
+
+html {
+  transition:
+    --night 1.4s var(--ease-out-soft),
+    --night-hard 0.5s var(--ease-out-soft);
+}
+html.is-night {
+  --night: 1;
+  --night-hard: 1;
+  color-scheme: dark;
+}
+html .f-day {
+  --night: 0;
+  --night-hard: 0;
+  color-scheme: light;
+}
+
+/* ---------- primitives every surface uses ---------- */
+
+.f-eyebrow {
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-moss);
+}
+
+.f-glass {
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow-glass);
+  border-radius: var(--radius-pane);
+}
+
+.f-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-pill);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+  /* never transition background/color here: the night engine animates every
+     token for 1.4 s, and a per-element transition restarting each frame lags behind it */
+  transition:
+    transform var(--dur-press) var(--ease-out-soft),
+    border-color var(--dur-quick) var(--ease-out-soft);
+}
+.f-pill:hover {
+  border-color: var(--color-line-strong);
+}
+.f-pill:active {
+  transform: scale(0.97);
+}
+.f-pill.is-primary {
+  background: var(--color-frost);
+  border-color: var(--color-frost);
+  color: var(--color-void);
+}
+.f-pill.is-accent {
+  background: var(--color-pulse);
+  border-color: var(--color-pulse);
+  color: var(--color-on-fill);
+}
+.f-pill.is-agent {
+  background: var(--color-agent-dim);
+  border-color: color-mix(in srgb, var(--color-agent) 40%, transparent);
+  color: var(--color-agent);
+}
+.f-pill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.f-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  /* one line on every platform: "Ctrl+Enter" is wider than "⌘↵" and must not wrap or squeeze */
+  white-space: nowrap;
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--color-line);
+  background: var(--color-abyss);
+  color: var(--color-mist);
+  font: 600 10px / 1 var(--font-sans);
+}
+
+/* roll-over label (shell/Tip.tsx): one per app, in screen space, ink on paper */
+.f-tip {
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  padding: 5px 8px;
+  border-radius: var(--radius-paper);
+  background: var(--color-frost);
+  color: var(--color-void);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  white-space: nowrap;
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--color-frost) 60%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  translate: 0 -2px;
+  transition:
+    opacity var(--dur-press) var(--ease-out-soft),
+    translate var(--dur-quick) var(--ease-out-soft);
+}
+.f-tip.is-on {
+  opacity: 1;
+  translate: 0 0;
+}
+.f-tip .f-kbd {
+  border-color: color-mix(in srgb, var(--color-void) 25%, transparent);
+  background: transparent;
+  color: color-mix(in srgb, var(--color-void) 75%, transparent);
+}
+
+.f-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-dim);
+  flex-shrink: 0;
+}
+.f-dot.is-ok {
+  background: var(--color-ok);
+}
+.f-dot.is-warn {
+  background: var(--color-warn);
+}
+.f-dot.is-bad {
+  background: var(--color-bad);
+}
+.f-dot.is-agent {
+  background: var(--color-agent);
+  box-shadow: 0 0 0 4px var(--color-agent-dim);
+}
+.f-dot.is-live {
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+@keyframes f-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

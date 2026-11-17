@@ -1,0 +1,1220 @@
+/* The agent group of a section (components/SectionCrew.tsx) and the agents pane
+   on the right (shell/AgentsPane.tsx). On tokens only; violet is the crew's. */
+
+/* ---------- a face: an agent's initial on its crew colour ---------- */
+
+.crew-face {
+  position: relative;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--crew);
+  color: var(--color-void);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+  /* the ring between overlapping faces is the paper they stand on */
+  box-shadow: 0 0 0 1.5px var(--color-raise);
+}
+.crew-face:disabled {
+  cursor: default;
+}
+.crew-face.is-large {
+  width: 28px;
+  height: 28px;
+  font-size: var(--text-13);
+}
+/* at work: a ring of its own colour that breathes (opacity only: the compositor's) */
+.crew-face.is-working::after {
+  content: "";
+  position: absolute;
+  inset: -3.5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--crew);
+  opacity: 0.55;
+  animation: crew-face-breathe 1.6s var(--ease-out-soft) infinite;
+  pointer-events: none;
+}
+@keyframes crew-face-breathe {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.12;
+  }
+}
+/* done: still itself (its own colour), at rest: no ring, set back a little */
+.crew-face.is-done {
+  opacity: 0.62;
+}
+.crew-face.is-stopped,
+.crew-face.is-error {
+  background: var(--color-warn);
+}
+.crew-face:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+.crew-face:not(:disabled):active {
+  scale: 0.92;
+}
+
+/* ---------- the tab above a section ---------- */
+
+.sec-crew {
+  position: absolute;
+  left: 12px;
+  bottom: 100%;
+  margin-bottom: 5px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 30px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-sheet);
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+  cursor: default;
+  /* SectionCrew.tsx (useStick) writes its transform: where it stands, and screen size against the camera */
+  transform-origin: 0 100%;
+  /* waits above the section until the pointer is on it (or it's pinned); leaving waits a beat, like the tools */
+  opacity: 0;
+  translate: 0 4px;
+  pointer-events: none;
+  transition:
+    opacity var(--dur-quick) var(--ease-out-soft) 180ms,
+    translate var(--dur-quick) var(--ease-out-soft) 180ms;
+}
+.section-card:hover > .sec-crew,
+.sec-crew:focus-within,
+.sec-crew.is-pinned,
+.sec-crew.is-shown {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+/* the gap between the tab and the section is still the section: the pointer can cross it */
+.sec-crew::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 7px;
+}
+body.is-connecting .sec-crew,
+.section-card.section-dragging .sec-crew,
+.section-card.is-mini .sec-crew {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sec-crew-teams {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.sec-crew-team {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+/* one team: shoulder to shoulder */
+.sec-crew-team.is-together {
+  gap: 0;
+}
+.sec-crew-team.is-together .crew-face + .crew-face {
+  margin-left: -5px;
+}
+.sec-crew-team.is-together .crew-face.is-working::after {
+  /* overlapping rings would read as noise: a team breathes as its lead does */
+  display: none;
+}
+.sec-crew-team.is-together .crew-face.is-working:first-child::after {
+  display: block;
+}
+.sec-crew-more {
+  color: var(--color-dim);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.sec-crew-words {
+  color: var(--color-mist);
+}
+.sec-crew.is-empty .sec-crew-words {
+  color: var(--color-dim);
+}
+.sec-crew-btn {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-dim);
+  cursor: pointer;
+}
+.sec-crew-btn + .sec-crew-btn {
+  margin-left: calc(var(--space-3) * -1 + 1px);
+}
+.sec-crew-btn:hover {
+  color: var(--color-frost);
+  background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+}
+.sec-crew-btn.is-on {
+  color: var(--color-agent);
+}
+
+/* ---------- the agents pane, on the right ---------- */
+
+.agents-pane {
+  right: 0;
+  border-left: 1px solid var(--color-line);
+}
+.agents-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 40px;
+  margin: var(--space-2) var(--space-3) 0 var(--space-5);
+  font: 600 var(--text-14) / 1 var(--font-sans);
+}
+.agents-head-n {
+  color: var(--color-dim);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.agents-head .top-btn {
+  margin-left: auto;
+}
+.agents-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--space-4) var(--space-6) var(--space-5);
+}
+.agents-empty {
+  padding: var(--space-5) 0;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.agents-empty .f-kbd {
+  margin: 0 2px;
+}
+.agents-place {
+  padding: var(--space-4) 0 var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.agents-place:first-child {
+  border-top: 0;
+}
+.agents-place-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-bottom: var(--space-3);
+}
+.agents-place-name {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.agents-place-name:hover {
+  color: var(--color-pulse);
+}
+.agents-place-name:disabled {
+  color: var(--color-mist);
+  cursor: default;
+}
+.agents-place.is-at .agents-place-name {
+  color: var(--color-agent);
+}
+.agents-place-words {
+  flex-shrink: 0;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+}
+.agents-place-none {
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+
+/* a team: a lead and the helpers it called in, held by one violet rule */
+.agents-team {
+  position: relative;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+.agents-team.is-together {
+  padding: var(--space-2) 0 var(--space-2) var(--space-4);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--crew) 6%, transparent);
+  box-shadow: inset 2px 0 0 var(--crew);
+}
+.agents-team-label {
+  display: block;
+  padding: var(--space-2) 0 var(--space-1);
+  color: var(--crew);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: 0.02em;
+}
+.agents-team-label span {
+  color: var(--color-dim);
+  font-weight: 500;
+}
+.agent-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-1);
+}
+.agent-row-name {
+  color: var(--crew);
+  font: 600 var(--text-13) / 1.25 var(--font-sans);
+}
+.agent-row-role {
+  margin-left: var(--space-3);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.25 var(--font-sans);
+}
+.agent-row-doing {
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.35 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-row.is-done .agent-row-doing,
+.agent-row.is-stopped .agent-row-doing,
+.agent-row.is-error .agent-row-doing {
+  color: var(--color-mist);
+}
+.agent-row-task {
+  grid-column: 2;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-row-acts {
+  grid-column: 2;
+  display: flex;
+  gap: var(--space-1);
+  margin: var(--space-2) 0 0 calc(var(--space-3) * -1);
+}
+.agent-row-acts:empty {
+  display: none;
+}
+
+/* ---------- the agents of a section, in the section: the panel in its corner, and the card ---------- */
+
+.sa-panel {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 60;
+  max-height: min(560px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-pane);
+  border: 1px solid color-mix(in srgb, var(--color-agent) 34%, var(--color-line));
+  background: var(--color-raise);
+  box-shadow: var(--shadow-lift);
+  animation: sa-in var(--dur-pane) var(--ease-out-soft);
+  will-change: transform;
+}
+@keyframes sa-in {
+  from {
+    opacity: 0;
+  }
+}
+.sa-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 40px;
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+.sa-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-mist);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sa-title b,
+.sa-card-head b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.sa-spark {
+  margin-right: var(--space-2);
+  color: var(--color-agent);
+}
+.sa-close {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  cursor: pointer;
+}
+.sa-close:hover {
+  color: var(--color-frost);
+  background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+}
+.sa-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  overflow-y: auto;
+}
+.sa-none {
+  margin: var(--space-2) 0 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+.sa-none b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.sa-label {
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.6 var(--font-sans);
+}
+.sa-teams .agents-team:last-child {
+  margin-bottom: 0;
+}
+.sa-recent {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.sa-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.7 var(--font-sans);
+}
+.sa-who {
+  flex-shrink: 0;
+  color: var(--color-agent);
+  font-weight: 600;
+}
+.sa-what {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sa-when {
+  flex-shrink: 0;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
+}
+.sa-ask {
+  flex-shrink: 0;
+  margin-top: 0;
+}
+.sa-ask .t3-ask-text {
+  resize: none;
+}
+.sa-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+.sa-starter {
+  height: 22px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.sa-starter:hover {
+  box-shadow: 0 0 0 1px var(--color-agent);
+}
+.sa-ask .f-pill:disabled {
+  opacity: 0.45;
+}
+/* on the design page: in the flow, not standing over the board */
+.sa-panel.sa-specimen {
+  position: relative;
+  animation: none;
+  align-self: flex-start;
+}
+/* the card: the same view, kept on the board */
+.sa-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-raise);
+}
+.sa-card-head {
+  flex-shrink: 0;
+  padding: var(--space-5) var(--space-4) var(--space-1);
+  color: var(--color-mist);
+  font: 500 var(--text-14) / 1.3 var(--font-sans);
+}
+.sa-card .sa-body {
+  flex: 1;
+}
+.sa-card .sa-ask {
+  margin-top: auto;
+}
+.panel-card.kind-crew {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-agent) 30%, transparent), var(--shadow-sheet);
+}
+
+/* ---------- this computer's agents: Foundation's T3 instance, at the foot of the pane ---------- */
+
+.t3-block {
+  margin-top: var(--space-4);
+}
+.t3-title {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.t3-stop {
+  margin-left: auto;
+}
+.t3-words {
+  margin: 0 0 var(--space-4);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  list-style: none;
+}
+.t3-words.is-bad {
+  color: var(--color-bad);
+  overflow-wrap: anywhere;
+}
+.t3-agents {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.t3-agent {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-1);
+}
+.t3-face {
+  cursor: default;
+}
+/* an agent that can't take work yet is there, set back */
+.t3-agent.is-missing .t3-face,
+.t3-agent.is-sign-in .t3-face,
+.t3-agent.is-error .t3-face {
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+.t3-agent.is-missing .agent-row-name,
+.t3-agent.is-error .agent-row-name {
+  color: var(--color-mist);
+}
+.t3-agent-words {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.35 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.t3-work {
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  box-shadow: inset 2px 0 0 var(--crew);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.t3-work-title {
+  min-width: 0;
+  color: var(--color-frost);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.t3-work-state {
+  flex-shrink: 0;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.t3-work.is-waiting .t3-work-state {
+  color: var(--color-warn);
+}
+.t3-work.is-error .t3-work-state {
+  color: var(--color-bad);
+}
+.t3-off {
+  padding: var(--space-3) 0 0;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.4 var(--font-sans);
+}
+
+/* the two places an agent can run */
+.t3-where {
+  margin: var(--space-4) 0 var(--space-1);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.t3-head-acts {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-1);
+}
+.t3-agent-top {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+.t3-agent-acts {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+.t3-work-acts {
+  margin-left: auto;
+  display: flex;
+  flex-shrink: 0;
+}
+.t3-work {
+  align-items: center;
+}
+.t3-ask {
+  grid-column: 1 / -1;
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.t3-ask:focus-within {
+  box-shadow: 0 0 0 1px var(--color-agent);
+}
+.t3-ask-text {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+  resize: vertical;
+  outline: none;
+}
+.t3-ask-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  min-width: 0;
+}
+.t3-ask-model,
+.t3-field select,
+.t3-field input {
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1 var(--font-sans);
+  outline: none;
+}
+.t3-field select:focus,
+.t3-field input:focus,
+.t3-ask-model:focus {
+  box-shadow: 0 0 0 1px var(--color-pulse);
+}
+.t3-ask-note {
+  min-width: 0;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.t3-ask-send {
+  margin-left: auto;
+  flex-shrink: 0;
+  height: 26px;
+}
+.t3-add-open {
+  margin: var(--space-4) 0 0 calc(var(--space-3) * -1);
+}
+.t3-add {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.t3-add-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+/* each choice gets the form's width: two labels side by side, never wrapped */
+.t3-add-row .pane-seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  margin: 0;
+}
+.t3-add-row .pane-seg-btn {
+  white-space: nowrap;
+}
+.t3-add-words,
+.t3-add-note {
+  margin: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+.t3-add-note {
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.t3-field {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+}
+.t3-add-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+/* ---------- on #/design ---------- */
+
+.sec-crew-demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+/* room above each specimen section for its tab */
+.sec-crew-demo .oncall-cell {
+  padding-top: 60px;
+}
+.agents-pane-specimen.is-short {
+  height: 300px;
+}
+.agents-pane-specimen.is-tall {
+  height: 560px;
+}
+.agents-pane-specimen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 400px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-void);
+  color: var(--color-frost);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crew-face.is-working::after {
+    animation: none;
+  }
+  .sec-crew {
+    transition: none;
+  }
+}
+
+/* ---------- the agents panel's faces (2026-11-16): at work, adding one, the background ---------- */
+
+/* the tabs sit over a hairline the pane's full width (2026-11-17, Josh: a line between the tabs and what scrolls
+   under them); what scrolls starts a step below it */
+.agents-tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 48px;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+.agents-tabs ~ .agents-scroll {
+  padding-top: var(--space-4);
+}
+.agents-tabs .top-btn {
+  margin-left: auto;
+}
+.agents-tab {
+  height: 26px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.agents-tab:hover {
+  color: var(--color-frost);
+}
+.agents-tab.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+}
+.agents-tab[data-agents-tab="add"] {
+  color: var(--color-agent);
+}
+.agents-pane[data-agents-pane="agents"] .agents-head {
+  display: none;
+}
+
+/* adding an agent: four steps on one sheet */
+.add-agent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-6);
+}
+.add-lede,
+.add-note {
+  margin: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+.add-lede b,
+.add-note b {
+  color: var(--color-frost);
+}
+.add-note code {
+  font: 400 var(--text-11) / 1 var(--font-code);
+  padding: 1px 4px;
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+  color: var(--color-frost);
+}
+.add-note.is-ok {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  color: var(--color-frost);
+}
+.add-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-pulse);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.add-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.add-step.is-open {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-agent) 45%, var(--color-line));
+}
+.add-step.is-wait {
+  opacity: 0.55;
+}
+.add-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+}
+.add-step-n {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+}
+.add-step.is-open .add-step-n {
+  background: var(--color-agent);
+  color: var(--color-on-fill);
+}
+.add-step.is-done .add-step-n {
+  background: var(--color-ok);
+  color: var(--color-on-fill);
+}
+.add-step-sum {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+}
+.add-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.add-kind {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.add-kind:hover {
+  background: var(--color-agent-dim);
+}
+.add-kind.is-on {
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-agent);
+}
+.add-kind-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+}
+.add-kind-text b {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+}
+.add-kind-state {
+  max-width: 120px;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.25 var(--font-sans);
+  text-align: right;
+}
+.add-kind-state.is-ok {
+  color: var(--color-ok);
+}
+.add-connect,
+.add-final {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.add-avatars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: var(--space-2);
+}
+.add-avatars .add-note {
+  grid-column: 1 / -1;
+}
+.add-avatar {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  overflow: hidden;
+  cursor: pointer;
+}
+.add-avatar .avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 12%;
+  animation: none;
+  border-radius: 0;
+}
+.add-avatar:hover {
+  border-color: var(--color-line-strong);
+}
+.add-avatar.is-on {
+  border-color: var(--color-agent);
+  box-shadow: 0 0 0 2px var(--color-agent);
+}
+.add-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+
+/* the background: sessions and runs */
+.bg-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.bg-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.bg-state {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.bg-open {
+  margin-left: auto;
+  height: 24px;
+}
+.bg-task {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+}
+.bg-task-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+}
+.bg-task-text b {
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bg-task.is-working .bg-task-text b::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--color-agent);
+  animation: f-breathe 1.6s var(--ease-out-soft) infinite;
+}
+.bg-task.is-error .bg-task-text span {
+  color: var(--color-bad);
+}
+.bg-task-acts {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+/* ---------- adding an agent: the ways of connecting it, each with steps that tick off (2026-11-17) ---------- */
+
+.add-way {
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.add-way.is-on {
+  box-shadow: inset 0 0 0 1px var(--color-agent);
+  background: color-mix(in srgb, var(--color-agent) 4%, transparent);
+}
+.add-way-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.add-way-radio {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--color-line-strong);
+}
+.add-way.is-on .add-way-radio {
+  box-shadow:
+    inset 0 0 0 1.5px var(--color-agent),
+    inset 0 0 0 4px var(--color-raise),
+    inset 0 0 0 8px var(--color-agent);
+}
+.add-way-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  color: var(--color-mist);
+}
+.add-way-text b {
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+  color: var(--color-frost);
+}
+.add-way-body {
+  padding: 0 var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.way-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.way-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+}
+.way-step-n {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+}
+.way-step.is-now .way-step-n {
+  background: var(--color-agent);
+  box-shadow: none;
+  color: var(--color-void);
+}
+.way-step.is-done .way-step-n {
+  background: color-mix(in srgb, var(--color-ok) 16%, transparent);
+  box-shadow: none;
+  color: var(--color-ok);
+}
+.way-step.is-wait {
+  opacity: 0.5;
+}
+.way-step-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  color: var(--color-mist);
+}
+.way-step-body > b {
+  font: 600 var(--text-13) / 20px var(--font-sans);
+  color: var(--color-frost);
+}
+.way-step.is-done .way-step-body > b {
+  font-weight: 500;
+  color: var(--color-mist);
+}
+.way-step-body p {
+  margin: 0;
+}
+.way-step-body .t3-add {
+  align-self: stretch;
+}
+.way-fine {
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.way-acts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.add-cmd {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  cursor: pointer;
+}
+.add-cmd code {
+  font: 500 var(--text-12) / 1.4 var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.add-cmd span {
+  color: var(--color-dim);
+}
+.add-cmd:hover span {
+  color: var(--color-pulse);
+}

@@ -1,0 +1,2123 @@
+/* Huddles (video portals) and Slack channel cards. Tokens only; see DESIGN.md §5. */
+
+/* ---------- huddle portal ---------- */
+
+.huddle-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  container-type: inline-size;
+}
+.huddle-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.huddle-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.huddle-status.is-live {
+  background: color-mix(in srgb, var(--color-ok) 12%, transparent);
+  color: var(--color-ok);
+}
+/* recording: red is the one convention people read without a legend */
+.huddle-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-bad) 12%, transparent);
+  color: var(--color-bad);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.08em;
+}
+.huddle-rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-bad);
+  flex-shrink: 0;
+  animation: f-breathe 1.6s var(--ease-out-soft) infinite;
+}
+.huddle-channel {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+}
+.huddle-tabs {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+}
+.huddle-tab {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.huddle-tab.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow: 0 1px 0 var(--color-line);
+}
+
+/* the room: faces in a grid that fills the portal */
+.huddle-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1fr;
+  grid-auto-rows: 1fr;
+}
+.huddle-stage.n-2,
+.huddle-stage.n-3,
+.huddle-stage.n-4 {
+  grid-template-columns: 1fr 1fr;
+}
+.huddle-stage.n-5,
+.huddle-stage.n-6 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+@container (max-width: 400px) {
+  .huddle-stage.n-2 {
+    grid-template-columns: 1fr;
+  }
+  .huddle-stage.n-5,
+  .huddle-stage.n-6 {
+    grid-template-columns: 1fr 1fr;
+  }
+  .huddle-tab {
+    padding: 0 7px;
+  }
+  .huddle-channel {
+    display: none;
+  }
+}
+.huddle-tile {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  display: grid;
+  place-items: center;
+}
+.huddle-tile video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.huddle-tile.is-self video {
+  transform: scaleX(-1);
+}
+.huddle-name {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 12px);
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-abyss) 86%, transparent);
+  color: var(--color-frost);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.huddle-name svg {
+  width: 12px;
+  height: 12px;
+  color: var(--color-bad);
+}
+.huddle-name i {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--color-dim);
+}
+.huddle-face {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  color: var(--color-frost);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+}
+.huddle-face.is-big {
+  width: 64px;
+  height: 64px;
+  font-size: var(--text-20);
+}
+.huddle-captions {
+  position: absolute;
+  left: 50%;
+  bottom: 36px;
+  translate: -50% 0;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
+  border-radius: var(--radius-paper);
+  background: color-mix(in srgb, var(--color-frost) 82%, transparent);
+  color: var(--color-void);
+  font: 500 var(--text-13) / 1.35 var(--font-sans);
+  text-align: center;
+  pointer-events: none;
+}
+.huddle-captions b {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* nobody in it: a portal waiting on the paper */
+.huddle-stage.is-empty {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--color-line-strong);
+  background: repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in srgb, var(--color-frost) 3%, transparent) 7px 8px);
+}
+.huddle-portal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 340px;
+  padding: var(--space-4);
+  text-align: center;
+}
+.huddle-faces {
+  display: flex;
+}
+.huddle-faces .huddle-face + .huddle-face {
+  margin-left: -8px;
+}
+.huddle-empty-title {
+  font: 600 var(--text-16) / 1.25 var(--font-sans);
+  color: var(--color-frost);
+}
+.huddle-empty-note {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+
+/* controls */
+.huddle-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.huddle-ctl {
+  display: inline-grid;
+  place-items: center;
+  width: var(--h-pill);
+  height: var(--h-pill);
+  border-radius: 50%;
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--dur-press) var(--ease-out-soft);
+}
+.huddle-ctl:active {
+  transform: scale(0.94);
+}
+.huddle-ctl.is-off {
+  background: color-mix(in srgb, var(--color-bad) 12%, var(--color-raise));
+  border-color: color-mix(in srgb, var(--color-bad) 40%, transparent);
+  color: var(--color-bad);
+}
+.huddle-rec-glyph {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--color-bad);
+}
+.huddle-ctl.is-rec .huddle-rec-glyph {
+  background: var(--color-bad);
+}
+.huddle-ctl-note {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.2 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.huddle-leave {
+  color: var(--color-bad);
+}
+
+/* notes: the live transcript */
+.huddle-notes {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.huddle-lines,
+.huddle-archive {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-right: 4px;
+}
+.huddle-line p {
+  margin: 2px 0 0;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.huddle-line-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-size: var(--text-12);
+}
+.huddle-line-head b {
+  font-weight: 600;
+  color: var(--color-frost);
+}
+.huddle-line time,
+.huddle-line-head i {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-style: normal;
+}
+.huddle-line.is-system {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+  text-align: center;
+}
+.huddle-speech-note {
+  color: var(--color-warn);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+}
+.huddle-say input,
+.slack-filter,
+.slack-compose textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+  outline: none;
+}
+.huddle-say input,
+.slack-filter {
+  height: var(--h-control);
+  padding: 0 10px;
+}
+.huddle-say input:focus,
+.slack-filter:focus,
+.slack-compose textarea:focus {
+  border-color: var(--color-pulse);
+}
+
+/* archive: sessions, newest first */
+.huddle-archive {
+  gap: var(--space-2);
+}
+.huddle-session {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+}
+.huddle-session-head {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.huddle-session-head b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.huddle-session-people {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.huddle-session-count {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+}
+.huddle-session-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3);
+}
+.huddle-recordings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+.huddle-recordings figure {
+  margin: 0;
+}
+.huddle-recordings video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+}
+.huddle-recordings figcaption {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+}
+.huddle-session-foot {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* the call goes with you: a chip in the corner while you're joined */
+.huddle-pip {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 48px;
+  padding: 0 8px 0 6px;
+  border-radius: var(--radius-pill);
+}
+.huddle-pip-face {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 0;
+  padding: 0;
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.huddle-pip-face video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.huddle-pip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 180px;
+  min-width: 0;
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+  color: var(--color-mist);
+}
+.huddle-pip-text b {
+  color: var(--color-frost);
+  font: 600 var(--text-12) / 1.2 var(--font-sans);
+}
+.huddle-pip-text b,
+.huddle-pip-text span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.presenting .huddle-pip {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------- Slack channel ---------- */
+
+.slack-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  container-type: inline-size;
+}
+.slack-off,
+.slack-picker,
+.slack-channel {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.slack-empty {
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  padding: var(--space-3) 0;
+}
+.slack-channels,
+.slack-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.slack-channel-row {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  height: var(--h-control);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.slack-channel-row:hover {
+  background: var(--color-panel);
+}
+.slack-channel-row b {
+  width: 14px;
+  color: var(--color-dim);
+}
+.slack-channel-row i {
+  margin-left: auto;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+  font-style: normal;
+}
+.slack-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.slack-topic {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.slack-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-right: 4px;
+}
+.slack-msg {
+  padding-top: var(--space-2);
+}
+.slack-msg.is-cont {
+  padding-top: 0;
+}
+.slack-msg-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.slack-msg-head b {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.slack-msg-head time {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.slack-msg p {
+  margin: 1px 0 0;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.slack-msg.is-ours p {
+  border-left: 2px solid var(--color-pulse);
+  padding-left: var(--space-2);
+}
+.slack-msg a {
+  color: var(--color-pulse);
+}
+.slack-replies {
+  color: var(--color-pulse);
+  font: 500 var(--text-11) / 1.6 var(--font-sans);
+}
+.slack-compose {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.slack-compose textarea {
+  resize: none;
+  padding: 8px 10px;
+}
+.slack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.slack-send {
+  margin-left: auto;
+}
+@container (max-width: 400px) {
+  .slack-actions .f-pill:not(.slack-send) {
+    padding: 0 9px;
+  }
+}
+/* the place picker lies over the messages */
+.slack-places {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30px;
+  bottom: 96px;
+  z-index: 2;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-lift);
+}
+.slack-places-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-1) var(--space-2);
+}
+.slack-place {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 28px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.slack-place:hover {
+  background: var(--color-pulse-dim);
+}
+.slack-place b {
+  width: 14px;
+  color: var(--color-dim);
+  font-weight: 400;
+}
+.slack-place.is-card {
+  padding-left: 30px;
+  color: var(--color-mist);
+  font-weight: 400;
+}
+
+/* #/design specimens: a card body without the grid around it */
+.live-specimen {
+  position: relative;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+}
+
+/* ---------- Machines (Kiri or Docker): a Linux machine in a section ---------- */
+
+.machine-body {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  container-type: inline-size;
+  min-height: 0;
+}
+.machine-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.machine-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: var(--radius-pill);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+.machine-state.is-ok {
+  background: color-mix(in srgb, var(--color-ok) 12%, transparent);
+  color: var(--color-ok);
+}
+.machine-state.is-warn {
+  background: color-mix(in srgb, var(--color-warn) 12%, transparent);
+  color: var(--color-warn);
+}
+.machine-state.is-bad {
+  background: color-mix(in srgb, var(--color-bad) 12%, transparent);
+  color: var(--color-bad);
+}
+.machine-engine {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.machine-image {
+  font: 400 var(--text-12) / 1 var(--font-code);
+  color: var(--color-mist);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.machine-ports {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.machine-port {
+  height: 22px;
+  font: 500 var(--text-11) / 1 var(--font-code);
+}
+.machine-picker {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.machine-picker .f-eyebrow {
+  margin-top: var(--space-2);
+}
+.machine-proposed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
+  font: 500 var(--text-12) / 1.4 var(--font-sans);
+}
+.machine-error {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-bad) 10%, transparent);
+  color: var(--color-bad);
+  font: 400 var(--text-12) / 1.45 var(--font-code);
+  word-break: break-word;
+}
+.machine-note {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.machine-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.machine-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: transform var(--dur-press) var(--ease-spring);
+}
+.machine-chip.is-code {
+  font-family: var(--font-code);
+  font-weight: 400;
+}
+.machine-chip:hover:not(:disabled) {
+  border-color: var(--color-line-strong);
+}
+.machine-chip:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.machine-chip.is-on {
+  border-color: var(--color-pulse);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+  color: var(--color-pulse);
+}
+.machine-chip:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.machine-field {
+  margin-top: var(--space-2);
+  height: 32px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1 var(--font-code);
+  outline: none;
+}
+.machine-field:focus {
+  border-color: var(--color-pulse);
+}
+.machine-start {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-2);
+}
+.machine-terms {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.4 var(--font-sans);
+}
+.machine-progress {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-code);
+  font-variant-numeric: tabular-nums;
+}
+.machine-well {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--color-line-strong);
+}
+.machine-poster {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-paper);
+  background: var(--color-abyss);
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1 var(--font-code);
+}
+.machine-term-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--color-line);
+  background: var(--color-abyss);
+  overflow: hidden;
+}
+.machine-term {
+  position: absolute;
+  inset: var(--space-2);
+}
+.machine-term .xterm-viewport {
+  background: transparent !important;
+  overscroll-behavior: contain;
+}
+.machine-watching,
+.machine-people {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  font: 600 10px / 1 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.machine-watching {
+  top: auto;
+  bottom: var(--space-3);
+  background: color-mix(in srgb, var(--color-warn) 14%, var(--color-abyss));
+  color: var(--color-warn);
+}
+.machine-people {
+  pointer-events: auto;
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+.machine-closed {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+/* the caret is in the machine (its shell or its desktop): the "in use" ring, and a line that says where keys go and the way out */
+/* The ring is the well's own, never the card's or the section's (2026-11-17, Josh: "it should be within the section
+   when it's actively being typed into"): an ::after inside the well, over what it holds (a desktop's frame fills its
+   well and covered an inset shadow), 2 px on the screen at any zoom (--machine-ring is 2 px over the drawn scale, set
+   by useRingWidth while the keys are here). Nothing is transitioned. */
+.machine-term-wrap.has-keys {
+  border-color: transparent;
+}
+.machine-term-wrap.has-keys::after,
+.machine-desk-ring {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* an inset shadow, not a border: a browser snaps a border to whole pixels of the card's own, which is 1.2 px on the
+     screen at 122 % and 1.9 at 63 %; a shadow keeps the fraction. It is never transitioned (DESIGN §9). */
+  box-shadow: inset 0 0 0 var(--machine-ring, 2px) var(--color-pulse);
+  border-radius: calc(var(--radius-paper) - 1px);
+  pointer-events: none;
+  z-index: 3;
+}
+/* one ring: while a machine has the keys, the section's own ring and the card's selection ring stand down */
+.section-card.ctx-active:has(.machine-term-wrap.has-keys, .machine-desk-ring)::after {
+  opacity: 0;
+}
+.frame-card.ctx-active:has(.machine-term-wrap.has-keys, .machine-desk-ring) {
+  box-shadow: var(--shadow-card);
+}
+/* a desktop's ring goes round the machine's screen itself, which sits letterboxed in its well (centred, as noVNC draws it) */
+.machine-desk {
+  container-type: size;
+}
+.machine-desk-ring.is-screen {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(100cqw, calc(100cqh * var(--screen-ar)));
+  aspect-ratio: var(--screen-ar);
+  border-radius: 0;
+}
+/* full screen is the machine's alone: no ring (as an app's), the line still says where the keys go */
+.fs-able:fullscreen .machine-term-wrap.has-keys::after,
+.fs-able:fullscreen .machine-desk-ring {
+  display: none;
+}
+/* an install's line, with the way out of it */
+.machine-desk-progress {
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  text-align: center;
+}
+.machine-desk-said .f-dot {
+  display: inline-block;
+  margin-right: var(--space-2);
+  vertical-align: 1px;
+}
+.machine-desk-stop {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+}
+/* a desktop's connection that won't come back by itself: why, and Try again */
+.machine-closed.is-final {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.machine-closed.is-final > span {
+  flex: 1;
+  min-width: 0;
+}
+.machine-closed.is-final .f-pill {
+  flex-shrink: 0;
+}
+/* a machine that runs is not an agent at work: its card keeps a card's own border (shell.css tints .status-running violet) */
+.panel-card.kind-machine.status-running {
+  border-color: var(--color-line-strong);
+}
+.machine-keys {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+/* under a desktop's screen, in the row with the agents' leave */
+.machine-keys.is-inline {
+  position: static;
+  transform: none;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.machine-desk-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-shrink: 0;
+}
+.machine-desk-foot .machine-may {
+  flex: 1;
+}
+.machine-keys .f-dot {
+  background: var(--color-pulse);
+}
+.machine-keys-out {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--color-dim);
+}
+/* the head's switch: the shell or the desktop */
+.machine-view {
+  margin-left: auto;
+  display: inline-flex;
+  height: 22px;
+  padding: 2px;
+  gap: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  flex-shrink: 0;
+}
+.machine-view + .machine-ports,
+.machine-view + .machine-full + .machine-ports {
+  margin-left: 0;
+}
+/* full screen, beside Desktop */
+.machine-full {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.machine-full:hover {
+  color: var(--color-frost);
+}
+.machine-view-tab {
+  height: 18px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.machine-view-tab.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.machine-with-desk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.machine-with-desk input {
+  accent-color: var(--color-pulse);
+  margin: 0;
+}
+/* the desktop: the machine's screen in a frame, on the terminal's ground */
+.machine-desk {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--color-line);
+  background: var(--color-abyss);
+  overflow: hidden;
+}
+.machine-desk iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  pointer-events: none;
+}
+.machine-desk.is-in-use iframe,
+.fs-able:fullscreen .machine-desk iframe {
+  pointer-events: auto;
+}
+.machine-desk-shield {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: var(--space-3);
+  cursor: pointer;
+}
+.fs-able:fullscreen .machine-desk-shield {
+  display: none;
+}
+.machine-desk-hint {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.machine-desk-shield:hover .machine-desk-hint {
+  opacity: 1;
+}
+.machine-desk-well {
+  align-items: flex-start;
+}
+/* agents and this desktop: the leave a person gives, and who is driving */
+.machine-may {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-shrink: 0;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+}
+.machine-may .f-pill {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.machine-may .machine-terms,
+.machine-may-what {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-may.is-on .machine-may-what {
+  color: var(--color-agent);
+  margin-right: auto;
+}
+.machine-may-by {
+  color: var(--color-dim);
+  font-weight: 400;
+}
+.machine-agent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-agent-dim);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 32%, transparent);
+  min-width: 0;
+}
+.machine-agent-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+  color: var(--color-mist);
+}
+.machine-agent-who {
+  color: var(--color-agent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.machine-agent-did {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-agent-act {
+  margin-left: auto;
+  flex-shrink: 0;
+  height: 24px;
+}
+.machine-agent-acts {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 calc(var(--space-2) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.machine-agent-acts li {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+}
+.machine-agent-past {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-agent-when {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+/* the machine's pipes: what comes in, what goes out, and the two files */
+.machine-io {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  min-width: 0;
+}
+.machine-io-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 20px;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+}
+.machine-io-dir {
+  flex: 0 0 38px;
+  color: var(--color-frost);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.machine-io-ends {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  max-width: 46%;
+  min-width: 0;
+  overflow: hidden;
+}
+.machine-io-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 20px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  color: var(--color-frost);
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.machine-io-x {
+  border: 0;
+  background: transparent;
+  color: var(--color-dim);
+  font: 400 var(--text-13) / 1 var(--font-sans);
+  padding: 0 3px;
+  cursor: pointer;
+}
+.machine-io-x:hover {
+  color: var(--color-bad);
+}
+.machine-io-none {
+  color: var(--color-dim);
+  white-space: nowrap;
+}
+.machine-io-pick {
+  height: 20px;
+  max-width: 84px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+  outline: none;
+}
+.machine-io-pick:hover,
+.machine-io-pick:focus-visible {
+  border-color: var(--color-line-strong);
+}
+.machine-io-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.3 var(--font-code);
+}
+.machine-io-value.is-none {
+  color: var(--color-dim);
+  font-family: var(--font-sans);
+}
+.machine-io-when {
+  flex-shrink: 0;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
+}
+.machine-io-path {
+  flex-shrink: 0;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-code);
+}
+.machine-io-hint {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.4 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-io-hint code {
+  font-family: var(--font-code);
+  color: var(--color-mist);
+}
+.machine-io-hint.is-error {
+  color: var(--color-warn);
+  white-space: normal;
+}
+@container (max-width: 520px) {
+  .machine-io-path,
+  .machine-io-hint,
+  .machine-may .machine-terms {
+    display: none;
+  }
+}
+@container (max-width: 400px) {
+  .machine-io-when,
+  .machine-agent-acts {
+    display: none;
+  }
+}
+/* an agent's command on the card: violet is the agent asking; Run is the person's blue go-ahead */
+.machine-asks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex-shrink: 0;
+  max-height: 55%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.machine-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  min-width: 0;
+}
+.machine-ask.is-waiting {
+  background: var(--color-agent-dim);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 32%, transparent);
+  padding: var(--space-3);
+}
+.machine-ask-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+  color: var(--color-mist);
+}
+.machine-ask-who {
+  color: var(--color-agent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.machine-ask-verb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-ask-left {
+  margin-left: auto;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.machine-ask-cmd {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.45 var(--font-code);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 96px;
+  overflow-y: auto;
+}
+.machine-ask-why {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.machine-ask-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.machine-ask-terms {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-ask-note {
+  color: var(--color-warn);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+}
+.machine-ask-line {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.3 var(--font-code);
+}
+.machine-ask.is-declined .machine-ask-line,
+.machine-ask.is-timed-out .machine-ask-line {
+  color: var(--color-dim);
+  text-decoration: line-through;
+}
+@container (max-width: 400px) {
+  .machine-ask-terms {
+    display: none;
+  }
+}
+.machine-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.machine-name {
+  margin-left: auto;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-code);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.machine-remove {
+  color: var(--color-bad);
+}
+.machine-remove.is-armed {
+  background: color-mix(in srgb, var(--color-bad) 12%, transparent);
+  border-color: var(--color-bad);
+}
+@container (max-width: 400px) {
+  .machine-terms,
+  .machine-image,
+  .machine-name {
+    display: none;
+  }
+}
+@container (max-width: 300px) {
+  .machine-engine {
+    display: none;
+  }
+}
+/* #/design only: a still of the terminal in the same type and tokens */
+.machine-term-specimen {
+  margin: 0;
+  font: 400 12px / 1.15 var(--font-code);
+  color: var(--color-frost);
+  white-space: pre-wrap;
+}
+.machine-term-specimen .t-ok {
+  color: var(--color-ok);
+}
+.machine-term-specimen .t-pulse {
+  color: var(--color-pulse);
+}
+.machine-term-specimen .t-cursor {
+  display: inline-block;
+  width: 7px;
+  background: var(--color-pulse);
+}
+
+/* ---------- a machine's wells, redrawn (2026-11-17, Josh: "better centering, making the text larger, and using
+   icons to indicate the right features"): Start, Add a desktop, installing, didn't go in. One centred column. ---------- */
+.machine-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+.machine-well.machine-hero,
+.machine-desk-well.machine-hero {
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) var(--space-4);
+  overflow-y: auto;
+}
+.machine-hero-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.machine-hero-mark.is-warn {
+  background: color-mix(in srgb, var(--color-warn) 14%, transparent);
+  color: var(--color-warn);
+  box-shadow: none;
+}
+.machine-hero-mark.is-busy {
+  color: var(--color-warn);
+  animation: machine-hero-breathe 2.4s var(--ease-out-soft) infinite;
+}
+@keyframes machine-hero-breathe {
+  50% {
+    transform: scale(0.94);
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .machine-hero-mark.is-busy {
+    animation: none;
+  }
+}
+.machine-hero-title,
+.machine-hero .connector-offline-title {
+  color: var(--color-frost);
+  font: 650 18px / 1.25 var(--font-sans);
+  letter-spacing: -0.01em;
+}
+.machine-hero-lede,
+.machine-hero .connector-offline-reason {
+  max-width: 52ch;
+  color: var(--color-mist);
+  font: 400 13.5px / 1.5 var(--font-sans);
+}
+/* what a card says that someone may want to copy out (an error, an install's line): select it, the card stays put */
+.machine-copyable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+.machine-feats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+.machine-feats li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.machine-feats svg {
+  flex-shrink: 0;
+  color: var(--color-pulse);
+}
+.machine-feats li.is-agent svg {
+  color: var(--color-agent);
+}
+.machine-feats b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.machine-hero-go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+.machine-hero-go:has(> .machine-hero-button + .machine-hero-button) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.machine-hero-button {
+  height: 36px;
+  padding: 0 var(--space-5);
+  font: 600 13.5px / 1 var(--font-sans);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-hero-terms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+  color: var(--color-dim);
+  font: 400 11.5px / 1.4 var(--font-sans);
+}
+.machine-hero-terms li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.machine-desk-progress .machine-desk-said {
+  max-width: 60ch;
+  font: 400 var(--text-13) / 1.5 var(--font-code);
+}
+
+/* Start: the column scrolls inside the card, centred while it fits */
+.machine-picker {
+  align-items: center;
+}
+.machine-picker-col {
+  width: 100%;
+  max-width: 600px;
+  margin-block: auto;
+  padding: var(--space-2) 0;
+}
+.machine-picker-col > .f-eyebrow {
+  margin-top: var(--space-1);
+}
+.machine-picker-col .machine-chips {
+  justify-content: center;
+}
+.machine-picker-col .machine-field {
+  width: 100%;
+  height: 36px;
+  margin-top: 0;
+  font-size: var(--text-13);
+  text-align: center;
+}
+.machine-picker-col .machine-proposed,
+.machine-picker-col .machine-error {
+  width: 100%;
+  text-align: left;
+}
+.machine-distros {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: var(--space-2);
+}
+.machine-distro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: transform var(--dur-press) var(--ease-spring);
+}
+.machine-distro:hover:not(:disabled) {
+  border-color: var(--color-line-strong);
+}
+.machine-distro:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.machine-distro.is-on {
+  border-color: var(--color-pulse);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+.machine-distro:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.machine-distro-name {
+  font: 600 13.5px / 1.2 var(--font-sans);
+}
+.machine-distro.is-on .machine-distro-name {
+  color: var(--color-pulse);
+}
+.machine-distro-image {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-code);
+}
+.machine-distro-feats {
+  display: inline-flex;
+  gap: 5px;
+  margin-top: 3px;
+  color: var(--color-mist);
+}
+/* With a desktop: a row led by its icon, not a bare checkbox */
+.machine-option.machine-with-desk {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  text-align: left;
+  cursor: pointer;
+}
+.machine-option:hover:not(.is-off) {
+  border-color: var(--color-line-strong);
+}
+.machine-option:has(input:checked) {
+  border-color: var(--color-pulse);
+}
+.machine-option input {
+  accent-color: var(--color-pulse);
+  margin: 0;
+  flex-shrink: 0;
+}
+.machine-option-glyph {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-pulse);
+}
+.machine-option-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-dim);
+  font: 400 11.5px / 1.35 var(--font-sans);
+}
+.machine-option-words b {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+}
+.machine-option.is-off {
+  cursor: default;
+}
+.machine-option.is-off .machine-option-glyph {
+  color: var(--color-dim);
+}
+.machine-option.is-off b {
+  color: var(--color-mist);
+}
+
+/* ---------- a machine's tools: the same row under its terminal and its desktop (MachineTools.tsx) ---------- */
+.machine-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 32px;
+  flex-shrink: 0;
+}
+.machine-tools-group {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+}
+.machine-tools > .machine-tools-group:last-child:not(:first-child) {
+  margin-left: auto;
+}
+.machine-tool {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-spring);
+}
+.machine-tool:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-frost) 8%, transparent);
+  color: var(--color-frost);
+}
+.machine-tool:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.machine-tool:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+.machine-tool:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+.machine-tools-said {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ok);
+  font: 500 11.5px / 1 var(--font-sans);
+}
+.machine-tools-said.is-warn {
+  color: var(--color-warn);
+}
+.machine-tools .machine-may {
+  flex: 1;
+}
+@container (max-width: 520px) {
+  .machine-tools .machine-may .machine-terms {
+    display: none;
+  }
+}
+
+/* ---------- a machine in a window of its own (machine.html) ---------- */
+html:has(.machine-window),
+html:has(.machine-window) body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-void);
+  overflow: hidden;
+}
+.machine-window {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  background: var(--color-void);
+  color: var(--color-frost);
+  font-family: var(--font-sans);
+}
+.machine-window-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.machine-window-glyph {
+  display: grid;
+  place-items: center;
+  color: var(--color-mist);
+}
+.machine-window-name {
+  font: 650 var(--text-14) / 1 var(--font-sans);
+  white-space: nowrap;
+}
+.machine-window-head .machine-view {
+  margin-left: var(--space-2);
+}
+.machine-window-keys {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 11.5px / 1 var(--font-sans);
+}
+.machine-window-body.machine-body {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  padding: 0;
+  gap: var(--space-2);
+}
+.machine-window-none {
+  margin: auto;
+  color: var(--color-mist);
+}
+.machine-desk.is-alone iframe {
+  pointer-events: auto;
+}
+
+/* the wells grow with their card: a machine that fills a wide section is drawn at the section's fit (63 % or so),
+   where 18 px type reads as 11. One factor, set by the card's width (.machine-body is the container), scales the
+   column's type, its controls and its width together */
+.machine-hero {
+  --hero-k: 1;
+}
+@container (min-width: 880px) {
+  .machine-hero {
+    --hero-k: 1.2;
+  }
+}
+@container (min-width: 1240px) {
+  .machine-hero {
+    --hero-k: 1.4;
+  }
+}
+.machine-hero-mark {
+  width: calc(48px * var(--hero-k));
+  height: calc(48px * var(--hero-k));
+}
+.machine-hero-mark svg {
+  width: calc(22px * var(--hero-k));
+  height: calc(22px * var(--hero-k));
+}
+.machine-hero-title,
+.machine-hero .connector-offline-title {
+  font-size: calc(18px * var(--hero-k));
+}
+.machine-hero-lede,
+.machine-hero .connector-offline-reason {
+  font-size: calc(13.5px * var(--hero-k));
+}
+.machine-feats {
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-feats svg {
+  width: calc(16px * var(--hero-k));
+  height: calc(16px * var(--hero-k));
+}
+.machine-hero-button {
+  height: calc(36px * var(--hero-k));
+  padding: 0 calc(20px * var(--hero-k));
+  font-size: calc(13.5px * var(--hero-k));
+}
+.machine-hero-terms {
+  font-size: calc(11.5px * var(--hero-k));
+}
+.machine-hero-terms svg {
+  width: calc(14px * var(--hero-k));
+  height: calc(14px * var(--hero-k));
+}
+.machine-picker-col {
+  max-width: calc(600px * var(--hero-k));
+  gap: calc(12px * var(--hero-k));
+}
+.machine-distros {
+  grid-template-columns: repeat(auto-fill, minmax(calc(118px * var(--hero-k)), 1fr));
+}
+.machine-distro-name {
+  font-size: calc(13.5px * var(--hero-k));
+}
+.machine-distro-image {
+  font-size: calc(11px * var(--hero-k));
+}
+.machine-distro-feats svg {
+  width: calc(14px * var(--hero-k));
+  height: calc(14px * var(--hero-k));
+}
+.machine-picker-col .machine-field {
+  height: calc(36px * var(--hero-k));
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-picker-col .machine-chip {
+  height: calc(28px * var(--hero-k));
+  font-size: calc(12px * var(--hero-k));
+}
+.machine-option-glyph {
+  width: calc(32px * var(--hero-k));
+  height: calc(32px * var(--hero-k));
+}
+.machine-option-words {
+  font-size: calc(11.5px * var(--hero-k));
+}
+.machine-option-words b {
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-desk-progress .machine-desk-said {
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-picker-col .machine-proposed,
+.machine-picker-col .machine-error,
+.machine-picker-col .machine-note {
+  font-size: calc(12px * var(--hero-k));
+}
+
+/* the tools row grows with its card as the wells do, so its buttons stay a good press at a wide section's fit */
+.machine-tools {
+  --tools-k: 1;
+}
+@container (min-width: 880px) {
+  .machine-tools {
+    --tools-k: 1.2;
+  }
+}
+@container (min-width: 1240px) {
+  .machine-tools {
+    --tools-k: 1.4;
+  }
+}
+.machine-tools {
+  min-height: calc(32px * var(--tools-k));
+}
+.machine-tool {
+  width: calc(28px * var(--tools-k));
+  height: calc(28px * var(--tools-k));
+}
+.machine-tool svg {
+  width: calc(16px * var(--tools-k));
+  height: calc(16px * var(--tools-k));
+}
+.machine-tools-said {
+  font-size: calc(11.5px * var(--tools-k));
+}
+/* in a window of its own the page is at its own size: no growing */
+.machine-window .machine-tools {
+  --tools-k: 1;
+}
+
+/* a machine's Ins & outs (MachineViewIo.tsx IoView): the two lines, what came out last, and the two presses */
+.machine-io-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow: auto;
+}
+.machine-io-view .machine-io {
+  font-size: var(--text-13);
+}
+.machine-io-last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.machine-io-kind {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+}
+.machine-io-last pre {
+  flex-basis: 100%;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-void);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.5 var(--font-code);
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+}
+.machine-io-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

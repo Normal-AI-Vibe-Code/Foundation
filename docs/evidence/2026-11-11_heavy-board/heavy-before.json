@@ -1,0 +1,164 @@
+{
+  "machine": {
+    "viewport": "1440×900 @2x",
+    "browser": "chromium 157.0.4341.46 (headed, GPU)",
+    "photosAt35": {
+      "images": 27,
+      "imageMpx": 99.4,
+      "videos": 4,
+      "playing": 0,
+      "iframes": 10
+    },
+    "photosAt100": {
+      "images": 27,
+      "imageMpx": 99.4,
+      "videos": 4,
+      "playing": 0,
+      "iframes": 10
+    },
+    "apps": {
+      "images": 27,
+      "imageMpx": 99.4,
+      "videos": 4,
+      "playing": 0,
+      "iframes": 11
+    },
+    "fitted": {
+      "images": 27,
+      "imageMpx": 99.4,
+      "videos": 4,
+      "playing": 0,
+      "iframes": 12
+    }
+  },
+  "results": [
+    {
+      "label": "fitted (12 %): loading every picture (6 s)",
+      "frames": 348,
+      "fps": 58,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 66.6,
+      "overPct": 1.7,
+      "loaf": 3,
+      "loafRenderMs": 10,
+      "loafTop": [
+        "73ms (render 6): ",
+        "67ms (render 2): ",
+        "65ms (render 1): "
+      ]
+    },
+    {
+      "label": "fitted: pan (3 s)",
+      "frames": 543,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": []
+    },
+    {
+      "label": "fitted: pinch in and out (3 s)",
+      "frames": 442,
+      "fps": 57.4,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 49.9,
+      "overPct": 4.3,
+      "loaf": 1,
+      "loafRenderMs": 1,
+      "loafTop": [
+        "51ms (render 1): "
+      ]
+    },
+    {
+      "label": "photos at ~35 %: pan (3 s)",
+      "frames": 441,
+      "fps": 49.5,
+      "p50": 16.7,
+      "p95": 33.3,
+      "max": 33.4,
+      "overPct": 21.1,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": []
+    },
+    {
+      "label": "photos at ~35 %: pinch in and out (3 s)",
+      "frames": 445,
+      "fps": 56.6,
+      "p50": 16.6,
+      "p95": 33.2,
+      "max": 33.5,
+      "overPct": 5.8,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": []
+    },
+    {
+      "label": "photos at 100 %: pan (3 s)",
+      "frames": 541,
+      "fps": 59.9,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": []
+    },
+    {
+      "label": "photos at 100 %: pinch in and out (3 s)",
+      "frames": 469,
+      "fps": 59.9,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": []
+    },
+    {
+      "label": "glide: photos → fitted → apps (framing keys)",
+      "frames": 152,
+      "fps": 55.8,
+      "p50": 16.7,
+      "p95": 33.2,
+      "max": 49.9,
+      "overPct": 5.9,
+      "loaf": 1,
+      "loafRenderMs": 1,
+      "loafTop": [
+        "57ms (render 1): "
+      ]
+    },
+    {
+      "label": "apps framed: pan (3 s)",
+      "frames": 508,
+      "fps": 58.9,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 33.4,
+      "overPct": 2,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": []
+    },
+    {
+      "label": "apps framed: pinch in and out (3 s)",
+      "frames": 467,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": []
+    }
+  ]
+}

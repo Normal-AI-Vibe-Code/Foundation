@@ -1,0 +1,12 @@
+{
+  "name": "@foundation/extension",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Foundation for Chrome: every new tab opens Today (the Shiba, your focus, your goals, the company's apps).",
+  "scripts": {
+    "build": "node build.mjs",
+    "release": "node build.mjs --release",
+    "test": "node --test test/*.test.mjs"
+  }
+}

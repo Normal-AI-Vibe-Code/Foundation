@@ -1,0 +1,220 @@
+/* Foundation for Chrome — on Foundation's tokens (tokens.css is copied in by the build). */
+
+body {
+  margin: 0;
+  background: var(--color-void);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+a {
+  color: inherit;
+}
+h1 {
+  margin: var(--space-2) 0 0;
+  font: 500 var(--text-20) / 1.2 var(--font-display);
+  letter-spacing: -0.01em;
+}
+h2 {
+  margin: 0 0 var(--space-3);
+  display: flex;
+  gap: var(--space-3);
+}
+ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ext-note {
+  margin: 0;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.ext-note a {
+  color: var(--color-pulse);
+}
+
+/* the new tab, for the moment before Today */
+.ext-newtab {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+.ext-wait {
+  text-align: center;
+}
+.ext-wait .ext-note {
+  opacity: 0;
+  animation: ext-late 0.3s 2.5s forwards;
+}
+@keyframes ext-late {
+  to {
+    opacity: 1;
+  }
+}
+
+/* options */
+.ext-options main {
+  max-width: 520px;
+  margin: 64px auto;
+  padding: 0 var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ext-options form {
+  display: flex;
+  gap: var(--space-3);
+}
+.ext-options input {
+  flex: 1;
+  height: var(--h-control);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: inherit;
+}
+
+/* the popup */
+.ext-popup {
+  width: 360px;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.ext-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ext-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.ext-actions .f-pill {
+  text-decoration: none;
+}
+.ext-count {
+  color: var(--color-dim);
+  letter-spacing: 0;
+}
+.ext-group ol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.ext-row {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
+  border-radius: var(--radius-card);
+  text-decoration: none;
+}
+.ext-row:hover {
+  background: var(--color-raise);
+}
+.ext-row-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ext-row-text b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ext-row-text small {
+  color: var(--color-mist);
+  font-size: var(--text-11);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ext-glyph {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+}
+.ext-row[data-tone="bad"] .ext-glyph {
+  background: color-mix(in srgb, var(--color-bad) 14%, transparent);
+  color: var(--color-bad);
+}
+.ext-row[data-tone="warn"] .ext-glyph {
+  background: color-mix(in srgb, var(--color-warn) 14%, transparent);
+  color: var(--color-warn);
+}
+.ext-row[data-tone="agent"] .ext-glyph {
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
+}
+.ext-goal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px 32px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+.ext-goal span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ext-goal small {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ext-bar {
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  overflow: hidden;
+}
+.ext-bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-pulse);
+}
+.ext-apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ext-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-pill);
+  padding: 0 10px 0 2px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  text-decoration: none;
+}
+.ext-app .ext-glyph {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+}
+.ext-app[data-unlinked] {
+  background: transparent;
+  border-style: dashed;
+  color: var(--color-mist);
+}
+.ext-foot {
+  font-size: var(--text-11);
+  color: var(--color-dim);
+}

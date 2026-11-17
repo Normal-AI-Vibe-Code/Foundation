@@ -1,0 +1,27 @@
+name: Bug
+description: Something on the board or in the app doesn't work, or looks wrong.
+title: "Bug: "
+labels: ["plan", "kind: bug", "status: backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This joins Foundation's plan: the next **Sync with GitHub** (Settings → Plan) puts it on the board, in Backlog.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+      placeholder: Opened a section with 40 notes; its wires jumped to the end before the card grew.
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where
+      description: The screen or card, day or night, the window size, and the app (desktop or browser) and version (Settings → Releases).
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      description: One word for the part of the app, like wires, sections, search, crew, huddles, settings.

@@ -1,0 +1,76 @@
+# Foundation's desktop releases build themselves (SPEC §3 "Desktop updates", 2026-11-13).
+#
+# Every push to main that passes the tests and typecheck becomes a signed Windows release,
+# v<major>.<minor>.<patch + run number> (scripts/release.mjs ci). Its latest.json is the feed every
+# installed Foundation reads; each one offers the update within a launch (or six hours) and installs it
+# when a person presses Update and restart.
+#
+# Needs two Actions secrets on this repo: TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+# (~/.tauri/foundation-updater.key and .password on Josh's PC). Never replace them with a new key:
+# installed copies only accept updates signed by the key whose public half is in tauri.conf.json.
+
+name: Desktop release
+
+on:
+  push:
+    branches: [main]
+    # not for a push that only moves plan cards, evidence or prose (later lines win; release notes count)
+    paths:
+      - "**"
+      - "!docs/evidence/**"
+      - "!docs/plan.json"
+      - "!**/*.md"
+      - "!.github/ISSUE_TEMPLATE/**"
+      - "docs/blog/**"
+  workflow_dispatch:
+
+# one release at a time, oldest first: each run's number is its version, so none may be skipped mid-publish
+concurrency:
+  group: desktop-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the tags, for "the commits since the last release"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22" # 22.16+ for node:sqlite's FTS5
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Rune (apps/rune) builds to wasm with its own pinned toolchain (rust-toolchain.toml, which rustup
+      # installs on first use) and the wasm-bindgen CLI at the version apps/rune/Cargo.toml pins
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@0.2.129
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/client/src-tauri -> target
+            apps/rune -> target
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build, sign and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: node scripts/release.mjs ci ${{ github.run_number }}

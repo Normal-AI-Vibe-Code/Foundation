@@ -1,0 +1,23 @@
+
+> @foundation/server@0.3.0 machines:desktop-smoke
+> tsx scripts/machines-desktop-smoke.ts fedora kiri
+
+(node:52436) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+· Kiri 0.1.18 at \\.\pipe\kiri
+· started machine-desk-smoke-mwk3c2jd (fedora:42)
+· Ctrl+C did NOT interrupt (the shell answered after 39 s with 0): this engine blocks SIGINT and the image has no perl or python3 to clear it
+· piped: note “Input” → /foundation/in → tr a-z A-Z → /foundation/out → note “Result” = "HELLO FROM A NOTE"
+· JSON written to /foundation/out arrives on the out port as JSON
+    installing: Starting…
+    error: This image has neither apt nor apk: Foundation's desktop is for Ubuntu, Debian and Alpine machines.
+✗ This image has neither apt nor apk: Foundation's desktop is for Ubuntu, Debian and Alpine machines.
+· removed the machine and its disk
+npm error Lifecycle script `machines:desktop-smoke` failed with error:
+npm error code 1
+npm error path C:\Dev\Foundation\.claude\worktrees\agent-a30e22b6742f848f0\apps\server
+npm error workspace @foundation/server@0.3.0
+npm error location C:\Dev\Foundation\.claude\worktrees\agent-a30e22b6742f848f0\apps\server
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c tsx scripts/machines-desktop-smoke.ts fedora kiri
+exit 1

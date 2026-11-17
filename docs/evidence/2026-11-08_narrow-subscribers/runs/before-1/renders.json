@@ -1,0 +1,77 @@
+{
+  "when": "2026-11-09T04:42:27.527Z",
+  "board": {
+    "notes": 26,
+    "tables": 1,
+    "maps": 1,
+    "apps": 2,
+    "wires": 2,
+    "sections": 4
+  },
+  "strictMode": "dev server: every render counted twice",
+  "results": [
+    {
+      "action": "press a card",
+      "renders": {
+        "PortWires": 4,
+        "GridViewport": 2,
+        "SectionView": 4,
+        "NoteView": 2,
+        "ObjectFrame": 2,
+        "MapView": 4,
+        "WireLayer": 2,
+        "Present": 2
+      }
+    },
+    {
+      "action": "drag a card (60 moves)",
+      "renders": {
+        "PortWires": 128,
+        "GridViewport": 6,
+        "SectionView": 6,
+        "NoteView": 26,
+        "ObjectFrame": 26,
+        "MapView": 6,
+        "WireLayer": 6,
+        "Present": 6
+      }
+    },
+    {
+      "action": "type 30 characters in a note",
+      "renders": {
+        "PortWires": 62,
+        "GridViewport": 60,
+        "SectionView": 60,
+        "NoteView": 60,
+        "ObjectFrame": 60,
+        "MapView": 60,
+        "WireLayer": 60,
+        "Present": 60
+      }
+    },
+    {
+      "action": "pan (60 wheel events)",
+      "renders": {}
+    },
+    {
+      "action": "pinch zoom (60 ctrl-wheel events)",
+      "renders": {
+        "MapView": 12,
+        "PortWires": 2
+      }
+    },
+    {
+      "action": "10 edits by someone else (a note in another section)",
+      "renders": {
+        "GridViewport": 20,
+        "SectionView": 20,
+        "NoteView": 20,
+        "ObjectFrame": 20,
+        "MapView": 22,
+        "WireLayer": 20,
+        "PortWires": 34,
+        "Present": 20
+      }
+    }
+  ]
+}

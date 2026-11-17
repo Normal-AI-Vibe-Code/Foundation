@@ -2,16 +2,50 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "vite",
+      "name": "foundation",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 1420
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 1430
     },
     {
-      "name": "vite-preview",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "1425"],
-      "port": 1425
+      "name": "factoryform",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/sibling.mjs",
+        "factoryform"
+      ],
+      "port": 3001
+    },
+    {
+      "name": "creation",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/sibling.mjs",
+        "creation"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "creation-hub",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/sibling.mjs",
+        "creation-hub"
+      ],
+      "port": 4317
+    },
+    {
+      "name": "dataroom",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/sibling.mjs",
+        "dataroom",
+        "AirformDataRoom-foundation"
+      ],
+      "port": 3010
     }
   ]
 }

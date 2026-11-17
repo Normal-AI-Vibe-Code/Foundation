@@ -1,0 +1,1013 @@
+/* Today — the Shiba's room, with the person's day beside it (DESIGN §5 "Today"). On tokens only. */
+
+.today {
+  /* a place in the shell: it fills the open paper (the shell sets left, top and right from the floor) */
+  position: absolute;
+  bottom: 0;
+  z-index: 35;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  grid-template-rows: minmax(0, 1fr);
+  background: var(--color-void);
+  color: var(--color-frost);
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+
+/* the Shiba fills the room, edge to edge, under everything */
+.shiba-room {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.shiba-room .orb-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* no WebGL2: the same warm room as soft light */
+.shiba-fallback {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(22% 18% at 42% 34%, color-mix(in srgb, var(--color-agent) 38%, transparent), transparent 70%),
+    radial-gradient(34% 40% at 42% 60%, color-mix(in srgb, var(--color-warn) 30%, transparent), transparent 72%),
+    var(--color-panel);
+  animation: shiba-breathe 6s ease-in-out infinite;
+}
+.shiba-room[data-mood="listening"] .shiba-fallback {
+  background:
+    radial-gradient(24% 18% at 44% 38%, color-mix(in srgb, var(--color-warn) 34%, transparent), transparent 70%),
+    radial-gradient(34% 40% at 40% 62%, color-mix(in srgb, var(--color-pulse) 32%, transparent), transparent 72%),
+    var(--color-panel);
+}
+@keyframes shiba-breathe {
+  50% {
+    opacity: 0.86;
+  }
+}
+
+/* night dims the room toward navy; the words always have paper under them, low on the left */
+.today-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to left, color-mix(in srgb, var(--color-room-shade) 66%, transparent), color-mix(in srgb, var(--color-room-shade) 38%, transparent) 300px, transparent min(640px, 56%)),
+    linear-gradient(to top, color-mix(in srgb, var(--color-void) 62%, transparent), transparent 52%),
+    color-mix(in srgb, var(--color-void) calc(var(--night) * 58%), transparent);
+}
+.today.is-narrow .today-veil {
+  background:
+    linear-gradient(to top, color-mix(in srgb, var(--color-void) 62%, transparent), transparent 52%),
+    color-mix(in srgb, var(--color-void) calc(var(--night) * 58%), transparent);
+}
+
+/* ---------- top bar ---------- */
+
+.today-top {
+  grid-column: 1 / -1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) 0 var(--space-6);
+}
+/* the desktop window has no frame: Today's bar is its title bar (shell/WindowControls.tsx), as the board's is */
+.is-mac .today-top {
+  padding-left: 84px;
+}
+.has-window-controls .today-top {
+  padding-right: calc(138px + var(--space-3));
+}
+.today-top-spacer {
+  flex: 1;
+}
+.today-top .f-eyebrow {
+  color: var(--color-frost);
+  opacity: 0.72;
+}
+.today-top .f-pill {
+  flex: none;
+  white-space: nowrap;
+}
+.today-top a.f-pill {
+  text-decoration: none;
+}
+.today-ghost {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.today-ghost:hover {
+  color: var(--color-frost);
+  text-decoration: underline;
+}
+.today-me {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--color-raise);
+  color: var(--color-raise);
+  font: 700 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+
+/* ---------- the words ---------- */
+
+.today-words {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 780px;
+  padding: var(--space-7) var(--space-7) 40px 48px;
+  min-height: 0;
+}
+.today-stream {
+  list-style: none;
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 26vh;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent, black 40%);
+}
+.today-stream li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  opacity: calc(1 - var(--age) * 0.18);
+}
+.today-said {
+  font: 500 var(--text-13) / 1.4 var(--font-sans);
+  color: var(--color-mist);
+}
+.today-said::before {
+  content: "You · ";
+  color: var(--color-dim);
+}
+.today-answered {
+  font: 400 var(--text-14) / 1.45 var(--font-sans);
+  color: var(--color-mist);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.today-eyebrow {
+  margin: 0;
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-mist);
+}
+.today-eyebrow[data-mood="listening"],
+.today-eyebrow[data-mood="thinking"] {
+  color: var(--color-agent);
+}
+.today-line {
+  margin: 0;
+  font: 300 clamp(var(--text-24), 3.1vw, var(--text-40)) / 1.14 var(--font-display);
+  letter-spacing: -0.02em;
+  white-space: pre-line;
+  text-wrap: balance;
+  max-height: 46vh;
+  overflow: auto;
+  animation: today-rise var(--dur-rise) var(--ease-out-soft);
+}
+@keyframes today-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.today-sub {
+  margin: 0;
+  max-width: 560px;
+  font: 400 var(--text-14) / 1.5 var(--font-sans);
+  color: var(--color-mist);
+}
+
+.today-composer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  height: 48px;
+  padding: 0 var(--space-3) 0 var(--space-3);
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sheet);
+  max-width: 620px;
+}
+.today-composer:focus-within {
+  border-color: color-mix(in srgb, var(--color-agent) 60%, transparent);
+  box-shadow: 0 0 0 4px var(--color-agent-dim);
+}
+.today-composer input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-frost);
+  font: 400 var(--text-14) / 1 var(--font-sans);
+}
+.today-composer input::placeholder {
+  color: var(--color-dim);
+}
+.today-mic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: var(--color-panel);
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.today-mic[aria-pressed="true"] {
+  background: var(--color-agent);
+  color: var(--color-raise);
+  animation: shiba-breathe 1.6s ease-in-out infinite;
+}
+.today-mic:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ---------- the day, beside it ---------- */
+
+/* the Today panel: no card, no glass. White type straight over the room, on the shade the veil lays down its right side */
+.today-state {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  padding: var(--space-6) var(--space-6) var(--space-7) var(--space-5);
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.today:not(.is-narrow) .today-state {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 80%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 60%, transparent);
+  --color-moss: color-mix(in srgb, var(--color-over-room) 72%, transparent);
+  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+  --color-raise: color-mix(in srgb, var(--color-over-room) 12%, transparent);
+  --color-line: color-mix(in srgb, var(--color-over-room) 22%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-over-room) 40%, transparent);
+  --color-pulse: var(--color-over-room);
+  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  color: var(--color-frost);
+}
+.today-panel-title {
+  margin: 0;
+  font: 300 var(--text-32) / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+.today-app {
+  grid-template-columns: 28px minmax(0, 1fr) 8px;
+  align-items: center;
+}
+.today-app[data-unlinked] {
+  opacity: 0.62;
+}
+.today-app .today-row-title {
+  -webkit-line-clamp: 1;
+}
+.today-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.today-group h2 {
+  margin: 0 0 var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.today-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-dim);
+  letter-spacing: 0;
+}
+.today-empty,
+.today-source {
+  margin: 0;
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  color: var(--color-dim);
+}
+.today-source {
+  margin-top: var(--space-3);
+  padding-left: 14px;
+  position: relative;
+}
+.today-source::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--color-dim);
+}
+.today-source[data-connected]::before {
+  border: 0;
+  background: var(--color-ok);
+}
+
+/* the agent's point: a violet ring while the Shiba talks about it */
+[data-pointed] {
+  box-shadow:
+    0 0 0 2px var(--color-agent),
+    0 0 0 7px var(--color-agent-dim);
+  animation: today-point 2.4s ease-in-out infinite;
+}
+@keyframes today-point {
+  50% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--color-agent) 55%, transparent),
+      0 0 0 5px var(--color-agent-dim);
+  }
+}
+
+.today-row {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-card);
+  color: inherit;
+  text-decoration: none;
+}
+.today-row:hover {
+  background: var(--color-raise);
+}
+.today-glyph {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+}
+.today-row[data-tone="warn"] .today-glyph {
+  background: color-mix(in srgb, var(--color-warn) 14%, transparent);
+  color: var(--color-warn);
+}
+.today-row[data-tone="bad"] .today-glyph {
+  background: color-mix(in srgb, var(--color-bad) 14%, transparent);
+  color: var(--color-bad);
+}
+.today-row[data-tone="agent"] .today-glyph {
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
+}
+.today-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.today-row-title {
+  font: 600 var(--text-13) / 1.35 var(--font-sans);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.today-row-why {
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  color: var(--color-mist);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.today-row[data-tone="bad"] .today-row-why {
+  color: var(--color-bad);
+}
+.today-row-board {
+  font: 500 var(--text-11) / 18px var(--font-sans);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.today-goal {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+}
+.today-check {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-line-strong);
+  background: transparent;
+  color: var(--color-raise);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.today-check:hover:not(:disabled) {
+  border-color: var(--color-ok);
+}
+.today-goal[data-done] .today-check {
+  background: var(--color-ok);
+  border-color: var(--color-ok);
+}
+.today-goal-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.today-goal-title {
+  font: 600 var(--text-13) / 1.35 var(--font-sans);
+}
+.today-goal[data-done] .today-goal-title {
+  color: var(--color-dim);
+  text-decoration: line-through;
+}
+.today-goal-detail {
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  color: var(--color-mist);
+}
+.today-goal-detail b {
+  font-weight: 600;
+  color: var(--color-frost);
+}
+.today-bar {
+  display: block;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  overflow: hidden;
+}
+.today-bar span {
+  display: block;
+  height: 100%;
+  background: var(--color-pulse);
+  border-radius: var(--radius-pill);
+  transition: width var(--dur-lift) var(--ease-out-soft);
+}
+.today-goal[data-done] .today-bar span {
+  background: var(--color-ok);
+}
+.today-goal-pct {
+  font: 500 var(--text-12) / 20px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-dim);
+}
+.today-add input {
+  width: 100%;
+  height: var(--h-control);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--color-line-strong);
+  background: transparent;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1 var(--font-sans);
+  outline: 0;
+}
+.today-add input:focus {
+  border-style: solid;
+  border-color: var(--color-pulse);
+  background: var(--color-raise);
+}
+
+.today-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-left: var(--space-4);
+  padding: var(--space-2) 0;
+}
+.today-chips::-webkit-scrollbar {
+  display: none;
+}
+.today-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-pill);
+  padding: 0 12px 0 4px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-edge);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out-soft),
+    border-color var(--dur-quick) var(--ease-out-soft);
+}
+a.today-chip:hover {
+  border-color: var(--color-line-strong);
+}
+a.today-chip:active {
+  transform: scale(0.97);
+}
+.today-chip[data-unlinked] {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--color-line-strong);
+  color: var(--color-mist);
+  cursor: help;
+}
+.today-chip-glyph {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+}
+.today-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-dim);
+}
+.today-dot[data-tone="ok"] {
+  background: var(--color-ok);
+}
+.today-dot[data-tone="warn"] {
+  background: var(--color-warn);
+}
+
+/* ---------- narrow: the room on top, the day below, one scroll ---------- */
+
+.today-flow {
+  display: contents;
+}
+/* narrow: the room and its veil stay where they are, the whole place, and the words and the panel scroll
+   over them in a layer of their own (the type is white on the room, so the room has to be under all of it) */
+.today.is-narrow {
+  display: block;
+}
+.today.is-narrow .today-flow {
+  display: block;
+  position: relative;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.today.is-narrow .today-words {
+  /* the first screen is the Shiba's; the panel's title shows under it, so there's more */
+  min-height: calc(100% - 72px);
+  justify-content: flex-end;
+  padding: var(--space-6) var(--space-5) var(--space-6);
+}
+.today.is-narrow .today-state {
+  padding: var(--space-5);
+  overflow: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shiba-fallback,
+  .today-mic[aria-pressed="true"],
+  [data-pointed] {
+    animation: none;
+  }
+  .today-line {
+    animation: none;
+  }
+}
+
+/* ---------- #/design: Today's parts ---------- */
+
+.design-today {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  gap: var(--space-5);
+  align-items: start;
+}
+.design-today-room {
+  position: relative;
+  height: 340px;
+  border-radius: var(--radius-pane);
+  overflow: hidden;
+  background: var(--color-panel);
+}
+.design-today-words {
+  position: absolute;
+  left: var(--space-6);
+  right: var(--space-6);
+  bottom: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.design-today-words .today-line {
+  font-size: var(--text-32);
+  animation: none;
+}
+.design-today-moods {
+  grid-column: 1;
+  display: flex;
+  gap: var(--space-3);
+  text-transform: capitalize;
+}
+.design-today-state.today-state {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  margin: 0;
+  max-height: none;
+}
+.design-today-chips {
+  grid-column: 1;
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .design-today {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .design-today-state.today-state {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+/* ---------- 2026-11-16: the whole place is the Shiba's room, and everything on it is drawn in white ---------- */
+
+/* one shade over the whole room, deeper at the foot and down the right, so white reads on any of its moods */
+.today .today-veil,
+.today.is-narrow .today-veil {
+  background:
+    linear-gradient(to left, color-mix(in srgb, var(--color-room-shade) 46%, transparent), transparent min(640px, 56%)),
+    linear-gradient(to top, color-mix(in srgb, var(--color-room-shade) 52%, transparent), transparent 60%),
+    linear-gradient(color-mix(in srgb, var(--color-room-shade) 36%, transparent), color-mix(in srgb, var(--color-room-shade) 36%, transparent)),
+    color-mix(in srgb, var(--color-void) calc(var(--night) * 40%), transparent);
+}
+.today .today-words,
+.today .today-state,
+.today.is-narrow .today-state {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 64%, transparent);
+  --color-moss: color-mix(in srgb, var(--color-over-room) 76%, transparent);
+  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+  --color-raise: color-mix(in srgb, var(--color-over-room) 12%, transparent);
+  --color-line: color-mix(in srgb, var(--color-over-room) 24%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-over-room) 44%, transparent);
+  --color-pulse: var(--color-over-room);
+  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  color: var(--color-frost);
+}
+
+/* Ask the Shiba: glass over the room */
+.today .today-composer {
+  height: 52px;
+  background: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid color-mix(in srgb, var(--color-over-room) 34%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-over-room) 30%, transparent),
+    0 10px 30px color-mix(in srgb, var(--color-room-shade) 26%, transparent);
+}
+.today .today-composer:focus-within {
+  border-color: color-mix(in srgb, var(--color-over-room) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--color-over-room) 30%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--color-over-room) 16%, transparent);
+}
+.today .today-composer input {
+  font-size: var(--text-16);
+}
+.today .today-composer input::placeholder {
+  color: color-mix(in srgb, var(--color-over-room) 66%, transparent);
+}
+.today .today-mic {
+  background: color-mix(in srgb, var(--color-over-room) 18%, transparent);
+  color: var(--color-over-room);
+}
+.today .today-composer .f-pill.is-agent:not(:disabled) {
+  background: var(--color-over-room);
+  border-color: transparent;
+  color: var(--color-room-shade);
+}
+.today .today-composer .f-pill {
+  background: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  border-color: transparent;
+  color: var(--color-over-room);
+}
+.today .today-eyebrow[data-mood="listening"],
+.today .today-eyebrow[data-mood="thinking"] {
+  color: var(--color-over-room);
+}
+
+/* the Today panel: larger and easier to read */
+.today .today-state {
+  gap: var(--space-7);
+}
+.today {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+}
+.today-state .f-eyebrow {
+  font-size: var(--text-12);
+}
+.today-state .today-row,
+.today-state .today-goal {
+  padding: var(--space-4) var(--space-3);
+}
+.today-state .today-row-title,
+.today-state .today-goal-title {
+  font: 600 var(--text-16) / 1.35 var(--font-sans);
+}
+.today-state .today-row-why,
+.today-state .today-goal-detail {
+  font-size: var(--text-13);
+}
+.today-state .today-glyph {
+  width: 32px;
+  height: 32px;
+  font-size: var(--text-14);
+}
+.today-state .today-row {
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+}
+.today-state .today-row-board {
+  font-size: var(--text-12);
+  line-height: 22px;
+}
+.today-state .today-empty,
+.today-state .today-source {
+  font-size: var(--text-13);
+}
+/* Add a todo: white */
+.today .today-add input {
+  height: 40px;
+  border: 1px dashed color-mix(in srgb, var(--color-over-room) 60%, transparent);
+  color: var(--color-over-room);
+  font-size: var(--text-14);
+}
+.today .today-add input::placeholder {
+  color: color-mix(in srgb, var(--color-over-room) 78%, transparent);
+}
+.today .today-add input:focus {
+  border-style: solid;
+  border-color: var(--color-over-room);
+  background: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+}
+
+/* ---------- what the Shiba says, as more than a line (today/ShibaTalk.tsx) ---------- */
+
+.today-line.is-rich {
+  font: inherit;
+  letter-spacing: 0;
+  white-space: normal;
+  max-height: 52vh;
+}
+.shiba-talk {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  max-width: 720px;
+  color: var(--color-over-room);
+}
+.shiba-talk .shiba-prose {
+  height: auto;
+  padding: 0;
+  overflow: visible;
+  color: inherit;
+  font: 400 var(--text-16) / 1.5 var(--font-sans);
+}
+.shiba-talk .shiba-prose :is(h1, h2, h3, h4, strong, li, p, blockquote) {
+  color: inherit;
+}
+.shiba-talk.is-large .shiba-prose > p:first-child {
+  font: 300 clamp(var(--text-20), 2.3vw, var(--text-32)) / 1.2 var(--font-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.shiba-prose a {
+  color: inherit;
+  text-decoration: underline;
+}
+.shiba-prose code {
+  background: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  color: inherit;
+}
+.shiba-prose th,
+.shiba-prose td {
+  border-color: color-mix(in srgb, var(--color-over-room) 30%, transparent);
+  color: inherit;
+}
+.md-img {
+  display: block;
+  max-width: min(100%, 420px);
+  max-height: 280px;
+  margin: var(--space-3) 0;
+  border-radius: var(--radius-card);
+  object-fit: contain;
+}
+/* a block of code, a command, the steps: one line, opened on the right */
+.shiba-fold {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-over-room) 30%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-over-room) 10%, transparent);
+  color: var(--color-over-room);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.shiba-fold:hover {
+  background: color-mix(in srgb, var(--color-over-room) 20%, transparent);
+}
+.shiba-fold-mark {
+  font-family: var(--font-code);
+  opacity: 0.8;
+}
+.shiba-fold-first {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-code);
+}
+.shiba-fold.is-steps .shiba-fold-first {
+  font-family: var(--font-sans);
+}
+.shiba-fold-n {
+  flex: none;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+.shiba-plan {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
+  width: min(100%, 520px);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid color-mix(in srgb, var(--color-over-room) 30%, transparent);
+  border-radius: var(--radius-pane);
+  background: color-mix(in srgb, var(--color-over-room) 10%, transparent);
+  color: var(--color-over-room);
+  text-align: left;
+  cursor: pointer;
+}
+.shiba-plan-head {
+  display: flex;
+  justify-content: space-between;
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+.shiba-plan-goal {
+  font: 600 var(--text-14) / 1.35 var(--font-sans);
+}
+.shiba-plan-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+.shiba-plan-step {
+  display: flex;
+  gap: var(--space-3);
+}
+.shiba-plan-step[data-status="done"] {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+.shiba-plan-box {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-paper);
+  font-size: 10px;
+}
+.shiba-plan-step[data-status="active"] .shiba-plan-box {
+  animation: f-breathe 1.6s var(--ease-out-soft) infinite;
+}
+.shiba-plan-more {
+  opacity: 0.7;
+}
+
+/* ---------- #/design: Today's row, the Shiba's answer, the add-an-agent sheet ---------- */
+
+.design-today-parts {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.design-today-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.design-today-parts .design-today-room {
+  height: 360px;
+}
+.design-today-talk {
+  position: absolute;
+  inset: auto var(--space-5) var(--space-5) var(--space-5);
+}
+@media (max-width: 1000px) {
+  .design-today-parts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.design-today-parts .today-veil {
+  background: color-mix(in srgb, var(--color-room-shade) 46%, transparent);
+}
+.design-today-talk {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  --ink: var(--color-over-room);
+  --ink-soft: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  color: var(--color-over-room);
+}
+
+/* ---------- 2026-11-17: Today is a special app: the Shiba is behind every panel, and the panels go clear and white ---------- */
+
+/* the room is the whole window; the words and the Today panel keep to the open paper by padding (Today.tsx) */
+.today {
+  inset: 0;
+  box-sizing: border-box;
+}
+.today .shiba-room,
+.today .today-veil {
+  position: absolute;
+  inset: 0;
+}
+/* the floor's panes over it: no fill of their own, white type, white hairlines */
+.shell.is-place-today :is(.top-bar, .floor-pane) {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 62%, transparent);
+  --color-moss: color-mix(in srgb, var(--color-over-room) 74%, transparent);
+  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+  --color-raise: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  --color-abyss: color-mix(in srgb, var(--color-over-room) 8%, transparent);
+  --color-void: transparent;
+  --color-line: color-mix(in srgb, var(--color-over-room) 24%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-over-room) 44%, transparent);
+  --color-pulse: var(--color-over-room);
+  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  --color-agent: var(--color-over-room);
+  --color-agent-dim: color-mix(in srgb, var(--color-over-room) 18%, transparent);
+  --color-on-fill: var(--color-room-shade);
+  --shadow-sheet: none;
+  background: transparent;
+  color: var(--color-over-room);
+}
+.shell.is-place-today .side-pane .me-avatar {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-over-room) 60%, transparent);
+}
+.shell.is-place-today .server-switch-lift {
+  --color-frost: initial;
+}

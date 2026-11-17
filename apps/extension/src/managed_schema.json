@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "properties": {
+    "foundationUrl": {
+      "title": "Foundation's address",
+      "description": "Where every new tab opens Today, for everyone this policy reaches (for example https://foundation.formindustries.com). People can't change it in the extension's options while it's set.",
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The plan, as a board
+    url: https://github.com/joshleong/Foundation/issues?q=is%3Aopen+label%3Aplan
+    about: Every open card on Foundation's plan. In the app it's Settings → Plan.

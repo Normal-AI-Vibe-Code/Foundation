@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Foundation — Today</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="ext.css" />
+  </head>
+  <body class="ext-popup">
+    <header class="ext-head">
+      <p class="f-eyebrow" id="date"></p>
+      <h1 id="hello">Today</h1>
+      <div class="ext-actions">
+        <a class="f-pill is-agent" id="open-today" target="_blank">◌ Ask the Shiba</a>
+        <a class="f-pill" id="open-boards" target="_blank">▦ Boards</a>
+      </div>
+    </header>
+    <section id="focus" class="ext-group" hidden>
+      <h2 class="f-eyebrow">Focus today <span id="focus-n" class="ext-count"></span></h2>
+      <ol id="focus-list"></ol>
+    </section>
+    <section id="goals" class="ext-group" hidden>
+      <h2 class="f-eyebrow">Goals</h2>
+      <ol id="goal-list"></ol>
+    </section>
+    <section class="ext-group">
+      <h2 class="f-eyebrow">Apps</h2>
+      <div id="apps" class="ext-apps"></div>
+    </section>
+    <p class="ext-note" id="state" role="status"></p>
+    <footer class="ext-foot"><a href="options.html" target="_blank" id="where"></a></footer>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

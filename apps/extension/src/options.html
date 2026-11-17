@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Foundation — options</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="ext.css" />
+  </head>
+  <body class="ext-options">
+    <main>
+      <p class="f-eyebrow">Foundation for Chrome</p>
+      <h1>Where Foundation lives</h1>
+      <p class="ext-note">Every new tab opens Today at this address. Your sign-in stays with Foundation; this extension keeps only the address.</p>
+      <form id="form">
+        <input id="url" type="url" required placeholder="https://foundation.formindustries.com" aria-label="Foundation's address" />
+        <button class="f-pill is-primary" type="submit">Save</button>
+      </form>
+      <p class="ext-note" id="said" role="status"></p>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

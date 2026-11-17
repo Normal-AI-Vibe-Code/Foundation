@@ -1,0 +1,1996 @@
+{
+  "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
+  "repo": "joshleong/Foundation",
+  "syncedAt": "2026-11-17T08:08:12.388Z",
+  "columns": [
+    {
+      "id": "needs-you",
+      "name": "Needs you",
+      "hint": "Waits on a person: a key, an install, a decision"
+    },
+    {
+      "id": "next",
+      "name": "Next",
+      "hint": "Picked up in this order"
+    },
+    {
+      "id": "doing",
+      "name": "Doing",
+      "hint": "Someone (or an agent) is on it"
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "hint": "Built; waiting to merge or for a person to check"
+    },
+    {
+      "id": "backlog",
+      "name": "Backlog",
+      "hint": "Planned, not yet ordered"
+    },
+    {
+      "id": "done",
+      "name": "Done",
+      "hint": "Ran and was checked"
+    }
+  ],
+  "milestones": [
+    {
+      "id": "polish",
+      "name": "Polish",
+      "about": "Bugs and rough edges in what already ships"
+    },
+    {
+      "id": "vision",
+      "name": "Vision loop",
+      "about": "Briefs to Vision Code and back; Release to BomForm"
+    },
+    {
+      "id": "crew",
+      "name": "The crew",
+      "about": "Agents you can see, driven by a real model"
+    },
+    {
+      "id": "company",
+      "name": "Company brain",
+      "about": "BomForm, FactoryForm and the daily picture"
+    },
+    {
+      "id": "search",
+      "name": "Search depth",
+      "about": "Semantic search, Slack per person, Drive and Figma"
+    },
+    {
+      "id": "apps",
+      "name": "Apps first-class",
+      "about": "The registry, foundation.json, machines next"
+    },
+    {
+      "id": "huddles",
+      "name": "Huddles",
+      "about": "Voice in-house, recording consent, live Slack"
+    },
+    {
+      "id": "ship",
+      "name": "Ship",
+      "about": "CI, signed desktop builds, a hosted server"
+    },
+    {
+      "id": "today",
+      "name": "Today",
+      "about": "Home before the boards: the Shiba, focus, goals, Foundation for Chrome"
+    }
+  ],
+  "cards": [
+    {
+      "id": "council-seats-and-machine-io",
+      "title": "Councils of their own, seats with names (the same agent twice), the white line, a machine's Ins & outs",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "review",
+      "body": "Josh, 2026-11-17: every section has a different council; a council agent gets a name over its head; adding Claude again over-rode the first and its avatar; the monkey sat low with a circle; the bar should fold for the right pane; ins and outs as a top-level option, and a VM's output piped into a card on the right; full screen beside Desktop. Built: per-place councils (an agent asked from a council stays on it while it works), seats with ids and crew names (old ones named once, keeping their characters), mesh avatars fitted like silhouettes, no plinth, a white line with mic and ✕, the bar's room folding it, Ins & outs as the machine head's third tab with a test line and Out to a new note on the right. Checked: `test/grids.test.ts`, `e2e/council` (8), `e2e/bottom-bar` (8), `e2e/machine-io` on the real engine. Not checked: the desktop window; the live machine's pipes left alone (its Out writes over the note \"How it works\").",
+      "issue": 194
+    },
+    {
+      "id": "bottom-bar-and-tools",
+      "title": "The bottom bar holds the top right; the top right is the built-in tools; councils at the right; day/night that always reaches the paper",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "shell",
+      "status": "review",
+      "body": "Josh, 2026-11-17. Bottom bar: search (a window over its pill, pinnable to the right; its line the grid's hairline), talk, zoom, present and commands, the council beside Ask, Ask's pill with the agents' settings. The grid's council stands at the bottom right with the bar at the bottom left; a section's at its right by its Council button; three places, close together, empty places breathing. The agents panel has a line under its tabs. Side menu foot: the server pill the menu's width above Settings, the orb left of you, edges on the Settings icon. The grid's WebGL paper survives a lost context (it froze on its last colour). Tools at the top right: terminal, browser, files, change log, T3 (server and Vision's T3 client). The Add sheet opens T3 inside Foundation and turns on agents T3 ships switched off. Checked: `e2e/bottom-bar.spec.ts` (7), `test/hostterm.test.ts` (3), and council, section-crew, one-interface and today e2e; evidence in `docs/evidence/2026-11-17_bottom-bar/`.",
+      "issue": 190
+    },
+    {
+      "id": "machine-port-stale",
+      "title": "A port opened as a page shows its last load after the machine stops",
+      "kind": "bug",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "done",
+      "body": "The page's frame isn't told the machine stopped. Show it as stopped (and reload when it starts again).",
+      "issue": 4
+    },
+    {
+      "id": "on-fill-token",
+      "title": "Tokens for text on a solid fill and for highlights",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "done",
+      "body": "Most of the 19 raw colours left in components (`design.test.ts`'s allowlist) are white text on a solid state or person colour and the port bead's white gloss. A `--color-on-fill` and a highlight token in `tokens.css` would clear them; lower the test's ceiling as they go.",
+      "issue": 5
+    },
+    {
+      "id": "huddle-state-race",
+      "title": "Moving a huddle card while someone joins can drop who's in it",
+      "kind": "bug",
+      "milestone": "huddles",
+      "area": "huddles",
+      "status": "done",
+      "body": "Huddle state lives on the panel object; a move at the same moment overwrites it until the next join or leave. Keep it in its own map.",
+      "issue": 6
+    },
+    {
+      "id": "agent-claude-cmd",
+      "title": "The agent runtime starts an npm-installed claude.cmd safely",
+      "kind": "bug",
+      "milestone": "ship",
+      "area": "agent",
+      "status": "done",
+      "body": "`agent.ts` spawns `config.claudeCli` directly. That works while Claude Code is `claude.exe`, but an npm-installed `claude.cmd` can't be spawned without a shell. Reuse `claudeCommand` from `rea.ts` (found 2026-11-07 while fixing the REA job).",
+      "issue": 7
+    },
+    {
+      "id": "crew-follow",
+      "title": "Follow an agent",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "Done 2026-11-07: Follow on any working agent's roster row; your view glides (at your zoom) to keep its cursor in the middle of the open paper, a pill says whom you're following with Stop, and it ends when you press, drag or wheel the grid, press Esc, or the agent leaves.",
+      "issue": 8
+    },
+    {
+      "id": "space-typing-race",
+      "title": "Keys typed right after a tap of Space can reach the board's shortcuts",
+      "kind": "bug",
+      "milestone": "crew",
+      "area": "voice",
+      "status": "done",
+      "body": "A tap of Space opens the sheet for typing, but its field takes focus on the next animation frame. Letters typed in that gap go to the board (A toggles the agent layer), seen in a headless check on 2026-11-07. Focus the field in the same frame, and hold keys typed before it's ready.",
+      "issue": 9
+    },
+    {
+      "id": "t3-url-runtime",
+      "title": "Read Vision Code's real address from server-runtime.json",
+      "kind": "plan",
+      "milestone": "vision",
+      "area": "vision",
+      "status": "done",
+      "body": "Vision moves to the next port when :3783 is taken, and records where it went in `<T3CODE_HOME>/userdata/server-runtime.json`. Default `T3_URL` from it instead of assuming :3783.",
+      "issue": 10
+    },
+    {
+      "id": "signin-memory",
+      "title": "Flowform sign-in attempts are lost on a server restart",
+      "kind": "bug",
+      "milestone": "ship",
+      "area": "auth",
+      "status": "done",
+      "body": "Attempts live in server memory for 10 minutes, so a `tsx watch` restart mid-sign-in makes the person click again. Keep them in SQLite.",
+      "issue": 11
+    },
+    {
+      "id": "rea-windows",
+      "title": "The REA job on Windows",
+      "kind": "bug",
+      "milestone": "ship",
+      "area": "rea",
+      "status": "done",
+      "body": "It spawns `npx` without a shell; Windows needs `npx.cmd` resolved safely (its arguments include a target). The REA runner and the Vision brief are also unexercised end to end.",
+      "issue": 12
+    },
+    {
+      "id": "created-by-cards",
+      "title": "Notes and tables say which agent made them",
+      "kind": "bug",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "A real turn's cards are signed in the activity, but `createdBy` is set on panels only, so a note or table doesn't say which agent made it.",
+      "issue": 13
+    },
+    {
+      "id": "sheet-asks-vanish",
+      "title": "A finished ask from the sheet leaves the roster with nowhere to find it",
+      "kind": "bug",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "Agents asked from the sheet run without a tab; their sessions are in the side pane, but nothing points there once the roster lets them go 2.4 s after they finish (SPEC §7).",
+      "issue": 14
+    },
+    {
+      "id": "pane-beside-session",
+      "title": "Opening the side pane beside a session on a narrow window leaves a sliver",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "floor",
+      "status": "done",
+      "body": "The floor only gives way on its own. Narrow the session instead when the pane is opened by hand.",
+      "issue": 15
+    },
+    {
+      "id": "claude-sign-in",
+      "title": "The crew driven by a real model",
+      "kind": "hookup",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "done",
+      "body": "Claude Code signed back in; three real subscription turns drove the crew on 2026-11-07 (`docs/evidence/2026-11-07_crew/` 10–14) and found five faults, fixed the same day: connectors hosting the new section, raw markdown tables, port ids in cursor labels, the helper's brief logged as the person's ask, section ids in activity.",
+      "issue": 16
+    },
+    {
+      "id": "repo-visibility",
+      "title": "Decide the repo's visibility (public fork today)",
+      "kind": "hookup",
+      "milestone": "ship",
+      "area": "repo",
+      "status": "needs-you",
+      "body": "`joshleong/Foundation` is public and holds company plans and connector names (and now these issues). Make it private, or move it to the Form Industries org (SPEC §6 #1).",
+      "issue": 17
+    },
+    {
+      "id": "slack-app",
+      "title": "Create the Slack app and set SLACK_BOT_TOKEN",
+      "kind": "hookup",
+      "milestone": "huddles",
+      "area": "slack",
+      "status": "needs-you",
+      "body": "Create the app from `docs/slack-app-manifest.yml`, install it, set `SLACK_BOT_TOKEN` (and `SLACK_USER_TOKEN` for ⌘K search). Channel cards, links, huddle invites, Hermes DMs and `lay_out` from Slack have only run against a stand-in Slack (SPEC §6 #7).",
+      "issue": 18
+    },
+    {
+      "id": "keys-setup",
+      "title": "Keys: BomForm + CA, API credits, rea-agents setup",
+      "kind": "hookup",
+      "milestone": "company",
+      "area": "connectors",
+      "status": "needs-you",
+      "body": "`BOMFORM_MCP_URL` + `BOMFORM_API_KEY` + `NODE_EXTRA_CA_CERTS`, or the Data Room read token; `ANTHROPIC_API_KEY` for the API runtime (untested); `npx rea-agents setup` before a reverse-engineering card's Run (SPEC §6).",
+      "issue": 19
+    },
+    {
+      "id": "dataroom-sync-stopped",
+      "title": "The Data Room's daily BomForm sync stopped on 2026-09-05",
+      "kind": "bug",
+      "milestone": "company",
+      "area": "connectors",
+      "status": "needs-you",
+      "body": "BomForm reads the Data Room's copy, labelled \"copy · 58d old\". Check `BOMFORM_API_KEY` / `CRON_SECRET` on Vercel, merge `foundation-bomform-read` and point `DATAROOM_BOMFORM_URL` at airformdata.com (SPEC §6 #5).",
+      "issue": 20
+    },
+    {
+      "id": "install-kiri",
+      "title": "Machines on Kiri (Windows)",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "done",
+      "body": "Kiri installed by `npm run kiri:install` (MSI checked against a pinned SHA-256), started with `npm run dev`, woken by Start, and launched outside the server's process tree so it outlives Foundation. Still: Kiri's Windows installer is unsigned, and Kiri doesn't apply per-container memory/CPU caps.",
+      "issue": 21
+    },
+    {
+      "id": "github-issues",
+      "title": "Issues on and the plan pushed to GitHub",
+      "kind": "hookup",
+      "milestone": "ship",
+      "area": "repo",
+      "status": "done",
+      "body": "Done 2026-11-08 with Josh's go-ahead: issues turned on for `joshleong/Foundation` and `npm run plan:push` made one issue per card (labels `plan`, `kind:`, `status:`, `area:`, a milestone each; Done cards closed). Move cards on GitHub by their `status:` label, then `npm run plan:pull`.",
+      "issue": 22
+    },
+    {
+      "id": "github-project-scope",
+      "title": "Give gh the project scope so the kanban can live in GitHub Projects",
+      "kind": "hookup",
+      "milestone": "ship",
+      "area": "repo",
+      "status": "needs-you",
+      "body": "Issues carry the board today (status labels + milestones). For a GitHub Projects board, run `gh auth refresh -s project,read:project` and then `npm run plan:project`, which makes the project and adds every open issue with its column.",
+      "issue": 23
+    },
+    {
+      "id": "vision-scratch-project",
+      "title": "Remove the scratch \"Foundation hand-offs\" project from Vision Code",
+      "kind": "hookup",
+      "milestone": "vision",
+      "area": "vision",
+      "status": "needs-you",
+      "body": "Left behind when `npm test` used to reach the real Vision Code (fixed 2026-11-03). Delete it in Vision Code.",
+      "issue": 24
+    },
+    {
+      "id": "vision-export-seen",
+      "title": "See an export come back from a real Vision Code thread",
+      "kind": "plan",
+      "milestone": "vision",
+      "area": "vision",
+      "status": "needs-you",
+      "body": "One real hand-off started a Supervised thread that read the brief and waited on approval. Approve its file writes in Vision Code and check the export lands beside the brief as a card, then that reviewers are asked (SPEC §3 Vision loop).",
+      "issue": 25
+    },
+    {
+      "id": "vision-windows",
+      "title": "Vision Code hand-offs on Windows",
+      "kind": "bug",
+      "milestone": "vision",
+      "area": "vision",
+      "status": "needs-you",
+      "body": "Built 2026-11-07 (`t3paths.ts`): Vision Code's CLI and store are found on Windows and Linux, overrides still win, and when nothing is found the side pane and the hand-off card list every path tried. On this machine it found `C:\\Dev\\Vision\\.tools\\code-server\t3.exe` and `%APPDATA%\\co.normallab.vision\\code` and read 4 threads. Left for a person: press Run on a hand-off card on Windows with Vision Code open, and approve the thread there.",
+      "issue": 26
+    },
+    {
+      "id": "release-bomform",
+      "title": "Release stage writes BOM lines to BomForm",
+      "kind": "plan",
+      "milestone": "vision",
+      "area": "pipeline",
+      "status": "backlog",
+      "body": "Release completes the stage but writes nothing. Once BomForm's write tools are keyed, write the chosen CAD's BOM lines, person-approved, and show what was written on the stage (SPEC §3 Design pipelines).",
+      "issue": 27
+    },
+    {
+      "id": "vision-pairing",
+      "title": "A hosted Foundation reaches Vision Code by a pairing link",
+      "kind": "plan",
+      "milestone": "vision",
+      "area": "vision",
+      "status": "backlog",
+      "body": "Hand-offs use T3's CLI on the same machine. A hosted server needs a T3 pairing link and a stored client credential: a decision for Josh on where that credential lives (SPEC §7).",
+      "issue": 28
+    },
+    {
+      "id": "vision-review-verdict",
+      "title": "Reviews come back as Vision's own verdict, not only asks",
+      "kind": "plan",
+      "milestone": "vision",
+      "area": "vision",
+      "status": "backlog",
+      "body": "Review asks each reviewer through Hermes. Vision has its own review tools; bring their verdict back onto the Review stage beside the people's answers.",
+      "issue": 29
+    },
+    {
+      "id": "table-into-app-section",
+      "title": "A person's table (⌘K) added into an app section hides behind the app",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "done",
+      "body": "Agents' cards no longer do this: since 2026-11-07 a card an agent adds to a hosted section makes the app a card in the flow beside it (`cardSection` in `tools.ts`). The client's own add paths (⌘K, the section toolbar, the empty-section actions) should do the same.",
+      "issue": 30
+    },
+    {
+      "id": "add-section-gap-dblclick",
+      "title": "The + add-section buttons in the gaps catch double-clicks",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "done",
+      "body": "The + buttons sit in the 40 px gaps between sections, so a double-click aimed at the gap adds a section. Make adding a single, deliberate press that a double-click can't trigger (SPEC §7).",
+      "issue": 31
+    },
+    {
+      "id": "expanded-dim-wires",
+      "title": "Wires between other sections stay bright over an expanded section's dimmed neighbours",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "wires",
+      "status": "done",
+      "body": "When a section is expanded its neighbours fade to 12 %, but the wires between them draw at full strength. Dim them with their sections (SPEC §7).",
+      "issue": 32
+    },
+    {
+      "id": "legacy-css",
+      "title": "Prune the legacy toolbar CSS and the last raw colours",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "design",
+      "status": "done",
+      "body": "`.app-bar` is still in App.css; a few `rgba()` and hex colours and hover transitions on `background` remain and lag the night fade. Prune them and add a `check-design` test that ratchets raw colours down (Phase 1 leftover, DESIGN §2).",
+      "issue": 33
+    },
+    {
+      "id": "webm-duration",
+      "title": "Huddle recordings can't seek: Chrome's WebM has no duration",
+      "kind": "bug",
+      "milestone": "huddles",
+      "area": "huddles",
+      "status": "done",
+      "body": "MediaRecorder's WebM carries no duration, so the archive's player can't seek until it has played through. Write the duration into the file before it uploads (SPEC §7).",
+      "issue": 34
+    },
+    {
+      "id": "crew-stop-all",
+      "title": "A crew-wide stop",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "Done 2026-11-07: **Stop all** heads the crew roster when two or more of yours are working, and ⌘K → Stop all my agents does the same. Server-side (`POST /api/agent/runs/stop-all`, `stopAllRuns`): every run of yours on this board, helpers included, and nobody else's.",
+      "issue": 35
+    },
+    {
+      "id": "crew-point",
+      "title": "Agents that point at a cell or a port",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "Done 2026-11-07: `point_at` aims an agent's cursor at a table cell (\"D5\") or a panel's port, with a laser ring on the spot; it writes nothing. The agent's prompt tells it to point as it explains. Seen on the scripted runtime: the laser sat on D5 (52.62). A real model hasn't used it yet.",
+      "issue": 36
+    },
+    {
+      "id": "crew-shared-work",
+      "title": "Helpers see the lead's plan and each other's work",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "Done 2026-11-08: a helper's brief carries the lead's plan (`set_plan`) and what the crew has made so far, and `crew_work` (read) keeps it current: the ask, the plan, each agent's state, sections and cards, finished helpers included. On the script runtime, a second helper saw the first one's “Suppliers to call” and wrote only the lead times (`crew.test.ts`, `e2e/crew.spec.ts`). Not yet seen with a real model.",
+      "issue": 86
+    },
+    {
+      "id": "crew-spatial-voice",
+      "title": "Spatial voice: ask the agent nearest your pointer",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "backlog",
+      "body": "Holding Space near a working agent's cursor talks to that agent instead of starting a new one.",
+      "issue": 37
+    },
+    {
+      "id": "local-transcriber",
+      "title": "A local transcriber so voice stays in-house",
+      "kind": "plan",
+      "milestone": "huddles",
+      "area": "voice",
+      "status": "backlog",
+      "body": "Web Speech sends mic audio to the browser maker's service. Whisper on the server or Vision's `@pacific/voice` would keep it in-house, for the crew's sheet and huddle transcripts alike.",
+      "issue": 38
+    },
+    {
+      "id": "kiri-mac-linux",
+      "title": "Run npm run kiri:install on a Mac and on Linux",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "`scripts/kiri.mjs` has run on Windows only. Its macOS (`.dmg`, `open -a Kiri`) and Linux (`.deb`/`.rpm`, `kiri daemon`) paths are written from Kiri's docs and not yet tried.",
+      "issue": 39
+    },
+    {
+      "id": "mic-twice",
+      "title": "The voice sheet opens the microphone twice",
+      "kind": "bug",
+      "milestone": "crew",
+      "area": "voice",
+      "status": "done",
+      "body": "The level meter's getUserMedia runs beside Web Speech: in the desktop app and some browsers that's a second permission prompt (SPEC §7).",
+      "issue": 40
+    },
+    {
+      "id": "space-two-things",
+      "title": "Measure Space's three jobs on a real trackpad",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "voice",
+      "status": "backlog",
+      "body": "Held still it listens after 240 ms, tapped it types, held with a drag it pans. Someone who holds Space and waits before dragging sees the sheet flash. Check with real people.",
+      "issue": 41
+    },
+    {
+      "id": "daily-digest",
+      "title": "A daily \"what changed\" digest note by the agent",
+      "kind": "plan",
+      "milestone": "company",
+      "area": "company",
+      "status": "done",
+      "body": "Done 2026-11-07: a server-built note (no model) in the company board's \"Daily digest\" section each morning: who did what, sections and cards added or removed, each connector compared with the last digest. One per day, 14 kept by reusing the oldest, `write_digest` for one now.",
+      "issue": 42
+    },
+    {
+      "id": "bomform-diff",
+      "title": "BomForm snapshot cached and diffed",
+      "kind": "plan",
+      "milestone": "company",
+      "area": "connectors",
+      "status": "backlog",
+      "body": "Keep each day's BomForm snapshot and show what changed since the last one on the connector.",
+      "issue": 43
+    },
+    {
+      "id": "company-voice",
+      "title": "Spoken conversations about the company (@pacific/voice)",
+      "kind": "plan",
+      "milestone": "company",
+      "area": "voice",
+      "status": "backlog",
+      "body": "Vision's realtime voice session, pointed at the company board's tools.",
+      "issue": 44
+    },
+    {
+      "id": "semantic-search",
+      "title": "Semantic search: e5 text, SigLIP images, RRF k=60",
+      "kind": "plan",
+      "milestone": "search",
+      "area": "search",
+      "status": "backlog",
+      "body": "Port flowform's semantic search beside FTS5, fused by reciprocal rank. It would also let find_images see inside pictures (SPEC §7).",
+      "issue": 45
+    },
+    {
+      "id": "slack-per-user",
+      "title": "Slack per-person OAuth, with visibility that fails closed",
+      "kind": "plan",
+      "milestone": "search",
+      "area": "slack",
+      "status": "backlog",
+      "body": "Today ⌘K searches Slack with one user token. flowform's per-person OAuth and mirrored visibility are the target.",
+      "issue": 46
+    },
+    {
+      "id": "drive-figma",
+      "title": "Google Drive and Figma connectors",
+      "kind": "plan",
+      "milestone": "search",
+      "area": "connectors",
+      "status": "backlog",
+      "body": "Search and cards for Drive files and Figma frames.",
+      "issue": 47
+    },
+    {
+      "id": "app-registry",
+      "title": "An app registry UI",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "See and edit the company's apps (name, URL, repo, MCP, ports) instead of a list in code.",
+      "issue": 48
+    },
+    {
+      "id": "foundation-json",
+      "title": "foundation.json in our vibe-coded apps",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "Publish `/.well-known/foundation.json` from each app so opening its URL gives it a name, ports, MCP and repo. Also exercises the postMessage bridge with a real app, which hasn't happened yet.",
+      "issue": 49
+    },
+    {
+      "id": "wires-mcp",
+      "title": "Wires that call MCP tools on input",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "wires",
+      "status": "backlog",
+      "body": "A value arriving on a port calls an app's MCP tool and sends the result on.",
+      "issue": 50
+    },
+    {
+      "id": "machine-agent-commands",
+      "title": "Agents run commands in a machine a person started, approved per command",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "done",
+      "body": "Agents can read a machine's last screen; let them propose a command that runs once a person approves it on the card.",
+      "issue": 51
+    },
+    {
+      "id": "machine-compose",
+      "title": "docker compose stacks as sections; noVNC and ttyd presets",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "backlog",
+      "body": "A compose file opens as a section of machines wired together; desktop presets for web desktops.",
+      "issue": 52
+    },
+    {
+      "id": "machine-zoom-select",
+      "title": "A machine's terminal selection lands off at zooms other than 100 %",
+      "kind": "bug",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "done",
+      "body": "xterm measures its cells unscaled, so a mouse selection is off by the zoom factor (and now by a section's fit). Typing is fine.",
+      "issue": 53
+    },
+    {
+      "id": "recording-opt-out",
+      "title": "Per-person recording opt-out",
+      "kind": "plan",
+      "milestone": "huddles",
+      "area": "huddles",
+      "status": "backlog",
+      "body": "Anyone can start recording and everyone sees REC, but nobody can stay out except by leaving.",
+      "issue": 54
+    },
+    {
+      "id": "slack-live",
+      "title": "Slack live (Socket Mode), threads, and a summary at the end of a session",
+      "kind": "plan",
+      "milestone": "huddles",
+      "area": "slack",
+      "status": "backlog",
+      "body": "Cards poll every 5 s; threads show a count but can't be opened; a session's summary could post when it ends, person-approved.",
+      "issue": 55
+    },
+    {
+      "id": "huddle-screen-share",
+      "title": "Screen share into the portal; spatial audio while roaming",
+      "kind": "plan",
+      "milestone": "huddles",
+      "area": "huddles",
+      "status": "backlog",
+      "body": "Share a screen as a tile; voices fade with distance from the portal while you roam the board.",
+      "issue": 56
+    },
+    {
+      "id": "huddle-sfu",
+      "title": "An SFU past six people; TURN by default",
+      "kind": "plan",
+      "milestone": "huddles",
+      "area": "huddles",
+      "status": "backlog",
+      "body": "The mesh strains past about six. LiveKit self-hosted is the step up. Only STUN by default, so strict NATs need `FOUNDATION_ICE_SERVERS`.",
+      "issue": 57
+    },
+    {
+      "id": "huddle-invite-wait",
+      "title": "Inviting a channel to a new huddle waits 400 ms for the card to sync",
+      "kind": "bug",
+      "milestone": "huddles",
+      "area": "slack",
+      "status": "done",
+      "body": "A server-side create-and-invite would remove the wait.",
+      "issue": 58
+    },
+    {
+      "id": "real-voice-check",
+      "title": "Check speech transcription with a real voice",
+      "kind": "plan",
+      "milestone": "huddles",
+      "area": "voice",
+      "status": "needs-you",
+      "body": "Huddle transcripts and the crew's sheet were checked with typed lines and a stand-in recogniser. Talk in a huddle and to the sheet on a real machine.",
+      "issue": 59
+    },
+    {
+      "id": "fitted-frames-posters",
+      "title": "Live pages and section fit: the mount gate ignores the fit",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "done",
+      "body": "Frames mount when on screen and the camera's zoom is ≥ 0.3 (`useOnScreen`), whatever the section's fit. So a page fitted to 27 % in a section at 100 % zoom mounts at an effective 27 % (costly, unreadable), while one reported on the crowded company board stayed a poster (not reproduced: likely the board was zoomed out below 0.3). Decide the rule on the effective scale (zoom × fit) and reproduce the report first.",
+      "issue": 60
+    },
+    {
+      "id": "hover-bar-ports",
+      "title": "A machine card's hover bar covers its port pills (a design call)",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "done",
+      "body": "Seen while checking machine pages (2026-11-07): the bar that drops in over a card's top edge on hover sits over the machine card's head, where its published ports are pills (`:8080 ↗`), so they're hard to press. Options: move the port pills to the card's foot (as the huddle card moved its controls to the bottom for the same reason); start the head below the bar's 30 px; or let the bar skip machine cards and put its actions in the foot. DESIGN puts the pills in the head today, so this is Josh's call. Settled 2026-11-16: the bar no longer covers the card's content (it is given 38 px of room), and ports sit outside the body.",
+      "issue": 61
+    },
+    {
+      "id": "activity-roles",
+      "title": "A person's tool calls are logged as an agent; grid edits aren't logged",
+      "kind": "bug",
+      "milestone": "company",
+      "area": "company",
+      "status": "done",
+      "body": "`touch()` in `tools.ts` logs every tool call with role `agent`, including a person's HTTP call, so the daily digest counts people as agents. A person's own edits on the grid write no activity at all. Log the actor's real role, and log a person's structural edits (sections and cards added or removed).",
+      "issue": 62
+    },
+    {
+      "id": "october-grid-branch",
+      "title": "Port what's still missing from the October grid branch",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "backlog",
+      "body": "`feat/grid-interactions-and-persistence` (2026-10-04, merged into the upstream org repo, not into this one) was written on the app before the monorepo: multi-select and merging sections, dragging a card across sections, media ingest, local persistence, a voice command bar and sound effects (`src/sound/sfx.ts`). It can't be merged (different layout and store); compare it with today's app and port the parts that are still missing.",
+      "issue": 85
+    },
+    {
+      "id": "codemirror-notes",
+      "title": "Notes in CodeMirror with y-codemirror",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "notes",
+      "status": "done",
+      "body": "Two people editing the very same word can interleave letters (each edit rebases as one change). A CodeMirror binding fixes that and brings syntax-aware editing; undo would last across reloads.",
+      "issue": 63
+    },
+    {
+      "id": "narrow-store-subscribers",
+      "title": "Narrow the whole-store subscribers (GridViewport, WireLayer, MapView)",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "done",
+      "body": "They render on every change on a big board. Narrow them the way `useSection` did.",
+      "issue": 64
+    },
+    {
+      "id": "frame-section-tools",
+      "title": "Framing a section can put its tools off screen; an empty section's welcome reads small",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "done",
+      "body": "Framing zooms to a section's cards (about 0.55 at 1440×900). Frame tighter when it holds one card or none, and keep its top-right tools in view.",
+      "issue": 65
+    },
+    {
+      "id": "wire-first-column",
+      "title": "Backward wires into a pipeline's first column hook tightly",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "wires",
+      "status": "done",
+      "body": "The input sits 28 px from the section's wall, leaving about 14 px for the U-turn. A wider left pad on pipeline sections gives it room.",
+      "issue": 66
+    },
+    {
+      "id": "wire-landing-far-end",
+      "title": "Wire landings collide at the far end of an edge",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "wires",
+      "status": "done",
+      "body": "Landings push apart along an edge but not at the far end, so two apps crowding one edge can tilt one wire. Also: a wire from a split app section can run tight along a neighbour's edge.",
+      "issue": 67
+    },
+    {
+      "id": "expanded-snap",
+      "title": "An expanded section's size snaps while its card eases",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "done",
+      "body": "Wires jump to the new rects at once. Animate the store's rect so they travel together. Floating cards also stay where they were, which can make the open section wide.",
+      "issue": 68
+    },
+    {
+      "id": "trackpad-tune",
+      "title": "Tune throw momentum, MIN_FIT and pinch on a real trackpad",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "needs-you",
+      "body": "Throws carry velocity × 125 ms; fitted cards stop shrinking at 40 %. Both are judgement calls made headless; tune with a person on a real display.",
+      "issue": 69
+    },
+    {
+      "id": "perf-real-gpu",
+      "title": "Re-run the perf trace on a real GPU and decide on live frames during camera moves",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "backlog",
+      "body": "About 5 % of frames drop to 30 fps with live apps on screen in headless Chromium. Measure on the Mac and Windows GPUs, then choose: a still in their place while the camera moves, or live.",
+      "issue": 70
+    },
+    {
+      "id": "touched-rings",
+      "title": "Cards a tool changed without naming them go unringed",
+      "kind": "bug",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "done",
+      "body": "Rings come from ids in tool inputs and results. Ring from the activity a run wrote instead.",
+      "issue": 71
+    },
+    {
+      "id": "launcher-orphans",
+      "title": "Stopping the launcher from outside leaves its children running (Windows)",
+      "kind": "bug",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "done",
+      "body": "A hard kill of `scripts/dev.mjs` (an IDE stop button, Task Manager) never reaches its `taskkill /T`, so the server, Vite and the window keep their ports. Tie the children to the launcher.",
+      "issue": 72
+    },
+    {
+      "id": "shortcut-labels",
+      "title": "Keys say ⌘ on Windows",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "desktop",
+      "status": "done",
+      "body": "Merged 2026-11-08 (`fix/shortcut-labels`): labels print ⌘ on a Mac and Ctrl on Windows and Linux through `lib/keys.ts`; key chips never wrap.",
+      "issue": 73
+    },
+    {
+      "id": "ws-ticket",
+      "title": "A header-capable sync transport (ticket exchange)",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "auth",
+      "status": "done",
+      "body": "WebSocket auth uses the cookie, so a packaged app can't use a hosted server (cross-site). A short-lived ticket, like T3's `websocket-ticket`, fixes it.",
+      "issue": 74
+    },
+    {
+      "id": "ci",
+      "title": "CI: tests, typecheck and Tauri builds on Windows, macOS and Linux",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "ship",
+      "status": "backlog",
+      "body": "`npm test`, typecheck and `cargo build` on every push, on windows-latest too. Then signed installers.",
+      "issue": 75
+    },
+    {
+      "id": "hosted-server",
+      "title": "A hosted server: S3 media, Postgres or libsql",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "ship",
+      "status": "backlog",
+      "body": "And what a hosted server means for machines (they'd run on the host) and Vision hand-offs (a pairing link).",
+      "issue": 76
+    },
+    {
+      "id": "shared-ui",
+      "title": "One UI package across Data Room, Creation, Vision and Foundation",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "design",
+      "status": "backlog",
+      "body": "Panels from the Data Room, Creation and Vision sharing `@foundation/ui` (or Vision's `@pacific/ui` directly).",
+      "issue": 77
+    },
+    {
+      "id": "installers",
+      "title": "Run and sign the desktop installers; rebuild macOS",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "backlog",
+      "body": "The Windows NSIS and MSI builds were made but never run, and nothing is signed. The macOS build wasn't rebuilt since the Windows work.",
+      "issue": 78
+    },
+    {
+      "id": "link-accounts-ui",
+      "title": "Linking accounts and other admin as a screen",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "auth",
+      "status": "backlog",
+      "body": "Linking two users is `npm run link-accounts`. Admin (users, audit) has no UI yet.",
+      "issue": 79
+    },
+    {
+      "id": "iframe-sandbox",
+      "title": "Panel iframes are sandboxed with allow-same-origin",
+      "kind": "bug",
+      "milestone": "ship",
+      "area": "security",
+      "status": "done",
+      "body": "A hostile app on the same origin could escape. Serve third-party apps from their own origins and drop allow-same-origin where we can.",
+      "issue": 80
+    },
+    {
+      "id": "flowform-fixtures",
+      "title": "Commit the flowform importer's fixture rooms",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "tests",
+      "status": "needs-you",
+      "body": "`flowform-import.test.ts`'s six tests skip because the rooms were never committed (the old `data/` ignore caught them). Whoever has them should commit them.",
+      "issue": 81
+    },
+    {
+      "id": "floorplan-refresh",
+      "title": "Refresh the app floorplan after this release",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "docs",
+      "status": "backlog",
+      "body": "`public/floorplan.html` is a snapshot from 2026-11-03; machines, the crew, section fit and the plan board came since (docs/floorplan.md).",
+      "issue": 82
+    },
+    {
+      "id": "connector-card-title",
+      "title": "A connector shown as a card (not hosted) has no name at rest",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "done",
+      "body": "Cards have no title at rest by design; hosted apps and pipeline stages name themselves, but a connector card reads by its body only.",
+      "issue": 83
+    },
+    {
+      "id": "plan-board",
+      "title": "The plan as a kanban: GitHub issues and Settings → Plan",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "docs",
+      "status": "done",
+      "body": "`docs/plan.json` is the plan; `npm run plan:push` / `plan:pull` keep it and GitHub issues in step; Settings → Plan shows it as a board, and admins move cards there. SPEC §8 points here instead of a phase table. Built and checked in the browser; waiting on the first push to GitHub (see \"Turn on issues and push the plan to GitHub\").",
+      "issue": 84
+    },
+    {
+      "id": "desktop-updates",
+      "title": "The desktop app updates itself (signed feed, a card, one press)",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "done",
+      "body": "Like Vision (ADR-055): tauri-plugin-updater reads latest.json on the newest GitHub release, checks the installer against Foundation’s key, a person presses Update. npm run release builds and publishes. Checked on a real install (docs/evidence/2026-11-08_desktop-updates/).",
+      "issue": 87
+    },
+    {
+      "id": "app-icon",
+      "title": "A new app icon: an F laid in masonry",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "done",
+      "body": "apps/client/assets/foundation-icon.svg; the desktop icons and the browser tab use it.",
+      "issue": 88
+    },
+    {
+      "id": "files-search",
+      "title": "Search inside documents; paste, folders and one upload tray",
+      "kind": "plan",
+      "milestone": "search",
+      "area": "search",
+      "status": "done",
+      "body": "PDF, Word, PowerPoint, Excel and OpenDocument files are read after their upload answers (a worker thread, capped per file; unpdf for PDF, a built-in zip + XML reader for the rest), kept by content and put into search; older files are read at boot. ⌘K and the search pane show the matching words, marked. On the grid: paste files or a screenshot where the pointer is, drop whole folders (laid out as a group under a note naming them), and every upload goes through one glass tray (three at a time, Retry on failure). Checked: `test/files-text.test.ts` (9), `e2e/files.spec.ts` (4), `#/design` → Adding files, day and night (`docs/evidence/2026-11-08_files-search/`). Open: scanned PDFs (no OCR), legacy .doc/.ppt/.xls, a real OS folder drag (the e2e walks a stand-in entry tree).",
+      "issue": 89
+    },
+    {
+      "id": "open-section-floating-cards",
+      "title": "An open section keeps its floating cards where they were",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "backlog",
+      "body": "Left over from #68 (the wires now travel with the card). A card dropped far right in the fitted view stays there when the section opens, so the open section is wide and the camera frames it smaller. Docked cards reflow; floating ones could be brought within the open width, or the open width could ignore outliers.",
+      "issue": 90
+    },
+    {
+      "id": "today-shiba",
+      "title": "Today and the Shiba: home before the boards",
+      "kind": "plan",
+      "milestone": "today",
+      "area": "today",
+      "status": "done",
+      "body": "Signed in, a person lands on Today: the Shiba (Vision's ethereal shiba as the agent's face) answers about their day and changes their goals; beside it what wants them (asks, @mentions, stages they own, files and changes on their boards, work matching their job), their goals and every company app. Evidence: `docs/evidence/2026-11-11_today-shiba/` (SPEC §0.2).",
+      "issue": 108
+    },
+    {
+      "id": "chrome-real-check",
+      "title": "Load Foundation for Chrome in a real Chrome",
+      "kind": "plan",
+      "milestone": "today",
+      "area": "today",
+      "status": "done",
+      "body": "Checked in a real Chromium on 2026-11-11 (`apps/client/e2e/extension.spec.ts`): a new tab goes through the extension to Today, signed in; the popup reads `/api/today` from the extension's origin with Foundation's cookie; signed out it says so. Evidence: `docs/evidence/2026-11-11_chrome-extension/`. Branded Chrome with a hosted Foundation comes with the rollout (#110).",
+      "issue": 109
+    },
+    {
+      "id": "chrome-publish",
+      "title": "Publish Foundation for Chrome to everyone",
+      "kind": "hookup",
+      "milestone": "today",
+      "area": "today",
+      "status": "needs-you",
+      "body": "The package, listing, images and policies are ready (`apps/extension/README.md`, `STORE.md`, `store/`, `npm run release -w @foundation/extension`). Needs a person: confirm the placeholders in `apps/extension/release.json` (hosted address, domains, support email, privacy URL), register a Chrome Web Store developer account under a company Google account (one-time fee), upload as Private to the Workspace domain, then a Workspace admin force-installs it by id with `dist/policy/admin-console-policy.json` (SPEC §6 #17).",
+      "issue": 110
+    },
+    {
+      "id": "app-addresses",
+      "title": "Set BomForm's, HyperForm's and FleetForm's addresses",
+      "kind": "hookup",
+      "milestone": "today",
+      "area": "apps",
+      "status": "needs-you",
+      "body": "Today shows them as not linked until `BOMFORM_URL`, `HYPERFORM_URL`, `FLEETFORM_URL` are set (SPEC §6 #18). What is HyperForm's app? Only the Data Room's diligence video mentions it.",
+      "issue": 111
+    },
+    {
+      "id": "dataroom-goals",
+      "title": "People's projects and goals from the Data Room on Today",
+      "kind": "hookup",
+      "milestone": "today",
+      "area": "company",
+      "status": "needs-you",
+      "body": "Needs a read endpoint in AirformDataRoom (proposed: `GET /api/foundation/goals?email=`, bearer `FOUNDATION_READ_TOKEN`, like the BomForm digest), then `DATAROOM_GOALS_URL` here (SPEC §6 #19).",
+      "issue": 112
+    },
+    {
+      "id": "today-profile",
+      "title": "A profile form and the Shiba's first-run walkthrough",
+      "kind": "plan",
+      "milestone": "today",
+      "area": "today",
+      "status": "backlog",
+      "body": "Title, team and the words for \"your work\" are set only by telling the Shiba today. A small form on Today, and the Shiba asking a new person's role on their first visit.",
+      "issue": 113
+    },
+    {
+      "id": "today-voice",
+      "title": "The Shiba speaks its replies",
+      "kind": "plan",
+      "milestone": "today",
+      "area": "voice",
+      "status": "backlog",
+      "body": "Replies are type only. The browser's speech synthesis (local on macOS) or Vision's `@pacific/voice` (paid, consented per talk, as in HomeForm).",
+      "issue": 114
+    },
+    {
+      "id": "today-mention-index",
+      "title": "A mention and owner index, so Today doesn't read every board",
+      "kind": "plan",
+      "milestone": "today",
+      "area": "perf",
+      "status": "backlog",
+      "body": "Today reads every board on each load to find mentions, stages and changes. Fine for a handful of boards; past a few dozen it wants an index kept as boards change.",
+      "issue": 115
+    },
+    {
+      "id": "server-picture-levels",
+      "title": "Make picture levels on the server, so a first visit never downloads an original",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "backlog",
+      "body": "Levels are made in the browser from the original, once per device (`lib/imageLod.ts`), so the first visit to a heavy board still downloads every original (110 MB on the Flowform room). The server has no image decoder; one (sharp, or a WASM decoder) would let it serve `/files/<id>?w=512` and share levels across devices.",
+      "issue": 107
+    },
+    {
+      "id": "cards-never-take-wheel",
+      "title": "No card takes the wheel: Ctrl-click to use one, Ctrl+Enter full screen",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "review",
+      "body": "Josh, 2026-11-11: \"Don't allow any of the objects to take over scroll, give them a ctrl keyboard command to interact with them, and allow them to be fullscreened\". The wheel pans the grid over apps, maps, terminals and lists; ⌘/Ctrl-click puts a card in use; ⌘↵ / Ctrl+Enter or ⤢ opens it full screen without reloading it (`lib/cardUse.ts`, `e2e/card-use.spec.ts`).",
+      "issue": 106
+    },
+    {
+      "id": "heavy-board-perf",
+      "title": "A heavy board holds 60 fps: picture levels, live pages and videos start when the camera is calm",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "review",
+      "body": "Josh, 2026-11-11, on a Flowform room with 27 photos (up to 4096 px, 110 MB), 4 videos and 15 live apps: \"strive for 30-60 FPS\". Pictures draw from the smallest of 256/512/1024/2048 px levels that's sharp at their drawn size, made once in a worker and kept in Cache Storage (`lib/imageLod.ts`); live pages and videos mount only once the camera is still, one at a time (`lib/calm.ts`); videos let go 5 s off screen. Measured by `e2e/heavy.spec.ts` (PERF_GPU=1) on the room's own geometry: SPEC §5.",
+      "issue": 105
+    },
+    {
+      "id": "flowform-file-bytes",
+      "title": "Flowform file downloads, through the person's kept Flowform session",
+      "kind": "hookup",
+      "milestone": "company",
+      "area": "auth",
+      "status": "done",
+      "body": "Josh chose to keep the Flowform session for downloads (2026-11-11) and signed in through Flowform. Against production: Form Industries' 27 images and 4 videos (158 MB) and MatterForm's images, video and STEP file came into the archive and their cards became them. Flowform's file route needs `x-flowform-client-version` ≥ 1.9.0; renditions source → playback → display.",
+      "issue": 104
+    },
+    {
+      "id": "sections-are-grids",
+      "title": "Sections are grids within themselves: open one full-screen as its own grid",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "review",
+      "body": "Josh, 2026-11-11: \"The individual sections are actually grids within themselves, so opening them up to fullscreen opens up a full other grid.\" Sections nest (SectionDoc.parent, SectionDoc.grid). Open (was Expand) takes the view into a section's own grid, with every grid tool, and a breadcrumb under the top bar (Esc goes up). A section of cards opens as one section; splitting or adding beside it makes it a grid of sections. On the board such a section shows its grid in miniature; double-click opens it there. Cards added to it go to its first section; removing it removes what's inside. Checked in the browser two levels deep, day and night (docs/evidence/2026-11-11_grids-in-sections/); test/levels.test.ts, test/nested-sections.test.ts, e2e/wheel.spec.ts. Open: wires across levels, agents' cursors inside nested sections, presentation into nested grids (SPEC §7).",
+      "issue": 103
+    },
+    {
+      "id": "node-upgrade-windows",
+      "title": "Upgrade Node on the Windows machine to 22.16 or newer",
+      "kind": "hookup",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "needs-you",
+      "body": "System Node is 22.13.1 (no FTS5 in node:sqlite): the server can't start on it, which is why agents, Claude and data sources all failed to fetch. `winget install OpenJS.NodeJS.LTS`, then a new terminal. The launcher now says this itself.",
+      "issue": 102
+    },
+    {
+      "id": "server-switch",
+      "title": "A switch, bottom right: start this computer's server, or connect to a remote one",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "done",
+      "body": "Josh, 2026-11-13: \"an option button at the bottom right to start the local server or connect to the flowform server for local testing. have it expand to show both options\". A glass pill bottom right (the server in use and whether it answers) opens into This computer (Start runs Foundation's server from a checkout, C:\\Dev\\Foundation by default, on :4410; Stop; it goes when the app quits) and Remote server (an address, Flowform's server to begin with; Connect reloads onto it). Checked in the browser and on `#/design` day and night; on the installed 0.3.3 (taken as an update from CI's release): Start, Stop, and quitting the app stops a server it started. Flowform's server isn't a Foundation server, so Connect there signs nobody in until a hosted Foundation exists.",
+      "issue": 135
+    },
+    {
+      "id": "machine-in-section-tools",
+      "title": "Start a machine from a section's tools, not only its right-click menu",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "board",
+      "status": "done",
+      "body": "Josh, 2026-11-13: \"I don't see the ability also to create vms using Kiri or docker in the sections\". Machines were on main all along, but only on a section's right-click menu. Now ▣ in the section's tools and ⌘K too. Checked on a throwaway server: the tool made a card in an empty section, alpine started on Kiri (woken from asleep), the shared terminal answered (Alpine Linux, WSL2 kernel), Stop kept the disk, Remove (pressed twice) took it from Kiri.",
+      "issue": 136
+    },
+    {
+      "id": "desktop-starts-server",
+      "title": "The desktop app starts its own server",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "review",
+      "body": "The installed app expected a server at http://localhost:4410 and started none (2026-11-09). Built that day on its own branch: the app carries a pinned Node 22.22 and the server bundled by esbuild (`scripts/desktop-server.mjs`), checked with the packaged exe and the NSIS installer (`docs/evidence/2026-11-09_desktop-server/`). Merged 2026-11-14 into the server switch rather than beside it (Josh: \"merge everything\"): This computer → Start offers **Built in** (that bundled server, its data in the app's own folder) or **From a checkout**, both on :4410; one a person started and didn't stop starts again when the app opens; Stop means not again. On Windows a kill-on-close Job Object and the server leaving when its stdin closes mean it never outlives the app (`src-tauri/src/server.rs`, `local_server.rs`). Checked 2026-11-14 with a check build on Windows (`docs/evidence/2026-11-14_builtin-server/`): Start, sign-in, Stop, a hard kill, the restart at launch, and a checkout. In review until an installed release with the server inside has run on a computer that never had Foundation or Node.",
+      "issue": 101
+    },
+    {
+      "id": "flowform-boards-live",
+      "title": "Pull a Flowform board in from the app, and keep it in step",
+      "kind": "plan",
+      "milestone": "company",
+      "area": "auth",
+      "status": "done",
+      "body": "Search → Flowform lists your rooms; press one and it lands as board `ff-<room>` (the importer's ids and ledger): a section per surface, notes, tables with cells, app and link cards at their Flowform positions; read again every 5 minutes and on ↻; edits and removals here stand, nothing deleted; a Flowform viewer can't bring one in. `flowform-live.ts`, `test/flowform-live.test.ts` (5); Form Industries (57 cards) brought in on a throwaway copy, day and night. Images, videos, files and Flowform's older tables arrive as named notes. To do: Josh brings his rooms into his own Foundation.",
+      "issue": 100
+    },
+    {
+      "id": "flowform-files-browser",
+      "title": "Flowform's files in the search pane, to drag onto a board",
+      "kind": "plan",
+      "milestone": "search",
+      "area": "search",
+      "status": "done",
+      "body": "Search → Flowform: type and it searches your Flowform files through the link (Flowform's own `search`: uploads, board media, Slack, Figma); drag one out and it lands as a link card (Slack, Figma) or a note naming it. Checked in the browser against Josh's real files. The bytes don't come through: see `flowform-file-bytes`.",
+      "issue": 99
+    },
+    {
+      "id": "flowform-connect",
+      "title": "Connect Flowform once, in Settings → Services",
+      "kind": "hookup",
+      "milestone": "company",
+      "area": "auth",
+      "status": "done",
+      "body": "Josh connected Flowform on 2026-11-11 (after the registration fix). Each person connects their own.",
+      "issue": 98
+    },
+    {
+      "id": "flowform-link",
+      "title": "Flowform link: read your boards and files through its MCP endpoint",
+      "kind": "plan",
+      "milestone": "company",
+      "area": "auth",
+      "status": "done",
+      "body": "`flowformlink.ts`: OAuth (PKCE) to flowform-server's `/mcp`, `search:read canvas:read` only, tokens encrypted at rest; Connect/Disconnect in Settings → Services; agents get `flowform`. Registers afresh on every Connect (Flowform forgot a day-old registration). Josh connected it on 2026-11-11: 12 read tools, his 6 rooms, file search, all answered live (`docs/evidence/2026-11-11_flowform-live/`).",
+      "issue": 97
+    },
+    {
+      "id": "places-approved-folders",
+      "title": "Places: approved folders on this computer, browsed and dragged from",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "search",
+      "status": "review",
+      "body": "Settings → Places approves a folder (admins, as a person). The search pane's This computer chip browses it; a file dragged out is copied into the archive and lands as a card. Agents get `places` and `bring_file`. Read-only, nothing outside a place, secrets left where they are (`test/places.test.ts`). To check: a real folder on Josh's machine, a real model using the tools.",
+      "issue": 96
+    },
+    {
+      "id": "panel-edges-line",
+      "title": "Panel edges: a hairline and a clean cut, not a fade",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "floor",
+      "status": "done",
+      "body": "Josh, 2026-11-09: the left and right panels shouldn't fade the edge; a line, like a VS Code panel that resizes. The cards are clipped at the pane, each pane's edge is a hairline that turns blue under the pointer and drags to resize. Checked in the browser day and night (`docs/evidence/2026-11-09_edges-places-flowform/`).",
+      "issue": 95
+    },
+    {
+      "id": "app-icon-panels",
+      "title": "Josh's icon: four panels on a grid, in place of the masonry F",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "review",
+      "body": "apps/client/assets/foundation-mark.svg is the drawing (white). The desktop icons and the browser tab are the white mark on a glass squircle (translucent navy, sheen, lit rim; no blue); in the app the mark is blue on paper and white on fills. Shown on #/design → The mark, day and night (docs/evidence/2026-11-10_icon/). The installed app shows it after the next release build.",
+      "issue": 94
+    },
+    {
+      "id": "carry-cards",
+      "title": "Carry a card to another section, a new section, or another board",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "review",
+      "body": "Josh, 2026-11-10: \"It doesn't look like I can actually drag items from one section to another, dragging should not only be able to be dragged to other boards but it should create new sections to be dropped in.\" A card dragged out of its section lifts into a copy that follows the pointer (lib/carry.ts): another section rings and takes it where it's let go; an empty cell or past an edge of the board makes a new section for it; another space's tab (or its spaces-pane row) sends it to that board, into a section named From <board> (server send_to_board: note text, cells, its file; machines, huddles and stages stay). Anywhere else it flies back. Checked in the browser on all four paths (docs/evidence/2026-11-10_carry/); apps/server/test/carry.test.ts (4). Not yet in the e2e suite, and not tried on a real trackpad.",
+      "issue": 93
+    },
+    {
+      "id": "night-greyscale",
+      "title": "Night is greys and white, with yellow and orange for attention",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-10: \"The color pallete of dark mode should not use the neon blues and greens, but use white and grey-scale colors, with the eventual pops of orange or yellow.\" Night surfaces are graphite (#0f0f10 … #1f1f21), the accent and focus white, ok light grey, eyebrows grey, warn yellow, bad orange; on-fill turns dark at night. The paper shader's night is graphite with grey dots. Agents stay violet; data-viz and wire type tones are unchanged. Day is unchanged. #/design shows it (docs/evidence/2026-11-10_carry/12).",
+      "issue": 92
+    },
+    {
+      "id": "images-bare-invert",
+      "title": "Images rest bare; a clear image can be inverted on dark",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "review",
+      "body": "Josh, 2026-11-10: \"Images don't need borders until they are rolled over, and if it is a transparent image on a dark background there should be the option to invert it.\" Media cards have no paper, border or shadow at rest (no well behind a loaded clear image); a hairline and the resize corner come with the pointer. An image with see-through pixels offers ◐ Invert on dark at night; MediaDoc.invert is shared and applies only at night (invert + hue-rotate by --night-hard). Checked day and night in the browser.",
+      "issue": 91
+    },
+    {
+      "id": "publish-first-release",
+      "title": "Desktop releases publish themselves on every push to main",
+      "kind": "hookup",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "done",
+      "body": "Decided 2026-11-13 (Josh): every push to `main` on `joshleong/Foundation` that passes tests and typecheck becomes a signed Windows release (`.github/workflows/desktop-release.yml`, `npm run release -- ci`, version 0.3.<run>), and the feed is the fork again (the org repo's main stopped on 2026-10-04). The signing key and password are the repo's Actions secrets. The installed 0.3.0 was uninstalled. Left: (1) watch the first CI run go green and its release appear; (2) install from that release, then see the next push arrive as an update card; (3) keep a copy of `~/.tauri/foundation-updater.key` and `.password` that isn't this PC. Also unrun: macOS, Linux, the MSI path; the Windows installer isn't code-signed. Done 2026-11-13: v0.3.2 and v0.3.3 published by CI; the installed 0.3.2 took 0.3.3 through its update card. Still open elsewhere: a backup of the key off this PC; macOS, Linux and the MSI path; code signing.",
+      "issue": 116
+    },
+    {
+      "id": "search-pickup-clipboard",
+      "title": "Out of search, into the hand: results you pick up, and a clipboard to carry several",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "search",
+      "status": "review",
+      "body": "Josh, 2026-11-12: \"a high physicality clipboard like experience where you can drag things from the search into Foundation\". A result pulled out of search is a card in the hand (the picture, or a slip of paper): drag spring, lifted 2.5 %, leaning ≤ 2.5° about where it was pressed, its row kept behind it, the section under it ringing. It lands where it's let go; a file that has to be fetched waits at that spot on the board, then becomes the card; elsewhere or Esc it flies back. The clipboard at the pane's foot holds what you clip (＋, Ctrl-click, or a drop): pull one off, or the handle to carry the whole stack, fanned and trailing, dealt a step apart. `lib/pickup.ts`, `lib/pickupMath.ts`, `lib/hits.ts`, `state/clipboard.ts`, `shell/Clipboard.tsx`; `test/pickup.test.ts`; `#/design`. Checked in the browser, day and night (docs/evidence/2026-11-12_pickup-updates/). Open: Playwright doesn't drive it; trackpad and the packaged window untried; the held card isn't the landing size; ⌘C/⌘V not wired.",
+      "issue": 117
+    },
+    {
+      "id": "flowform-files-in-search",
+      "title": "Flowform's files in the one search, with pictures, and a room's files without bringing it in",
+      "kind": "plan",
+      "milestone": "search",
+      "area": "search",
+      "status": "review",
+      "body": "Josh, 2026-11-12: \"read the same things as flowform in terms of the files that it has access too\". The pane's search and ⌘K ask Flowform as the person (its own `search`: uploads, board media, Slack, Figma). Image and video results carry Flowform's own thumbnail (`/files/flowform/<file>/<rev>/thumb`, fetched as the person with the kept session). › on a room lists the files on its surfaces to pull out one at a time. `flowform-live.ts` (`searchFlowformFiles`, `roomFiles`), `flowformfiles.ts` (`fileThumb`); `test/flowformfiles.test.ts` (8). Checked against a stand-in only: the first run against server.formresearch.ai is Josh's (his link and session weren't borrowed).",
+      "issue": 118
+    },
+    {
+      "id": "min-client-version",
+      "title": "A server can name the oldest client it still works with",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "review",
+      "body": "From reading Flowform's updater (2026-11-12): its server refuses clients under a minimum. `FOUNDATION_MIN_CLIENT=x.y.z`: `/auth/config` carries it; an older client's socket ticket is refused (426) and its sync socket closed (4426); its update card stays up as needed, with Update and restart alone. `apps/server/src/clientversion.ts`, `packages/protocol/src/version.ts`, `update/updater.ts` (`learnMinimum`). `test/clientversion.test.ts` (5, real sockets), `test/update.test.ts` (8). Seen in the browser against a server set to 0.9.0. The installed-app path (meet a minimum, update through it) is unrun until a release is published (publish-first-release).",
+      "issue": 119
+    },
+    {
+      "id": "t3-threads-write-the-board",
+      "title": "An agent asked through T3 can read and write the board",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "review",
+      "body": "Built 2026-11-13: each ask has its own folder with a tool file (Foundation's tool server as that ask's crew member, board and an agent session for the asker); Foundation puts `--mcp-config .foundation-mcp.json --allowedTools mcp__foundation --strict-mcp-config` on each Claude-driven agent's launch line in its T3; the brief gives the agent the board and tells it to work on cards in its section; the pass ends with the thread. `test/t3threads.test.ts` (12); the real t3.exe took the launch line and kept Claude ready; in the browser a stand-in T3 used the pass and its card landed in the section as Claude's. To check (Josh): ask Claude through T3 on the real server for a card in a section (one turn on the Team plan). Left: approvals answered on the card (`thread.approval.respond`), presence across a restart of Foundation's server, moving the crew's own Claude runs onto T3 so there's one list, tools for Codex.",
+      "issue": 132
+    },
+    {
+      "id": "rune-type-paper-desktop",
+      "title": "Rune: Hanken Grotesk, the paper's dots and grain, markdown, frame times, and the desktop build",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "design",
+      "status": "review",
+      "body": "Built 2026-11-13 (fourth slice). The paper is the web paper's own shader inside Rune's frame (`apps/rune/src/paper.rs`, the compositor hook: grain, dots, pointer light, vignette, night; a section's dots too), since Rune's web canvas can't be see-through. Hanken Grotesk is handed to Rune as TrueType (`apps/rune/fonts`, from `scripts/rune-fonts.py`). A note's markdown is rendered by Rune's kit with the web note's margins. `build:desktop` runs `rune:build` (and goes on without it where there's no Rust toolchain). Frame times are measured (`e2e/rune-frames.spec.ts`, `docs/evidence/2026-11-13_rune-frames/`): Rune is slower than the web renderer on 300 notes and level on the heavy board. Checked in `e2e/rune.spec.ts` (the ninth check). Left: the installed app with Rune on (Windows, macOS, Linux's fallback), Cyrillic and Vietnamese, and the speed itself (its own card).",
+      "issue": 131
+    },
+    {
+      "id": "rune-sections-parity",
+      "title": "Rune: section tools, menu, drag, rename and Open; a card's hover bar, resize and carry",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "review",
+      "body": "Built 2026-11-13 (third slice). In Rune: a section's toolbar on hover (the web's list, `src/rune/tools.ts`, with line icons Rune draws), rename in Rune's own field, drag by the header to a cell or past an edge (its cards and islands travel with it; the landing cell rings), remove behind its confirmation, n more · Expand, Open as its own grid; the right-click menu is the web section's list, now shared (`components/sectionMenu.ts`); a note's bar (float or dock, remove) and resize corner, an image's remove and corner. Checked in `e2e/rune.spec.ts` (the eighth check) and `test/rune-scene.test.ts`. Left: carrying a card to another section or tab (lib/carry.ts's rules, with the lean), the gutters, + in the gaps, the empty section's welcome and file drops, a grid section's miniature, roll-over labels, tools that stay while the pointer is on a card, the settle ease after a drag.",
+      "issue": 130
+    },
+    {
+      "id": "rune-web-islands",
+      "title": "Rune: live cards as web islands over its canvas, and tables drawn by Rune",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "review",
+      "body": "Built 2026-11-12 (second slice). Apps, pages, machines, huddles, Slack, connectors, files, maps and video are the web's own components, placed over Rune's canvas as islands in a shell of their section (`src/rune/RuneIslands.tsx`; `scene.ts` `isIsland` decides, so each card is one engine's). A table is Rune's at rest (header, heads, ruling, what each cell shows) and the web's live sheet while it's the card in hand. Checked in `e2e/rune.spec.ts` (islands within 1 px of the store's rects; a table Rune → web → a formula typed → Rune) and `test/rune-scene.test.ts`. Left for later: cells edited in Rune's own field (so the first press lands on a cell), a table's wire handle at rest, islands under Rune's cards, and use / full screen checked under Rune.",
+      "issue": 129
+    },
+    {
+      "id": "rune-renderer",
+      "title": "A second renderer: Rune draws the board beside the web renderer",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "review",
+      "body": "Josh, 2026-11-12: a GPU-rendered interface (github.com/anomalyco/rune) side by side with the web UI, a toggle in Settings, boards marked as rendered by Rune, the web renderer untouched. Built as a first slice: `apps/rune` (Rust → wasm, WebGPU), `apps/client/src/rune` (the scene, the host, Settings → Renderer and its parity ledger, the mark in the bottom bar), `npm run rune:build`. Off by default. One camera and one store for both engines. Rune draws sections, notes (with its own text field for writing) and images; web content stays live as islands (#129). Checked headed on the GPU in Edge (`e2e/rune.spec.ts`, 6) and in `test/rune-scene.test.ts` (8); evidence in `docs/evidence/2026-11-12_rune/`. To check by hand: Settings → Renderer → Rune, then the company board; and `npm run desktop` with Rune on, which is unrun.",
+      "issue": 128
+    },
+    {
+      "id": "t3-threads-from-foundation",
+      "title": "Start a thread on a chosen agent from a section, and show it in that section's group",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "review",
+      "body": "Built 2026-11-12: Ask on a ready agent in the agents pane starts a supervised thread on it in Foundation's T3 for the section in use; the agent joins that section's group under its own name and follows its thread; Open (T3's own page) and Stop on its row. `apps/server/src/t3threads.ts`, `/api/t3host/threads`. `test/t3threads.test.ts` (10), `e2e/section-crew.spec.ts` against a stand-in T3. To check (Josh): Start T3, ask Claude something in a section on the real server. That spends a turn on the Team plan, so no agent has done it. Left: a thread can't write the board (t3-threads-write-the-board); approvals are answered in T3's page, not on the card.",
+      "issue": 127
+    },
+    {
+      "id": "t3-more-agents",
+      "title": "Kimi and DeepSeek in T3, cloud and local: built; needs keys and a local model server to prove",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "needs-you",
+      "body": "Built 2026-11-12: an admin adds Kimi or DeepSeek from the agents pane, in the cloud (the vendor's Anthropic-compatible address and an API key that goes straight to T3) or on this computer (a local model server, Ollama's address by default, no key); the pane keeps the two groups apart. Each is a Claude-driven T3 instance with its own Claude folder. Checked against a stand-in T3, and the real t3.exe took both instances with a made-up key. Needs Josh: (1) a Moonshot key and a DeepSeek key, typed into the form, then one ask to each: the default model ids (`kimi-k3`, `deepseek-v4-pro`) and addresses are from the vendors' pages and guides, not from a run. (2) For local: install Ollama 0.14 or newer and pull a model this PC can run (a DeepSeek R1 distill; Kimi's open weights are too large), then add it as local. (3) Codex (OpenAI): install `codex` and `codex login`; it then shows ready with no change here.",
+      "issue": 126
+    },
+    {
+      "id": "t3-instance",
+      "title": "Foundation's own T3 instance, and this computer's agents in the pane",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "review",
+      "body": "Built 2026-11-12 (Josh: build off Vision's T3, a T3 instance running in Foundation that the agent panel reads). `apps/server/src/t3host.ts` starts the unmodified `t3` 0.0.44 in `<data>/t3` the way Vision does (bootstrap on stdin, token exchange, socket ticket), person-started only, and keeps its providers and threads; `/api/t3host`; the agents pane's foot lists each agent with how it stands and its threads at work. `test/t3host.test.ts` (7, stand-in t3), the real `t3.exe` on this PC (Claude ready on the Team subscription, Codex not installed, four off), `e2e/section-crew.spec.ts` (+2). To check: Start T3 from the pane on the real server (the system Node can't run it yet: node-upgrade-windows).",
+      "issue": 125
+    },
+    {
+      "id": "agent-machines",
+      "title": "Claude Code agents that run inside a machine (Kiri or Docker)",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "machines",
+      "status": "backlog",
+      "body": "A machine image with Claude Code installed and a repo cloned inside; the server runs `claude -p --output-format stream-json` in it through the Engine API exec, with Foundation's MCP tools attached, and streams it into the session view. Each one is a new instance with its own disk, started by a person. Sign-in (decided 2026-11-12, #122): the machine's card offers both, a Claude folder signed in to a subscription (mounted) first, then a token or key; each is a separate Claude instance with its own folder. Settings → Services lists the instances. Kiri's containers share one small VM (WSL 2 on Windows): they separate our own agents, they don't contain hostile code. To find out first: whether Kiri and Docker Desktop both bind a Windows folder into a machine, and whether Claude Code in Linux reads a sign-in made on Windows. Posted agents (posted-agents) wait on the consent call in #122.",
+      "issue": 124
+    },
+    {
+      "id": "posted-agents",
+      "title": "An assigned agent's brief: standing instructions, a model and a budget for its seat",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Since 2026-11-15 a person assigns agents to a section or a grid and they stay on its council (`posted.ts`). What a seat doesn't carry yet: a brief the agent reads before every ask there, a model choice for that seat, a subscription or budget, and a refresh of what the agent is when it's re-pointed on this computer.",
+      "issue": 123
+    },
+    {
+      "id": "agent-consent-and-tokens",
+      "title": "Decide: what lets a posted agent keep working (sign-in is decided)",
+      "kind": "hookup",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "needs-you",
+      "body": "**Sign-in inside a machine: decided (Josh, 2026-11-12).** Offer both, the subscription first, and keep them apart as separate instances of Claude. (a) A Claude folder on this computer, signed in to a subscription, mounted into the machine (\"Mount ~/.claude\"). (b) A token or key, passed in only when a run starts. A machine's agent uses (a) when there is one and (b) otherwise, unless a person picks. Each is its own Claude instance: its own folder, sign-in, history and name in Settings, never two sharing one folder. Found the same day: `~/.claude` here is 2.1 GB and holds every project's transcripts and history beside `.credentials.json`, so the default is a folder of its own per instance (`CLAUDE_CONFIG_DIR`), signed in once by a person; mounting the whole of `~/.claude` stays a choice a person makes on the card, said plainly. It breaks no-host-mounts for that one folder only. Untested: Docker and Kiri were both stopped, so no mount has been tried on either. **Still open:** the invariant says nothing that spends money or runs code starts without a person. Is posting an agent to a section, from a browser session, the consent for it to keep working inside that section and its machine until someone pauses it (recommended), or does every turn need a press?",
+      "issue": 122
+    },
+    {
+      "id": "section-agents",
+      "title": "An agent group on every section, and the agents pane",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "review",
+      "body": "Built 2026-11-12: a tab right above each section with a face per agent at work inside it (hover, or pinned on this device; at screen size at any zoom; it comes down with the view when the section fills it). A free agent joins the group of the section it aims into and leaves when it moves on. A lead and its helpers read as one team. It opens into the agents pane on the right (✦ in the top bar too): every agent by section, what it's doing, who works with whom, Follow / Open / Stop. `components/SectionCrew.tsx`, `shell/AgentsPane.tsx`, `lib/sectionCrew.ts`, `lib/crewWatch.ts`. `test/section-crew.test.ts` (8), `e2e/section-crew.spec.ts` (3, two people, script runtime), `docs/evidence/2026-11-12_section-agents/`. To check: with a real model turn; whether the tab's place and the pin feel right (Josh).",
+      "issue": 121
+    },
+    {
+      "id": "slack-board",
+      "title": "The Slack board: a section per channel, live, kept by agents",
+      "kind": "plan",
+      "milestone": "huddles",
+      "area": "slack",
+      "status": "review",
+      "body": "Josh, 2026-11-12: a board with a section for every Slack channel, each gathering the channel's latest images, top-level items and a summary, a live Slack mark on each section, and Foundation's agents pulling information, editing summaries and organizing images as they're posted. Built: slacklive.ts (the board, the `slack` server map, reading, images, the agent queue), POST /api/slack/events, apps/slack-agent (Slack's bolt-js-support-agent template plus foundation/bridge.js, `npm run slack`), the Slack mark on section headers and #/design, ⌘K → Open the Slack board. Agents are off until a person presses ✦. Checked against a stand-in Slack with the scripted agent: slacklive.test.ts, bridge.test.js, browser day and night (docs/evidence/2026-11-12_slack-board/). Waits on Josh: slack login and linking the project to app A0CGWUQ6WSK, FOUNDATION_SERVICE_TOKEN in .env, then a run against the real workspace and one real agent summary (SPEC, Waiting on a person).",
+      "issue": 120
+    },
+    {
+      "id": "agents-in-sections",
+      "title": "Agents in the section, a text box, and a fuller right-click menu",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "review",
+      "body": "Built 2026-11-13 (Josh: \"bring the agent view into the sections … make apparent the ability to have agents collaborate and build things in the interface with the user … a formatted word text box that is a WYSIWYG editor\"). At rest every section's header carries ✦ Agents (it counts the agents at work) and ⤢, the way into its own grid. The chip opens the section's agents in its corner: who is at work, what agents made there, and a composer that asks an agent to build in that section; Keep here puts it on the board as a card (`panel: \"crew\"`). A text box is a note written as formatted text with a toolbar, kept as the note's markdown in the same shared text (`NoteDoc.rich`; `add_note` takes `text_box`). The right-click menu leads with asking an agent and groups Add / Live / Sections. `components/SectionAgents.tsx`, `components/RichText.tsx`, `components/sectionMenu.ts`. `e2e/section-agents.spec.ts` (5, two people, script runtime), `docs/evidence/2026-11-13_agents-in-sections/`. To check: a real model turn asked from the panel; a viewer; under Rune (no chip at rest there); whether the marks at rest are the right weight (Josh).",
+      "issue": 134
+    },
+    {
+      "id": "rune-frame-cost",
+      "title": "Rune: hold 60 fps on a board of notes (it is slower than the web renderer there)",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "design",
+      "status": "next",
+      "body": "Measured 2026-11-13 (`docs/evidence/2026-11-13_rune-frames/`): on 300 markdown notes the web renderer holds 60 fps and Rune runs long frames on a third to a half of them (p95 83 to 150 ms). Find what makes Rune's view run again on live-only frames (about one run per camera step and per grain tick: its `CommitWhy`), keep off-screen cards out of the frame (cull in `scene.ts`, or a cache that holds), and cut or throttle Rune's accessibility mirror (12 % of a pan). Done when `e2e/rune-frames.spec.ts` shows Rune at the web renderer's p95 on 300 notes, and then holds it there.",
+      "issue": 133
+    },
+    {
+      "id": "council-characters",
+      "title": "The council: agents as characters, and a studio board that makes them",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "Built 2026-11-14 (SPEC §0.4, §3; `docs/evidence/2026-11-14_council-characters/`). ☺ raises a seat per agent at work on a board or in a section, in its cursor's colour, with a mood from its state; the Character studio board runs inspiration → sheet → views → model → skeleton → clips on Meshy, a priced press at a time. Six 3D characters and five mesh avatars were made for real. Waiting on a person to look at it, and to choose whether these characters are the ones. 2026-11-15: the eleven ship as a starter set that a new install's studio board brings in. Reworked 2026-11-15 into the council of assigned agents (card *one-interface*).",
+      "issue": 137
+    },
+    {
+      "id": "council-real-turn",
+      "title": "See a real agent turn sit in the council",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "next",
+      "body": "The council's seats, colours and moods were checked with the script runtime only. Run a real Claude Code turn with the council up: does it wave, think and work at the right moments, and is `doing` enough to tell reading from writing? (SPEC §7.)",
+      "issue": 138
+    },
+    {
+      "id": "mesh-avatars-anime-set",
+      "title": "Rig the rest of the anime set: Hana, Midori, Sora, Rin",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "done",
+      "body": "Done 2026-11-14: Hana, Midori, Sora and Rin were rigged with mesh-avatar-studio (as Aoi was) and brought into their cards; all five sit on the council (`docs/evidence/2026-11-14_council-characters/24`, `25`). Sora's portrait was drawn again on a grey ground after Meshy's background removal took her white hair with it; Rin's eye regions were kept inside her lenses. No drawn variants (SPEC §7).",
+      "issue": 139
+    },
+    {
+      "id": "mesh-stage-on-the-board",
+      "title": "The mesh avatar stage as a press on the board",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "backlog",
+      "body": "Today a mesh avatar is rigged by hand in a Claude Code session with mesh-avatar-studio and brought in as a file. Make it a job a person starts from the card: an agent with vision reads the grids and writes the rig, the server builds the layers (Python, OpenCV) and renders the review poses onto the board for a person to accept. Needs uv, Python and Chromium on the server's machine, and an image model that edits inside a mask for the drawn eyes and mouths (Meshy's doesn't).",
+      "issue": 140
+    },
+    {
+      "id": "council-faces-3d",
+      "title": "3D characters that blink and change expression",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "backlog",
+      "body": "Meshy's skeleton has no face bones, so a 3D seat's face never moves. Options: swap the face texture per mood (a second image pass per character), morph targets made in Blender, or a small drawn face over the model. Also: a clip for working that isn't a talking gesture.",
+      "issue": 141
+    },
+    {
+      "id": "council-rune-tool",
+      "title": "Rune: the council on a section's toolbar",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "design",
+      "status": "backlog",
+      "body": "Since 2026-11-15 Rune's section toolbar ✦ opens the section's council, but its icon is still the agent's star: draw the council's mark (three seated figures) in `apps/rune/src/view.rs` `icon`, and check the new cards (a grid inside this one, kanban, design) and the port labels under Rune.",
+      "issue": 142
+    },
+    {
+      "id": "one-interface",
+      "title": "One interface: Today and Settings inside the shell, grids of grids, a council of assigned agents",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Built 2026-11-15 (SPEC §0.5, §3; `docs/evidence/2026-11-15_one-interface/`). The shell is the whole app: Today and Settings are places in it, the side menu (Today · Grids: Recent / All Grids · Settings) is open on a first run, the server's pill is in the top bar. Settings opens on General; Agents and Avatars are tabs; Plan is a kanban card on a grid and Design language a grid of chapters. A grid dragged onto another is its child, with a section on the parent that stands for it. Agents are assigned to a section or the grid and the council seats those; it talks to all or the selected, adds agents, shows whose model each is and opens the agent on the right. No agent layer: a port says where it goes. For a person: restart this computer's server so the installed app gets the new routes, then look at it with real agents.",
+      "issue": 143
+    },
+    {
+      "id": "council-conversation",
+      "title": "The council as a conversation: what each agent said back, in the council",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "next",
+      "body": "A line to the council starts an ask per agent; replies show only as work on the grid and as activity lines in the agent's pane. Keep a thread per place (who was told what, what each answered, in order), show it in the council and the agent's pane, and let a reply go to the agent that's mid-run instead of starting a new one. Needs a real model turn and a real T3 thread to be seen in it first (*council-real-turn*). 2026-11-17: the agents panel has a Council tab that lists what you said and each agent's live line; the replies are `council-replies-in-panel`.",
+      "issue": 144
+    },
+    {
+      "id": "design-grid-redrawn",
+      "title": "The design language as a grid: specimens redrawn at card width, sections sized to their chapters",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "backlog",
+      "body": "Settings → Design language is a real grid of twelve chapter cards, but each card draws the old page's sections, which were laid out for a 1,100 px page and are taller than their section (they scroll in the card). Redraw the specimens for the card, size each section to its chapter, and drop what the grid itself now shows better (the floor, the chrome).",
+      "issue": 145
+    },
+    {
+      "id": "kanban-of-a-grid",
+      "title": "A kanban card for a grid's own work, not only the plan",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "panels",
+      "status": "backlog",
+      "body": "`panel: \"kanban\"` shows Foundation's plan (`source: \"plan\"`). Give it a source of its own: columns and cards kept on the grid (a table underneath, or asks and stages by status), so any section can hold a kanban.",
+      "issue": 146
+    },
+    {
+      "id": "system-grids-reset",
+      "title": "Foundation's own grids: put the plan and design cards back when someone removes them",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "design",
+      "status": "backlog",
+      "body": "The plan and design-language grids are ordinary boards after the server lays them out: a member can move or delete their cards and nothing restores them. Check the layout when the grid is opened and add back what's missing; offer *Lay it out again* in Settings.",
+      "issue": 147
+    },
+    {
+      "id": "stage-budget-gpu",
+      "title": "Measure how many character cards play at once on a real GPU",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "backlog",
+      "body": "`characters/stageBudget.ts` starts at six live cards and follows the frames. It was only watched in a headless browser on software rendering (it settled at three of thirteen). Run the studio grid under `PERF_GPU=1` on this machine and set the starting budget and the thresholds from what it holds at 60 fps.",
+      "issue": 148
+    },
+    {
+      "id": "machines-desktop",
+      "title": "Machines you can type into, see, hand to an agent and pipe through",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "review",
+      "body": "Built 2026-11-15 on Kiri 0.1.18 (SPEC §3, §7; `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). A click in the terminal keeps the caret at any zoom and the app's shortcuts stand down; Terminal · Desktop on the card, with Add a desktop (XFCE over noVNC, relayed through the engine); desktop_screenshot / mouse / type / key for agents after a person's Let agents use this desktop; ports in and out through /foundation/in and /foundation/out, with a strip that says what is on each. For a person: try it in the packaged app, and with a live agent.",
+      "issue": 149
+    },
+    {
+      "id": "machines-live-agent",
+      "title": "A live agent drives a machine's desktop, with a person present",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "machines",
+      "status": "next",
+      "body": "The desktop tools were driven by an agent's token and the script runtime, never a model. Assign an agent to a section with a machine, give it leave on the card, and ask it for a real task from the council (API and subscription); see the screenshots reach it and the card say what it does. Then decide whether the council should offer the leave itself, and whether the leave should end by itself (an hour, or when the machine stops).",
+      "issue": 150
+    },
+    {
+      "id": "kiri-exec-bugs",
+      "title": "Report to Kiri: exec'd processes inherit a blocked SIGINT; an exec's stream stays open after exit",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "Found 2026-11-15 on Kiri 0.1.18 (reproductions in `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). Foundation works around both (perl or python3 clears the mask, so Ctrl+C is dead on Alpine until `apk add perl`; the server polls whether an exec still runs). Both are Kiri's to fix: file them at github.com/libracoder/kiri. Added 2026-11-17 (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`): processes killed inside a machine are never reaped; stopping a desktop's install leaves apt and dpkg as zombies until the machine restarts (they hold no lock and no file).",
+      "issue": 151
+    },
+    {
+      "id": "machines-wires-drawn",
+      "title": "Draw a note's or a table's wire to a machine, and drag one from a note",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "wires",
+      "status": "backlog",
+      "body": "A machine's in and out can be wired to a note or a table; the values flow and the strip lists them, but the wire layer draws card-to-card wires only, and such a wire can only be made from the strip's picker.",
+      "issue": 152
+    },
+    {
+      "id": "machines-desktop-more",
+      "title": "The machine's desktop: the packaged app, Docker, a browser inside, the clipboard, a screen that follows the card",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "backlog",
+      "body": "Not tried: the desktop in the packaged app (and Ctrl+W / Ctrl+T in its terminal), a real Docker engine, macOS or Linux hosts. Not built: a browser in the desktop (Ubuntu's Firefox is a snap), a clipboard between it and the grid, sound, a size other than 1280 × 800, a `screen` output port. 2026-11-17: the packaged app's transport was checked (the production build on another origin, a bearer, socket tickets); pressing it inside the Tauri window is now its own card, `desktop-in-tauri-window`.",
+      "issue": 153
+    },
+    {
+      "id": "today-council-agents",
+      "title": "Today in white, the council as a band, adding an agent, the studio's pipeline",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Built 2026-11-16 (SPEC §0.6, §3, §7; `docs/evidence/2026-11-16_today-council-agents/`). Today's pill with the Shiba and a badge, the room in white with a glass composer, answers drawn as markdown, pictures, a plan and folds that open on the right. The council is a band under the top bar (grid) or at the top of its section. ＋ opens Add an agent in the agents panel (who, connect, avatar, add); Background lists sessions. The Character studio has a pipeline row with a flow card, and characters are approved or archived. For a person: restart this computer's server, then add a real agent.",
+      "issue": 154
+    },
+    {
+      "id": "agent-sign-in-vm",
+      "title": "Sign an agent in from Foundation: a machine with a browser, shown as a browser tool",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "machines",
+      "status": "next",
+      "body": "Josh, 2026-11-16: the agent adding process should go through all the steps to log in with an account, in a built-in unique Kiri VM and browser rendered as a browser tool. Today the Connect step only says how to sign in at a terminal. Needs: a browser inside a machine's desktop (Ubuntu's Firefox is a snap; use a deb or Chromium), the agent's program installed and signed in there or its sign-in page opened there, the desktop shown in the agents panel as a browser pane, and the session's credentials kept in that machine. Depends on *machines-desktop-more* and *agent-machines*.",
+      "issue": 155
+    },
+    {
+      "id": "agent-panel-panes",
+      "title": "The agent panel as a workplace: chat, changes, files, terminal, browser, background tasks, plan",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "next",
+      "body": "Josh, 2026-11-16: use Claude Code's architecture to show how agents work, with the agent panel as the primary chat interface to Foundation. Today the panel has three faces (at work, add, background) and the agent's own pane has facts and a box to write to it. Build an agent's session as panes: the conversation (with the components Today now draws), what it changed on the grid, its files, its terminal and browser when it has a machine, its plan, and its background tasks; and keep-awake while it works.",
+      "issue": 156
+    },
+    {
+      "id": "t3-on-the-grid",
+      "title": "T3 inside Foundation: its sessions readable and continuable in the panel, and whole on a grid",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Josh, 2026-11-16: a mini version of T3 on the right panel that expands into a full version, in Foundation's style on the grid, with all of T3's features. Today Background lists T3's sessions with Open and Stop, and Open T3 puts T3 in a browser tab. Next: read a session's messages in the panel, reply to it, then a T3 card on a grid. **2026-11-17:** top bar → T3 shows T3 whole in the right panel: Foundation's own T3 started and stopped by a person, and T3's own page (Vision's build of its web client) signed in by a one-time link and framed there. Not yet in Foundation's style, and not on a grid.",
+      "issue": 157
+    },
+    {
+      "id": "session-components",
+      "title": "The session column and council replies drawn like Today's answers",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Today draws the Shiba's answers as markdown with pictures, a plan card and folded code, commands and steps that open in the detail pane. The session column (✦ Ask) and what a council's agents answer still draw the old way. Use the same parts there.",
+      "issue": 158
+    },
+    {
+      "id": "section-band-wires",
+      "title": "A section's council band moves its cards but not its wires",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "wires",
+      "status": "backlog",
+      "body": "While a section's council band is open, the section's header and cards are 236 px lower (a transform) and the wire layer still routes to where the ports were. Either make the band part of the section's layout (the body's rect starts under it) or offset that section's port points while it's open.",
+      "issue": 159
+    },
+    {
+      "id": "card-chrome",
+      "title": "Card chrome: remove a character, the bar makes room, Ctrl-wheel through a card, a 2 px scroll line, a resize gleam",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "review",
+      "body": "Built 2026-11-16 (`docs/evidence/2026-11-16_card-chrome/NOTES.md`). A character card's ✕ asks first and the character leaves every council with its card; the hover bar gives the card's content 38 px of room instead of covering it; Ctrl/⌘-wheel scrolls through a card with more in it than fits; scroll bars are a 2 px light line; the resize corner is a gleam shown on hover. A ✕ that does nothing on a character was not reproduced: if it happens again, note where it was pressed. Ctrl-wheel through a card became Alt-wheel on 2026-11-17, `pointer`.",
+      "issue": 160
+    },
+    {
+      "id": "card-chrome-elsewhere",
+      "title": "Card chrome on the cards and machines not looked at",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "next",
+      "body": "The bar's room was checked on a note, a live app, a character and a design chapter. Look at Slack, huddle, kanban, machine and file cards (a terminal's bottom line slides under the card's edge while hovered), run the frame-rate check, and try ⌘-wheel, a pinch and a character's ✕ in the desktop window, on a Mac and on a trackpad.",
+      "issue": 161
+    },
+    {
+      "id": "character-restore",
+      "title": "Bring back a character whose card was removed",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "pipeline",
+      "status": "backlog",
+      "body": "Removing a character's card keeps its record and files, but nothing in the app puts it back on the grid. Offer removed characters in the pipeline card (or the Character studio's menu) with Restore.",
+      "issue": 162
+    },
+    {
+      "id": "council-setup-chrome",
+      "title": "The council on its section's edge, a guided agent setup, the side menu, tabs and search redrawn, Today's room behind every panel",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Built 2026-11-17 (SPEC §0.7, §3, §7; `docs/evidence/2026-11-17_council-setup-chrome/`, 14 shots). The council is no band: agents rise from behind their section's top edge and stand on it beside silhouettes of other approved characters that are places to fill (at least four, always one more than the agents; the last wears a ＋); no text box; rolling over an agent opens a line with a microphone that goes to it alone; speak to all, the Council tab and close at the section's top right; the grid's council stands on the window's bottom edge. Marks above each head: the provider, cloud or this computer, a state dot or a pulled plug, and an unreachable agent drawn grey and sad. The agents panel opens on a new Council tab (what you said, each agent's live line, a composer with a microphone). Connect is guided ways with numbered steps: three for Claude (an API key through a new T3 preset `claude`, signing in with a Claude account through T3, Claude Code on this computer), T3 sign-in for ChatGPT and Gemini, a key or a local model for Kimi and DeepSeek. Side menu, top bar tabs (lines, not cards) and the search pane redrawn; the council's mark is three filled figures (the outlined one was the frowny face); Today's room is the whole window; a card's ✕ keeps a 26 px press at any size. Checked: typecheck; `e2e/council.spec.ts` (8), `section-agents` (5), `today`, `one-interface` on ports above 15000; day and night looked at. Not built or not verified: no terminal on this computer inside Foundation (`agent-host-terminal`); key pages open in the system browser (`in-app-browser`); the Claude API-key way was never run with a real key; Vision's T3 sign-in was not read; the Council tab doesn't show replies (`council-replies-in-panel`); voice in the council's line not exercised in a browser test; offline is judged from the agents list only; the ✕'s 26 px has no e2e test. The server on :4410 has to restart to serve it (`server-restart-4410`).",
+      "issue": 163
+    },
+    {
+      "id": "agent-host-terminal",
+      "title": "A terminal on this computer, so an agent can be mounted from inside Foundation",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "review",
+      "body": "Josh, 2026-11-17: mount Claude through the inbuilt terminal. Foundation has no terminal on the computer it runs on: a machine card's terminal is a separate computer and can't sign the host in, so the third way of adding Claude (*Claude Code on this computer*) tells the person to use the computer's own terminal. Give the server a terminal on its own host (a person's, never an agent's; it runs commands on the computer, so it needs the same care as Places) and run the install and `claude` steps in it from the Connect step. **2026-11-17: built.** Top bar → Terminal: a shell on the server's computer, in its folder, for an admin, started by their press; the socket opens only with a one-time key minted for that person (`apps/server/src/hostterm.ts`, `test/hostterm.test.ts`, `e2e/bottom-bar.spec.ts`). It is line-mode (no pseudo-terminal), so `npm install -g …` runs in it but a sign-in that wants a real terminal (`claude` login) does not; the Connect step doesn't yet run its commands in it.",
+      "issue": 164
+    },
+    {
+      "id": "in-app-browser",
+      "title": "Open key pages and sign-ins in a browser inside Foundation",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "backlog",
+      "body": "The Connect step's links (console.anthropic.com/settings/keys, Kimi's and DeepSeek's key pages) open in the system browser. Show them in Foundation's own browser (a web page space or card) so the steps and the page are side by side. Sign-in pages often refuse to be framed; find out which do first. **2026-11-17:** a browser is built (top bar → Browser: address, back, forward, reload, open outside, put on the grid). The Connect step's key links still open the system browser: not routed into it, and whether those pages refuse to be framed is unchecked.",
+      "issue": 165
+    },
+    {
+      "id": "council-replies-in-panel",
+      "title": "The Council tab shows what the agents answered, and keeps what was said",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "next",
+      "body": "The agents panel's Council tab (2026-11-17) lists what you said and each agent's live line (doing, at rest, not connected). The agents' full replies are only in their sessions, and what you said is kept for that window only (`lib/councilOpen.ts` `logSaid`): gone on a reload, not shared. Keep the conversation on the server per place and draw each agent's replies in the tab. With `council-conversation`.",
+      "issue": 166
+    },
+    {
+      "id": "server-restart-4410",
+      "title": "Add a desktop on box-a70f (the server it runs on is restarted)",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "The Foundation server on localhost:4410 was started on 2026-11-15 at 19:42 and never restarted, so it runs that hour's code: Add a desktop answered 404 `not found` (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`, `live-server-probe.txt`). After this branch is merged into the checkout it starts from: the server switch, Stop, then Start. Then Desktop → Add a desktop on `box-a70f`, and open the Character studio once (the studio's upgrade to nodes runs then). Nobody restarted it or touched that machine in the 2026-11-17 work. 2026-11-17 (later): the reason \"Stop, then Start\" could not be done is that the app had adopted that server after an update and offered no Stop for it. The switch now offers Restart and Stop for a Foundation server it recognises (once the next release is installed). 2026-11-17 (later still): restarted from C:\\Dev\\Foundation on main f039b9e; Add a desktop, agents and prefs now answer 401 to a stranger instead of 404 (`live-server-probe.sh`). What is left is a person: Desktop → Add a desktop on `box-a70f`, and the update to desktop 0.3.15 on the update card.",
+      "issue": 167
+    },
+    {
+      "id": "pointer",
+      "title": "The pointer: a left press grabs only a handle, Alt-wheel scrolls a card (with a hint), the section menu in three bands",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_pointer/NOTES.md`). A left drag moves only from the paper, a section's header or a card's bar; images and videos move by a grip in their corner. Ctrl/⌘-wheel always zooms; Alt-wheel scrolls the card under the pointer, and a small mark on such a card says so until dismissed or learnt. A section's right-click menu: the council, Add and Live side by side, the grid's actions as a row of icons with roll-over names; arrow keys. No swallowed press on a character's ✕ was found.",
+      "issue": 168
+    },
+    {
+      "id": "card-x-when-small",
+      "title": "A card's ✕ is 8 px when the card is drawn at 30 %",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "review",
+      "body": "Fixed 2026-11-17 (with `council-setup-chrome`; commits de4bf4a, c9dc04f): the ✕ keeps a 26 px press area on the screen however small its card is drawn (the area follows zoom times the section's fit). Measured in a browser: a 10.5 px button with a 26.0 px press at the Character studio's fit. No e2e test holds it yet; not tried under Rune or in the desktop window. As found by `pointer`: the bar's buttons scale with the card, and the bar round them is the drag handle, so a near miss grabs. Likelier than a swallowed press as why a character 'couldn't be removed'. The bar's other buttons still scale with the card.",
+      "issue": 169
+    },
+    {
+      "id": "pointer-rune",
+      "title": "Rune: cards grab only by their bar or grip; run its e2e on the new menu",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "rune",
+      "status": "backlog",
+      "body": "`apps/rune/src/view.rs` drags a note or an image from anywhere on it. Bring it to the 2026-11-17 rule, and run `e2e -- rune` (its two menu assertions were rewritten for the icon row, unrun).",
+      "issue": 170
+    },
+    {
+      "id": "pointer-elsewhere",
+      "title": "The pointer rules on a Mac, a trackpad, touch and in the desktop window",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "backlog",
+      "body": "Alt/⌥-wheel, ⇧ sideways in a browser, the grip with no hover, the menu's keys, and the `#/design` Using-a-card paragraph and its old image specimen (DesignPage.tsx).",
+      "issue": 171
+    },
+    {
+      "id": "sub-grids",
+      "title": "Open as its own grid makes a real sub-grid; the old grid keeps a preview and a link",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_sub-grids/NOTES.md`). Josh: \"Open as its own grid doesn't work, it should create a sub-grid that can be pulled out of the grid collection and moved to other grids, but still maintain a preview in the Grid it used to be in, and maintain a link to the new location.\" ⤢ on a section asks once, then the server (`extract_section`, `POST /api/boards/:id/sections/:section/extract`) makes a grid inside this one from it: cards with their text, cells, files and inner wires; characters, councils and asks follow; machines, huddles and stages stay and are named; a Slack section is refused; membership copied; idempotent. The section hosts the grid's card with the grid in miniature; moved away, the old parent keeps the card and says where it went. Checked: `apps/server/test/subgrids.test.ts` (8), `e2e/sub-grid.spec.ts` (5, two people). Not done: hosted-app sections have no ⤢ for it, no undo, Rune doesn't draw the question; not run in the packaged desktop app.",
+      "issue": 172
+    },
+    {
+      "id": "sub-grid-dissolve",
+      "title": "Dissolve a sub-grid back into its parent section (the undo of Open as its own grid)",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "next",
+      "body": "There is no undo: putting a sub-grid's cards back into the section is by hand (`send_to_board`, card by card). One server move, the reverse of `extract_section`, from the grid's card.",
+      "issue": 173
+    },
+    {
+      "id": "sub-grid-hosted-app",
+      "title": "Hosted-app sections: offer Open as its own grid",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "next",
+      "body": "On a section that hosts an app ⤢ is *Fill the screen*, so there is no press that makes it a grid (the tool and the route take such a section). Offer it in the menu.",
+      "issue": 174
+    },
+    {
+      "id": "sub-grid-preview-signal",
+      "title": "Sub-grid previews: one change signal instead of a 4 s poll per card",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "backlog",
+      "body": "Every grid card on screen asks its grid's outline every 4 s. Fine for a handful; a grid of many child cards wants one request or a change signal.",
+      "issue": 175
+    },
+    {
+      "id": "sub-grid-rune",
+      "title": "Rune: draw the make-it-a-grid question; ⤢ makes a sub-grid",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "rune",
+      "status": "backlog",
+      "body": "Under Rune ⤢ still opens the in-window level, and the right-click menu's *Open as its own grid* sets a question only the web section draws.",
+      "issue": 176
+    },
+    {
+      "id": "sub-grid-offline-guard",
+      "title": "Guard a moved card against an offline device bringing it back",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "backlog",
+      "body": "Extract deletes the moved cards from the parent's document. A device that was offline and changed one of them can bring it back onto the parent when it reconnects, so it would exist on both grids; text typed into a moved note in the instant of the move can be lost. Not seen in tests; not guarded.",
+      "issue": 177
+    },
+    {
+      "id": "machines-fixes",
+      "title": "Machines: Add a desktop says why when it can't, an install can be stopped, and the in-use ring is the well's",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`). Josh: \"Add a desktop doesn't work in Kiri … the selection around the window is still weird\". The cause was a server started before the desktop routes were merged (404 as a toast reading *not found*). Now a refused press is said in the well with Try again (an older server by name, no network, no recipe by the distro's name, not root, an interrupted install); a quiet install says for how long and has Stop; a second install can't trip over the first; packages go in as root. A running machine wears no agent's ring; the in-use ring is the terminal well's or round the desktop's screen, 2 px on the screen at any zoom, the only ring while it shows. Checked on Kiri 0.1.18 (Ubuntu, Debian, Alpine smoke; the four distros without a recipe refused in words; a stalled and an unreachable mirror in a real machine), `test/machines-desktop.test.ts` (15), `e2e/machines-fixes.spec.ts` (4), and the packaged app's transport. Not done: the owner's server was not restarted and his machine not touched; the Tauri window itself was not driven.",
+      "issue": 178
+    },
+    {
+      "id": "server-older-than-app",
+      "title": "Say when the server is older than the app",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "next",
+      "body": "The app updates itself; a server started from a checkout runs what it was started with. Both report 0.3.0, so only a missing route gives it away, one feature at a time. Have the server report its commit and when it started; the app compares and offers the restart. 2026-11-17: part of the way there: the switch recognises and restarts a server an earlier run of the app started, and Add a desktop offers Restart the server when its route is missing. The general check (commit and start time compared) is still to do.",
+      "issue": 179
+    },
+    {
+      "id": "desktop-more-distros",
+      "title": "A desktop on Fedora, Rocky, Arch and openSUSE",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "backlog",
+      "body": "Four of the Start picker's seven distros are refused by name (no recipe). Add dnf (with EPEL on Rocky), pacman and zypper recipes, or take them out of what Add a desktop offers.",
+      "issue": 180
+    },
+    {
+      "id": "desktop-in-tauri-window",
+      "title": "Press Add a desktop inside the Tauri window",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "next",
+      "body": "The packaged app's transport is checked (the production build on another origin, a bearer, socket tickets; 2026-11-17) and the installed app serves `desktop.html` and its script. Nobody has pressed it inside the Tauri window (WebView2). Takes over from the packaged-app part of `machines-desktop-more`.",
+      "issue": 181
+    },
+    {
+      "id": "machine-tools",
+      "title": "A machine's tools: copy and paste, Ctrl+scroll, a window of its own, the wells redrawn",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-tools/NOTES.md`). Josh: \"the VM takes over Ctrl+scroll … I am unable to click in and copy the text that I need … design the vm start interface and add desktop feature a little better … terminal tools for copying out text that are standardized, and the ability to full-screen the vm into another tab\". The same tools row under the terminal and the desktop (Copy, Copy all, Paste, a window of its own); Ctrl+C copies a selection and is still the interrupt without one; the desktop's copied text reaches the clipboard, Ctrl+V reaches the machine; Ctrl+scroll is always the grid's zoom; machine.html as a tab or an app window; Start and Add a desktop as one centred, iconed column that grows with the card. Checked: `e2e/machines-tools.spec.ts` on Kiri (Ubuntu), `test/machine-words.test.ts`, `#/design` day and night. Not done: the Tauri window of its own not pressed; viewers get no clipboard.",
+      "issue": 191
+    },
+    {
+      "id": "pipes-older-server",
+      "title": "Pipes on an older server say so",
+      "kind": "bug",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "backlog",
+      "body": "On a server from before the pipes, a machine's strip shows and nothing flows: the same silent failure Add a desktop had. Not looked at.",
+      "issue": 182
+    },
+    {
+      "id": "character-sheet",
+      "title": "Character card as a sheet: typographic structure, lines, identity as formatted text",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_character-studio/NOTES.md`). The card reads as a sheet: stage, the name as a title you can write in, quiet tags, then *Who it is*, *Stages*, *Pictures*, *Drawn from* under eyebrows with a hairline between, the approval row, the foot. *Who it is* is formatted text on the card (the Text box's surface and toolbar), saved on leaving it and on ⌘/Ctrl+Enter with a tick; markdown kept, plain words to the prompts. Checked in a browser, day and night, at 260 / 400 / 460 / 560 on `#/design`.",
+      "issue": 183
+    },
+    {
+      "id": "character-expressions-stage",
+      "title": "Expressions stage in the character pipeline (stand-in verified)",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17. After the sheet, for both forms: one 4:3 picture of eight labelled panels (9 credits), in the lineage, a reference for the views; optional on older characters (*Add expressions*), and it clears nothing after it. Checked against the stand-in Meshy only (`test/characters.test.ts` 15, `e2e/character-studio.spec.ts`). Not verified on the real Meshy: the prompt's results and `aspect_ratio: \"4:3\"` on `image-to-image` are unseen. No existing character has a sheet (`character-expressions-press`).",
+      "issue": 184
+    },
+    {
+      "id": "studio-pipeline-nodes",
+      "title": "Character studio: the pipeline as nodes with Generate and auto-placement",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17. A set's pipeline is nine node cards joined by the grid's wires (Inspiration → Sheet → Expressions → Views → Mesh avatar → Output, the 3D lane under Mesh avatar); each shows the characters at it as tiles with Generate and its price; ＋ New on the Sheet node; a finished card is placed into `Characters · <Set>` by the server; `upgradeStudio` brings a studio with the one flow card to the nodes. Checked against the stand-in: `test/studio-pipeline.test.ts` (4), `e2e/character-studio.spec.ts` (9). Not verified: the upgrade on the live studio, a viewer on the nodes in a browser, the studio's frame rate with 27 more cards and 27 wires.",
+      "issue": 185
+    },
+    {
+      "id": "character-expressions-press",
+      "title": "Press the expressions sheet for one animal (Mochi, 9 credits), look at it, then the other five (45)",
+      "kind": "hookup",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "needs-you",
+      "body": "It spends Meshy credits, so it is a person's press; nothing was spent on 2026-11-17 and no character has an expressions sheet. On a server running this code (`server-restart-4410`): press Mochi's (9 credits) and look at it before the rest, because the prompt has never met the real image model (the eight-panel grid, the labels, 4:3 on `image-to-image`). Then the other five animal mesh avatars (45; 54 in all). `node scripts/characters-expressions.mjs --set animals` lists them and the cost; `--press` with `FOUNDATION_SESSION` spends them.",
+      "issue": 186
+    },
+    {
+      "id": "mavatar-drawn-variants",
+      "title": "mesh-avatar-studio: drawn closed-eye and open-mouth variants from the expressions sheet's BLINK and TALKING panels",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "next",
+      "body": "Not built. The expressions sheet is drawn to be their source, but nothing cuts or registers the panels, and mesh-avatar-studio's rig format hasn't been checked for taking them. Try it on one character and write down what happened (`docs/characters.md` says what has to be found out first).",
+      "issue": 187
+    },
+    {
+      "id": "studio-live-upgrade-look",
+      "title": "Open the live studio on the new code: look at the upgraded layout with all twenty-two characters, and measure its frames",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "next",
+      "body": "`upgradeStudio` is tested on the server and was never watched in a browser on an upgraded studio, nor run on the live one. It runs the first time the Character studio is opened on a server running this code (`server-restart-4410`): the flow card becomes the Inspiration node, eight nodes and nine wires per set are added, columns grow to 2,060 px and the pipeline row to 1,490 px. Then `e2e -- frames` and the perf trace on it (27 more cards, 27 wires).",
+      "issue": 188
+    },
+    {
+      "id": "pipeline-nodes-viewer-e2e",
+      "title": "Viewer check for the pipeline nodes in e2e",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "next",
+      "body": "A viewer should see the nodes with no Generate and no ＋ New. Written, and only the card's viewer state is on `#/design`; not checked in a browser.",
+      "issue": 189
+    },
+    {
+      "id": "collections",
+      "title": "Collections: gather a pipeline's pictures and characters, lay them out in a section, drag copies out",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_collections/NOTES.md`). Josh: \"a primitive … that can output images or character cards like we have stored in Character studio into a collection, that can be piped into a section that automatically lays out the products … expanded to be able to drag out copies of those cards onto the grid.\" A collection card (❖) gathers what its wired sources make: a stage node its pictures, Output (now with an output of its own) the finished characters, another collection its items, each once. Lay out in a section, or its output dropped on one: each item a docked card there, later ones following. Expand: tiles that drag out as copies; a character's copy is marked and never an avatar twice. Character pipeline in a section's menu lays the flow with a collection after Output on any grid. Checked: `apps/server/test/collections.test.ts` (6), `e2e/collections.spec.ts` (6), pointer, character-studio, council, card-chrome, section-agents and sub-grid specs. Not done: Rune doesn't draw it; no wire drawn to the section it lays into; nothing goes into mesh-avatar-studio itself; not run on the live studio or in the desktop window.",
+      "issue": 192
+    },
+    {
+      "id": "collections-rune",
+      "title": "Rune draws a collection and its drag-out",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "backlog",
+      "body": "The GPU renderer (apps/rune) draws a collection card blank and has no tile drag-out. Bring it to the web renderer's card (panels/CollectionView.tsx).",
+      "issue": 193
+    }
+  ]
+}

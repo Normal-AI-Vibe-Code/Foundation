@@ -1,0 +1,207 @@
+{
+  "when": "2026-11-08T04:16:54.337Z",
+  "machine": {
+    "viewport": "1440×900 @2x",
+    "browser": "chromium 157.0.4341.42 (headed)",
+    "wind": {
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "canvas": "3458×2184",
+      "medianMs": 0,
+      "p90Ms": 0.1
+    }
+  },
+  "budget": "p95 ≤ 16.7 ms × 1.25; ≤ 5 % of frames over; the wind at ≥ 55 fps while it runs",
+  "results": [
+    {
+      "label": "sign-in: arriving (frame opens, wind reveals, 2.5 s)",
+      "frames": 140,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 183.1,
+      "over": 4,
+      "overPct": 2.9,
+      "loaf": 4,
+      "loafBlockingMax": 11,
+      "loafTop": [
+        "195ms: TimerHandler:setTimeout asciiWind2.js 57ms",
+        "63ms: http://localhost:21450/src/main.tsx main.tsx 60ms",
+        "60ms: TimerHandler:setTimeout asciiWind2.js 28ms"
+      ],
+      "windFps": 5.4,
+      "windP95": 67.1
+    },
+    {
+      "label": "sign-in: at rest (4 s)",
+      "frames": 240,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 18.5,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windFps": 10.2,
+      "windP95": 101.2
+    },
+    {
+      "label": "sign-in: the cursor stirs the wind (3 s)",
+      "frames": 372,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.9,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windFps": 10,
+      "windP95": 100.1
+    },
+    {
+      "label": "sign-in: presses ripple (3 s)",
+      "frames": 178,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windFps": 10.1,
+      "windP95": 100.4
+    },
+    {
+      "label": "sign-in: typing stirs the wind (name + email)",
+      "frames": 125,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 16.8,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windFps": 1,
+      "windP95": 0
+    },
+    {
+      "label": "sign-in: signing in dissolves into the board",
+      "frames": 77,
+      "p50": 16.7,
+      "p95": 66.7,
+      "max": 216.3,
+      "over": 7,
+      "overPct": 9.1,
+      "loaf": 5,
+      "loafBlockingMax": 67,
+      "loafTop": [
+        "215ms: ",
+        "150ms: DOMWebSocket.onmessage board.ts 75ms",
+        "118ms: MessagePort.onmessage react-dom_client.js?v=c76cf968 113ms"
+      ],
+      "windFps": 26.7,
+      "windP95": 116.2
+    },
+    {
+      "label": "board: at rest (3 s)",
+      "frames": 180,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 17,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": []
+    },
+    {
+      "label": "board: pan (trackpad scroll, 3 s)",
+      "frames": 745,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 49.9,
+      "over": 1,
+      "overPct": 0.1,
+      "loaf": 1,
+      "loafBlockingMax": 12,
+      "loafTop": [
+        "63ms: TimerHandler:setTimeout SectionView.tsx 61ms"
+      ]
+    },
+    {
+      "label": "board: pinch zoom (ctrl + wheel, 3 s)",
+      "frames": 747,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 33.3,
+      "over": 2,
+      "overPct": 0.3,
+      "loaf": 1,
+      "loafBlockingMax": 3,
+      "loafTop": [
+        "53ms: TimerHandler:setTimeout SectionView.tsx 52ms"
+      ]
+    },
+    {
+      "label": "board: drag a card (2 s)",
+      "frames": 312,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 133.1,
+      "over": 2,
+      "overPct": 0.6,
+      "loaf": 2,
+      "loafBlockingMax": 82,
+      "loafTop": [
+        "140ms: DIV#root.onpointermove react-dom_client.js?v=c76cf968 130ms",
+        "62ms: DIV#root.onpointerdown react-dom_client.js?v=c76cf968 58ms"
+      ]
+    },
+    {
+      "label": "board: pan with live frames running (3 s)",
+      "frames": 750,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 19.9,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": []
+    },
+    {
+      "label": "board: side pane, search and ⌘K open and close",
+      "frames": 206,
+      "p50": 16.7,
+      "p95": 49.9,
+      "max": 382.7,
+      "over": 58,
+      "overPct": 28.2,
+      "loaf": 3,
+      "loafBlockingMax": 344,
+      "loafTop": [
+        "397ms: DOMWindow.onkeydown Shell.tsx 388ms",
+        "82ms: MessagePort.onmessage react-dom_client.js?v=c76cf968 10ms",
+        "57ms: DOMWindow.onkeydown Shell.tsx 33ms"
+      ]
+    },
+    {
+      "label": "board: framing glides (0, ⇧1, F)",
+      "frames": 223,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 66.6,
+      "over": 6,
+      "overPct": 2.7,
+      "loaf": 4,
+      "loafBlockingMax": 15,
+      "loafTop": [
+        "71ms: DOMWindow.onkeydown GridViewport.tsx 63ms",
+        "67ms: DOMWindow.onkeydown GridViewport.tsx 62ms",
+        "66ms: DOMWindow.onkeydown GridViewport.tsx 53ms"
+      ]
+    }
+  ]
+}

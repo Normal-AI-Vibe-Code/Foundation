@@ -1,0 +1,242 @@
+{
+  "machine": {
+    "viewport": "1440×900 @2x",
+    "browser": "chromium 157.0.4341.46 (headed, GPU)",
+    "photosAt35": {
+      "images": 25,
+      "imageMpx": 1.9,
+      "videos": 4,
+      "playing": 0,
+      "iframes": 0
+    },
+    "photosAt100": {
+      "images": 25,
+      "imageMpx": 3.9,
+      "videos": 1,
+      "playing": 0,
+      "iframes": 0
+    },
+    "apps": {
+      "images": 27,
+      "imageMpx": 9.6,
+      "videos": 4,
+      "playing": 0,
+      "iframes": 0
+    },
+    "fitted": {
+      "images": 27,
+      "imageMpx": 7.6,
+      "videos": 0,
+      "playing": 0,
+      "iframes": 0
+    }
+  },
+  "results": [
+    {
+      "label": "fitted (12 %): loading every picture (6 s)",
+      "frames": 354,
+      "fps": 58.8,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 49.9,
+      "overPct": 1.7,
+      "loaf": 1,
+      "loafRenderMs": 6,
+      "loafTop": [
+        "57ms (render 6): "
+      ],
+      "churn": {
+        "img": 46,
+        "iframe": 0,
+        "video": 4
+      }
+    },
+    {
+      "label": "fitted: pan (3 s)",
+      "frames": 544,
+      "fps": 59.9,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 18,
+        "iframe": 0,
+        "video": 0
+      }
+    },
+    {
+      "label": "fitted: pinch in and out (3 s)",
+      "frames": 484,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 0,
+        "iframe": 0,
+        "video": 0
+      }
+    },
+    {
+      "label": "photos at ~35 %: pan (3 s)",
+      "frames": 542,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 0,
+        "iframe": 0,
+        "video": 0
+      }
+    },
+    {
+      "label": "photos at ~35 %: pinch in and out (3 s)",
+      "frames": 480,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 0,
+        "iframe": 0,
+        "video": 0
+      }
+    },
+    {
+      "label": "photos at 100 %: pan (3 s)",
+      "frames": 545,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 0,
+        "iframe": 0,
+        "video": 0
+      }
+    },
+    {
+      "label": "photos at 100 %: pinch in and out (3 s)",
+      "frames": 481,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 0,
+        "iframe": 0,
+        "video": 0
+      }
+    },
+    {
+      "label": "glide 1: photos → fitted → apps (framing keys)",
+      "frames": 162,
+      "fps": 59.4,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 33.3,
+      "overPct": 0.6,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 33,
+        "iframe": 0,
+        "video": 1
+      }
+    },
+    {
+      "label": "glide 2: photos → fitted → apps (framing keys)",
+      "frames": 164,
+      "fps": 59.6,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 16.9,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 75,
+        "iframe": 0,
+        "video": 1
+      }
+    },
+    {
+      "label": "glide 3: photos → fitted → apps (framing keys)",
+      "frames": 164,
+      "fps": 59.8,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 75,
+        "iframe": 0,
+        "video": 2
+      }
+    },
+    {
+      "label": "apps framed: pan (3 s)",
+      "frames": 542,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 16.9,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 0,
+        "iframe": 0,
+        "video": 0
+      }
+    },
+    {
+      "label": "apps framed: pinch in and out (3 s)",
+      "frames": 482,
+      "fps": 60,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 16.8,
+      "overPct": 0,
+      "loaf": 0,
+      "loafRenderMs": 0,
+      "loafTop": [],
+      "churn": {
+        "img": 0,
+        "iframe": 0,
+        "video": 0
+      }
+    }
+  ]
+}

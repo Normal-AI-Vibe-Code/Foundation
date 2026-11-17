@@ -1,0 +1,53 @@
+{
+  "when": "2026-11-07T07:06:05.653Z",
+  "browser": "chromium 153.0.8010.12 (Playwright, headless)",
+  "viewport": "1440×900 @1x",
+  "board": {
+    "notes": 180,
+    "liveFrames": 20,
+    "sections": 10
+  },
+  "results": [
+    {
+      "label": "pan (trackpad scroll, 3 s)",
+      "frames": 572,
+      "p50": 33.3,
+      "p95": 50,
+      "max": 66.7,
+      "over33": 101,
+      "longTasks": 4,
+      "liveFramesMounted": 4
+    },
+    {
+      "label": "pinch zoom (ctrl + wheel, 3 s)",
+      "frames": 587,
+      "p50": 33.3,
+      "p95": 50,
+      "max": 133.3,
+      "over33": 130,
+      "longTasks": 4,
+      "liveFramesMounted": 4
+    },
+    {
+      "label": "drag a card (2 s)",
+      "frames": 387,
+      "p50": 33.3,
+      "p95": 50,
+      "max": 66.7,
+      "over33": 78,
+      "longTasks": 4,
+      "liveFramesMounted": 4
+    },
+    {
+      "label": "pan with live frames running (3 s)",
+      "frames": 548,
+      "p50": 33.4,
+      "p95": 66.6,
+      "max": 116.6,
+      "over33": 261,
+      "longTasks": 16,
+      "liveFramesMounted": 8
+    }
+  ],
+  "note": "Headless Chromium draws WebGL in software (SwiftShader), so the paper shader costs more here than on a GPU; treat these as an upper bound."
+}

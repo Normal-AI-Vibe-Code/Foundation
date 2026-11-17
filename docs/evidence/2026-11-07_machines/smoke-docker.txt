@@ -1,0 +1,10 @@
+· Kiri at \\.\pipe\kiri: Kiri isn't running here (nothing answers at \\.\pipe\kiri)
+· Docker at \\.\pipe\docker_engine: up, 28.3.0 (API 1.51)
+· proposed pnl_mw7b9hbceg9ln (nothing started)
+· started machine-smoke-mw7b9hba on Docker in 423 ms; ports [{"port":8000,"host":8783}]
+· typed into the shared terminal: foundation-42
+· an agent's read sees the screen
+· stopped
+· started again in 343 ms, the disk kept
+· removed, with its disk
+✓ machines work on this engine

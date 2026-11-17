@@ -1,0 +1,16 @@
+
+> @foundation/server@0.1.0 machines:smoke
+> tsx scripts/machines-smoke.ts kiri
+
+(node:59612) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+· Kiri at \\.\pipe\kiri: up, 0.1.18 (API 1.47)
+· Docker at \\.\pipe\docker_engine: up, 28.3.0 (API 1.51)
+· proposed pnl_mw7in7qcazf1e (nothing started)
+· started machine-smoke-mw7in7qa on Kiri in 1990 ms; ports [{"port":8000,"host":40561}]
+· typed into the shared terminal: foundation-42
+· an agent's read sees the screen
+· stopped
+· started again in 151 ms, the disk kept
+· removed, with its disk
+✓ machines work on this engine

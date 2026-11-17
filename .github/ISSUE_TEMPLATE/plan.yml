@@ -1,0 +1,25 @@
+name: Plan
+description: Something we should build or change.
+labels: ["plan", "kind: plan", "status: backlog"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This joins Foundation's plan: the next **Sync with GitHub** (Settings → Plan) puts it on the board, in Backlog.
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+      description: What it does for the people using the board, in their words.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: What done looks like
+      description: How we'll know it works. What's checked, and where.
+  - type: input
+    id: area
+    attributes:
+      label: Area
+      description: One word for the part of the app, like wires, sections, search, crew, huddles, settings.

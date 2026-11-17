@@ -1,0 +1,12 @@
+$ node scripts/dev-orphans-check.mjs --launcher scripts/dev.base-check.mjs   # the launcher before this change (git show HEAD:scripts/dev.mjs)
+walk: finds npm → tsx → server under a dead shell; leaves Kiri, an older PID 10's child and a reused PID alone
+
+── node scripts\dev.base-check.mjs
+up in 15.4 s: server :15441, client :15431
+12 processes: node.exe:65872 conhost.exe:78068 cmd.exe:56292 cmd.exe:72156 node.exe:11012 node.exe:71068 cmd.exe:63260 node.exe:72724 cmd.exe:68976 node.exe:42696 node.exe:57512 esbuild.exe:78020
+taskkill /F /PID 65872 → SUCCESS: The process with PID 65872 has been terminated.
+FAIL after 10.0 s: still running conhost.exe:78068 node.exe:11012 node.exe:71068 cmd.exe:63260 node.exe:72724 cmd.exe:68976 node.exe:42696 node.exe:57512 esbuild.exe:78020; ports open 15441, 15431
+cleaned up 9 left running
+
+1 of 1 failed
+exit 1

@@ -1,0 +1,33 @@
+{
+  "about": "What the official build of Foundation for Chrome needs to know. `placeholder: true` marks a value nobody has confirmed yet: `npm run release -w @foundation/extension` builds with it anyway and lists it, so the package can be made and tried before the answers are in. Replace the value, set placeholder to false. See apps/extension/README.md.",
+  "foundationUrl": {
+    "value": "https://foundation.formindustries.com",
+    "placeholder": true,
+    "what": "Where the hosted Foundation lives. The build's default; a Workspace admin can set it for everyone instead (managed policy foundationUrl), without a rebuild."
+  },
+  "companyDomains": {
+    "value": ["formindustries.com"],
+    "placeholder": true,
+    "what": "The company's own domains. The extension may read Foundation's Today on any https host under these (granted at install), so an admin can move Foundation within them by policy and the popup still works."
+  },
+  "publisher": {
+    "value": "Form Industries",
+    "placeholder": false,
+    "what": "Who publishes it on the Chrome Web Store (a group publisher owned by the company's Google Workspace)."
+  },
+  "supportEmail": {
+    "value": "foundation@formindustries.com",
+    "placeholder": true,
+    "what": "Where people write when it breaks. Shown on the listing and on the privacy page."
+  },
+  "privacyUrl": {
+    "value": "https://foundation.formindustries.com/#/privacy",
+    "placeholder": true,
+    "what": "The privacy policy the Web Store listing links to. Foundation serves one at #/privacy without a sign-in; the reviewers must be able to open it, so if Foundation isn't reachable from the internet, publish the same text on a public page and put that here."
+  },
+  "extensionId": {
+    "value": "",
+    "placeholder": true,
+    "what": "The Web Store's id for the item, known after the first upload. The admin console's force-install and the policy snippets use it."
+  }
+}

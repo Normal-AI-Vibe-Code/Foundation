@@ -1,0 +1,258 @@
+{
+  "when": "2026-11-08T04:40:01.077Z",
+  "machine": {
+    "viewport": "1440×900 @2x",
+    "browser": "chromium 157.0.4341.42 (headed)",
+    "wind": {
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 5080 (0x00002C02) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "canvas": "3458×2184",
+      "medianMs": 0,
+      "p90Ms": 0
+    },
+    "firstWindMs": 9783
+  },
+  "budget": "p95 ≤ 16.7 ms × 1.25; ≤ 5 % of frames over; the wind at ≥ 55 fps while it runs",
+  "results": [
+    {
+      "label": "sign-in: arriving (frame opens, wind reveals, 2.5 s)",
+      "frames": 158,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 49.9,
+      "over": 1,
+      "overPct": 0.6,
+      "loaf": 2,
+      "loafBlockingMax": 12,
+      "loafTop": [
+        "64ms: http://localhost:21450/src/main.tsx main.tsx 60ms",
+        "58ms: TimerHandler:setTimeout asciiWind2.js 56ms"
+      ],
+      "windState": {
+        "backoff": 0,
+        "suspended": false,
+        "settled": false,
+        "backoffs": []
+      },
+      "windFps": 8.9,
+      "windP95": 16.9
+    },
+    {
+      "label": "sign-in: at rest (4 s)",
+      "frames": 242,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windState": {
+        "backoff": 0,
+        "suspended": false,
+        "settled": false,
+        "backoffs": []
+      },
+      "windFps": 60,
+      "windP95": 16.9
+    },
+    {
+      "label": "sign-in: the cursor stirs the wind (3 s)",
+      "frames": 409,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windState": {
+        "backoff": 0,
+        "suspended": false,
+        "settled": false,
+        "backoffs": []
+      },
+      "windFps": 60.1,
+      "windP95": 17.1
+    },
+    {
+      "label": "sign-in: presses ripple (3 s)",
+      "frames": 185,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.9,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windState": {
+        "backoff": 0,
+        "suspended": false,
+        "settled": false,
+        "backoffs": []
+      },
+      "windFps": 60.2,
+      "windP95": 16.8
+    },
+    {
+      "label": "sign-in: typing stirs the wind (name + email)",
+      "frames": 127,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windState": {
+        "backoff": 0,
+        "suspended": false,
+        "settled": false,
+        "backoffs": []
+      },
+      "windFps": 60.1,
+      "windP95": 17
+    },
+    {
+      "label": "sign-in: the board loads behind the page (wind keeps turning)",
+      "frames": 39,
+      "p50": 16.7,
+      "p95": 133,
+      "max": 133.2,
+      "over": 7,
+      "overPct": 17.9,
+      "loaf": 5,
+      "loafBlockingMax": 66,
+      "loafTop": [
+        "147ms: DOMWebSocket.onmessage board.ts 76ms",
+        "129ms: ",
+        "119ms: "
+      ],
+      "windState": {
+        "backoff": 0,
+        "suspended": false,
+        "settled": false,
+        "backoffs": []
+      },
+      "windFps": 34.8,
+      "windP95": 130.4
+    },
+    {
+      "label": "sign-in: the page dissolves into the board",
+      "frames": 58,
+      "p50": 16.7,
+      "p95": 16.7,
+      "max": 16.8,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": [],
+      "windFps": 59.7,
+      "windP95": 16.8
+    },
+    {
+      "label": "board: at rest (3 s)",
+      "frames": 180,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 16.8,
+      "over": 0,
+      "overPct": 0,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": []
+    },
+    {
+      "label": "board: pan (trackpad scroll, 3 s)",
+      "frames": 775,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 49.9,
+      "over": 1,
+      "overPct": 0.1,
+      "loaf": 1,
+      "loafBlockingMax": 16,
+      "loafTop": [
+        "66ms: TimerHandler:setTimeout SectionView.tsx 64ms"
+      ]
+    },
+    {
+      "label": "board: pinch zoom (ctrl + wheel, 3 s)",
+      "frames": 798,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 83,
+      "over": 2,
+      "overPct": 0.3,
+      "loaf": 2,
+      "loafBlockingMax": 12,
+      "loafTop": [
+        "72ms: ",
+        "63ms: TimerHandler:setTimeout SectionView.tsx 61ms"
+      ]
+    },
+    {
+      "label": "board: drag a card (2 s)",
+      "frames": 493,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 815.3,
+      "over": 6,
+      "overPct": 1.2,
+      "loaf": 3,
+      "loafBlockingMax": 463,
+      "loafTop": [
+        "992ms: DIV#root.onpointermove react-dom_client.js?v=a7281613 188ms",
+        "526ms: FrameRequestCallback frame.html 437ms",
+        "169ms: "
+      ]
+    },
+    {
+      "label": "board: pan with live frames running (3 s)",
+      "frames": 766,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 43.8,
+      "over": 4,
+      "overPct": 0.5,
+      "loaf": 0,
+      "loafBlockingMax": 0,
+      "loafTop": []
+    },
+    {
+      "label": "board: side pane, search and ⌘K open and close",
+      "frames": 271,
+      "p50": 16.6,
+      "p95": 16.8,
+      "max": 50,
+      "over": 7,
+      "overPct": 2.6,
+      "loaf": 2,
+      "loafBlockingMax": 14,
+      "loafTop": [
+        "66ms: DOMWindow.onkeydown Shell.tsx 57ms",
+        "50ms: DOMWindow.onkeydown Shell.tsx 30ms"
+      ]
+    },
+    {
+      "label": "board: framing glides (0, ⇧1, F)",
+      "frames": 228,
+      "p50": 16.6,
+      "p95": 16.7,
+      "max": 50,
+      "over": 4,
+      "overPct": 1.8,
+      "loaf": 4,
+      "loafBlockingMax": 11,
+      "loafTop": [
+        "71ms: DOMWindow.onkeydown GridViewport.tsx 56ms",
+        "65ms: DOMWindow.onkeydown GridViewport.tsx 60ms",
+        "62ms: DOMWindow.onkeydown GridViewport.tsx 57ms"
+      ]
+    }
+  ]
+}

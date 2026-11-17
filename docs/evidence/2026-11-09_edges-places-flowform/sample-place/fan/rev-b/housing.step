@@ -1,0 +1,8 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('Rim drive fan housing'),'2;1');
+FILE_NAME('housing.step','2026-11-09',('Form Industries'),(''),'','','');
+ENDSEC;
+DATA;
+ENDSEC;
+END-ISO-10303-21;

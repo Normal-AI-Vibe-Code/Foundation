@@ -1,0 +1,881 @@
+/* The council (characters/Council.tsx) and a character drawn anywhere (characters/Avatar.tsx). Tokens only. */
+
+/* ---------- an avatar: a 3D seat, a mesh face, or a still ---------- */
+
+.avatar {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.avatar-none {
+  display: grid;
+  place-items: center;
+  color: var(--crew, var(--color-dim));
+  font: 500 var(--text-18, 18px) / 1 var(--font-sans);
+}
+.avatar-still {
+  object-fit: cover;
+  object-position: 50% 12%;
+  border-radius: var(--radius-card);
+  user-select: none;
+  animation: avatar-breathe 4.2s var(--ease-out-soft) infinite alternate;
+  transform-origin: 50% 100%;
+}
+/* materialising: while the character loads, its silhouette stands in its place, a light passing over it;
+   the character then fades in over it and the silhouette goes */
+.avatar-3d > .avatar-still,
+.avatar-mesh > .avatar-still {
+  position: absolute;
+  inset: 0;
+  animation: avatar-shimmer 1.5s var(--ease-out-soft) infinite;
+  filter: brightness(0);
+  opacity: 0.32;
+  -webkit-mask-image: linear-gradient(105deg, #000 30%, rgb(0 0 0 / 0.45) 50%, #000 70%);
+  mask-image: linear-gradient(105deg, #000 30%, rgb(0 0 0 / 0.45) 50%, #000 70%);
+  -webkit-mask-size: 300% 100%;
+  mask-size: 300% 100%;
+}
+.is-night .avatar-3d > .avatar-still,
+.is-night .avatar-mesh > .avatar-still {
+  filter: brightness(0) invert(1);
+  opacity: 0.26;
+}
+@keyframes avatar-shimmer {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+  to {
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+}
+.avatar-3d.is-live > .avatar-canvas,
+.avatar-mesh.is-live > .avatar-canvas {
+  animation: avatar-arrive var(--dur-lift) var(--ease-out-soft) both;
+}
+@keyframes avatar-arrive {
+  from {
+    opacity: 0;
+    filter: brightness(0.2) blur(3px);
+  }
+}
+.avatar-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.avatar-3d.is-loading > .avatar-canvas,
+.avatar-mesh.is-loading > .avatar-canvas,
+.avatar-mesh.is-failed > .avatar-canvas {
+  opacity: 0;
+}
+@keyframes avatar-breathe {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.012, 1.02);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-still {
+    animation: none;
+  }
+}
+
+/* ---------- the council (2026-11-17): figures standing on an edge, no panel ---------- */
+
+/* where it stands. A section's: on the section's top edge, over what's above it. The grid's: on the window's bottom edge */
+.council-place {
+  position: absolute;
+  z-index: 60;
+  height: 170px;
+  pointer-events: none;
+}
+.council-place.is-section {
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  z-index: 7;
+}
+.council-place.is-board {
+  bottom: 0;
+}
+/* the section comes forward so its council covers its neighbour above, and lets it out of its own box */
+.section-card.has-council {
+  z-index: 45;
+  overflow: visible;
+}
+/* 2026-11-17 (Josh): the agents stand at the right, beside the buttons that called them (a section's Council
+   button is at its top right; the grid's bar keeps the bottom left) */
+.council {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  pointer-events: none;
+  color: var(--color-frost);
+}
+.council.is-inline {
+  position: relative;
+  inset: auto;
+  height: 170px;
+  margin-bottom: 96px;
+  border-bottom: 1px solid var(--color-line-strong);
+}
+/* the one canvas every 3D figure is drawn on: it ends at the edge they stand behind, so they're cut off by it */
+.council-stage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+.council-row {
+  display: flex;
+  align-items: flex-end;
+  /* close together: a group, not a lineup */
+  gap: 0;
+  min-width: 0;
+}
+.council-none {
+  align-self: center;
+  margin: 0 0 var(--space-5);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  color: var(--color-mist);
+}
+.council-seat {
+  position: relative;
+  flex: none;
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+/* the window a figure shows through: it ends at the edge, and the figure is taller than it */
+.council-crop {
+  position: relative;
+  width: 100%;
+  height: 148px;
+  overflow: hidden;
+}
+.council-figure {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 190px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  /* up from behind the edge, one after another */
+  animation: council-up var(--dur-lift) var(--ease-spring) both;
+  animation-delay: calc(var(--i) * 55ms + 40ms);
+  transition: translate var(--dur-quick) var(--ease-out-soft);
+}
+@keyframes council-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+.council-seat:hover .council-figure,
+.council-seat:focus-within .council-figure,
+.council-seat.is-hot .council-figure {
+  translate: 0 -6px;
+}
+.council-figure:focus-visible {
+  outline: 0;
+}
+.council-figure .avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.council-figure .avatar-still {
+  object-fit: cover;
+  object-position: 50% 0;
+}
+/* can't be reached: grey, and it hangs its head (the mood it's given is the sad one) */
+.council-seat.is-offline .council-figure {
+  filter: grayscale(1) opacity(0.55);
+  translate: 0 10px;
+}
+.council-seat.is-done .council-figure,
+.council-seat.is-stopped .council-figure {
+  opacity: 0.8;
+}
+
+/* above the head: whose model, where it runs, how it stands */
+.council-marks {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  animation: council-marks-in var(--dur-pane) var(--ease-out-soft) both;
+  animation-delay: calc(var(--i) * 55ms + 260ms);
+}
+@keyframes council-marks-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.council-mark {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+  color: var(--color-mist);
+}
+.council-mark.is-off {
+  background: color-mix(in srgb, var(--color-bad) 14%, var(--color-raise));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-bad) 55%, var(--color-line));
+  color: var(--color-bad);
+}
+.council-mark.is-state {
+  width: 8px;
+  height: 8px;
+  margin-left: 2px;
+  background: var(--color-ok);
+  box-shadow: none;
+}
+.council-mark.is-state.is-working {
+  background: var(--crew);
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+.council-mark.is-state.is-error {
+  background: var(--color-bad);
+}
+.council-mark.is-plus {
+  background: var(--color-agent-dim);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-agent) 50%, var(--color-line));
+  color: var(--color-agent);
+}
+
+/* a place nobody has taken: a character's outline */
+.council-ghost .council-figure .avatar-still,
+.council-ghost-plain {
+  filter: brightness(0);
+  opacity: 0.13;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.is-night .council-ghost .council-figure .avatar-still,
+.is-night .council-ghost-plain {
+  filter: brightness(0) invert(1);
+  opacity: 0.2;
+}
+.council-ghost-plain {
+  position: absolute;
+  inset: 8% 6% 0;
+  width: 88%;
+  height: 92%;
+  fill: currentColor;
+}
+.council-ghost .council-figure .avatar-none {
+  opacity: 0;
+}
+/* a place waiting for an agent breathes a little and shifts its weight, out of step with its neighbours:
+   something could stand here (transform only, on the figure inside, so the rise and the hover still apply) */
+.council-ghost .council-figure > * {
+  transform-origin: 50% 100%;
+  animation: council-ghost-idle 3.6s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -1.3s);
+}
+@keyframes council-ghost-idle {
+  0% {
+    transform: translateY(0) rotate(-0.8deg) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) rotate(0deg) scale(1.012);
+  }
+  100% {
+    transform: translateY(-1px) rotate(0.8deg) scale(1.004);
+  }
+}
+.council-ghost:hover .council-figure .avatar-still,
+.council-ghost:hover .council-ghost-plain,
+.council-ghost .council-figure:focus-visible .avatar-still {
+  opacity: 0.34;
+}
+
+/* an agent you roll over: a white line over its body (2026-11-17, Josh: "just a white box … above the section, with the
+   close and mic button"), above the section's edge; the grid's, above the bottom bar. Its name is over its head */
+.council-under {
+  position: absolute;
+  z-index: 8;
+  bottom: var(--space-3);
+  left: 50%;
+  width: 232px;
+  translate: -50% 4px;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--dur-quick) var(--ease-out-soft),
+    translate var(--dur-quick) var(--ease-out-soft),
+    visibility 0s var(--dur-quick);
+}
+.council-seat:hover .council-under,
+.council-seat:focus-within .council-under,
+.council-seat.is-hot .council-under,
+.council-seat:has(.council-say.is-held) .council-under {
+  opacity: 1;
+  visibility: visible;
+  translate: -50% 0;
+  transition-delay: 0s;
+}
+.council-seat.is-shut:not(:has(.council-say.is-held)) .council-under {
+  opacity: 0;
+  visibility: hidden;
+}
+/* the grid's stands on the window's bottom edge: the line sits over the body, clear of the bottom bar */
+.council.is-board .council-under {
+  bottom: 64px;
+}
+.council-under .council-say {
+  height: 34px;
+  background: var(--color-over-room);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px color-mix(in srgb, var(--color-room-shade) 8%, transparent);
+}
+.council-under .council-say:focus-within {
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1.5px var(--color-agent);
+}
+.council-under .council-say-text {
+  color: var(--color-room-shade);
+}
+.council-under .council-say-text::placeholder {
+  color: color-mix(in srgb, var(--color-room-shade) 48%, transparent);
+}
+.council-under .council-say-btn {
+  color: color-mix(in srgb, var(--color-room-shade) 62%, transparent);
+}
+.council-under .council-say-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-agent) 14%, transparent);
+  color: var(--color-agent);
+}
+/* the name, first over the head, beside its marks */
+.council-mark-name {
+  max-width: 60px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* where it runs, smaller beside the name, so a head's marks keep within its own figure's width */
+.council-marks .council-mark[data-council-where] {
+  width: 16px;
+  height: 16px;
+}
+.council-seat.is-working .council-mark-name {
+  box-shadow: 0 0 0 1.5px var(--crew);
+}
+/* a mesh avatar (the runtime fits its picture to the bottom of its canvas): the canvas takes the picture's own 3:4 at the
+   figure's full height, centred, so the head is at the top and the chest shows, as a silhouette's does (2026-11-17: it
+   stood low and small, under its marks) */
+.council-figure .avatar-mesh > .avatar-canvas {
+  left: 50%;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 896 / 1200;
+  translate: -50% 0;
+}
+.council-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  white-space: nowrap;
+}
+.council-name > b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.council-name > i {
+  font-style: normal;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.council-dot {
+  flex: none;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--crew);
+}
+.council-seat.is-idle .council-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--crew);
+}
+.council-says {
+  color: var(--color-mist);
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.council-says.is-off {
+  color: var(--color-bad);
+}
+.council-say {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 32px;
+  padding: 0 var(--space-1) 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-void);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.council-say:focus-within {
+  box-shadow: inset 0 0 0 1px var(--color-agent);
+}
+.council-say-text {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.2 var(--font-sans);
+}
+.council-say-btn {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.council-say-btn:hover:not(:disabled) {
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
+}
+.council-say-btn.is-live {
+  background: var(--color-agent);
+  color: var(--color-void);
+  animation: f-breathe 1.6s var(--ease-out-soft) infinite;
+}
+.council-say-btn.is-send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* at the section's top right, on its edge: everyone at once, the panel, close */
+.council-tools {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  gap: 2px;
+  margin-bottom: var(--space-2);
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-raise) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+  pointer-events: auto;
+  animation: council-marks-in var(--dur-pane) var(--ease-out-soft) both;
+}
+.council-tool {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.council-tool:hover {
+  background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+  color: var(--color-frost);
+}
+.council-tool.is-on {
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
+}
+.council-tools-say {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + var(--space-3));
+  right: 0;
+  width: 300px;
+  padding: var(--space-3);
+  border-radius: var(--radius-pane);
+  background: color-mix(in srgb, var(--color-raise) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line);
+}
+.council.is-board .council-tools-say {
+  top: auto;
+  bottom: calc(100% + var(--space-3));
+}
+
+/* ---------- the agents panel's Council tab: the long conversation with all of them ---------- */
+
+.council-talk {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.council-talk-who {
+  flex: none;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.council-talk-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font: 600 var(--text-13) / 1.2 var(--font-display);
+}
+.council-talk-title i {
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+  font-style: normal;
+  color: var(--color-dim);
+}
+.council-talk-seats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.council-talk-seat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 26px;
+  padding: 0 var(--space-3) 0 3px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.council-talk-seat.is-on {
+  background: var(--color-agent-dim);
+  box-shadow: inset 0 0 0 1px var(--color-agent);
+  color: var(--color-frost);
+}
+.council-talk-seat.is-offline {
+  color: var(--color-dim);
+  text-decoration: line-through;
+}
+.council-talk-log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.council-talk-empty {
+  margin: auto 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.55 var(--font-sans);
+}
+.council-talk-said {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.council-talk-said small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+}
+.council-talk-now {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  align-items: start;
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  color: var(--color-mist);
+}
+.council-talk-now b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.council-talk-now .is-off {
+  color: var(--color-bad);
+}
+.council-talk-open {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-pulse);
+  font: inherit;
+  cursor: pointer;
+}
+.council-talk-foot {
+  flex: none;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--color-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.council-talk-foot .council-say {
+  height: 38px;
+}
+.council-talk-foot .council-say-text {
+  font-size: var(--text-13);
+}
+.council-talk-to {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .council-ghost .council-figure > *,
+  .council-figure,
+  .council-marks,
+  .council-tools,
+  .avatar-3d > .avatar-still,
+  .avatar-mesh > .avatar-still {
+    animation: none;
+  }
+}
+
+/* ---------- an agent's own pane, on the right (characters/AgentInfo.tsx) ---------- */
+
+.agent-info-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
+.agent-info-figure {
+  position: relative;
+  align-self: center;
+  width: 190px;
+  height: 250px;
+}
+.agent-info-figure .council-plinth {
+  inset: 58% 4% 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--crew) 55%, transparent), color-mix(in srgb, var(--crew) 16%, transparent) 70%, transparent);
+  box-shadow: none;
+}
+.agent-info-figure .avatar-still {
+  object-fit: contain;
+  object-position: 50% 100%;
+}
+.agent-info-figure .council-provider {
+  top: 0;
+  right: 6px;
+}
+.agent-info-others {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.agent-info-other {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.agent-info-other.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+  cursor: default;
+}
+.agent-info-facts {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.agent-info-facts dt {
+  color: var(--color-dim);
+}
+.agent-info-facts dd {
+  margin: 0;
+  color: var(--color-frost);
+  overflow-wrap: anywhere;
+}
+.agent-info-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.agent-info-pick {
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+}
+.agent-info-now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-agent-dim);
+}
+.agent-info-off {
+  color: var(--color-bad);
+}
+.agent-info-did h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+}
+.agent-info-did p {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.agent-info-did time {
+  flex: none;
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-11);
+}
+.agent-info-say {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+}
+.agent-info-say:focus-within {
+  border-color: var(--color-agent);
+}
+.agent-info-say textarea {
+  resize: none;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+}
+.agent-info-say-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+}
+.design-agent-info {
+  position: relative;
+  width: 360px;
+  margin: var(--space-5) auto 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+}
+
+/* the agent's pane keeps the plinth and the bead the old council had */
+.agent-info-figure .council-plinth {
+  position: absolute;
+}
+.agent-info-figure .council-provider {
+  position: absolute;
+  z-index: 3;
+}
+.agent-info-figure .council-figure,
+.agent-info-figure > .avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  animation: none;
+}
+
+/* the grid's council stands on the window's bottom edge at the right; the bar that lives there moves to the
+   bottom left (GridViewport.tsx, .hud.is-aside), and the council's buttons keep the bar's distance from the
+   window's bottom and right edges */
+.council.is-board {
+  padding-right: var(--space-5);
+}
+.council.is-board .council-tools {
+  margin-bottom: var(--space-5);
+  padding: 4px;
+}
+
+.design-council-talk {
+  position: relative;
+  width: 360px;
+  margin: var(--space-5) auto 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+}
+
+/* a section wider than the window: its council's buttons keep to the part of the top edge in view (Council.tsx sets the shift) */
+.council-place.is-section .council-tools {
+  translate: calc(-1 * var(--council-shift, 0px)) 0;
+}

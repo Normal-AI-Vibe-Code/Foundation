@@ -1,0 +1,35 @@
+# Foundation's Slack app. Create it at https://api.slack.com/apps → Create New App →
+# From a manifest → pick the workspace → paste this. Install it, then copy the
+# Bot User OAuth Token (xoxb-…) into .env as SLACK_BOT_TOKEN (SPEC §6.7).
+# For ⌘K Slack search, also copy the User OAuth Token (xoxp-…) as SLACK_USER_TOKEN.
+#
+# Private channels: /invite @Foundation in the channel first. Public channels are
+# joined automatically the first time someone posts from a card (channels:join).
+display_information:
+  name: Foundation
+  description: Form Industries' shared board — Slack channels, links and huddles on the grid
+  background_color: "#325bb4"
+features:
+  bot_user:
+    display_name: Foundation
+    always_online: false
+oauth_config:
+  scopes:
+    bot:
+      - channels:read # list channels for the channel picker
+      - groups:read # …and private channels the app was invited to
+      - channels:history # read a channel on its card
+      - groups:history
+      - channels:join # join a public channel the first time someone posts to it
+      - chat:write # post from a card, share board links, huddle invites, huddle notes
+      - chat:write.customize # posts read "Josh via Foundation", not just "Foundation"
+      - users:read # names instead of user ids
+      - users:read.email # Hermes finds the person to nudge by email
+      - im:write # …and DMs them
+      - files:read # the agent lays out images shared in Slack (copied into Foundation's archive)
+    user:
+      - search:read # ⌘K searches Slack as the person who connected it; find_images searches its files
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

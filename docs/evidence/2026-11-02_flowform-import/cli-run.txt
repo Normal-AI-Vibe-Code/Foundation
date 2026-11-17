@@ -1,0 +1,78 @@
+# Fixture backup (test/fixtures/flowform/backup.ts) packed like Flowform's backup: tar -czf current.tar.gz data
+$ npm run import:flowform -- current.tar.gz --media-dir media --dry-run
+· room Launch room (5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b)
+· room Flowform (flowform)
+
+DRY RUN — nothing kept. source <scratch>/ff3/current.tar.gz · media dir:<scratch>/ff3/media
+people: 3 new, 0 linked by email, 0 already linked, 1 system/deleted skipped
+
+Launch room → ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b
+  doc: snapshot + 2 logged updates + 1 agent action
+  members: 3 create
+  sections: 2 create
+  cards: 12 create
+  files: 4 imported, 1 archived, 1 missing
+  missing media: files/file-lost/var-lost.pdf
+  not carried: 1 unplaceable card (no kind or geometry; flowform skips it too), 1 group (sections are Foundation's grouping), 1 connector arrow between cards (Foundation wires join app ports), 1 directive, 2 sticky colour
+
+Flowform → ff-flowform (open to everyone, flowform's default room)
+  doc: snapshot + 0 logged updates + 0 agent actions
+  members: none
+  sections: 1 create
+  cards: 1 create
+  files: none
+
+# after the dry run: Foundation data dir exists? no — nothing written
+
+$ npm run import:flowform -- current.tar.gz --media-dir media   # run 1
+· room Launch room (5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b)
+· room Flowform (flowform)
+
+source <scratch>/ff3/current.tar.gz · media dir:<scratch>/ff3/media
+people: 3 new, 0 linked by email, 0 already linked, 1 system/deleted skipped
+
+Launch room → ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b
+  doc: snapshot + 2 logged updates + 1 agent action
+  members: 3 create
+  sections: 2 create
+  cards: 12 create
+  files: 4 imported, 1 archived, 1 missing
+  missing media: files/file-lost/var-lost.pdf
+  not carried: 1 unplaceable card (no kind or geometry; flowform skips it too), 1 group (sections are Foundation's grouping), 1 connector arrow between cards (Foundation wires join app ports), 1 directive, 2 sticky colour
+
+Flowform → ff-flowform (open to everyone, flowform's default room)
+  doc: snapshot + 0 logged updates + 0 agent actions
+  members: none
+  sections: 1 create
+  cards: 1 create
+  files: none
+
+$ npm run import:flowform -- current.tar.gz --media-dir media   # run 2
+· room Launch room (5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b)
+· room Flowform (flowform)
+
+source <scratch>/ff3/current.tar.gz · media dir:<scratch>/ff3/media
+people: 0 new, 0 linked by email, 3 already linked, 1 system/deleted skipped
+
+Launch room → ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b
+  doc: snapshot + 2 logged updates + 1 agent action
+  members: 3 unchanged
+  sections: 2 unchanged
+  cards: 12 unchanged
+  files: 4 existing, 1 missing
+  missing media: files/file-lost/var-lost.pdf
+  not carried: 1 unplaceable card (no kind or geometry; flowform skips it too), 1 group (sections are Foundation's grouping), 1 connector arrow between cards (Foundation wires join app ports), 1 directive, 2 sticky colour
+
+Flowform → ff-flowform (open to everyone, flowform's default room)
+  doc: snapshot + 0 logged updates + 0 agent actions
+  members: none
+  sections: 1 unchanged
+  cards: 1 unchanged
+  files: none
+
+# backup extractions + dry-run copies left in the temp folder: before 19, after 19
+
+# with the server running (port 4460 held by `npm run dev`):
+$ npm run import:flowform -- current.tar.gz --media-dir media
+Foundation's server is running on :4460. Stop it, then import (it would overwrite the imported boards when it compacts).
+(exit 1)  — captured earlier in this session against the live dev server

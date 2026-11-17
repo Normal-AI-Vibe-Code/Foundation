@@ -1,0 +1,33 @@
+{
+  "name": "@foundation/server",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "link-accounts": "tsx scripts/link-accounts.ts",
+    "machines:smoke": "tsx scripts/machines-smoke.ts",
+    "machines:desktop-smoke": "tsx scripts/machines-desktop-smoke.ts",
+    "test": "node --test --import tsx test/*.test.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@foundation/protocol": "*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "lib0": "^0.2.99",
+    "unpdf": "1.9.1",
+    "ws": "^8.18.0",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.20",
+    "zod": "^3.25.0",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "~5.8.3"
+  }
+}

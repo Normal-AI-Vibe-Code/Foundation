@@ -1,0 +1,14 @@
+{
+  "fit": 0.488,
+  "low": {
+    "zoom": 0.52,
+    "drawnAt": 0.26,
+    "crowded": true,
+    "roomy": true
+  },
+  "high": {
+    "zoom": 0.8,
+    "drawnAt": 0.39,
+    "crowded": true
+  }
+}

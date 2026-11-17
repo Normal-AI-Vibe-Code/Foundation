@@ -1,0 +1,391 @@
+/* Foundation's own cards: a grid inside this one, a kanban, a chapter of the design language. On tokens only. */
+
+/* ---------- a grid inside this one ---------- */
+
+.grid-link {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-7);
+  container-type: inline-size;
+  overflow: hidden;
+}
+.grid-link.is-gone {
+  justify-content: center;
+  align-items: center;
+  color: var(--color-dim);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.grid-link-open {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.grid-link-name {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  font: 600 var(--text-32) / 1.1 var(--font-display);
+  letter-spacing: -0.02em;
+}
+.grid-link-glyph {
+  color: var(--color-pulse);
+  font-size: var(--text-24);
+}
+.grid-link-facts {
+  color: var(--color-mist);
+  font: 400 var(--text-14) / 1.4 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.grid-link-go {
+  margin-top: var(--space-3);
+}
+.grid-link-open:hover .grid-link-name {
+  color: var(--color-pulse);
+}
+.grid-link-sections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2) var(--space-5);
+}
+.grid-link-sections li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+}
+.grid-link-sec {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grid-link-count {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-12);
+}
+.grid-link-sections .grid-link-more {
+  background: transparent;
+  color: var(--color-dim);
+}
+.grid-link-kids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  flex: none;
+}
+
+/* the card as the grid's body draws it: the head, then the grid in miniature taking what's left */
+.grid-link-wrap {
+  height: 100%;
+  min-height: 0;
+}
+.grid-link-top {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* a grid that was here and moved: a quiet line under the name says where it is now */
+.grid-link.is-moved .grid-link-eyebrow {
+  color: var(--color-dim);
+}
+.grid-link.is-moved .grid-link-glyph {
+  color: var(--color-mist);
+}
+.grid-link-top > .grid-link-go {
+  align-self: flex-start;
+  margin-top: 0;
+  border: 0;
+  cursor: pointer;
+}
+.grid-link-moved {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.grid-link-moved > span[aria-hidden] {
+  color: var(--color-dim);
+}
+.grid-link-where,
+.grid-link-remove {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.grid-link-where {
+  color: var(--color-frost);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--color-line-strong);
+  text-underline-offset: 3px;
+}
+.grid-link-where:hover {
+  color: var(--color-pulse);
+}
+.grid-link-moved > span:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.grid-link-remove {
+  flex: none;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+.grid-link-remove:hover {
+  color: var(--color-bad);
+}
+body.is-viewer .grid-link-remove {
+  display: none;
+}
+
+/* the grid in miniature: its sections at their places, their cards as blocks */
+.grid-link-preview {
+  flex: 1 1 0;
+  min-height: 96px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  container-type: size;
+  cursor: zoom-in;
+  text-align: left;
+  color: inherit;
+}
+.grid-preview {
+  position: relative;
+  flex: none;
+  width: min(100cqw, calc(100cqh * var(--gp-ratio, 1.4)));
+  aspect-ratio: var(--gp-ratio, 1.4);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  box-shadow: 0 0 0 1px var(--color-line);
+  overflow: hidden;
+}
+.grid-link-preview:hover .grid-preview {
+  box-shadow: 0 0 0 1px var(--color-pulse);
+}
+.gp-sec {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px;
+  border-radius: calc(var(--radius-card) / 2);
+  background: var(--color-raise);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  /* a hairline of the well between neighbours */
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  overflow: hidden;
+  container-type: size;
+}
+.gp-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-frost);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+}
+.gp-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gp-count {
+  flex: none;
+  color: var(--color-dim);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.gp-cards {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 3px;
+  overflow: hidden;
+}
+.gp-card {
+  position: relative;
+  min-width: 10px;
+  max-height: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 2px 3px;
+  border-radius: 3px;
+  background: var(--color-abyss);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+  overflow: hidden;
+}
+.gp-sec.is-hosted .gp-card {
+  flex: 1 1 100%;
+  height: 100%;
+}
+.gp-card.is-grid .gp-glyph,
+.gp-sec.is-grid .gp-count {
+  color: var(--color-pulse);
+}
+.gp-card.is-picture {
+  padding: 0;
+}
+.gp-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gp-glyph {
+  flex: none;
+  color: var(--color-dim);
+}
+.gp-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* small sections say less: the name goes first, then the cards' names */
+@container (max-width: 120px) {
+  .gp-label {
+    display: none;
+  }
+}
+@container (max-width: 56px) {
+  .gp-head {
+    display: none;
+  }
+}
+@container (max-height: 40px) {
+  .gp-head {
+    display: none;
+  }
+}
+
+/* ---------- kanban ---------- */
+
+.kanban-card,
+.design-card {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-void);
+}
+.kanban-card {
+  padding: var(--space-6) var(--space-6) var(--space-5);
+}
+.kanban-card .kb {
+  min-height: 0;
+  flex: 1 1 0;
+}
+.kanban-note {
+  margin: auto;
+  color: var(--color-dim);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+
+/* ---------- a chapter of the design language ---------- */
+
+.design-card {
+  overflow: auto;
+  user-select: text;
+}
+.design-card .design-page.is-chapter {
+  height: auto;
+  overflow: visible;
+  padding: var(--space-6) var(--space-7) var(--space-7);
+  background: transparent;
+}
+
+/* ---------- #/design: a section made a grid of its own (design/SubGridDemo.tsx) ---------- */
+
+.subgrid-demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.subgrid-demo-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+.subgrid-demo-fig {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.subgrid-demo-fig figcaption {
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.subgrid-demo-card {
+  height: 460px;
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  box-shadow: var(--shadow-sheet), 0 0 0 1px var(--color-line);
+}
+.subgrid-demo-section {
+  position: relative;
+  height: 190px;
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line-strong);
+}
+.subgrid-demo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  padding: 0 var(--space-4);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+}
+.subgrid-demo-bar {
+  align-self: flex-start;
+}
+.subgrid-demo-bar .level-step,
+.subgrid-demo-bar .level-make {
+  display: inline-flex;
+  align-items: center;
+}
+.subgrid-demo-bar + .subgrid-demo-bar {
+  margin-top: var(--space-3);
+}

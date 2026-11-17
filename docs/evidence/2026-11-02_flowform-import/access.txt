@@ -1,0 +1,16 @@
+## sam@formindustries.com — member (editor)
+GET /api/boards → ['company', 'ff-flowform', 'ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b']
+GET /api/boards/ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b/members → 200
+POST /api/boards/ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b/tools/read_board → 200
+GET /api/files → 3 files
+GET /api/search?q=chamber&remote=0 → ['Plan', 'This week']
+WS /sync/ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b → 101
+
+## rin@formindustries.com — signed in, not a member
+GET /api/boards → ['company', 'ff-flowform']
+GET /api/boards/ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b/members → 404
+POST /api/boards/ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b/tools/read_board → 404
+GET /api/files → 0 files
+GET /api/search?q=chamber&remote=0 → []
+WS /sync/ff-5b0f1c9e-2d43-4f7a-9a51-0c6e1d2f3a4b → 401
+

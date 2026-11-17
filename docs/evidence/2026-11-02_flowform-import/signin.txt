@@ -1,0 +1,13 @@
+# Sign in with a Flowform account: the live hand-off (2026-11-02, Foundation on :1436 → production Flowform)
+$ curl -sI http://localhost:1436/auth/flowform/start
+HTTP/1.1 302 Found
+set-cookie: foundation_ff_attempt=<secret>; Path=/auth/flowform; HttpOnly; SameSite=Lax; Max-Age=600
+location: https://server.formresearch.ai/auth/google/start?cb=http%3A%2F%2Flocalhost%3A1436%2Fauth%2Fflowform%2Fdone%2F<nonce>
+
+$ curl -sI <that location>   # Flowform production
+HTTP/2 303 
+location: https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=…&state=…&code_challenge=…&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fserver.formresearch.ai%2Fauth
+
+Google's account chooser is the next page; only the person signs in there. Flowform then 303s to
+http://localhost:1436/auth/flowform/done/<nonce>?session_token=…, Foundation checks /auth/me (email_verified, role),
+revokes that Flowform session and sets its own hashed one (test/flowform.test.ts covers that half with a fake Flowform).

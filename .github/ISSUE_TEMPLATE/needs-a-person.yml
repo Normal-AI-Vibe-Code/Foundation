@@ -1,0 +1,19 @@
+name: Needs a person
+description: A key, an install, an account or a decision that only a person can do.
+labels: ["plan", "kind: hookup", "status: needs-you"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This joins Foundation's plan in **Needs you** on the next sync (Settings → Plan).
+  - type: textarea
+    id: what
+    attributes:
+      label: What's needed, and from whom
+      placeholder: A Figma token with read access, set as FIGMA_TOKEN on the server.
+    validations:
+      required: true
+  - type: textarea
+    id: unblocks
+    attributes:
+      label: What it unblocks

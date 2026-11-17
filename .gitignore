@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Foundation server data (SQLite, uploaded files)
+/data/
+.env
+apps/server/.env
+
+# Playwright run output (traces, failure contexts); the evidence folders keep the curated shots
+docs/evidence/e2e-results/
+
+# Rust / Tauri build output (anywhere, including a stray src-tauri/ from building at the root)
+target/
+**/gen/schemas/
+
+# The Rune renderer, built from apps/rune by `npm run rune:build` (12 MB of wasm: not checked in)
+apps/client/public/rune/
+
+# The server the desktop app carries: built by scripts/desktop-server.mjs (a Node binary and a bundle)
+apps/client/src-tauri/server/*
+!apps/client/src-tauri/server/README.md

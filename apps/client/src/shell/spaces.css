@@ -1,0 +1,947 @@
+/*
+ * Spaces (2026-11-10): the top bar's tabs are spaces, the left pane lists them
+ * (recent, or by project folder) or shows the open space's own people and
+ * activity, a session with the agent opens from the bottom bar, and scroll
+ * bars are thin half-ink rectangles that show only while a pane is in use.
+ */
+
+/* ---------- tabs: one per open space ---------- */
+
+/* the tabs take only the room they need, so ＋ sits right after them and the tools keep to the right */
+.top-bar .tabs {
+  flex: 0 1 auto;
+}
+.top-bar .top-tools {
+  margin-left: auto;
+}
+.tab.is-space .tab-main {
+  cursor: pointer;
+}
+.tab.is-current .tab-main {
+  cursor: default;
+}
+.tab-info {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin: 0 var(--space-2) 0 calc(-1 * var(--space-2));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-dim);
+  cursor: pointer;
+}
+.tab-info:hover,
+.tab-info.is-on {
+  color: var(--color-pulse);
+  background: var(--color-pulse-dim);
+}
+.tab-info + .tab-close {
+  margin-left: calc(-1 * var(--space-1));
+}
+.tab-rename {
+  width: 168px;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: 0;
+  outline: 1px solid var(--color-pulse);
+  border-radius: var(--radius-paper);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+}
+.tab-new-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.tab-new-more {
+  width: 16px;
+  margin-left: -2px;
+  color: var(--color-dim);
+}
+.tab-new-menu {
+  position: absolute;
+  z-index: 60;
+  top: 36px;
+  left: 0;
+  width: 296px;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line);
+}
+.tab-new-item {
+  display: grid;
+  grid-template-columns: 18px auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.tab-new-item:hover {
+  background: var(--color-pulse-dim);
+}
+.tab-new-item .tab-glyph {
+  text-align: center;
+}
+.tab-new-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tab-new-hint {
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- the spaces pane: recent, or project folders ---------- */
+
+.pane-eyebrow-acts {
+  margin-left: auto;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.pane-eyebrow-acts .pane-eyebrow-act {
+  margin-left: 0;
+}
+/* violet is an agent's; a person's tools take the blue tint */
+.pane-eyebrow:not(.is-agent) .pane-eyebrow-act:hover {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.pane-seg {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0 var(--space-2) var(--space-3);
+  padding: var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+}
+.pane-seg-btn {
+  flex: 1;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.pane-seg-btn:hover {
+  color: var(--color-frost);
+}
+.pane-seg-btn.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow: var(--shadow-sheet);
+}
+.space-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.space-row .space-open {
+  flex: 1;
+  min-width: 0;
+}
+.space-row.is-current .space-open {
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.space-row.is-folder .pane-label {
+  font-weight: 600;
+}
+.space-move {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-dim);
+  font-size: var(--text-13);
+  cursor: pointer;
+  opacity: 0;
+}
+.space-row:hover .space-move,
+.space-move:focus-visible,
+.space-move.is-on {
+  opacity: 1;
+}
+.space-move:hover,
+.space-move.is-on {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.space-move-pick {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 2px);
+  right: 0;
+  max-width: 100%;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-pulse);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+}
+.folder-caret {
+  display: inline-block;
+  color: var(--color-dim);
+  transition: rotate var(--dur-quick) var(--ease-out-soft);
+}
+.folder-caret.is-open {
+  rotate: 90deg;
+}
+.pane-sub {
+  padding: var(--space-4) var(--space-3) var(--space-2);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+}
+
+/* ---------- this space's pane: what it is, who's here, who may change it, its activity ---------- */
+
+.info-name {
+  min-width: 0;
+  height: var(--h-control);
+  margin: 0 var(--space-1) var(--space-3);
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-frost);
+  font: 600 var(--text-16) / 1 var(--font-display);
+  text-overflow: ellipsis;
+}
+.info-name:not([readonly]):hover {
+  border-color: var(--color-line);
+}
+.info-name:not([readonly]):focus {
+  outline: 0;
+  border-color: var(--color-pulse);
+  background: var(--color-raise);
+}
+.info-facts {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3) var(--space-3);
+  margin: 0;
+  padding: 0 var(--space-3);
+  font-size: var(--text-12);
+}
+.info-facts dt {
+  color: var(--color-dim);
+}
+.info-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-frost);
+}
+.info-pick {
+  width: 100%;
+  height: 24px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+}
+.info-url {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.info-count {
+  font-variant-numeric: tabular-nums;
+}
+.pane-row.is-still {
+  height: 28px;
+}
+.person-dot.is-agent {
+  background: var(--color-agent);
+}
+
+/* ---------- a web page space: the page is the canvas ---------- */
+
+.page-canvas {
+  position: absolute;
+  z-index: 35;
+  bottom: 68px;
+  background: var(--color-void);
+  border-bottom: 1px solid var(--color-line);
+}
+.page-canvas iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--color-on-fill);
+}
+/* nothing of the grid shows in the strip the bottom bar keeps */
+.is-page-space .world-mask {
+  visibility: hidden;
+}
+
+/* ---------- a session with the agent: opened from the bottom bar ---------- */
+
+.hud-ask {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--color-agent);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.hud-ask.is-on {
+  box-shadow:
+    0 0 0 1.5px var(--color-agent),
+    0 0 0 6px var(--color-agent-dim);
+}
+.session-tools {
+  flex-shrink: 0;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+.session-tools .top-btn {
+  width: 26px;
+  height: 26px;
+  font-size: var(--text-13);
+}
+.session-history {
+  position: absolute;
+  z-index: 6;
+  top: 46px;
+  left: var(--space-4);
+  right: var(--space-4);
+  max-height: 60%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line);
+}
+
+/* ---------- scroll bars: a 2 px light line by the pane's edge, there only while the pane is in use ----------
+   (2026-11-16, Josh: "make the scroll bar much thinner and basically 2px line next to the edge of the card
+   and light colored") */
+
+/* the strip the bar can be grabbed in stays 8 px wide; only 2 px of it are drawn */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+/* a 2 px line, 1 px in from the pane's edge: the thumb's clear borders leave only that much of it (5 + 2 + 1
+   across the strip, for an upright bar and a level one alike; along its length it just ends a little short).
+   No radius */
+::-webkit-scrollbar-thumb {
+  border: solid transparent;
+  border-width: 5px 1px 1px 5px;
+  border-radius: 0;
+  background-color: transparent;
+  background-clip: content-box;
+}
+/* shown under the pointer and while it scrolls (lib/scrollbars.ts marks .is-scrolling) */
+:hover::-webkit-scrollbar-thumb,
+.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-frost) 28%, transparent);
+}
+/* engines without those parts (Firefox): the nearest it has */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  *:hover,
+  .is-scrolling {
+    scrollbar-color: color-mix(in srgb, var(--color-frost) 28%, transparent) transparent;
+  }
+}
+
+/* ---------- the side menu (2026-11-15): Today, grids (recent, or the tree of grids inside grids), Settings ---------- */
+
+.pane-place.is-current {
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.pane-glyph.is-agent,
+.tab-glyph.is-agent {
+  color: var(--color-agent);
+}
+.pane-low {
+  flex: none;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
+}
+.grid-caret {
+  flex: none;
+  width: 16px;
+  height: 24px;
+  margin-right: -4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-dim);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  cursor: pointer;
+  transition: rotate var(--dur-quick) var(--ease-out-soft);
+}
+.grid-caret.is-open {
+  rotate: 90deg;
+}
+.grid-caret.is-none {
+  cursor: default;
+}
+.grid-caret:hover {
+  color: var(--color-frost);
+}
+.space-row[draggable="true"] .space-open {
+  cursor: pointer;
+}
+.space-row.is-dragging {
+  opacity: 0.4;
+}
+/* a grid held over another: the one that would take it rings, as a section does under a carried card */
+.space-row.is-over .space-open {
+  box-shadow:
+    0 0 0 2px var(--color-pulse),
+    0 0 0 6px var(--color-pulse-dim);
+  background: var(--color-raise);
+}
+.pane-seg-btn.is-over {
+  box-shadow: 0 0 0 2px var(--color-pulse);
+  color: var(--color-frost);
+}
+.grid-top-drop {
+  margin: var(--space-3) var(--space-2) 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  color: var(--color-dim);
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+  text-align: center;
+}
+.grid-top-drop.is-over {
+  border-color: var(--color-pulse);
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+/* the place you're in when it isn't a grid: a tab that can't be closed */
+.tab.is-place .tab-main {
+  cursor: default;
+}
+
+/* away from the grids (Today, a Settings page) the grid's own chrome rests */
+.shell.is-away .hud,
+.shell.is-away .world-mask,
+.shell.is-away .level-bar,
+.shell.is-away .crew-guide {
+  visibility: hidden;
+}
+
+/* ---------- Today's row in the side menu (2026-11-16): a pill, the Shiba very small, and what's waiting ---------- */
+
+.pane-today {
+  width: calc(100% - var(--space-2));
+  margin: 0 var(--space-1);
+  height: 36px;
+  padding: 0 var(--space-3) 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.pane-today.is-current {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 60%, var(--color-line-strong)),
+    var(--shadow-sheet);
+}
+.pane-today .pane-label {
+  font-weight: 600;
+}
+/* the Shiba, 18 px: two soft lights turning in a disc. CSS only, on the compositor */
+.shiba-dot {
+  position: relative;
+  flex: none;
+  display: inline-block;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-warn) 30%, var(--color-raise));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 30%, transparent);
+}
+.shiba-dot::before,
+.shiba-dot::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  will-change: transform;
+}
+.shiba-dot::before {
+  background: radial-gradient(closest-side at 34% 38%, color-mix(in srgb, var(--color-agent) 85%, transparent), transparent 62%);
+  animation: shiba-dot-turn 7s linear infinite;
+}
+.shiba-dot::after {
+  background: radial-gradient(closest-side at 66% 64%, color-mix(in srgb, var(--color-bad) 55%, var(--color-warn)), transparent 60%);
+  animation: shiba-dot-turn 11s linear infinite reverse;
+}
+.shiba-dot[data-mood="thinking"]::before,
+.shiba-dot[data-mood="speaking"]::before,
+.shiba-dot[data-mood="listening"]::before {
+  animation-duration: 2.4s;
+}
+.shiba-dot[data-mood="thinking"]::after,
+.shiba-dot[data-mood="speaking"]::after,
+.shiba-dot[data-mood="listening"]::after {
+  animation-duration: 3.6s;
+}
+@keyframes shiba-dot-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pane-badge {
+  flex: none;
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+  color: var(--color-on-fill);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shiba-dot::before,
+  .shiba-dot::after {
+    animation: none;
+  }
+}
+
+/* ---------- what a conversation folded away, on the right (shell/DetailPane.tsx) ---------- */
+
+.detail-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-copy {
+  height: 24px;
+}
+.detail-body {
+  user-select: text;
+}
+.detail-meta {
+  margin-bottom: var(--space-3);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.detail-code {
+  margin: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.55 var(--font-code);
+  white-space: pre;
+}
+.detail-code.is-small {
+  margin-top: var(--space-2);
+  font-size: var(--text-11);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.detail-steps,
+.detail-plan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.detail-step-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+.detail-step-head code {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-code);
+}
+.detail-goal {
+  margin: 0 0 var(--space-4);
+  font: 600 var(--text-14) / 1.4 var(--font-sans);
+}
+.detail-plan li {
+  display: flex;
+  gap: var(--space-3);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+}
+.detail-plan li[data-status="done"] {
+  color: var(--color-dim);
+  text-decoration: line-through;
+}
+.detail-box {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-paper);
+  font-size: 10px;
+}
+.detail-plan li[data-status="done"] .detail-box {
+  background: var(--color-agent);
+  border-color: var(--color-agent);
+  color: var(--color-on-fill);
+}
+
+/* ====================== 2026-11-17: the side menu, the tabs and search, redrawn ====================== */
+
+/* ---- the side menu: sections lined off edge to edge, rows the full width, hover and selected told apart ---- */
+
+.side-pane .pane-band {
+  flex: none;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.side-pane .pane-band.pane-low {
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+.side-pane .pane-pick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+.side-pane .pane-pick .pane-seg {
+  flex: 1;
+  margin: 0;
+  /* 2026-11-17: outlined, so the pill reads as a control and its left edge is the line the rows start on */
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.pane-new {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.pane-new:hover {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.side-pane .pane-scroll {
+  padding: 0 0 var(--space-4);
+}
+.side-pane .pane-scroll .pane-group {
+  padding: 0;
+  gap: 0;
+}
+/* a row: the pane's whole width and 34 px, text starting at the selector's left edge */
+.side-pane .pane-row {
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--space-4);
+  border-radius: 0;
+}
+.side-pane .space-row {
+  gap: 0;
+  padding-left: 0;
+}
+/* All Grids keeps Recent's padding: a top-level grid starts at the pill's left edge either way, one inside
+   it 16 px further. The caret hangs in the gutter just left of the row's mark, so it never moves the text */
+.side-pane .space-row .space-open {
+  padding-left: calc(var(--space-4) + var(--depth, 0) * 16px);
+}
+.side-pane .grid-caret {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: calc(var(--depth, 0) * 16px);
+  width: var(--space-4);
+  height: 34px;
+  margin: 0;
+  text-align: center;
+}
+.side-pane .grid-caret.is-none {
+  display: none;
+}
+/* hover: a quiet ink wash, the full row */
+.side-pane .pane-row:hover,
+.side-pane .space-row:hover .space-open {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+/* selected: the accent's tint and a 2 px bar at the pane's edge. Never the same as hover */
+.side-pane .space-row.is-current .space-open,
+.side-pane .pane-place.is-current {
+  background: var(--color-pulse-dim);
+  box-shadow: inset 2px 0 0 var(--color-pulse);
+  color: var(--color-frost);
+}
+.side-pane .space-row.is-current .space-open:hover,
+.side-pane .pane-place.is-current:hover {
+  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+}
+.side-pane .space-row .space-move {
+  position: absolute;
+  right: var(--space-3);
+}
+/* Today: no longer a pill; a row in its own lined-off section */
+.side-pane .pane-today {
+  width: 100%;
+  margin: 0;
+  height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: 0;
+  box-shadow: none;
+}
+.side-pane .pane-today.is-current {
+  box-shadow: inset 2px 0 0 var(--color-agent);
+  background: var(--color-agent-dim);
+}
+.side-pane .pane-foot {
+  border-top: 0;
+  /* the orb, then you, from the Settings icon's left edge (2026-11-17) */
+  padding-left: var(--space-4);
+}
+.pane-empty.is-create {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.pane-empty-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- the top bar: the menu's fold and Today over the menu; tabs from the menu's edge, drawn as tabs ---- */
+
+.top-left {
+  flex: none;
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-3);
+}
+/* 2026-11-17: over the open menu the fold sits at the menu's right edge */
+.top-left.is-over-pane {
+  justify-content: flex-end;
+}
+/* and a line, the bar's height, between it and the tabs (over the menu, it lands on the menu's own edge) */
+.top-left::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(-1 * var(--space-2));
+  width: 1px;
+  background: var(--color-line);
+  pointer-events: none;
+}
+.top-today {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.top-today:hover {
+  color: var(--color-frost);
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.top-today.is-on {
+  color: var(--color-frost);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 55%, var(--color-line-strong));
+  background: var(--color-agent-dim);
+}
+/* in the top left (2026-11-17): the window's corner; what's waiting sits right against the word. Over the open
+   menu it keeps the corner and the fold keeps the menu's right edge */
+.top-left .top-today {
+  flex: none;
+  padding-right: var(--space-3);
+}
+.top-left.is-over-pane .top-today {
+  margin-right: auto;
+}
+.top-today .pane-badge {
+  margin-left: calc(-1 * var(--space-1));
+}
+/* a place you're passing through (Settings): a pill, fully outlined, with room around it */
+.tab-pill {
+  flex: none;
+  align-self: center;
+  height: 28px;
+  margin: 0 var(--space-4) 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+}
+/* the grids' tabs: lines, not cards (2026-11-17: no top and no corners). Every line runs the bar's full
+   height, to its top edge; the open tab is its two sides and no foot, so it opens into the grid below it
+   (it covers the bar's own hairline for its width), and its name is bold */
+.top-bar .tabs {
+  align-self: stretch;
+  align-items: flex-end;
+  gap: 0;
+  padding-left: var(--space-3);
+}
+.top-bar .tab.is-space {
+  position: relative;
+  height: calc(100% + 1px);
+  margin-bottom: -1px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.top-bar .tab.is-space + .tab.is-space::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 1px;
+  width: 1px;
+  background: var(--color-line);
+}
+.top-bar .tab.is-space.is-current {
+  border-left-color: var(--color-line-strong);
+  border-right-color: var(--color-line-strong);
+  background: var(--color-void);
+  color: var(--color-frost);
+}
+.top-bar .tab.is-space.is-current .tab-title {
+  font-weight: 700;
+}
+.top-bar .tab.is-space.is-current::before,
+.top-bar .tab.is-space.is-current + .tab.is-space::before {
+  display: none;
+}
+/* the foot it doesn't have: the bar's hairline stops under the open tab */
+.top-bar .tab.is-space.is-current::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-void);
+}
+.top-bar .tab.is-space:not(.is-current):hover {
+  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+}
+.top-bar .tab-new-wrap {
+  margin-left: var(--space-2);
+}
+
+/* ---- search: a line with the icon and a suggestion, not a box; chips with an outline ---- */
+
+.search-pane.search-pop .search-head {
+  margin: 0;
+}
+.search-pane .search-head {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-3) 0 var(--space-5);
+  height: 44px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  border-bottom: 1px solid var(--color-line);
+}
+/* the line under the search line is the grid's own hairline, focused or not (2026-11-17, Josh) */
+.search-pane .search-head:focus-within {
+  box-shadow: none;
+}
+.search-pane .search-glyph {
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-mist);
+}
+.search-pane .search-filters {
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
+}
+.search-pane .search-chip {
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.search-pane .search-chip.is-on {
+  box-shadow: none;
+}
+/* the bottom bar's search pill: its key chip keeps clear of the pill's rounded end */
+.hud-search {
+  padding-right: var(--space-4);
+}

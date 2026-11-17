@@ -1,0 +1,58 @@
+{
+  "when": "2026-11-09T04:46:38.257Z",
+  "board": {
+    "notes": 26,
+    "tables": 1,
+    "maps": 1,
+    "apps": 2,
+    "wires": 2,
+    "sections": 4
+  },
+  "strictMode": "dev server: every render counted twice",
+  "results": [
+    {
+      "action": "press a card",
+      "renders": {
+        "GridViewport": 2,
+        "SectionView": 4,
+        "NoteView": 2,
+        "ObjectFrame": 2
+      }
+    },
+    {
+      "action": "drag a card (60 moves)",
+      "renders": {
+        "SectionView": 6,
+        "NoteView": 26,
+        "ObjectFrame": 26
+      }
+    },
+    {
+      "action": "type 30 characters in a note",
+      "renders": {
+        "SectionView": 60,
+        "NoteView": 60,
+        "ObjectFrame": 60
+      }
+    },
+    {
+      "action": "pan (60 wheel events)",
+      "renders": {}
+    },
+    {
+      "action": "pinch zoom (60 ctrl-wheel events)",
+      "renders": {
+        "MapView": 12
+      }
+    },
+    {
+      "action": "10 edits by someone else (a note in another section)",
+      "renders": {
+        "SectionView": 20,
+        "NoteView": 20,
+        "ObjectFrame": 20,
+        "PortWires": 2
+      }
+    }
+  ]
+}

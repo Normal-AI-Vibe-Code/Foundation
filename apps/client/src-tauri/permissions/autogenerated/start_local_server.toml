@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-start-local-server"
+description = "Enables the start_local_server command without any pre-configured scope."
+commands.allow = ["start_local_server"]
+
+[[permission]]
+identifier = "deny-start-local-server"
+description = "Denies the start_local_server command without any pre-configured scope."
+commands.deny = ["start_local_server"]

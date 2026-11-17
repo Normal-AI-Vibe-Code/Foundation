@@ -1,0 +1,323 @@
+/* The server switch (SPEC §3, DESIGN §5 "Server switch"). Passing chrome: glass, bottom right, over
+   everything the sign-in page included (it can be what lets you sign in). The pill stays put; the
+   panel opens upward from it. On tokens only. */
+
+.server-switch-place {
+  position: fixed;
+  /* over the sign-in page (900), under the update card (910) and the window's own controls (920) */
+  z-index: 905;
+  bottom: var(--space-5);
+  right: var(--space-5);
+  pointer-events: none;
+}
+.server-switch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+  pointer-events: auto;
+}
+.server-switch[data-still] {
+  pointer-events: auto;
+}
+.server-switch-lift {
+  transform-origin: bottom right;
+  will-change: transform, opacity;
+}
+
+/* ---------- the pill ---------- */
+
+.server-switch-pill {
+  height: var(--h-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out-soft);
+}
+.server-switch-pill:hover {
+  color: var(--color-frost);
+}
+.server-switch-pill:active {
+  transform: scale(0.97);
+}
+.server-switch-pill[aria-expanded="true"] {
+  color: var(--color-frost);
+  box-shadow: var(--shadow-glass), inset 0 0 0 1px var(--color-pulse);
+}
+.server-switch-addr {
+  font-variant-numeric: tabular-nums;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.server-switch-caret {
+  font-size: var(--text-11);
+  color: var(--color-dim);
+}
+
+.server-switch-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-dim);
+}
+.server-switch-dot[data-tone="ok"] {
+  background: var(--color-ok);
+}
+.server-switch-dot[data-tone="warn"] {
+  background: var(--color-warn);
+  animation: server-switch-breathe 1.6s var(--ease-out-soft) infinite;
+}
+.server-switch-dot[data-tone="bad"] {
+  background: var(--color-bad);
+}
+@keyframes server-switch-breathe {
+  50% { opacity: 0.35; }
+}
+
+/* ---------- the panel ---------- */
+
+.server-switch-panel {
+  container-type: inline-size;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 2 * var(--space-5)));
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1.45 var(--font-sans);
+}
+.server-switch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: 0 var(--space-1) var(--space-2);
+}
+.server-switch-now {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.server-switch-now code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-frost);
+}
+.server-switch-panel code {
+  font: 500 var(--text-12) / 1.3 var(--font-code);
+}
+
+/* each way to have a server: paper on the glass; the one in use ringed */
+.server-switch-option {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  border: 1px solid var(--color-line);
+}
+.server-switch-option[data-current] {
+  border-color: color-mix(in srgb, var(--color-pulse) 45%, transparent);
+}
+.server-switch-option-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.server-switch-option-head strong {
+  font-weight: 650;
+  font-size: var(--text-14);
+}
+.server-switch-tag {
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse-dim);
+  color: var(--color-pulse);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.server-switch-lede,
+.server-switch-hint,
+.server-switch-error {
+  margin: 0;
+  font-size: var(--text-12);
+  overflow-wrap: anywhere;
+}
+.server-switch-lede {
+  color: var(--color-mist);
+}
+.server-switch-hint {
+  color: var(--color-dim);
+}
+.server-switch-error {
+  color: var(--color-bad);
+  white-space: pre-wrap;
+  max-height: 140px;
+  overflow: auto;
+}
+.server-switch .server-switch-field {
+  height: var(--h-control);
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  font: 500 var(--text-12) / 1 var(--font-code);
+}
+.server-switch .server-switch-field:disabled {
+  color: var(--color-mist);
+  background: var(--color-panel);
+}
+.server-switch-row {
+  display: flex;
+  gap: var(--space-3);
+}
+.server-switch-row .server-switch-field {
+  flex: 1;
+}
+/* which server Start runs: built in, or a checkout's */
+.server-switch-kinds {
+  display: flex;
+  gap: var(--space-2);
+}
+.server-switch-kinds .server-switch-kind {
+  flex: 1;
+  justify-content: center;
+}
+.server-switch-kinds .server-switch-kind[aria-checked="false"] {
+  color: var(--color-dim);
+  background: transparent;
+}
+/* the pick is tinted like the In use tag: Start stays the one blue action */
+.server-switch-kinds .server-switch-kind[aria-checked="true"] {
+  background: var(--color-pulse-dim);
+  color: var(--color-pulse);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-pulse) 45%, transparent);
+}
+.server-switch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.server-switch-actions .f-pill[disabled] {
+  opacity: 0.7;
+  cursor: progress;
+}
+.server-switch-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: auto;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+
+/* narrow: the address in the pill goes first */
+@container (max-width: 300px) {
+  .server-switch-row {
+    flex-direction: column;
+  }
+}
+@media (max-width: 520px) {
+  .server-switch-addr {
+    display: none;
+  }
+}
+
+/* the call chip and the upload tray share the corner: while the switch is there they sit above it */
+html[data-server-switch] .huddle-pip {
+  bottom: calc(var(--space-5) + var(--h-pill) + var(--space-4));
+}
+html[data-server-switch] .upload-tray-place {
+  bottom: calc(var(--space-5) + var(--h-pill) + var(--space-4));
+}
+html[data-server-switch] .huddle-pip ~ .upload-tray-place {
+  bottom: calc(76px + var(--h-pill) + var(--space-4));
+}
+
+/* ---------- in the top bar (signed in): a quiet pill, its panel dropping down from it ---------- */
+
+.server-switch-place.is-bar {
+  position: relative;
+  z-index: auto;
+  inset: auto;
+  pointer-events: auto;
+}
+.is-bar .server-switch {
+  position: relative;
+}
+.is-bar .server-switch-pill {
+  height: 26px;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.is-bar .server-switch-pill:hover {
+  background: var(--color-pulse-dim);
+}
+.is-bar .server-switch-pill[aria-expanded="true"] {
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+.is-bar .server-switch-addr {
+  max-width: 132px;
+}
+.is-bar .server-switch-lift,
+.is-bar .server-switch[data-still] .server-switch-panel {
+  position: absolute;
+  z-index: 70;
+  top: calc(100% + var(--space-3));
+  right: 0;
+  transform-origin: top right;
+}
+
+/* ---------- in the side menu's foot, above Settings (2026-11-17): the width of the menu, its panel rising from it ---------- */
+
+.server-switch-place.is-pane {
+  display: block;
+  /* its edges in line with the Settings icon under it (the menu rows' 12 px), and the same space on the right */
+  padding: var(--space-2) var(--space-4);
+}
+.is-pane .server-switch {
+  align-items: stretch;
+}
+.is-pane .server-switch-pill {
+  width: 100%;
+  height: 30px;
+  justify-content: flex-start;
+  padding: 0 var(--space-4);
+}
+.is-pane .server-switch-addr {
+  flex: 1;
+  max-width: none;
+  text-align: left;
+}
+.is-pane .server-switch-lift,
+.is-pane .server-switch[data-still] .server-switch-panel {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + var(--space-3));
+  left: var(--space-3);
+  transform-origin: bottom left;
+}

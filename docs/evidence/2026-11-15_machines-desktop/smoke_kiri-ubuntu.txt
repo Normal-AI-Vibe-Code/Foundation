@@ -1,0 +1,19 @@
+· Kiri 0.1.18 at \\.\pipe\kiri
+· started machine-desk-smoke-mwiyg4c3 (ubuntu:24.04)
+· Ctrl+C interrupted sleep (exit 130)
+· piped: note “Input” → /foundation/in → tr a-z A-Z → /foundation/out → note “Result” = "HELLO FROM A NOTE"
+· JSON written to /foundation/out arrives on the out port as JSON
+    installing: Starting…
+    installing: Reading the package lists
+    installing: Starting the desktop…
+    ready
+· added a desktop in 64 s: 1280×800
+· VNC through Foundation's relay, a person who can edit: a 1280×800 screen; a pointer move to (500, 300) moved the machine's pointer (x:500 y:300)
+· VNC through Foundation's relay, a viewer: a 1280×800 screen; a pointer move to (900, 600) was dropped (still x:500 y:300)
+· an agent without leave is refused, and the card says it asked
+· with leave, the agent sees the screen: 1280x800, a 22 KB PNG
+· the agent double-clicked Home, pressed ctrl+l and typed /foundation: window titles now "foundation - Thunar"
+· what the agent saw afterwards is in C:/Dev/Foundation/.claude/worktrees/agent-aac31bb1799fd900e/docs/evidence/2026-11-15_machines-desktop/smoke_what-the-agent-saw.png
+· the leave taken back: refused again
+✓ desktop, agent and pipes work on this engine
+· removed the machine and its disk

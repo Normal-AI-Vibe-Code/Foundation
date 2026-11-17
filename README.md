@@ -1,121 +1,77 @@
 # Foundation
 
-A spreadsheet-canvas desktop app: fully functional spreadsheet tables on an
-infinite pannable/zoomable canvas, with split-panel workspaces, spring-physics
-motion, and a GPU shader background. Built with Tauri 2 + React + TypeScript.
+The company brain of Form Industries. It is one shared grid where people, the apps we build, and the agents that work with us meet.
 
-## Run
+- **Today:** home, before the boards. The Shiba (the agent's face) answers questions about your day, while beside it sit what wants you (asks, notes that tag you, stages you own, new files on your boards, work matching your job), your goals, and every company app. In Chrome, the extension makes it every new tab.
+- **The grid:** sections hold tables, maps, notes and media, plus live panels: running apps (with their GitHub repo, MCP tools and input/output ports), web pages, machines, uploaded files and CAD, live company systems, agent jobs, and asks to teammates.
+- **The agent layer:** sits above the grid and shows how apps are wired, where agents are working, and what everyone just did.
+- **The agent:** runs the whole interface. It runs on your Claude Code subscription or on API credits. It can organize the board, open and wire apps, find repos, read BomForm and FactoryForm, brief Vision, chase people for CAD (Hermes), and queue reverse-engineering (REA).
+- **The company board:** shows Vision, BomForm, FactoryForm, the Data Room, Creation and Foundation live, wired by how data actually flows between them.
+
+**[SPEC.md](SPEC.md)** is the plan, with status, the hookups you need to do, known issues and phases. **[DESIGN.md](DESIGN.md)** is the design language. Inside the app, `#/design` renders it live.
+
+## Run it locally
 
 ```sh
-npm run tauri dev      # native desktop window (dev, hot reload)
-npm run tauri build    # production installer (src-tauri/target/release/bundle)
-npm run dev            # frontend only, in a browser at localhost:1420
+npm install
+npm run dev            # server :4410 + client :1430 → open http://localhost:1430
 ```
 
-## The Grid model
+Sign in with **Continue with Google**, the same Google sign-in as the flowform client, through flowform-server (`FLOWFORM_URL`, default https://server.formresearch.ai), or with your name and an allowlisted email (dev login). To configure Slack, BomForm, API credits and more, copy `.env.example` to `.env`; see SPEC §6.
 
-The workspace is a single spreadsheet-like **Grid** with column/row tracks.
-**Sections** occupy rectangular spans of tracks (their header shows the span,
-e.g. `A1:A3`) and each section is its own scrollable nested grid holding
-primitives (tables, maps).
+```sh
+npm test               # server invariants (node:test)
+npm run typecheck      # every workspace
+npm run desktop        # the server + the desktop window (needs Rust; see below)
+```
 
-- **Split** (◫ / ⬓ in a section header) subdivides the section's track —
-  every other section touching that track shifts or widens its span, exactly
-  like inserting a spreadsheet column/row
-- **Resize** by dragging the gutters between tracks — this resizes the
-  underlying grid, so every section in the track resizes with it
-- **Scroll** with the wheel inside a section to move its nested grid;
-  primitives live in section content space
-- The **viewport snaps**: pan the void and release — the camera springs to
-  frame the nearest section, track band, object, or the whole grid.
-  **⤢** on a section expands it to fill the viewport; **Esc** returns to
-  overview; double-click a table header to snap to it
-- **Grid chrome**: spreadsheet labels (A, B, … / 1, 2, …) frame the grid,
-  dashed lines mark track boundaries, and uncovered cells appear as dashed
-  targets with a **+ Section** button
-- **Move sections**: drag a section's header — a highlight tracks the cell
-  under the cursor; drop on a sibling to swap places, or on an empty cell
-  to relocate (freed tracks are pruned)
-- **Data-flow wires** run beneath the sections, faded until you hover a
-  connected card — blue for table → map bindings, green for cross-table
-  formula references; they pulse when the source data changes. Every table
-  has a **source port** on its right edge: drag it onto a map to connect.
-  Drag a blue wire's map-side port onto another map to **move** the
-  connection, or into the void to **disconnect**. New maps start unbound
-- **Hold Space** to command by voice — the mic waveform renders live;
-  release to run. Without speech/mic, releasing opens a typed command bar.
-  Commands use your current selection as context: "add a table",
-  "map of team", "split this section", "add 3 rows", "rename this to
-  Budget", "connect team to map 2", "delete this", "overview"…
-- **Sound design**: every interaction has a synthesized voice — pops for
-  creating, thunks for docking, whooshes for camera snaps, chimes for
-  connections, descending knocks for deletion. Toggle with 🔊 in the toolbar
-- **Double-click a section** (header or empty canvas) to zoom into it
-- **Interaction levels**: the keyboard addresses one level at a time —
-  Grid (arrows page the viewport, corner brackets show), Section (arrows
-  walk between sections, blue section ring), or Primitive (arrows navigate
-  table cells, blue card ring). **Esc** steps up a level; the toolbar
-  breadcrumb (**↑ · Grid › Section › Card**) shows where you are and each
-  segment is clickable navigation
-- **＋** on any of a section's four edges adds a neighbor section there
-- **Right-click** everywhere: a section surface offers add-primitive,
-  insert-section (all four directions), split, expand, and remove; a table
-  cell offers insert/delete row & column, clear cell, and delete table —
-  structural edits **rewrite formulas** (`=SUM(B2:B6)` becomes
-  `=SUM(B3:B7)` after an insert; references into deleted rows become
-  `#REF!`); an empty grid cell offers create-section
-- **Track resizing** happens via a grab knob that appears on rollover and
-  rides along the boundary under your cursor
+### On Windows
 
-Inside a section, primitives **dock into a flow grid** by default — new cards
-take the next slot, and everything reflows on a spring when something is
-added, removed, or resized. Dragging a card's header floats it (free
-position); the **⌗ / ✥** button on any card docks it back or releases it.
+1. Install **Node 22.16 or newer** (nodejs.org, LTS) and **Git for Windows**. Older Node 22 releases ship a SQLite without full-text search (FTS5), and the server won't start on them.
+2. Clone and run, in PowerShell:
+   ```powershell
+   git clone https://github.com/joshleong/Foundation.git
+   cd Foundation
+   copy .env.example .env
+   npm install
+   npm run dev
+   ```
+   Open http://localhost:1430. Sign in with Google, or with your name and an allowlisted email (`.env` sets `FOUNDATION_ALLOWLIST`). Every ⌘ shortcut is Ctrl on Windows and Linux, and the app labels it that way there.
+3. **The desktop window** also needs the Tauri toolchain: **Visual Studio Build Tools** with the *Desktop development with C++* workload, **Rust** from rustup.rs (the default MSVC toolchain), and **WebView2** (already on Windows 10 and 11). Then `npm run desktop`. The first build compiles the Rust side, which takes a few minutes.
+   **An installer:** `npm run tauri build` writes `apps/client/src-tauri/target/release/bundle/nsis/Foundation_<version>_x64-setup.exe` (and an `.msi`). The installed app carries its own server and Node (`scripts/desktop-server.mjs` builds them into the installer): the server switch, bottom right, starts it on http://localhost:4410 when you pick **Built in** and press **Start**, with its data in `%APPDATA%\co.normallab.foundation`, so nothing else needs to be installed. **From a checkout** runs a Foundation checkout's server there instead, and a server already answering on :4410 (`npm run dev`) is simply used. It serves its own page from http://localhost:31440, and boards opened before still open when the server is down. To use a hosted server, the sign-in page's **Server** line.
+   **Updates:** an installed Foundation checks `latest.json` on the newest GitHub release a few seconds after it opens, and offers a newer version on a card; it installs only when you press **Update and restart**, and only an installer signed with Foundation's updater key. Releasing (on the machine that holds the key, `~/.tauri/foundation-updater.key`): write `docs/blog/<version>.md`, then `npm run release -- bump <version>`, `npm run release -- build`, push `main` and the tag, and `npm run release -- publish`.
+4. **The agent** runs on Claude Code: install it with Anthropic's native Windows installer so `claude.exe` is on your PATH (an npm-installed `claude.cmd` can't be started without a shell; point `FOUNDATION_CLAUDE_CLI` at a `claude.exe` instead), or set `ANTHROPIC_API_KEY` for the API runtime.
 
-## Using it
+Vision Code hand-offs look for Vision on macOS paths, and the reverse-engineering job starts `npx` directly, so neither starts on Windows yet (SPEC §7).
 
-- **⊞ / ◍ / ▤ / ⇪** in a section header — add a table / map / markdown
-  note / media (open dialog); or **drop image & video files** from the
-  desktop straight onto a section. Videos autoplay muted on a loop —
-  toggle autoplay (❚❚/▶) and sound (🔇/🔊) in the card header
-- **＋** on a section's right/bottom edge — add a new section beside it
-  (inserts a grid track, spreadsheet-style)
-- **✕** in a section header — remove it (with confirmation); an aligned
-  neighbor absorbs the freed space and unused tracks are pruned
-- **Pan**: drag the void (release velocity carries into the snap).
-  **Zoom**: `Ctrl` + scroll (snaps to the nearest framing when idle)
-- **Move a table**: drag its header — it follows on a spring tether
-- **Edit cells**: click to select, type or double-click / `Enter` to edit,
-  `Tab`/`Enter` to commit, arrows to navigate, `Delete` to clear
-- **Formulas** start with `=`: `=B2*1.1`, `=SUM(B2:B6)`, `=IF(D2>0, D2, 0)`
-  - Functions: `SUM AVG MIN MAX COUNT COUNTA IF ROUND ABS SQRT FLOOR CEIL POW CONCAT`
-  - Cross-table references: `=Revenue!A1` or `='Table 1'!D8*2`
-  - While typing a formula, click any cell (any table) to insert its reference
-  - Errors: `#REF`, `#CYCLE`, `#DIV/0`, `#VALUE`, `#NAME`
-- **Rename a table**: click its name (names are what formulas reference)
-- **Rich cells**: drag an image file onto a cell (stored as a thumbnail,
-  double-click for a lightbox), or drop/paste/type a URL — Google Drive,
-  Docs, Sheets and Slides links get branded chips; click a chip to open it
-  in your browser
-- **Maps**: the **◍ Map** toolbar button drops a MapLibre GL map onto the
-  canvas. Bind it to any table that has `Lat` / `Lng` header columns (plus a
-  name/label column) and every valid row becomes a pulsing pin — edits to the
-  table re-plot pins live. Toggle **3D** for a tilted perspective, drag the
-  corner to resize. Maps are passive cards while the canvas is zoomed out;
-  click one to spring the canvas to 1:1 and interact (pan/zoom/rotate) directly
+Connect Claude Code (or Codex) to a board: press **⌘K**, choose **Connect Claude Code**, and paste the command it copies.
 
-## Architecture
+## Keys
 
-| Path | What |
-| --- | --- |
-| `src/engine/formula.ts` | tokenizer → recursive-descent parser → evaluator |
-| `src/engine/workbook.ts` | cell store, cross-table dependency graph, topological recalc, cycle detection |
-| `src/physics/spring.ts` | shared-rAF spring engine (camera, drags, inertia) — writes styles directly, no React re-render on the hot path |
-| `src/gl/background.ts` | WebGL2 fragment shader: paper grain + camera-synced dot grid + pointer light |
-| `src/state/store.ts` | grid tracks + section spans + object layout; split/resize with spreadsheet semantics |
-| `src/components/` | `GridViewport` (camera, snap framing, gutters), `SectionView` (scrollable nested grid), `TableView` (sheet UI), `MapView` (MapLibre binding) |
-| `src/utils/media.ts` | image downscaling, external link opening, link labeling |
+⌘ is Ctrl on Windows and Linux, where the app shows its shortcuts as Ctrl+K, Ctrl+J and so on.
 
-Component-level springs (entrances, button press physics) use the `motion`
-library; continuous motion (pan/zoom/drag/fling) uses the custom spring
-engine. All animated properties are GPU-composited transforms.
+| Key | Action |
+|---|---|
+| **⌘K** | Search everything, paste a link to open it as a live app, or run an action |
+| **⌘J** | The agent (🎙 to talk) |
+| **A** | Agent layer |
+| **P** | Present |
+| **⌘U** | Upload |
+| **Esc** | Release an app and step up the grid |
+
+On the grid itself:
+- Drag empty space to pan; Ctrl + scroll to zoom.
+- Drag a card header to float it.
+- Drag from an output port to wire it.
+
+## Layout
+
+```
+apps/client       React 19 + Vite grid and shell (Tauri desktop in src-tauri)
+apps/server       Node 22 + TypeScript: SQLite, Yjs sync, auth, files, search, MCP, agent, connectors, Today
+apps/extension    Foundation for Chrome: every new tab opens Today (npm run build -w @foundation/extension)
+packages/protocol the board schema every side shares
+packages/ui       design tokens, springs and the night engine
+```
+
+Foundation also takes in the work of `flowform-client` and `flowform-server` (see SPEC §3.1). The Gantt and digital-twin features were dropped.

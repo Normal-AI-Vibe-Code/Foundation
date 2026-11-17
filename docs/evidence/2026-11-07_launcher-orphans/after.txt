@@ -1,0 +1,27 @@
+$ node scripts/dev-orphans-check.mjs
+walk: finds npm → tsx → server under a dead shell; leaves Kiri, an older PID 10's child and a reused PID alone
+
+── node scripts/dev.mjs
+up in 3.6 s: server :15441, client :15431
+13 processes: node.exe:68632 conhost.exe:39448 node.exe:79844 cmd.exe:64416 cmd.exe:78088 node.exe:78696 node.exe:74368 cmd.exe:33988 cmd.exe:70376 node.exe:69844 node.exe:66720 node.exe:21356 esbuild.exe:67712
+taskkill /F /PID 68632 → SUCCESS: The process with PID 68632 has been terminated.
+PASS: all 13 gone and both ports closed 7.2 s after the kill
+watchdog log:
+  2026-11-08T08:25:22.353Z 79844 launcher 68632 gone; children 64416 78088
+  2026-11-08T08:25:23.700Z 79844 pass 1: 78696 74368 33988 70376 69844 66720 21356 67712
+  2026-11-08T08:25:24.450Z 79844 taskkill → 0 SUCCESS: The process with PID 78696 has been terminated. | SUCCESS: The process with PID 74368 has been terminated. | SUCCESS: The process with PID 33988 has been terminated. | SUCCESS: The process with PID 70376 has been terminated. | SUCCESS: The process with PID 69844 has been terminated. | SUCCESS: The process with PID 66720 has been terminated. | SUCCESS: The process with PID 21356 has been terminated. | SUCCESS: The process with PID 67712 has been terminated.
+  2026-11-08T08:25:29.491Z 79844 pass 2: nothing left
+
+── npm run dev (npm killed)
+up in 3.7 s: server :15441, client :15431
+15 processes: node.exe:78900 conhost.exe:80356 cmd.exe:66464 node.exe:44372 node.exe:80880 cmd.exe:74664 cmd.exe:64060 node.exe:59932 node.exe:10420 cmd.exe:23932 cmd.exe:52820 node.exe:78888 node.exe:43868 node.exe:70676 esbuild.exe:62280
+taskkill /F /PID 78900 → SUCCESS: The process with PID 78900 has been terminated.
+PASS: all 15 gone and both ports closed 4.0 s after the kill
+watchdog log:
+  2026-11-08T08:25:42.064Z 80880 launcher 44372 gone; children 74664 64060
+  2026-11-08T08:25:43.331Z 80880 pass 1: 59932 10420 23932 52820 78888 43868 70676 62280
+  2026-11-08T08:25:44.013Z 80880 taskkill → 0 SUCCESS: The process with PID 59932 has been terminated. | SUCCESS: The process with PID 10420 has been terminated. | SUCCESS: The process with PID 52820 has been terminated. | SUCCESS: The process with PID 78888 has been terminated. | SUCCESS: The process with PID 43868 has been terminated. | ERROR: The process with PID 23932 could not be terminated. | Reason: There is no running instance of the task. | ERROR: The process with PID 70676 could not be terminated. | Reason: There is no running instance of the task. | ERROR: The process with PID 62280 could not be terminated. | Reason: There is no running instance of the task.
+  2026-11-08T08:25:45.699Z 80880 pass 2: nothing left
+
+all 2 passed
+exit 0
