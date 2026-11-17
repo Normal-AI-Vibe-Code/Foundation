@@ -85,7 +85,7 @@ function Tile({ e, inMain, viewer, still, onApprove }: { e: UploaderEntry; inMai
         <b>{e.name}</b>
         <span>{e.form === "mesh" ? "mesh avatar" : "3D"}</span>
       </span>
-      <span className={`up-chip is-${s.tone}`} title={s.word}>
+      <span className={`up-chip is-${s.tone}`} title={e.state === "removed" && e.why ? `${s.word}: ${e.why}` : s.word}>
         {s.word}
       </span>
       {approvable && (

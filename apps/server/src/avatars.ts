@@ -171,6 +171,16 @@ function entryOf(c: CharacterState, w: Wired): UploaderEntry {
   };
 }
 
+/** every character this install has, by its key (an original, the newest where two share one), for what main has that isn't wired */
+function characterKeys(): Map<string, { id: string; name: string; set: string; form: string }> {
+  const out = new Map<string, { id: string; name: string; set: string; form: string }>();
+  for (const r of all<{ id: string; state: string }>("select id, state from characters order by created_at")) {
+    const c = JSON.parse(r.state) as CharacterState;
+    if (!c.copyOf) out.set(avatarKey(c), { id: c.id, name: c.name, set: c.set, form: c.form });
+  }
+  return out;
+}
+
 /** the server's own fields, never kept in the map: the characters an uploader archived when their wire came off */
 type Kept = UploaderState & { withdrawn?: string[] };
 
@@ -204,13 +214,25 @@ export function reconcile(boardId: string): void {
       }
       if (was) {
         for (const e of was.entries) {
-          if (now.has(e.id)) continue;
-          if (e.state === "avatar") {
-            approvals.push({ id: e.id, to: "archived", why: `its wire into ${AVATARS_SECTION} was taken off` });
-            withdrawn.add(e.id);
+          if (now.has(e.id) || e.state !== "avatar") continue;
+          approvals.push({ id: e.id, to: "archived", why: `its wire into ${AVATARS_SECTION} was taken off` });
+          withdrawn.add(e.id);
+        }
+      }
+      // what an upload would take out of main: everything main has that isn't an avatar here, shown before anyone presses
+      const avatars = new Set(entries.filter((e) => e.state === "avatar").map((e) => e.key));
+      const leaving = [...inMain].filter((k) => !avatars.has(k));
+      if (leaving.length) {
+        const known = characterKeys();
+        for (const key of leaving) {
+          const waiting = entries.find((e) => e.key === key);
+          if (waiting) {
+            waiting.why = `${waiting.why}; until then it leaves main at the next upload`;
+            continue;
           }
-          // shown as leaving until an upload takes it out of main
-          if (e.state !== "waiting" && inMain.has(e.key)) entries.push({ ...e, state: "removed", why: "leaves Foundation's avatars at the next upload" });
+          const c = known.get(key);
+          const [form, set, name] = key.split(":");
+          entries.push({ id: c?.id ?? key, name: c?.name ?? mainNames.get(key) ?? name, set: c?.set ?? set, form: (c?.form ?? form) as UploaderEntry["form"], key, state: "removed", why: c ? (now.has(c.id) ? "not an avatar here" : "in main, but not wired in here") : "in main, but not on this Foundation" });
         }
       }
       const repo = repoInfo();
@@ -333,9 +355,16 @@ export function mainKeys(): string[] {
     }
   }
   const dir = starterDir();
-  return (mainCache = dir ? readStarter(dir).map(avatarKey) : []);
+  return (mainCache = dir ? keysOf({ characters: readStarter(dir) }) : []);
 }
-const keysOf = (m: { characters?: StarterCharacter[] }) => (m.characters ?? []).map(avatarKey);
+/** main's characters' names as main spells them, by key (for one main has that this Foundation hasn't) */
+const mainNames = new Map<string, string>();
+const keysOf = (m: { characters?: StarterCharacter[] }) =>
+  (m.characters ?? []).map((c) => {
+    const key = avatarKey(c);
+    mainNames.set(key, c.name);
+    return key;
+  });
 
 /** forget what was read (tests, and after an upload) */
 export function forgetRepo() {
@@ -356,7 +385,7 @@ type ManifestCharacter = Omit<StarterCharacter, "files"> & { files: Partial<Reco
  */
 export function exportSet(ids: string[], out: string): { added: string[]; removed: string[]; kept: number } {
   const manifestPath = join(out, "manifest.json");
-  const prev = existsSync(manifestPath) ? (JSON.parse(readFileSync(manifestPath, "utf8")) as { version?: number; characters?: ManifestCharacter[] }) : {};
+  const prev = existsSync(manifestPath) ? (JSON.parse(readFileSync(manifestPath, "utf8")) as { version?: number; madeAt?: string; characters?: ManifestCharacter[] }) : {};
   const prevBy = new Map((prev.characters ?? []).map((c) => [avatarKey(c), c]));
   const chars = ids.map((id) => characterById(id)).filter((c): c is CharacterState => Boolean(c?.ready));
   const wanted = new Map(chars.map((c) => [avatarKey(c), c]));
@@ -406,7 +435,10 @@ export function exportSet(ids: string[], out: string): { added: string[]; remove
       }
       characters.push({ name: c.name, set: c.set, form: c.form, identity: c.identity, height: c.height, files });
     }
-    writeFileSync(join(stage, "manifest.json"), `${JSON.stringify({ version: prev.version ?? 1, characters }, null, 2)}\n`);
+    // the day the set last changed: kept while it's the same characters
+    const sameSet = order.length === (prev.characters ?? []).length && order.every((k) => prevBy.has(k));
+    const madeAt = sameSet && prev.madeAt ? prev.madeAt : new Date().toISOString().slice(0, 10);
+    writeFileSync(join(stage, "manifest.json"), `${JSON.stringify({ version: prev.version ?? 1, madeAt, characters }, null, 2)}\n`);
     rmSync(out, { recursive: true, force: true });
     mkdirSync(out, { recursive: true });
     for (const n of readdirSync(stage)) copyFileSync(join(stage, n), join(out, n));
@@ -437,7 +469,9 @@ async function pushOnce(repo: RepoInfo & { dir: string }, ids: string[], by: str
     );
     const at = Date.now();
     if (!changed) return { at, outcome: "same", text: `Main already has these ${ids.length} avatars: nothing to upload.`, by, how };
-    const what = [added.length ? `+${list(added)}` : "", removed.length ? `−${list(removed)}` : ""].filter(Boolean).join(", ") || "their pictures and files";
+    const files = (await git(["diff", "--cached", "--name-only"], tmp)).stdout.split("\n").filter(Boolean);
+    const onlyManifest = files.every((f) => f.endsWith("/manifest.json"));
+    const what = [added.length ? `+${list(added)}` : "", removed.length ? `−${list(removed)}` : ""].filter(Boolean).join(", ") || (onlyManifest ? "the manifest: where each file came from" : "new pictures or files");
     const message = [
       `Characters: Foundation's avatars from the Character studio (${what})`,
       "",

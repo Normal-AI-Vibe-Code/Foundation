@@ -96,8 +96,9 @@ test("the studio gets Foundation avatars on its left: the uploader hosted there,
   chars.upgradeStudio(BOARD);
   assert.equal([...m().objects.values()].filter((o) => o.kind === "panel" && o.panel === "uploader").length, 1);
   av.reconcile(BOARD);
-  assert.deepEqual(up().entries, []);
   assert.deepEqual(up().inMain, ["mesh:anime:old"], "what main has, read from origin");
+  // what an upload would take out of main shows before anyone presses: Old is in main and nowhere here
+  assert.deepEqual(up().entries.map((e) => [e.name, e.state, e.why]), [["Old", "removed", "in main, but not on this Foundation"]]);
   assert.match(up().target ?? "", /main$/);
 });
 
@@ -111,7 +112,7 @@ test("a wired section brings its character cards: finished and approved is an av
   const card = m().objects.get(aoi.panelId) as PanelDoc;
   assert.equal(card.ports.find((p) => p.dir === "out")?.name, CHARACTER_OUT, "a character card has an output");
   av.reconcile(BOARD);
-  assert.deepEqual(states(), { Aoi: "avatar", Hana: "waiting" });
+  assert.deepEqual(states(), { Aoi: "avatar", Hana: "waiting", Old: "removed" });
   assert.match(up().entries.find((e) => e.name === "Hana")!.why!, /approve/);
   assert.equal(up().entries[0].via, "Characters · Anime");
   // a card wired on its own, from a section that isn't wired
