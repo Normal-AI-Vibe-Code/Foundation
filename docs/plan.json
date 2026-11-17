@@ -1729,7 +1729,7 @@
       "milestone": "apps",
       "area": "machines",
       "status": "needs-you",
-      "body": "The Foundation server on localhost:4410 was started on 2026-11-15 at 19:42 and never restarted, so it runs that hour's code: Add a desktop answered 404 `not found` (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`, `live-server-probe.txt`). After this branch is merged into the checkout it starts from: the server switch, Stop, then Start. Then Desktop → Add a desktop on `box-a70f`, and open the Character studio once (the studio's upgrade to nodes runs then). Nobody restarted it or touched that machine in the 2026-11-17 work.",
+      "body": "The Foundation server on localhost:4410 was started on 2026-11-15 at 19:42 and never restarted, so it runs that hour's code: Add a desktop answered 404 `not found` (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`, `live-server-probe.txt`). After this branch is merged into the checkout it starts from: the server switch, Stop, then Start. Then Desktop → Add a desktop on `box-a70f`, and open the Character studio once (the studio's upgrade to nodes runs then). Nobody restarted it or touched that machine in the 2026-11-17 work. 2026-11-17 (later): the reason \"Stop, then Start\" could not be done is that the app had adopted that server after an update and offered no Stop for it. The switch now offers Restart and Stop for a Foundation server it recognises (once the next release is installed).",
       "issue": 167
     },
     {
@@ -1849,7 +1849,7 @@
       "milestone": "ship",
       "area": "desktop",
       "status": "next",
-      "body": "The app updates itself; a server started from a checkout runs what it was started with. Both report 0.3.0, so only a missing route gives it away, one feature at a time. Have the server report its commit and when it started; the app compares and offers the restart.",
+      "body": "The app updates itself; a server started from a checkout runs what it was started with. Both report 0.3.0, so only a missing route gives it away, one feature at a time. Have the server report its commit and when it started; the app compares and offers the restart. 2026-11-17: part of the way there: the switch recognises and restarts a server an earlier run of the app started, and Add a desktop offers Restart the server when its route is missing. The general check (commit and start time compared) is still to do.",
       "issue": 179
     },
     {
@@ -1871,6 +1871,15 @@
       "status": "next",
       "body": "The packaged app's transport is checked (the production build on another origin, a bearer, socket tickets; 2026-11-17) and the installed app serves `desktop.html` and its script. Nobody has pressed it inside the Tauri window (WebView2). Takes over from the packaged-app part of `machines-desktop-more`.",
       "issue": 181
+    },
+    {
+      "id": "machine-tools",
+      "title": "A machine's tools: copy and paste, Ctrl+scroll, a window of its own, the wells redrawn",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-tools/NOTES.md`). Josh: \"the VM takes over Ctrl+scroll … I am unable to click in and copy the text that I need … design the vm start interface and add desktop feature a little better … terminal tools for copying out text that are standardized, and the ability to full-screen the vm into another tab\". The same tools row under the terminal and the desktop (Copy, Copy all, Paste, a window of its own); Ctrl+C copies a selection and is still the interrupt without one; the desktop's copied text reaches the clipboard, Ctrl+V reaches the machine; Ctrl+scroll is always the grid's zoom; machine.html as a tab or an app window; Start and Add a desktop as one centred, iconed column that grows with the card. Checked: `e2e/machines-tools.spec.ts` on Kiri (Ubuntu), `test/machine-words.test.ts`, `#/design` day and night. Not done: the Tauri window of its own not pressed; viewers get no clipboard."
     },
     {
       "id": "pipes-older-server",

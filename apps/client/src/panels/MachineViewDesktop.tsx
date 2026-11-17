@@ -19,15 +19,19 @@
  * actions under it; when one asks without leave, the line offers the button.
  */
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MACHINE_AGENT_ACTIVE_MS, type MachineAgentAct, type MachineState } from "@foundation/protocol";
 import { onNight } from "@foundation/ui";
 import type { PanelMeta } from "../state/store";
 import { SERVER_NAME, api } from "../lib/api";
-import { desktopRefusal as refusalWords } from "./machineWords";
+import { desktopRefusal as refusalWords, olderServer } from "./machineWords";
+import { askRestart } from "../server/desktop";
+import { AgentGlyph, DesktopGlyph, LockGlyph, PackageGlyph, PopOutGlyph, PullGlyph, WarnGlyph } from "../shell/glyphs";
 import { putInUse } from "../lib/cardUse";
 import { getUi, setUi, toast, useUi } from "../state/ui";
 import { KeysLine, ago, boardId, useNow, useRingWidth } from "./MachineViewBits";
+import { copyText, readClipboard } from "./machineTerminal";
+import { MachineTools, copiedWords, openMachineWindow, useFlash } from "./MachineTools";
 
 export type MachineViewName = "terminal" | "desktop";
 
@@ -67,6 +71,9 @@ export function ViewSwitch({ view, onView }: { view: MachineViewName; onView?: (
   );
 }
 
+/** the desktop app (Tauri), which can restart this computer's server itself */
+const inDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
 const post = (panelId: string, path: "desktop" | "agents", json: object = {}) => api<{ machine: MachineState }>(`/api/boards/${encodeURIComponent(boardId())}/machines/${panelId}/${path}`, { method: "POST", json });
 
 /** why a press didn't work, for the card (machineWords.ts: a server older than the app says so) */
@@ -80,13 +87,17 @@ export function Desktop({ panel, m, viewer }: { panel: PanelMeta; m: MachineStat
   const [hasKeys, setHasKeys] = useState(false);
   // a press the server refused (or never got): the card says why, where the button is, until the next press
   const [refused, setRefused] = useState<string | null>(null);
+  // the refusal was a server from before desktops: in the desktop app, the well offers to restart it
+  const [older, setOlder] = useState(false);
   const add = async () => {
     setBusy(true);
     setRefused(null);
+    setOlder(false);
     try {
       await post(panel.id, "desktop");
     } catch (e) {
       setRefused(desktopRefusal(e));
+      setOlder(olderServer(e));
     } finally {
       setBusy(false);
     }
@@ -104,26 +115,33 @@ export function Desktop({ panel, m, viewer }: { panel: PanelMeta; m: MachineStat
   };
   if (d?.state === "ready") {
     return (
-      <>
-        <DesktopScreen panelId={panel.id} name={m.name} viewer={viewer} onKeys={setHasKeys} />
-        {/* under the screen, not over it: the machine's own screen stays whole */}
-        <div className="machine-desk-foot">
-          <AgentsMay panelId={panel.id} m={m} viewer={viewer} />
-          {hasKeys && !viewer && <KeysLine what="this desktop" inline />}
-        </div>
-      </>
+      <DesktopScreen panelId={panel.id} name={m.name} viewer={viewer} onKeys={setHasKeys}>
+        <AgentsMay panelId={panel.id} m={m} viewer={viewer} />
+        {hasKeys && !viewer && <KeysLine what="this desktop" inline />}
+      </DesktopScreen>
     );
   }
-  if (refused && d?.state !== "installing") return <DesktopWell state="error" detail={refused} name={m.name} viewer={viewer} busy={busy} onAdd={() => void add()} />;
+  if (refused && d?.state !== "installing") return <DesktopWell state="error" detail={refused} name={m.name} viewer={viewer} busy={busy} onAdd={() => void add()} onRestart={older && inDesktop ? askRestart : undefined} />;
   return <DesktopWell state={d?.state ?? "none"} detail={d?.detail} name={m.name} viewer={viewer} busy={busy} onAdd={() => void add()} onStop={() => void stop()} />;
 }
 
-/** no desktop yet, one being installed, or an install that failed. Also drawn on #/design. */
-export function DesktopWell({ state, detail, name, viewer, busy, onAdd, onStop }: { state: "none" | "installing" | "error"; detail?: string; name: string; viewer: boolean; busy?: boolean; onAdd?: () => void; onStop?: () => void }) {
+/**
+ * No desktop yet, one being installed, or an install that failed (2026-11-17, Josh: "design the vm start
+ * interface and add desktop feature a little better centering, making the text larger, and using icons to
+ * indicate the right features"). One centred column: a 48 px round mark, a title at 18, what it is at 13.5,
+ * what you get as three rows each led by its icon, the one blue action, and its terms as icon-led chips.
+ * Failed is the same column with the warn mark and the whole reason (selectable, to copy). Installing is the
+ * mark breathing, the package manager's own line and Stop. Also drawn on #/design.
+ */
+export function DesktopWell({ state, detail, name, viewer, busy, onAdd, onStop, onRestart }: { state: "none" | "installing" | "error"; detail?: string; name: string; viewer: boolean; busy?: boolean; onAdd?: () => void; onStop?: () => void; onRestart?: () => void }) {
   if (state === "installing") {
     return (
-      <div className="machine-progress machine-desk-progress">
-        <span className="machine-desk-said">
+      <div className="machine-hero machine-progress machine-desk-progress">
+        <span className="machine-hero-mark is-busy">
+          <PackageGlyph size={22} />
+        </span>
+        <div className="machine-hero-title">Adding a desktop to {name}</div>
+        <span className="machine-desk-said machine-copyable" onPointerDown={(e) => e.stopPropagation()}>
           <span className="f-dot is-warn is-live" />
           Adding a desktop: {detail ?? "starting…"}
         </span>
@@ -136,31 +154,88 @@ export function DesktopWell({ state, detail, name, viewer, busy, onAdd, onStop }
       </div>
     );
   }
+  const failed = state === "error";
   return (
-    <div className="machine-well machine-desk-well">
-      <div className="connector-offline-title">{state === "error" ? `The desktop didn't go in` : `${name} has no desktop yet`}</div>
-      <div className="connector-offline-reason">
-        {state === "error" ? detail : "A desktop is an X server, the XFCE desktop and VNC, installed inside the machine. You see and use it here, on this card; agents can too, once you let them."}
-      </div>
+    <div className={`machine-well machine-hero machine-desk-well${failed ? " is-failed" : ""}`}>
+      <span className={`machine-hero-mark${failed ? " is-warn" : ""}`}>{failed ? <WarnGlyph size={22} /> : <DesktopGlyph size={22} />}</span>
+      <div className="machine-hero-title connector-offline-title">{failed ? `The desktop didn't go in` : `${name} has no desktop yet`}</div>
+      {failed ? (
+        // the whole reason, which can be copied out (a press here doesn't move the card)
+        <div className="machine-hero-lede machine-copyable connector-offline-reason" onPointerDown={(e) => e.stopPropagation()}>
+          {detail}
+        </div>
+      ) : (
+        <>
+          <div className="machine-hero-lede connector-offline-reason">A real desktop inside the machine: an X server, XFCE and VNC.</div>
+          <ul className="machine-feats">
+            <li>
+              <DesktopGlyph />
+              <span>
+                <b>Use it on this card</b> · click the screen and the keys are the machine's
+              </span>
+            </li>
+            <li>
+              <PopOutGlyph />
+              <span>
+                <b>Or in a window of its own</b> · full screen, none of Foundation's shortcuts
+              </span>
+            </li>
+            <li className="is-agent">
+              <AgentGlyph />
+              <span>
+                <b>Agents can use it too</b> · only once you let them
+              </span>
+            </li>
+          </ul>
+        </>
+      )}
       {viewer ? (
         <div className="machine-note">View only: someone who can edit this board adds it.</div>
       ) : (
-        <div className="machine-start">
-          <button className="f-pill is-accent" disabled={busy} onClick={onAdd}>
-            {busy ? "Starting…" : state === "error" ? "Try again" : "Add a desktop"}
+        <div className="machine-hero-go">
+          {onRestart && (
+            <button className="f-pill is-accent machine-hero-button" disabled={busy} onClick={onRestart} data-tip="Stops this computer's Foundation server and starts it again from its folder, so it runs the code that's there now. The app reloads when it's back.">
+              Restart the server
+            </button>
+          )}
+          <button className={`f-pill machine-hero-button${onRestart ? "" : " is-accent"}`} disabled={busy} onClick={onAdd}>
+            {busy ? "Starting…" : failed ? "Try again" : "Add a desktop"}
           </button>
-          <span className="machine-terms">Installs packages in the machine (Ubuntu, Debian, Alpine) · a few minutes · nothing is published</span>
         </div>
+      )}
+      {!viewer && !failed && (
+        <ul className="machine-hero-terms machine-terms">
+          <li>
+            <PackageGlyph size={14} /> Installs packages in the machine · Ubuntu, Debian, Alpine
+          </li>
+          <li>
+            <PullGlyph size={14} /> A few minutes
+          </li>
+          <li>
+            <LockGlyph size={14} /> Nothing is published
+          </li>
+        </ul>
       )}
     </div>
   );
 }
 
-function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; name: string; viewer: boolean; onKeys: (on: boolean) => void }) {
+/**
+ * The machine's screen in its frame, and under it the tools row (MachineTools.tsx), which also carries what's
+ * given as children (the agents' leave, the keys line): under the screen, never over it, so the machine's own
+ * screen stays whole. `alone`: in a window of its own (machineWindow.tsx), where the desktop has the keys from
+ * the start and there is no grid to zoom, card to use or ring to draw.
+ */
+export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onFull, children }: { panelId: string; name: string; viewer: boolean; onKeys: (on: boolean) => void; alone?: boolean; board?: string; onFull?: () => void; children?: ReactNode }) {
+  const bid = board ?? boardId();
   const wrap = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
-  const inUse = useUi().engaged === panelId;
+  const engaged = useUi().engaged === panelId;
+  const inUse = Boolean(alone) || engaged;
   const [hasKeys, setKeys] = useState(false);
+  // the last text the machine copied (x11vnc sends its selection): Copy puts it on this computer's clipboard again
+  const [clip, setClip] = useState("");
+  const [flash, say] = useFlash(2400);
   const setHasKeys = (on: boolean) => {
     setKeys(on);
     onKeys(on);
@@ -172,8 +247,8 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
   const [attempt, setAttempt] = useState(0);
   // the machine's screen as it came (1280×800): the ring goes round the picture, not the letterbox
   const [shape, setShape] = useState<{ w: number; h: number } | null>(null);
-  useRingWidth(wrap, hasKeys && !viewer);
-  const src = `${import.meta.env.BASE_URL}desktop.html#board=${encodeURIComponent(boardId())}&panel=${encodeURIComponent(panelId)}${viewer ? "&view=1" : ""}`;
+  useRingWidth(wrap, hasKeys && !viewer && !alone);
+  const src = `${import.meta.env.BASE_URL}desktop.html#board=${encodeURIComponent(bid)}&panel=${encodeURIComponent(panelId)}${viewer ? "&view=1" : ""}`;
   const tell = (cmd: string, more: object = {}) => frame.current?.contentWindow?.postMessage({ type: "foundation:desktop", cmd, ...more }, window.location.origin);
   // the frame's ground is the card's, in day and night (a frame can't read our tokens)
   const paint = () => wrap.current && tell("paint", { background: getComputedStyle(wrap.current).backgroundColor });
@@ -181,7 +256,7 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow || e.origin !== window.location.origin) return;
-      const d = e.data as { type?: string; event?: string; on?: boolean; reason?: string; final?: boolean; w?: number; h?: number };
+      const d = e.data as { type?: string; event?: string; on?: boolean; reason?: string; final?: boolean; w?: number; h?: number; text?: string; copied?: boolean; dx?: number; dy?: number; mode?: number; x?: number; y?: number };
       if (d?.type !== "foundation:desktop") return;
       if (d.event === "connected") {
         setNote(null);
@@ -193,10 +268,22 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
         setFinal(Boolean(d.final));
       } else if (d.event === "keys") {
         setHasKeys(Boolean(d.on));
-        if (d.on) putInUse(panelId);
+        if (d.on && !alone) putInUse(panelId);
       } else if (d.event === "leave") {
+        if (alone) return; // a window of its own has nothing to leave to
         frame.current?.blur();
         if (getUi().engaged === panelId) setUi({ engaged: null });
+      } else if (d.event === "clip" && d.text) {
+        setClip(d.text);
+        say(d.copied ? `${copiedWords(d.text)} from the machine` : "The machine copied text: Copy puts it on your clipboard");
+      } else if (d.event === "wheel" && !alone) {
+        // ⌘/Ctrl-wheel over the screen is the grid's zoom (lib/cardUse.ts), about the same point: the frame
+        // measures in its own unscaled pixels, the card is drawn at the board's scale
+        const f = frame.current;
+        if (!f) return;
+        const r = f.getBoundingClientRect();
+        const k = f.clientWidth ? r.width / f.clientWidth : 1;
+        f.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, ctrlKey: true, deltaX: d.dx ?? 0, deltaY: d.dy ?? 0, deltaMode: d.mode ?? 0, clientX: r.left + (d.x ?? 0) * k, clientY: r.top + (d.y ?? 0) * k }));
       }
     };
     window.addEventListener("message", onMsg);
@@ -219,14 +306,28 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
   }, [inUse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const use = () => {
-    putInUse(panelId);
+    if (!alone) putInUse(panelId);
     frame.current?.focus();
     tell("focus");
   };
+  const copy = async () => {
+    if (!clip) return say("Select or copy text in the machine first", "warn");
+    say((await copyText(clip)) ? copiedWords(clip) : "Your browser didn't allow the copy", "ok");
+  };
+  const paste = async () => {
+    const text = await readClipboard();
+    if (text === null) return say("Your browser didn't let Foundation read the clipboard: press Ctrl+V in the machine", "warn");
+    if (!text) return say("Your clipboard is empty", "warn");
+    use();
+    tell("type", { text });
+    say(`Typed ${copiedWords(text).slice("Copied ".length)} into the machine`);
+  };
   return (
-    <div ref={wrap} className={`machine-desk${inUse ? " is-in-use" : ""}${hasKeys && !viewer ? " has-keys" : ""}`}>
-      <iframe key={attempt} ref={frame} src={src} title={`${name}'s desktop`} onLoad={paint} allow="clipboard-read; clipboard-write" />
-      {hasKeys && !viewer && <span className={`machine-desk-ring${shape ? " is-screen" : ""}`} style={shape ? ({ "--screen-ar": String(shape.w / shape.h) } as CSSProperties) : undefined} />}
+    <>
+    <div ref={wrap} className={`machine-desk${inUse ? " is-in-use" : ""}${hasKeys && !viewer ? " has-keys" : ""}${alone ? " is-alone" : ""}`}>
+      {/* in a window of its own the desktop takes the keys as soon as it's there */}
+      <iframe key={attempt} ref={frame} src={src} title={`${name}'s desktop`} onLoad={() => (paint(), alone && use())} allow="clipboard-read; clipboard-write" />
+      {hasKeys && !viewer && !alone && <span className={`machine-desk-ring${shape ? " is-screen" : ""}`} style={shape ? ({ "--screen-ar": String(shape.w / shape.h) } as CSSProperties) : undefined} />}
       {!inUse && (
         // a plain click uses the desktop, as it puts the caret in the terminal; until then the wheel and the pointer are the grid's
         <div className="machine-desk-shield" onPointerDown={(e) => e.stopPropagation()} onClick={use}>
@@ -253,6 +354,10 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
         </div>
       )}
     </div>
+    <MachineTools view="desktop" canType={!viewer} canCopy={Boolean(clip)} flash={flash} onCopy={() => void copy()} onPaste={() => void paste()} onFull={onFull} onPopOut={alone ? undefined : () => void openMachineWindow(bid, panelId, "desktop", name, viewer)}>
+      {children}
+    </MachineTools>
+    </>
   );
 }
 

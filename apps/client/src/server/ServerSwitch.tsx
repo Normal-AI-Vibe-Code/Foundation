@@ -18,7 +18,7 @@ import { springs } from "@foundation/ui";
 import { BEARER, SERVER, chooseServer } from "../lib/api";
 import { inDesktop } from "../update/updater";
 import { useUi } from "../state/ui";
-import { answers, localStatus, startLocal, stopLocal } from "./desktop";
+import { RESTART_EVENT, answers, localStatus, startLocal, stopLocal } from "./desktop";
 import {
   FOLDER_DEFAULT,
   LOCAL_PORT,
@@ -56,6 +56,8 @@ export interface ServerSwitchViewProps {
   localListening: boolean;
   /** this app started that server */
   localOurs: boolean;
+  /** an earlier run of this app started it (the switch's way): it can be stopped and restarted from here */
+  localAdopted?: boolean;
   /** which kind Start runs: the app's own server or a checkout's */
   kind: LocalKind;
   /** this build carries its own server (not `tauri dev`) */
@@ -75,6 +77,7 @@ export interface ServerSwitchViewProps {
   onToggle?: () => void;
   onStart?: () => void;
   onStop?: () => void;
+  onRestart?: () => void;
   onUseLocal?: () => void;
   onKind?: (k: LocalKind) => void;
   onFolder?: (v: string) => void;
@@ -154,17 +157,22 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
             <>
               <span className="server-switch-state">
                 <i className="server-switch-dot" data-tone="ok" />
-                {p.localOurs ? "Running · started here" : "Running"}
+                {p.localOurs ? "Running · started here" : p.localAdopted ? "Running · started here earlier" : "Running"}
               </span>
               {!currentIsLocal && (
                 <button type="button" className="f-pill is-accent" onClick={p.onUseLocal}>
                   Use this server
                 </button>
               )}
-              {p.localOurs && (
-                <button type="button" className="f-pill" onClick={p.onStop}>
-                  Stop
-                </button>
+              {(p.localOurs || p.localAdopted) && (
+                <>
+                  <button type="button" className="f-pill" onClick={p.onRestart} data-tip="Stop it and start it again: it runs the code that's there now (after an update, say)">
+                    Restart
+                  </button>
+                  <button type="button" className="f-pill" onClick={p.onStop}>
+                    Stop
+                  </button>
+                </>
               )}
             </>
           ) : p.desktop ? (
@@ -282,6 +290,7 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
   const [local, setLocal] = useState<LocalPhase>("unknown");
   const [listening, setListening] = useState(false);
   const [ours, setOurs] = useState(false);
+  const [adopted, setAdopted] = useState<LocalKind | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [folder, setFolder] = useState(() => read(FOLDER_KEY, FOLDER_DEFAULT));
   const [builtIn, setBuiltIn] = useState(false);
@@ -320,6 +329,7 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
       if (!s) return null;
       setListening(s.listening);
       setOurs(s.ours);
+      setAdopted(s.adopted ?? null);
       setBuiltIn(s.builtIn);
       setRunning({ kind: s.kind, folder: s.folder });
       if (startingRef.current) return s;
@@ -424,6 +434,28 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
     if (isLocalServer(current)) setReach("down");
   };
 
+  // stop, then start the same kind again: it runs what's in its folder now
+  const restart = async () => {
+    const k = running.kind ?? adopted ?? kind;
+    setOpen(true);
+    setLocal("starting");
+    startingRef.current = true;
+    await stopLocal().catch(() => null);
+    setOurs(false);
+    setAdopted(null);
+    setListening(false);
+    await start(k);
+  };
+  const restartRef = useRef(restart);
+  restartRef.current = restart;
+  // asked from elsewhere (a machine's card found the server older than the app)
+  useEffect(() => {
+    if (!shown || !inDesktop) return;
+    const go = () => void restartRef.current();
+    window.addEventListener(RESTART_EVENT, go);
+    return () => window.removeEventListener(RESTART_EVENT, go);
+  }, [shown]);
+
   const connect = () => {
     const r = serverOrigin(remote);
     if (!r.ok) {
@@ -448,6 +480,7 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
         local={local}
         localListening={listening}
         localOurs={ours}
+        localAdopted={Boolean(adopted)}
         kind={kind}
         builtIn={builtIn}
         runningKind={running.kind}
@@ -459,6 +492,7 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
         onToggle={() => setOpen((o) => !o)}
         onStart={() => void start()}
         onStop={() => void stop()}
+        onRestart={() => void restart()}
         onUseLocal={goLocal}
         onKind={(k) => {
           setKindPick(k);

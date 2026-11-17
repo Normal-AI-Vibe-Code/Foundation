@@ -1,4 +1,4 @@
-import { inUse, releaseCard } from "../lib/cardUse";
+import { fullscreenCard, inUse, releaseCard } from "../lib/cardUse";
 import { cardWheel } from "../lib/cardScroll";
 import { installScrollHint, noteAltScroll } from "../lib/scrollHint";
 import { keys } from "../lib/keys";
@@ -574,10 +574,12 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     (e: WheelEvent) => {
       const container = containerRef.current;
       if (!container) return;
-      // panning the grid ends a card's use, so it can't catch the wheel as it slides under the pointer
-      releaseCard();
+      const zooming = e.ctrlKey || e.metaKey;
+      // panning the grid ends a card's use, so it can't catch the wheel as it slides under the pointer;
+      // a zoom keeps the card under the pointer, so a terminal or a desktop in use keeps the keys
+      if (!zooming) releaseCard();
       const r = container.getBoundingClientRect();
-      if (e.ctrlKey || e.metaKey) {
+      if (zooming) {
         const cx = e.clientX - r.left;
         const cy = e.clientY - r.top;
         // trackpad pinch arrives as small ctrl-wheel deltas: follow the fingers 1:1;
@@ -631,8 +633,11 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     // Caught on the way down, so a card's own scroller (xterm, maplibre, a list) never sees it.
     // Alt-wheel over a card with more in it than fits scrolls through that card (lib/cardScroll.ts);
     // ⌘/Ctrl-wheel always zooms (2026-11-17: the zoom key does one thing).
+    // 2026-11-17, Josh ("the VM takes over Ctrl+scroll"): that holds over the card in use too, a terminal or a
+    // desktop with the keys included (the desktop's frame hands its ⌘/Ctrl-wheel up: panels/desktopFrame.ts).
+    // Only a card full screen keeps it, since the grid isn't there to zoom.
     const h = (e: WheelEvent) => {
-      if (inUse(e.target)) return;
+      if (inUse(e.target) && (!(e.ctrlKey || e.metaKey) || fullscreenCard())) return;
       e.preventDefault();
       if (e.altKey && !e.ctrlKey && !e.metaKey && cardWheel(e, noteAltScroll)) {
         e.stopPropagation();

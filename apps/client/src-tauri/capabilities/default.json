@@ -16,6 +16,8 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-start-dragging",
+    "core:window:allow-unminimize",
+    "core:webview:allow-create-webview-window",
     "allow-local-server-status",
     "allow-start-local-server",
     "allow-stop-local-server"

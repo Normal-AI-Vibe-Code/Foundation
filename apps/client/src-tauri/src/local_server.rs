@@ -6,8 +6,11 @@
 //!    the checkout's.
 //! Nothing here starts on its own. No console window; output in the app's log folder
 //! (`local-server.log`); stopped when the app quits, and gone with it however it ends (server.rs).
-//! A server that was already running (`npm run dev`, another app) is used, never started twice and
-//! never stopped from here.
+//! A server that was already running is used, never started twice. One started the switch's way by an
+//! earlier run of this app (it outlives an update's relaunch) is recognised by its command line and can
+//! be stopped from here (2026-11-17: the app updated, the server it had started kept running code from
+//! before desktops, and the card's "Stop, then Start" had no Stop to press). Anything else on the port
+//! (`npm run dev`, another program) is never stopped from here.
 
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
@@ -33,6 +36,9 @@ struct Slot {
     running: Option<Running>,
     /// why the last one we started stopped by itself, until the next start
     exited: Option<String>,
+    /// the process on the port when last asked, and whether it's a Foundation server started the switch's
+    /// way (asking a process's command line takes a moment: asked again only for a new process)
+    adopted: Option<(u32, Option<Kind>)>,
 }
 
 struct Running {
@@ -71,6 +77,9 @@ pub struct Status {
     built_in: bool,
     /// the one we started stopped by itself: its exit and the end of its log
     exited: Option<String>,
+    /// what's on the port when this run didn't start it but an earlier run of the app (or another copy)
+    /// did, the switch's way: it can be stopped (and so restarted) from here
+    adopted: Option<Kind>,
 }
 
 fn listening(port: u16) -> bool {
@@ -149,9 +158,12 @@ fn reap(slot: &mut Slot) {
     }
 }
 
-fn status_of(app: &AppHandle, slot: &Slot) -> Status {
+fn status_of(app: &AppHandle, slot: &mut Slot) -> Status {
+    let on = listening(SERVER_PORT);
+    let adopted = if on && slot.running.is_none() { adopted(slot) } else { None };
     Status {
-        listening: listening(SERVER_PORT),
+        listening: on,
+        adopted,
         ours: slot.running.is_some(),
         kind: slot.running.as_ref().map(|r| r.kind),
         folder: slot.running.as_ref().map(|r| r.folder.clone()),
@@ -164,7 +176,100 @@ fn status_of(app: &AppHandle, slot: &Slot) -> Status {
 pub fn local_server_status(app: AppHandle, state: State<'_, LocalServer>) -> Status {
     let mut slot = state.0.lock().unwrap_or_else(|e| e.into_inner());
     reap(&mut slot);
-    status_of(&app, &slot)
+    status_of(&app, &mut slot)
+}
+
+// ---------- a server this run of the app didn't start ----------
+
+/// which kind of Foundation server a command line is, when it is one started the switch's way:
+/// `node --import tsx apps/server/src/index.ts` (a checkout) or the app's own `server/node` running
+/// `server/index.mjs` (built in). `npm run dev` (tsx watch, from apps/server) and anything else is None.
+fn foundation_kind(cmdline: &str) -> Option<Kind> {
+    let c = cmdline.replace('\\', "/").replace('"', "");
+    if c.contains("--import tsx apps/server/src/index.ts") && !c.contains(" watch ") {
+        return Some(Kind::Checkout);
+    }
+    if c.contains("/server/node") && c.trim_end().ends_with("/server/index.mjs") {
+        return Some(Kind::BuiltIn);
+    }
+    None
+}
+
+/// the process listening on a port, from `netstat -ano`'s lines ("  TCP  127.0.0.1:4410  0.0.0.0:0  LISTENING  28840")
+fn listener_in(netstat: &str, port: u16) -> Option<u32> {
+    let end = format!(":{port}");
+    netstat.lines().find_map(|l| {
+        let f: Vec<&str> = l.split_whitespace().collect();
+        if f.len() == 5 && f[0] == "TCP" && f[1].ends_with(&end) && f[3] == "LISTENING" {
+            f[4].parse().ok()
+        } else {
+            None
+        }
+    })
+}
+
+#[cfg(windows)]
+fn listener_pid(port: u16) -> Option<u32> {
+    ["TCP", "TCPv6"].iter().find_map(|p| {
+        let out = hidden(&mut Command::new("netstat")).args(["-ano", "-p", p]).stdin(Stdio::null()).output().ok()?;
+        listener_in(&String::from_utf8_lossy(&out.stdout), port)
+    })
+}
+#[cfg(not(windows))]
+fn listener_pid(port: u16) -> Option<u32> {
+    let out = Command::new("lsof").args(["-nP", &format!("-iTCP:{port}"), "-sTCP:LISTEN", "-t"]).stdin(Stdio::null()).output().ok()?;
+    String::from_utf8_lossy(&out.stdout).lines().next()?.trim().parse().ok()
+}
+
+#[cfg(windows)]
+fn command_line(pid: u32) -> Option<String> {
+    let q = format!("(Get-CimInstance Win32_Process -Filter 'ProcessId={pid}').CommandLine");
+    let out = hidden(&mut Command::new("powershell")).args(["-NoProfile", "-NonInteractive", "-Command", &q]).stdin(Stdio::null()).output().ok()?;
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!s.is_empty()).then_some(s)
+}
+#[cfg(not(windows))]
+fn command_line(pid: u32) -> Option<String> {
+    let out = Command::new("ps").args(["-o", "command=", "-p", &pid.to_string()]).stdin(Stdio::null()).output().ok()?;
+    let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!s.is_empty()).then_some(s)
+}
+
+/// the kind of the Foundation server on the port that this run didn't start, if it is one
+fn adopted(slot: &mut Slot) -> Option<Kind> {
+    let pid = listener_pid(SERVER_PORT)?;
+    if let Some((p, k)) = slot.adopted {
+        if p == pid {
+            return k;
+        }
+    }
+    let k = command_line(pid).as_deref().and_then(foundation_kind);
+    slot.adopted = Some((pid, k));
+    k
+}
+
+/// stops the Foundation server on the port that this run didn't start (and what it started: agents' runs);
+/// anything that isn't one is left alone
+fn stop_adopted(slot: &mut Slot) {
+    let Some(pid) = listener_pid(SERVER_PORT) else { return };
+    // asked afresh: the pid could have been reused since it was last looked at
+    if command_line(pid).as_deref().and_then(foundation_kind).is_none() {
+        return;
+    }
+    #[cfg(windows)]
+    {
+        let _ = hidden(&mut Command::new("taskkill")).args(["/PID", &pid.to_string(), "/T", "/F"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = Command::new("kill").args(["-TERM", &pid.to_string()]).status();
+    }
+    slot.adopted = None;
+    // until the port is free, so a Start straight after doesn't find it taken
+    let t0 = std::time::Instant::now();
+    while listening(SERVER_PORT) && t0.elapsed() < Duration::from_secs(6) {
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 /// the built-in server's home: the app's data folder (FOUNDATION_DESKTOP_HOME moves it, for a check
@@ -182,7 +287,7 @@ pub fn start_local_server(app: AppHandle, state: State<'_, LocalServer>, kind: K
     reap(&mut slot);
     // already answering (npm run dev, or ours): use it, never a second one on the same port
     if slot.running.is_some() || listening(SERVER_PORT) {
-        return Ok(status_of(&app, &slot));
+        return Ok(status_of(&app, &mut slot));
     }
     let log = app.path().app_log_dir().map_err(|e| e.to_string())?.join("local-server.log");
     let (mut cmd, shown) = match kind {
@@ -226,6 +331,7 @@ pub fn start_local_server(app: AppHandle, state: State<'_, LocalServer>, kind: K
     let job = crate::server::job::Job::holding(&child);
     let stdin = child.stdin.take();
     slot.exited = None;
+    slot.adopted = None;
     slot.running = Some(Running {
         child,
         kind,
@@ -235,7 +341,7 @@ pub fn start_local_server(app: AppHandle, state: State<'_, LocalServer>, kind: K
         #[cfg(windows)]
         _job: job,
     });
-    Ok(status_of(&app, &slot))
+    Ok(status_of(&app, &mut slot))
 }
 
 /// stop the server this app started (and what it started); one it didn't start is left alone
@@ -262,9 +368,14 @@ fn stop(slot: &mut Slot) {
 #[tauri::command]
 pub fn stop_local_server(app: AppHandle, state: State<'_, LocalServer>) -> Status {
     let mut slot = state.0.lock().unwrap_or_else(|e| e.into_inner());
-    stop(&mut slot);
+    if slot.running.is_some() {
+        stop(&mut slot);
+    } else {
+        // started the switch's way by an earlier run of this app: a person can stop it from here too
+        stop_adopted(&mut slot);
+    }
     slot.exited = None;
-    status_of(&app, &slot)
+    status_of(&app, &mut slot)
 }
 
 /// the app is quitting: a server it started goes with it
@@ -287,6 +398,25 @@ mod tests {
         assert!(parse_node("v22.16.0").unwrap() >= NODE_NEEDS);
         assert!(parse_node("v24.0.0").unwrap() >= NODE_NEEDS);
         assert_eq!(parse_node(""), None);
+    }
+
+    #[test]
+    fn which_servers_can_be_stopped_from_here() {
+        // the switch's own two ways, as Windows reports them
+        assert!(foundation_kind(r#""node" --import tsx apps/server/src/index.ts"#) == Some(Kind::Checkout));
+        assert!(foundation_kind(r#""C:\Users\a\AppData\Local\Foundation\server\node.exe" --no-warnings "C:\Users\a\AppData\Local\Foundation\server\index.mjs""#) == Some(Kind::BuiltIn));
+        // npm run dev (tsx watch, from apps/server) and anything else on the port: never
+        assert!(foundation_kind(r#"node C:\Dev\Foundation\node_modules\tsx\dist\cli.mjs watch src/index.ts"#).is_none());
+        assert!(foundation_kind("node --import tsx apps/server/src/other.ts").is_none());
+        assert!(foundation_kind("python -m http.server 4410").is_none());
+    }
+
+    #[test]
+    fn the_listener_from_netstat() {
+        let n = "\nActive Connections\n\n  Proto  Local Address          Foreign Address        State           PID\n  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING       1200\n  TCP    127.0.0.1:44100        0.0.0.0:0              LISTENING       9\n  TCP    127.0.0.1:4410         127.0.0.1:50000        ESTABLISHED     77\n  TCP    127.0.0.1:4410         0.0.0.0:0              LISTENING       28840\n";
+        assert_eq!(listener_in(n, 4410), Some(28840));
+        assert_eq!(listener_in(n, 4411), None);
+        assert_eq!(listener_in("  TCP    [::1]:4410             [::]:0                 LISTENING       31\n", 4410), Some(31));
     }
 
     #[test]

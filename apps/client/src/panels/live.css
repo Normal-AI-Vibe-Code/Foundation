@@ -1527,3 +1527,538 @@
   width: 7px;
   background: var(--color-pulse);
 }
+
+/* ---------- a machine's wells, redrawn (2026-11-17, Josh: "better centering, making the text larger, and using
+   icons to indicate the right features"): Start, Add a desktop, installing, didn't go in. One centred column. ---------- */
+.machine-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+}
+.machine-well.machine-hero,
+.machine-desk-well.machine-hero {
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5) var(--space-4);
+  overflow-y: auto;
+}
+.machine-hero-mark {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.machine-hero-mark.is-warn {
+  background: color-mix(in srgb, var(--color-warn) 14%, transparent);
+  color: var(--color-warn);
+  box-shadow: none;
+}
+.machine-hero-mark.is-busy {
+  color: var(--color-warn);
+  animation: machine-hero-breathe 2.4s var(--ease-out-soft) infinite;
+}
+@keyframes machine-hero-breathe {
+  50% {
+    transform: scale(0.94);
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .machine-hero-mark.is-busy {
+    animation: none;
+  }
+}
+.machine-hero-title,
+.machine-hero .connector-offline-title {
+  color: var(--color-frost);
+  font: 650 18px / 1.25 var(--font-sans);
+  letter-spacing: -0.01em;
+}
+.machine-hero-lede,
+.machine-hero .connector-offline-reason {
+  max-width: 52ch;
+  color: var(--color-mist);
+  font: 400 13.5px / 1.5 var(--font-sans);
+}
+/* what a card says that someone may want to copy out (an error, an install's line): select it, the card stays put */
+.machine-copyable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+.machine-feats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  text-align: left;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+.machine-feats li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.machine-feats svg {
+  flex-shrink: 0;
+  color: var(--color-pulse);
+}
+.machine-feats li.is-agent svg {
+  color: var(--color-agent);
+}
+.machine-feats b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.machine-hero-go {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+.machine-hero-go:has(> .machine-hero-button + .machine-hero-button) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.machine-hero-button {
+  height: 36px;
+  padding: 0 var(--space-5);
+  font: 600 13.5px / 1 var(--font-sans);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.machine-hero-terms {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+  color: var(--color-dim);
+  font: 400 11.5px / 1.4 var(--font-sans);
+}
+.machine-hero-terms li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.machine-desk-progress .machine-desk-said {
+  max-width: 60ch;
+  font: 400 var(--text-13) / 1.5 var(--font-code);
+}
+
+/* Start: the column scrolls inside the card, centred while it fits */
+.machine-picker {
+  align-items: center;
+}
+.machine-picker-col {
+  width: 100%;
+  max-width: 600px;
+  margin-block: auto;
+  padding: var(--space-2) 0;
+}
+.machine-picker-col > .f-eyebrow {
+  margin-top: var(--space-1);
+}
+.machine-picker-col .machine-chips {
+  justify-content: center;
+}
+.machine-picker-col .machine-field {
+  width: 100%;
+  height: 36px;
+  margin-top: 0;
+  font-size: var(--text-13);
+  text-align: center;
+}
+.machine-picker-col .machine-proposed,
+.machine-picker-col .machine-error {
+  width: 100%;
+  text-align: left;
+}
+.machine-distros {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: var(--space-2);
+}
+.machine-distro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+  transition: transform var(--dur-press) var(--ease-spring);
+}
+.machine-distro:hover:not(:disabled) {
+  border-color: var(--color-line-strong);
+}
+.machine-distro:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.machine-distro.is-on {
+  border-color: var(--color-pulse);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+.machine-distro:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.machine-distro-name {
+  font: 600 13.5px / 1.2 var(--font-sans);
+}
+.machine-distro.is-on .machine-distro-name {
+  color: var(--color-pulse);
+}
+.machine-distro-image {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-code);
+}
+.machine-distro-feats {
+  display: inline-flex;
+  gap: 5px;
+  margin-top: 3px;
+  color: var(--color-mist);
+}
+/* With a desktop: a row led by its icon, not a bare checkbox */
+.machine-option.machine-with-desk {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  text-align: left;
+  cursor: pointer;
+}
+.machine-option:hover:not(.is-off) {
+  border-color: var(--color-line-strong);
+}
+.machine-option:has(input:checked) {
+  border-color: var(--color-pulse);
+}
+.machine-option input {
+  accent-color: var(--color-pulse);
+  margin: 0;
+  flex-shrink: 0;
+}
+.machine-option-glyph {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-pulse);
+}
+.machine-option-words {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-dim);
+  font: 400 11.5px / 1.35 var(--font-sans);
+}
+.machine-option-words b {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+}
+.machine-option.is-off {
+  cursor: default;
+}
+.machine-option.is-off .machine-option-glyph {
+  color: var(--color-dim);
+}
+.machine-option.is-off b {
+  color: var(--color-mist);
+}
+
+/* ---------- a machine's tools: the same row under its terminal and its desktop (MachineTools.tsx) ---------- */
+.machine-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 32px;
+  flex-shrink: 0;
+}
+.machine-tools-group {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+}
+.machine-tools > .machine-tools-group:last-child:not(:first-child) {
+  margin-left: auto;
+}
+.machine-tool {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-spring);
+}
+.machine-tool:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-frost) 8%, transparent);
+  color: var(--color-frost);
+}
+.machine-tool:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.machine-tool:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+.machine-tool:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+.machine-tools-said {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ok);
+  font: 500 11.5px / 1 var(--font-sans);
+}
+.machine-tools-said.is-warn {
+  color: var(--color-warn);
+}
+.machine-tools .machine-may {
+  flex: 1;
+}
+@container (max-width: 520px) {
+  .machine-tools .machine-may .machine-terms {
+    display: none;
+  }
+}
+
+/* ---------- a machine in a window of its own (machine.html) ---------- */
+html:has(.machine-window),
+html:has(.machine-window) body {
+  margin: 0;
+  height: 100%;
+  background: var(--color-void);
+  overflow: hidden;
+}
+.machine-window {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  background: var(--color-void);
+  color: var(--color-frost);
+  font-family: var(--font-sans);
+}
+.machine-window-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.machine-window-glyph {
+  display: grid;
+  place-items: center;
+  color: var(--color-mist);
+}
+.machine-window-name {
+  font: 650 var(--text-14) / 1 var(--font-sans);
+  white-space: nowrap;
+}
+.machine-window-head .machine-view {
+  margin-left: var(--space-2);
+}
+.machine-window-keys {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 11.5px / 1 var(--font-sans);
+}
+.machine-window-body.machine-body {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  padding: 0;
+  gap: var(--space-2);
+}
+.machine-window-none {
+  margin: auto;
+  color: var(--color-mist);
+}
+.machine-desk.is-alone iframe {
+  pointer-events: auto;
+}
+
+/* the wells grow with their card: a machine that fills a wide section is drawn at the section's fit (63 % or so),
+   where 18 px type reads as 11. One factor, set by the card's width (.machine-body is the container), scales the
+   column's type, its controls and its width together */
+.machine-hero {
+  --hero-k: 1;
+}
+@container (min-width: 880px) {
+  .machine-hero {
+    --hero-k: 1.2;
+  }
+}
+@container (min-width: 1240px) {
+  .machine-hero {
+    --hero-k: 1.4;
+  }
+}
+.machine-hero-mark {
+  width: calc(48px * var(--hero-k));
+  height: calc(48px * var(--hero-k));
+}
+.machine-hero-mark svg {
+  width: calc(22px * var(--hero-k));
+  height: calc(22px * var(--hero-k));
+}
+.machine-hero-title,
+.machine-hero .connector-offline-title {
+  font-size: calc(18px * var(--hero-k));
+}
+.machine-hero-lede,
+.machine-hero .connector-offline-reason {
+  font-size: calc(13.5px * var(--hero-k));
+}
+.machine-feats {
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-feats svg {
+  width: calc(16px * var(--hero-k));
+  height: calc(16px * var(--hero-k));
+}
+.machine-hero-button {
+  height: calc(36px * var(--hero-k));
+  padding: 0 calc(20px * var(--hero-k));
+  font-size: calc(13.5px * var(--hero-k));
+}
+.machine-hero-terms {
+  font-size: calc(11.5px * var(--hero-k));
+}
+.machine-hero-terms svg {
+  width: calc(14px * var(--hero-k));
+  height: calc(14px * var(--hero-k));
+}
+.machine-picker-col {
+  max-width: calc(600px * var(--hero-k));
+  gap: calc(12px * var(--hero-k));
+}
+.machine-distros {
+  grid-template-columns: repeat(auto-fill, minmax(calc(118px * var(--hero-k)), 1fr));
+}
+.machine-distro-name {
+  font-size: calc(13.5px * var(--hero-k));
+}
+.machine-distro-image {
+  font-size: calc(11px * var(--hero-k));
+}
+.machine-distro-feats svg {
+  width: calc(14px * var(--hero-k));
+  height: calc(14px * var(--hero-k));
+}
+.machine-picker-col .machine-field {
+  height: calc(36px * var(--hero-k));
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-picker-col .machine-chip {
+  height: calc(28px * var(--hero-k));
+  font-size: calc(12px * var(--hero-k));
+}
+.machine-option-glyph {
+  width: calc(32px * var(--hero-k));
+  height: calc(32px * var(--hero-k));
+}
+.machine-option-words {
+  font-size: calc(11.5px * var(--hero-k));
+}
+.machine-option-words b {
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-desk-progress .machine-desk-said {
+  font-size: calc(13px * var(--hero-k));
+}
+.machine-picker-col .machine-proposed,
+.machine-picker-col .machine-error,
+.machine-picker-col .machine-note {
+  font-size: calc(12px * var(--hero-k));
+}
+
+/* the tools row grows with its card as the wells do, so its buttons stay a good press at a wide section's fit */
+.machine-tools {
+  --tools-k: 1;
+}
+@container (min-width: 880px) {
+  .machine-tools {
+    --tools-k: 1.2;
+  }
+}
+@container (min-width: 1240px) {
+  .machine-tools {
+    --tools-k: 1.4;
+  }
+}
+.machine-tools {
+  min-height: calc(32px * var(--tools-k));
+}
+.machine-tool {
+  width: calc(28px * var(--tools-k));
+  height: calc(28px * var(--tools-k));
+}
+.machine-tool svg {
+  width: calc(16px * var(--tools-k));
+  height: calc(16px * var(--tools-k));
+}
+.machine-tools-said {
+  font-size: calc(11.5px * var(--tools-k));
+}
+/* in a window of its own the page is at its own size: no growing */
+.machine-window .machine-tools {
+  --tools-k: 1;
+}

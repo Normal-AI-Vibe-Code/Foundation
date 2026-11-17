@@ -19,6 +19,9 @@ export interface LocalStatus {
   builtIn: boolean;
   /** the one this app started stopped by itself: its exit and the end of its log */
   exited: string | null;
+  /** a Foundation server on the port that an earlier run of this app started (it outlives an update's
+   * relaunch): which kind. It can be stopped, and so restarted, from here (local_server.rs) */
+  adopted?: LocalKind | null;
 }
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -29,6 +32,14 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 export const localStatus = () => call<LocalStatus>("local_server_status");
 export const startLocal = (kind: LocalKind, folder?: string) => call<LocalStatus>("start_local_server", { kind, folder: folder ?? null });
 export const stopLocal = () => call<LocalStatus>("stop_local_server");
+
+/**
+ * Asks the server switch to restart this computer's server (stop, then start the same kind from the same
+ * folder): the way out when the server is older than the app, offered where that is found (a machine's
+ * Add a desktop). The switch opens and shows it happening; the page reloads when the server is back.
+ */
+export const RESTART_EVENT = "foundation:restart-server";
+export const askRestart = () => window.dispatchEvent(new Event(RESTART_EVENT));
 
 /** whether a Foundation server answers at an origin (its public /auth/config), within a few seconds */
 export async function answers(origin: string, ms = 3000): Promise<boolean> {

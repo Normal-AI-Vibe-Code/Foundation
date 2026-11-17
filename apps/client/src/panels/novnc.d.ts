@@ -12,5 +12,13 @@ declare module "@novnc/novnc/core/rfb.js" {
     focus(): void;
     blur(): void;
     sendKey(keysym: number, code: string | null, down?: boolean): void;
+    /** sets the machine's clipboard (x11vnc puts it on the X selection) */
+    clipboardPasteFrom(text: string): void;
   }
+}
+
+declare module "@novnc/novnc/core/input/keysymdef.js" {
+  /** a Unicode code point's X keysym */
+  const keysyms: { lookup(codepoint: number): number };
+  export default keysyms;
 }

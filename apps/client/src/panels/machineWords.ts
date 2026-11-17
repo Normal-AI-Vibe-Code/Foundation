@@ -14,10 +14,28 @@
  */
 export function desktopRefusal(e: unknown, server: string, doing = "add a desktop"): string {
   const err = (e ?? {}) as { status?: number; message?: string };
-  if (err.status === 404 && /^not found$/i.test((err.message ?? "").trim())) {
-    return `The Foundation server at ${server} is older than this app and can't ${doing} yet. Restart it (the server switch at the bottom right: Stop, then Start; or stop and start it where it runs), then try again. Nothing was changed in the machine.`;
+  if (olderServer(e)) {
+    return `The Foundation server at ${server} is older than this app and can't ${doing} yet. Restart it (Restart, here or in the server pill at the foot of the side menu; or stop and start it where it runs), then try again. Nothing was changed in the machine.`;
   }
   return err.message || "The server didn't say why.";
+}
+
+/** whether a refusal is a server from before the route existed: its router's own "not found" */
+export function olderServer(e: unknown): boolean {
+  const err = (e ?? {}) as { status?: number; message?: string };
+  return err.status === 404 && /^not found$/i.test((err.message ?? "").trim());
+}
+
+/**
+ * Whether Add a desktop has a recipe for an image (machinedesktop.ts installs with apt or apk): "yes" for
+ * Ubuntu, Debian and Alpine (and images named for them), "no" for the Start picker's other four, "maybe"
+ * for any other image (one built on Debian or Alpine works; the card says so if it doesn't).
+ */
+export function desktopRecipe(image: string): "yes" | "no" | "maybe" {
+  const name = image.trim().toLowerCase().split("@")[0].split(":")[0].split("/").pop() ?? "";
+  if (/^(ubuntu|debian|alpine)$/.test(name)) return "yes";
+  if (/^(fedora|archlinux|arch|rockylinux|rocky|tumbleweed|leap|opensuse|centos|almalinux)$/.test(name) || image.toLowerCase().startsWith("opensuse/")) return "no";
+  return "maybe";
 }
 
 /**
@@ -27,3 +45,27 @@ export function desktopRefusal(e: unknown, server: string, doing = "add a deskto
  * double, its size).
  */
 export const ringWidth = (drawnScale: number) => (drawnScale > 0 && Number.isFinite(drawnScale) ? Math.round(Math.max(1, Math.min(8, 2 / drawnScale)) * 100) / 100 : 2);
+
+// ---------- a terminal's copy and paste (machineTerminal.ts) ----------
+
+/** lines as a terminal holds them (a wrapped row continues the one before it), without the empty ones at the end */
+export function joinRows(rows: { text: string; wrapped: boolean }[]): string {
+  const lines: string[] = [];
+  for (const r of rows) {
+    if (r.wrapped && lines.length) lines[lines.length - 1] += r.text;
+    else lines.push(r.text);
+  }
+  while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+  return lines.join("\n");
+}
+
+/** which copy-and-paste key this is, if any: "copy" takes the selection, "paste" is left to the browser's paste */
+export function clipKey(e: { type: string; code: string; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean }, hasSelection: boolean, mac: boolean): "copy" | "paste" | null {
+  if (e.type !== "keydown") return null;
+  const mod = mac ? e.metaKey : e.ctrlKey;
+  if (!mod || e.altKey) return null;
+  // Ctrl+C with nothing selected is the shell's interrupt
+  if (e.code === "KeyC") return e.shiftKey || mac || hasSelection ? "copy" : null;
+  if (e.code === "KeyV") return "paste";
+  return null;
+}

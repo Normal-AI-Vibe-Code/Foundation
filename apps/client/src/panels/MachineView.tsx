@@ -23,13 +23,10 @@
  */
 
 import "@xterm/xterm/css/xterm.css";
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { boardMaps, MACHINE_DISTROS, type MachineAsk, type MachineState } from "@foundation/protocol";
-import { onNight } from "@foundation/ui";
 import { addPanel, addSectionAdjacent, getState, type PanelMeta } from "../state/store";
-import { api, openSocket } from "../lib/api";
+import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { askAgent, toast, useUi } from "../state/ui";
 import { useOnScreen } from "./PanelView";
@@ -41,6 +38,12 @@ import { getUi, setUi } from "../state/ui";
 import { KeysLine, useRingWidth } from "./MachineViewBits";
 import { AgentUse, Desktop, ViewSwitch, useMachineView } from "./MachineViewDesktop";
 import { IoStrip } from "./MachineViewIo";
+import { desktopRecipe } from "./machineWords";
+import { AgentGlyph, DesktopGlyph, LockGlyph, PullGlyph, ShieldGlyph, TerminalGlyph } from "../shell/glyphs";
+import { copyText, mountTerminal, readClipboard, type MachineTerminal } from "./machineTerminal";
+import { MachineTools, copiedWords, openMachineWindow, pastedWords, useFlash } from "./MachineTools";
+
+export { themeFromTokens } from "./machineTerminal";
 
 export { KeysLine };
 
@@ -122,7 +125,7 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
         ) : view === "desktop" ? (
           <Desktop panel={panel} m={m} viewer={viewer} />
         ) : (
-          <Terminal panelId={panel.id} canType={!viewer} />
+          <Terminal panelId={panel.id} name={m.name} canType={!viewer} />
         )
       ) : m.state === "pulling" || m.state === "starting" ? (
         <div className="machine-progress">
@@ -350,7 +353,6 @@ function Picker({ panel, m, engine, viewer }: { panel: PanelMeta; m: MachineStat
       .catch(() => setTars([]));
   }, [engine?.id]);
 
-  const pick = (img: string) => setImage(img);
   const load = async (f: ArchiveFile) => {
     setLoading(f.id);
     try {
@@ -364,65 +366,133 @@ function Picker({ panel, m, engine, viewer }: { panel: PanelMeta; m: MachineStat
       setLoading(null);
     }
   };
+  return (
+    <MachinePickerView
+      m={m}
+      proposedText={panel.text}
+      engineName={engine?.name}
+      asleep={Boolean(engine?.asleep)}
+      image={image}
+      have={have.map((h) => h.tag)}
+      tars={tars}
+      loading={loading}
+      desk={desk}
+      viewer={viewer}
+      onImage={setImage}
+      onLoad={(f) => void load(f as ArchiveFile)}
+      onDesk={setDesk}
+      start={<StartButton panel={panel} m={m} image={image} engine={engine} viewer={viewer} desktop={desk && desktopRecipe(image || m.image || "") !== "no"} />}
+    />
+  );
+}
 
+/** a distro's name as it's written */
+const DISTRO_NAME: Record<string, string> = { ubuntu: "Ubuntu", debian: "Debian", alpine: "Alpine", fedora: "Fedora", arch: "Arch", rocky: "Rocky", opensuse: "openSUSE" };
+
+/**
+ * Not started: what to start, in one centred column (2026-11-17, Josh: "design the vm start interface …
+ * better centering, making the text larger, and using icons to indicate the right features"). A title at
+ * 18 and what you get at 13.5; the distros as tiles, each with its name, its image in code type and the
+ * icons of what it can have (a terminal always; a desktop where Add a desktop has a recipe); what the engine
+ * has already and saved images as chips; a free field; **With a desktop** as a row led by its icon (greyed,
+ * with the reason, for an image that can't have one); Start as the one blue action, wide, with its terms as
+ * icon-led chips. Also drawn on #/design.
+ */
+export function MachinePickerView(p: {
+  m: Pick<MachineState, "proposedBy" | "state" | "detail" | "image">;
+  proposedText?: string;
+  engineName?: string;
+  asleep?: boolean;
+  image: string;
+  have: string[];
+  tars: { id: string; name: string }[];
+  loading?: string | null;
+  desk: boolean;
+  viewer: boolean;
+  onImage?: (img: string) => void;
+  onLoad?: (f: { id: string; name: string }) => void;
+  onDesk?: (on: boolean) => void;
+  start: ReactNode;
+}) {
+  const { m, viewer } = p;
+  const engine = p.engineName ?? "the engine";
+  const recipe = desktopRecipe(p.image || m.image || "");
   return (
     <div className="machine-picker">
-      {m.proposedBy && (
-        <div className="machine-proposed">
-          <span className="f-dot is-agent" /> Proposed by {m.proposedBy}
-          {panel.text ? `: ${panel.text}` : ""}
+      <div className="machine-hero machine-picker-col">
+        {m.proposedBy && (
+          <div className="machine-proposed">
+            <AgentGlyph size={14} /> Proposed by {m.proposedBy}
+            {p.proposedText ? `: ${p.proposedText}` : ""}
+          </div>
+        )}
+        {m.state === "error" && m.detail && (
+          <div className="machine-error machine-copyable" onPointerDown={(e) => e.stopPropagation()}>
+            {m.detail}
+          </div>
+        )}
+        {m.state !== "error" && m.detail && !m.proposedBy && <div className="machine-note">{m.detail}</div>}
+        <span className="machine-hero-mark">
+          <TerminalGlyph size={22} />
+        </span>
+        <div className="machine-hero-title">Start a machine</div>
+        <div className="machine-hero-lede">
+          A Linux machine on {engine}, with a disk of its own and a terminal everyone here shares.{p.asleep ? ` ${engine} is asleep: Start wakes it.` : ""}
         </div>
-      )}
-      {m.state === "error" && m.detail && <div className="machine-error">{m.detail}</div>}
-      {m.state !== "error" && m.detail && !m.proposedBy && <div className="machine-note">{m.detail}</div>}
-      <div className="f-eyebrow">A Linux machine</div>
-      <div className="machine-chips">
-        {MACHINE_DISTROS.map((d) => (
-          <button key={d.id} className={`machine-chip${image === d.image ? " is-on" : ""}`} disabled={viewer} onClick={() => pick(d.image)} data-tip={d.image}>
-            {d.id}
-          </button>
-        ))}
+        <div className="machine-distros" role="radiogroup" aria-label="A Linux machine">
+          {MACHINE_DISTROS.map((d) => {
+            const can = desktopRecipe(d.image) === "yes";
+            return (
+              <button key={d.id} role="radio" aria-checked={p.image === d.image} className={`machine-distro${p.image === d.image ? " is-on" : ""}`} disabled={viewer} onClick={() => p.onImage?.(d.image)} data-tip={can ? `${d.image} · a terminal, and a desktop if you want one` : `${d.image} · a terminal (no desktop recipe for it yet)`}>
+                <span className="machine-distro-name">{DISTRO_NAME[d.id] ?? d.id}</span>
+                <code className="machine-distro-image">{d.image.split("/").pop()}</code>
+                <span className="machine-distro-feats" aria-hidden>
+                  <TerminalGlyph size={14} />
+                  {can && <DesktopGlyph size={14} />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {p.have.length > 0 && (
+          <>
+            <div className="f-eyebrow">On {engine} already</div>
+            <div className="machine-chips">
+              {p.have.map((tag) => (
+                <button key={tag} className={`machine-chip is-code${p.image === tag ? " is-on" : ""}`} disabled={viewer} onClick={() => p.onImage?.(tag)}>
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {p.tars.length > 0 && (
+          <>
+            <div className="f-eyebrow">Saved images in the archive</div>
+            <div className="machine-chips">
+              {p.tars.map((f) => (
+                <button key={f.id} className="machine-chip is-code" disabled={viewer || (p.loading ?? null) !== null} onClick={() => p.onLoad?.(f)} data-tip={`Load ${f.name} into ${engine} (docker load). The file stays in the archive.`}>
+                  {p.loading === f.id ? "Loading…" : `⇪ ${f.name}`}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <input className="machine-field" value={p.image} disabled={viewer} spellCheck={false} placeholder="or any image: postgres:17, nginx:1.27, ghcr.io/…" onChange={(e) => p.onImage?.(e.target.value.trim())} onKeyDown={(e) => e.stopPropagation()} />
+        {!viewer && (
+          <label className={`machine-option machine-with-desk${recipe === "no" ? " is-off" : ""}`} data-tip={recipe === "no" ? undefined : "Installed once it runs: an X server, XFCE and VNC, a few minutes. You can add it later too, from the card's Desktop view."}>
+            <input type="checkbox" checked={p.desk && recipe !== "no"} disabled={recipe === "no"} onChange={(e) => p.onDesk?.(e.target.checked)} />
+            <span className="machine-option-glyph">
+              <DesktopGlyph />
+            </span>
+            <span className="machine-option-words">
+              <b>With a desktop</b>
+              <span>{recipe === "no" ? "No desktop recipe for this image yet: Ubuntu, Debian and Alpine have one" : recipe === "maybe" ? "If it's built on Debian, Ubuntu or Alpine · a few minutes more" : "See it and use it on this card · a few minutes more"}</span>
+            </span>
+          </label>
+        )}
+        {p.start}
       </div>
-      {have.length > 0 && (
-        <>
-          <div className="f-eyebrow">On {engine?.name ?? "the engine"} already</div>
-          <div className="machine-chips">
-            {have.map((h) => (
-              <button key={h.tag} className={`machine-chip is-code${image === h.tag ? " is-on" : ""}`} disabled={viewer} onClick={() => pick(h.tag)}>
-                {h.tag}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      {tars.length > 0 && (
-        <>
-          <div className="f-eyebrow">Saved images in the archive</div>
-          <div className="machine-chips">
-            {tars.map((f) => (
-              <button key={f.id} className="machine-chip is-code" disabled={viewer || loading !== null} onClick={() => void load(f)} data-tip={`Load ${f.name} into ${engine?.name ?? "the engine"} (docker load). The file stays in the archive.`}>
-                {loading === f.id ? "Loading…" : `⇪ ${f.name}`}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <input
-        className="machine-field"
-        value={image}
-        disabled={viewer}
-        spellCheck={false}
-        placeholder="or any image: postgres:17, nginx:1.27, ghcr.io/…"
-        onChange={(e) => setImage(e.target.value.trim())}
-        onKeyDown={(e) => e.stopPropagation()}
-      />
-      {!viewer && (
-        <label className="machine-with-desk" data-tip="Adds a graphical desktop (an X server, XFCE and VNC) once it runs: packages installed in the machine, a few minutes. Ubuntu, Debian and Alpine images. You can add it later too, from the card's Desktop view.">
-          <input type="checkbox" checked={desk} onChange={(e) => setDesk(e.target.checked)} />
-          With a desktop
-        </label>
-      )}
-      <StartButton panel={panel} m={m} image={image} engine={engine} viewer={viewer} desktop={desk} />
     </div>
   );
 }
@@ -440,14 +510,28 @@ function StartButton({ panel, m, image, engine, viewer, desktop }: { panel: Pane
       setBusy(false);
     }
   };
+  return <StartLine label={busy ? "Starting…" : `Start ${image || m.image || ""} on ${engine?.name ?? "the engine"}`} disabled={busy || !(image || m.image)} onStart={() => void start()} wakes={engine?.asleep ? engine.name : undefined} desktop={desktop} />;
+}
+
+/** Start, wide and blue, and its terms as icon-led chips. Also drawn on #/design. */
+export function StartLine({ label, disabled, onStart, wakes, desktop }: { label: string; disabled?: boolean; onStart?: () => void; wakes?: string; desktop?: boolean }) {
   return (
-    <div className="machine-start">
-      <button className="f-pill is-accent" disabled={busy || !(image || m.image)} onClick={() => void start()}>
-        {busy ? "Starting…" : `Start ${image || m.image || ""} on ${engine?.name ?? "the engine"}`}
+    <div className="machine-start machine-hero-go">
+      <button className="f-pill is-accent machine-hero-button" disabled={disabled} onClick={onStart}>
+        {label}
       </button>
-      <span className="machine-terms">
-        {engine?.asleep ? `Wakes ${engine.name} first · ` : ""}Pulls it if needed{desktop ? " · then installs a desktop in it" : ""} · ports on 127.0.0.1 only · nothing from this computer mounted
-      </span>
+      <ul className="machine-hero-terms machine-terms">
+        {wakes && <li>Wakes {wakes} first</li>}
+        <li>
+          <PullGlyph size={14} /> Pulls it if needed{desktop ? ", then installs a desktop" : ""}
+        </li>
+        <li>
+          <LockGlyph size={14} /> Ports on 127.0.0.1 only
+        </li>
+        <li>
+          <ShieldGlyph size={14} /> Nothing from this computer mounted
+        </li>
+      </ul>
     </div>
   );
 }
@@ -503,77 +587,36 @@ function Controls({ panel, m, viewer, engine }: { panel: PanelMeta; m: MachineSt
 
 // ---------- the terminal ----------
 
-const TOKENS = {
-  background: "--color-abyss",
-  foreground: "--color-frost",
-  cursor: "--color-pulse",
-  selectionBackground: "--color-pulse",
-  black: "--color-frost",
-  brightBlack: "--color-dim",
-  red: "--color-bad",
-  brightRed: "--color-bad",
-  green: "--color-ok",
-  brightGreen: "--color-ok",
-  yellow: "--color-warn",
-  brightYellow: "--color-warn",
-  blue: "--color-pulse",
-  brightBlue: "--color-pulse",
-  magenta: "--color-agent",
-  brightMagenta: "--color-agent",
-  cyan: "--color-moss",
-  brightCyan: "--color-moss",
-  white: "--color-mist",
-  brightWhite: "--color-frost",
-} as const;
-
-/** each token resolved to a colour xterm can paint (night mixes and all), through one probe element */
-export function themeFromTokens(el: HTMLElement): ITheme {
-  const probe = document.createElement("span");
-  probe.style.display = "none";
-  el.appendChild(probe);
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(TOKENS)) {
-    probe.style.color = k === "selectionBackground" ? `color-mix(in srgb, var(${v}) 28%, transparent)` : `var(${v})`;
-    out[k] = getComputedStyle(probe).color;
-  }
-  probe.remove();
-  out.cursorAccent = out.background;
-  return out as ITheme;
-}
-
-const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string; canType: boolean }) {
+const Terminal = memo(function Terminal({ panelId, name, canType }: { panelId: string; name: string; canType: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   const [note, setNote] = useState<string | null>(null);
   const [people, setPeople] = useState<string[]>([]);
   const boardId = useMemo(board, []);
-  const xterm = useRef<XTerm | null>(null);
+  const mt = useRef<MachineTerminal | null>(null);
   // the caret is in the shell: the card says so, and it is in use (the wheel scrolls its scrollback)
   const [hasKeys, setHasKeys] = useState(false);
+  const [hasSel, setHasSel] = useState(false);
+  const [flash, say] = useFlash();
   const inUse = useUi().engaged === panelId;
   const well = useRef<HTMLDivElement>(null);
   useRingWidth(well, hasKeys);
   // a click elsewhere (or anything else that ends the card's use) takes the keys back from the shell
   useEffect(() => {
-    if (!inUse && el.current?.contains(document.activeElement)) xterm.current?.blur();
+    if (!inUse && el.current?.contains(document.activeElement)) mt.current?.term.blur();
   }, [inUse]);
   useEffect(() => {
     const node = el.current;
     if (!node) return;
-    const font = getComputedStyle(node).getPropertyValue("--font-code").trim() || "monospace";
-    const term = new XTerm({
-      fontFamily: font,
-      fontSize: 12,
-      lineHeight: 1.15,
-      cursorBlink: canType,
-      disableStdin: !canType,
-      scrollback: 3000,
-      theme: themeFromTokens(node),
-      allowTransparency: false,
+    const t = mountTerminal(node, {
+      boardId,
+      panelId,
+      canType,
+      onNote: setNote,
+      onPeople: setPeople,
+      onCopied: (n) => say(n ? `Copied ${n} character${n === 1 ? "" : "s"}` : "Your browser didn't allow the copy", n ? "ok" : "warn"),
     });
-    const fit = new FitAddon();
-    term.loadAddon(fit);
-    term.open(node);
-    xterm.current = term;
+    mt.current = t;
+    const sel = t.term.onSelectionChange(() => setHasSel(t.term.hasSelection()));
     const onFocus = () => {
       setHasKeys(true);
       putInUse(panelId);
@@ -583,7 +626,7 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
     };
     // the one way out by keyboard: Esc twice (a single Esc is the shell's; both still reach it)
     const leave = escEscToLeave(() => {
-      term.blur();
+      t.term.blur();
       if (getUi().engaged === panelId) setUi({ engaged: null });
     });
     const onEsc = (e: KeyboardEvent) => void leave(e);
@@ -592,112 +635,54 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
     node.addEventListener("keydown", onEsc, true);
     // xterm measures in its own pixels; the board draws it scaled, so a selection landed off by the zoom (#53)
     const offMouse = unscaleMouse(node);
-    let ws: WebSocket | null = null;
-    let retry: ReturnType<typeof setTimeout> | undefined;
-    let tries = 0;
-    let done = false; // the shell ended or the machine stopped: don't reconnect
-    const sendSize = () => {
-      if (canType && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: "resize", cols: term.cols, rows: term.rows }));
-    };
-    const refit = () => {
-      try {
-        fit.fit();
-      } catch {
-        /* not laid out yet */
-      }
-      sendSize();
-    };
-    // a dropped socket (the server restarted, the network blinked) comes back on its own; the screen is replayed
-    const connect = async () => {
-      let s: WebSocket;
-      try {
-        s = await openSocket(`/machines/${encodeURIComponent(boardId)}/${encodeURIComponent(panelId)}/tty`);
-      } catch {
-        if (done || tries >= 6) return setNote((n) => n ?? "The terminal closed.");
-        setNote("Reconnecting…");
-        retry = setTimeout(connect, 600 * 2 ** tries++);
-        return;
-      }
-      if (done) return void s.close();
-      ws = s;
-      s.binaryType = "arraybuffer";
-      let fresh = true;
-      s.onopen = () => {
-        tries = 0;
-        setNote(null);
-        refit();
-      };
-      s.onmessage = (e) => {
-        if (typeof e.data === "string") {
-          const c = JSON.parse(e.data) as { t: string; text?: string; people?: string[] };
-          if (c.t === "hello" || c.t === "people") setPeople(c.people ?? []);
-          if (c.t === "exit" || c.t === "error") {
-            done = true;
-            setNote(c.text ?? "The terminal closed.");
-          }
-          return;
-        }
-        if (fresh) {
-          term.reset(); // the server sends the whole screen first
-          fresh = false;
-        }
-        term.write(new Uint8Array(e.data as ArrayBuffer));
-      };
-      s.onclose = () => {
-        if (done || tries >= 6) return setNote((n) => n ?? "The terminal closed.");
-        setNote("Reconnecting…");
-        retry = setTimeout(connect, 600 * 2 ** tries++);
-      };
-    };
-    void connect();
-    const enc = new TextEncoder();
-    const data = term.onData((d) => {
-      if (canType && ws?.readyState === WebSocket.OPEN) ws.send(enc.encode(d));
-    });
-    let t: ReturnType<typeof setTimeout> | undefined;
-    const ro = new ResizeObserver(() => {
-      clearTimeout(t);
-      t = setTimeout(refit, 80);
-    });
-    ro.observe(node);
-    const offNight = onNight(() => {
-      // the tokens fade over 1.4 s: repaint at the midpoint and at the end
-      setTimeout(() => (term.options.theme = themeFromTokens(node)), 700);
-      setTimeout(() => (term.options.theme = themeFromTokens(node)), 1500);
-    });
     return () => {
-      done = true; // a ticket still on its way opens nothing
-      clearTimeout(t);
-      clearTimeout(retry);
-      ro.disconnect();
       offMouse();
-      offNight();
-      data.dispose();
+      sel.dispose();
       node.removeEventListener("focusin", onFocus);
       node.removeEventListener("focusout", onBlur);
       node.removeEventListener("keydown", onEsc, true);
-      xterm.current = null;
+      mt.current = null;
       setHasKeys(false);
-      // this socket is done: its late close mustn't say "closed" over the next one (StrictMode mounts twice)
-      if (ws) {
-        ws.onopen = ws.onmessage = ws.onclose = null;
-        ws.close();
-      }
-      term.dispose();
+      t.dispose();
     };
-  }, [boardId, panelId, canType]);
+  }, [boardId, panelId, canType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const copy = async (text: string) => {
+    if (!text) return say("Nothing to copy yet", "warn");
+    say((await copyText(text)) ? copiedWords(text) : "Your browser didn't allow the copy", "ok");
+  };
+  const paste = async () => {
+    const text = await readClipboard();
+    if (text === null) return say("Your browser didn't let Foundation read the clipboard: press Ctrl+V in the terminal", "warn");
+    if (!text) return say("Your clipboard is empty", "warn");
+    mt.current?.paste(text);
+    mt.current?.focus();
+    say(pastedWords(text));
+  };
   return (
-    <div ref={well} className={`machine-term-wrap${hasKeys ? " has-keys" : ""}`}>
-      {/* keys go to the shell, not the board's shortcuts (lib/keysHeld.ts) */}
-      <div ref={el} className="machine-term wheel-own" {...{ [HOLDS_KEYS]: "" }} onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
-      {hasKeys && canType && <KeysLine />}
-      {!canType && <div className="machine-watching">View only: you're watching</div>}
-      {people.length > 1 && (
-        <div className="machine-people" data-tip={people.join(", ")}>
-          {people.length} here
-        </div>
-      )}
-      {note && <div className="machine-closed">{note}</div>}
-    </div>
+    <>
+      <div ref={well} className={`machine-term-wrap${hasKeys ? " has-keys" : ""}`}>
+        {/* keys go to the shell, not the board's shortcuts (lib/keysHeld.ts) */}
+        <div ref={el} className="machine-term wheel-own" {...{ [HOLDS_KEYS]: "" }} onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
+        {hasKeys && canType && <KeysLine />}
+        {!canType && <div className="machine-watching">View only: you're watching</div>}
+        {people.length > 1 && (
+          <div className="machine-people" data-tip={people.join(", ")}>
+            {people.length} here
+          </div>
+        )}
+        {note && <div className="machine-closed">{note}</div>}
+      </div>
+      <MachineTools
+        view="terminal"
+        canType={canType}
+        canCopy={hasSel}
+        flash={flash}
+        onCopy={() => void copy(mt.current?.selection() ?? "")}
+        onCopyAll={() => void copy(mt.current?.all() ?? "")}
+        onPaste={() => void paste()}
+        onPopOut={() => void openMachineWindow(boardId, panelId, "terminal", name, !canType)}
+      />
+    </>
   );
 });

@@ -181,3 +181,122 @@ export function SlidersGlyph({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+// ---- a machine's tools and features (panels/MachineTools.tsx, the Start well, Add a desktop) ----
+
+/** a machine's graphical desktop: a screen on a stand */
+export function DesktopGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="1.8" y="2.6" width="12.4" height="8.4" rx="1.6" />
+      <path d="M8 11v2.4M5.4 13.4h5.2" />
+    </svg>
+  );
+}
+
+/** copy what's chosen: two sheets */
+export function CopyGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="5.4" y="5.4" width="8.4" height="8.4" rx="1.6" />
+      <path d="M10.6 5.4V3.8c0-.9-.7-1.6-1.6-1.6H3.8c-.9 0-1.6.7-1.6 1.6V9c0 .9.7 1.6 1.6 1.6h1.6" />
+    </svg>
+  );
+}
+
+/** copy all of it: a page of lines */
+export function CopyAllGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="2.8" y="1.8" width="10.4" height="12.4" rx="1.6" />
+      <path d="M5.4 5h5.2M5.4 7.6h5.2M5.4 10.2h3.4" />
+    </svg>
+  );
+}
+
+/** paste from this computer: a clipboard */
+export function PasteGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M5.6 3H4.2c-.8 0-1.4.6-1.4 1.4v8.4c0 .8.6 1.4 1.4 1.4h7.6c.8 0 1.4-.6 1.4-1.4V4.4c0-.8-.6-1.4-1.4-1.4h-1.4" />
+      <rect x="5.6" y="1.8" width="4.8" height="2.6" rx="1" />
+      <path d="M8 6.8v4.6M6.2 9.6L8 11.4l1.8-1.8" />
+    </svg>
+  );
+}
+
+/** open in a window of its own: a box with an arrow leaving it */
+export function PopOutGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M7 3H4c-.8 0-1.4.6-1.4 1.4V12c0 .8.6 1.4 1.4 1.4h7.6c.8 0 1.4-.6 1.4-1.4V9" />
+      <path d="M9.6 2.4h4v4M13.6 2.4L7.8 8.2" />
+    </svg>
+  );
+}
+
+/** full screen: four corners */
+export function FullGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M2.4 6V2.4H6M10 2.4h3.6V6M13.6 10v3.6H10M6 13.6H2.4V10" />
+    </svg>
+  );
+}
+
+/** packages that go in: a box */
+export function PackageGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M8 1.9l5.6 3v6.2L8 14.1l-5.6-3V4.9z" />
+      <path d="M2.4 4.9L8 7.9l5.6-3M8 7.9v6.2" />
+    </svg>
+  );
+}
+
+/** pulled from a registry: an arrow down to a line */
+export function PullGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M8 2.2v8M4.6 7l3.4 3.4L11.4 7M2.8 13.4h10.4" />
+    </svg>
+  );
+}
+
+/** only this computer can reach it: a lock */
+export function LockGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="3" y="7" width="10" height="7" rx="1.6" />
+      <path d="M5.2 7V5a2.8 2.8 0 015.6 0v2" />
+    </svg>
+  );
+}
+
+/** kept apart from this computer: a shield */
+export function ShieldGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M8 1.9l5 1.9v4c0 3.1-2.1 5.4-5 6.3-2.9-.9-5-3.2-5-6.3v-4z" />
+    </svg>
+  );
+}
+
+/** an agent: the four-point star, filled, in whatever colour it's given */
+export function AgentGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+      <path d="M8 1.6c.5 3.4 1.9 5.2 6.4 6.4-4.5 1.2-5.9 3-6.4 6.4-.5-3.4-1.9-5.2-6.4-6.4C6.1 6.8 7.5 5 8 1.6z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** something went wrong: a triangle with a mark */
+export function WarnGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M8 2.2l6 10.6H2z" />
+      <path d="M8 6.4v3M8 11.2v.1" />
+    </svg>
+  );
+}

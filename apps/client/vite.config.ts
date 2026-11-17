@@ -38,8 +38,8 @@ export default defineConfig(async () => ({
     watch: { ignored: ["**/src-tauri/**"] },
     proxy,
   },
-  // two pages: the app, and the page inside a machine card's Desktop view (desktop.html: noVNC in a frame)
-  build: { rollupOptions: { input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), desktop: fileURLToPath(new URL("./desktop.html", import.meta.url)) } } },
+  // three pages: the app, the page inside a machine card's Desktop view (desktop.html: noVNC in a frame), and a machine in a window of its own (machine.html)
+  build: { rollupOptions: { input: { main: fileURLToPath(new URL("./index.html", import.meta.url)), desktop: fileURLToPath(new URL("./desktop.html", import.meta.url)), machine: fileURLToPath(new URL("./machine.html", import.meta.url)) } } },
   // `vite preview` serves the production build the same way (e2e frames on the build: E2E_BUILD=1)
   preview: { proxy },
 }));

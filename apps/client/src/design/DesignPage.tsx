@@ -106,7 +106,8 @@ import { SectionCrewView, type CrewFace } from "../components/SectionCrew";
 import { SectionAgentsChipView, SectionAgentsView } from "../components/SectionAgents";
 import { RichToolbar } from "../components/RichText";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
-import { KeysLine, MachineAskList } from "../panels/MachineView";
+import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
+import { MachineTools } from "../panels/MachineTools";
 import { AgentsMayLine, AgentUseLine, DesktopWell, ViewSwitch } from "../panels/MachineViewDesktop";
 import { IoLines } from "../panels/MachineViewIo";
 import type { MachineAsk, SlackSectionState } from "@foundation/protocol";
@@ -971,7 +972,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
               </div>
             </div>
           </div>
-          <div className="frame-card live-specimen" style={{ width: 400, height: 320 }}>
+          <div className="frame-card live-specimen" style={{ width: 520, height: 560 }}>
             <div className="machine-body is-absent">
               <div className="machine-head">
                 <span className="machine-state is-idle">
@@ -981,28 +982,17 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
                 <span className="machine-engine">Docker 28.3.0</span>
                 <code className="machine-image">postgres:17</code>
               </div>
-              <div className="machine-picker">
-                <div className="machine-proposed">
-                  <span className="f-dot is-agent" /> Proposed by Foundation Agent: a scratch database for the BOM import
-                </div>
-                <div className="f-eyebrow">A Linux machine</div>
-                <div className="machine-chips">
-                  {["ubuntu", "debian", "alpine", "fedora"].map((d) => (
-                    <span key={d} className="machine-chip">
-                      {d}
-                    </span>
-                  ))}
-                </div>
-                <div className="f-eyebrow">On Docker already</div>
-                <div className="machine-chips">
-                  <span className="machine-chip is-code is-on">postgres:17</span>
-                  <span className="machine-chip is-code">nginx:1.27</span>
-                </div>
-                <div className="machine-start">
-                  <span className="f-pill is-accent">Start postgres:17 on Docker</span>
-                  <span className="machine-terms">Pulls it if needed · ports on 127.0.0.1 only · nothing from this computer mounted</span>
-                </div>
-              </div>
+              <MachinePickerView
+                m={{ proposedBy: "Foundation Agent", state: "absent", image: "postgres:17" }}
+                proposedText="a scratch database for the BOM import"
+                engineName="Docker"
+                image="postgres:17"
+                have={["postgres:17", "nginx:1.27"]}
+                tars={[]}
+                desk={false}
+                viewer={false}
+                start={<StartLine label="Start postgres:17 on Docker" />}
+              />
             </div>
           </div>
         </div>
@@ -1061,7 +1051,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           </div>
         </div>
         <div className="adapt-row">
-          <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
+          <div className="frame-card live-specimen" style={{ width: 520, height: 520 }}>
             <div className="machine-body is-absent">
               <div className="machine-head">
                 <span className="machine-state is-idle">
@@ -1071,20 +1061,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
                 <span className="machine-engine">Kiri · asleep</span>
                 <code className="machine-image">alpine:3.22</code>
               </div>
-              <div className="machine-picker">
-                <div className="f-eyebrow">A Linux machine</div>
-                <div className="machine-chips">
-                  {["ubuntu", "debian", "alpine", "fedora"].map((d) => (
-                    <span key={d} className={`machine-chip${d === "alpine" ? " is-on" : ""}`}>
-                      {d}
-                    </span>
-                  ))}
-                </div>
-                <div className="machine-start">
-                  <span className="f-pill is-accent">Start alpine:3.22 on Kiri</span>
-                  <span className="machine-terms">Wakes Kiri first · Pulls it if needed · ports on 127.0.0.1 only · nothing from this computer mounted</span>
-                </div>
-              </div>
+              <MachinePickerView m={{ state: "absent", image: "ubuntu:24.04" }} engineName="Kiri" asleep image="ubuntu:24.04" have={[]} tars={[]} desk viewer={false} start={<StartLine label="Start ubuntu:24.04 on Kiri" wakes="Kiri" desktop />} />
             </div>
           </div>
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
@@ -1256,6 +1233,7 @@ function MachineUseDemo() {
               </pre>
               <KeysLine />
             </div>
+            <MachineTools view="terminal" canType canCopy flash={{ text: "Copied 3 lines", tone: "ok" }} onCopy={() => {}} onCopyAll={() => {}} onPaste={() => {}} onPopOut={() => {}} />
             <IoLines
               ins={[{ link: "l1", name: "Note “Input”" }]}
               outs={[
@@ -1293,10 +1271,10 @@ function MachineUseDemo() {
             <div className="machine-desk has-keys">
               <span className="machine-desk-ring is-screen" style={{ ["--screen-ar" as string]: "1.6" }} />
             </div>
-            <div className="machine-desk-foot">
+            <MachineTools view="desktop" canType canCopy flash={{ text: "Copied 42 characters from the machine", tone: "ok" }} onCopy={() => {}} onPaste={() => {}} onPopOut={() => {}}>
               <AgentsMayLine may={{ by: "Ada", at: now - 3 * 60_000 }} viewer={false} now={now} />
               <KeysLine what="this desktop" inline />
-            </div>
+            </MachineTools>
           </div>
         </div>
         <div className="frame-card live-specimen" style={{ width: 560, height: 360 }}>
@@ -1313,25 +1291,25 @@ function MachineUseDemo() {
         </div>
       </div>
       <div className="adapt-row">
-        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 400 }}>
           <div className="machine-body is-running">
             {head("desktop")}
             <DesktopWell state="none" name="build-box" viewer={false} />
           </div>
         </div>
-        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 400 }}>
           <div className="machine-body is-running">
             {head("desktop")}
             <DesktopWell state="installing" detail="Setting up xfwm4 (142 of 245)" name="build-box" viewer={false} />
           </div>
         </div>
-        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 400 }}>
           <div className="machine-body is-running">
             {head("desktop")}
             <DesktopWell state="error" detail="No recipe: Fedora Linux 42 (Container Image) has neither apt nor apk, and Foundation's desktop installs only on Ubuntu, Debian and Alpine machines. Nothing was changed." name="build-box" viewer={false} />
           </div>
         </div>
-        <div className="frame-card live-specimen" style={{ width: 260, height: 240 }}>
+        <div className="frame-card live-specimen" style={{ width: 260, height: 420 }}>
           <div className="machine-body is-running">
             {head("desktop")}
             <DesktopWell state="none" name="build-box" viewer />
@@ -1340,22 +1318,22 @@ function MachineUseDemo() {
       </div>
       {/* when it can't work, the card says exactly why (2026-11-17): an install gone quiet (with Stop), no network, a server older than the app */}
       <div className="adapt-row">
-        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 400 }}>
           <div className="machine-body is-running">
             {head("desktop")}
             <DesktopWell state="installing" detail="Downloading xfce4-session (247 packages) · no word from the package manager for 3 min" name="build-box" viewer={false} />
           </div>
         </div>
-        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 400 }}>
           <div className="machine-body is-running">
             {head("desktop")}
             <DesktopWell state="error" detail="The machine couldn't reach its package servers, so the desktop wasn't installed (Temporary failure resolving 'archive.ubuntu.com'). Check the machine's network from its terminal (apt-get update), then try again." name="build-box" viewer={false} />
           </div>
         </div>
-        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 400 }}>
           <div className="machine-body is-running">
             {head("desktop")}
-            <DesktopWell state="error" detail="The Foundation server at localhost:4410 is older than this app and can't add a desktop yet. Restart it (the server switch at the bottom right: Stop, then Start; or stop and start it where it runs), then try again. Nothing was changed in the machine." name="build-box" viewer={false} />
+            <DesktopWell state="error" detail="The Foundation server at localhost:4410 is older than this app and can't add a desktop yet. Restart it (Restart, here or in the server pill at the foot of the side menu; or stop and start it where it runs), then try again. Nothing was changed in the machine." name="build-box" viewer={false} onRestart={() => {}} />
           </div>
         </div>
       </div>
