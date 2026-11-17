@@ -1,0 +1,14 @@
+(node:45216) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+· Kiri 0.1.18
+· started machine-desk-fail-mwk3nt49 (ubuntu:24.04)
+· exec as the image's own user: uid 0; asked for user "0": uid 0; asked for "nobody": uid 65534
+· a mirror that never answers, after 4 s the card says: “Adding a desktop: Reading the package lists · no word from the package manager for 4 s”
+·   in the machine meanwhile: apt-get http http
+· Stop: 62 ms; the card's desktop is now null; package managers left in the machine: (3 killed, not yet reaped)
+· no DNS, after 8 s the card says (error): “The machine couldn't reach its package servers, so the desktop wasn't installed (Temporary failure resolving 'archive.ubuntu.com'). Check the machine's network from its terminal (apt-get update), then try again.”
+· a real install under way: “Setting up perl-base (1 of 247)”
+· Stop mid-install: 78 ms; desktop null; package managers left: (8 killed, not yet reaped)
+· Add a desktop again after the Stop: {"state":"ready","by":"Smoke","at":1794884184596,"w":1280,"h":800} in 34 s
+· removed the machine and its disk
+exit 0
