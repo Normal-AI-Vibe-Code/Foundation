@@ -10,7 +10,9 @@
 
 import * as Y from "yjs";
 import type { CharacterState } from "./characters.ts";
+import type { CollectionState } from "./collections.ts";
 export * from "./characters.ts";
+export * from "./collections.ts";
 
 // ---------- board document layout ----------
 
@@ -29,6 +31,7 @@ export const BOARD = {
   slack: "slack", // section id → SlackSectionState (a section kept for a Slack channel; kept by the server alone)
   characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
   agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
+  collections: "collections", // collection panel id → CollectionState (what it has gathered, and the section it lays out into; kept by the server alone)
 } as const;
 
 /** the place that means "the whole grid" in the board's `agents` map */
@@ -186,6 +189,7 @@ export type PanelKind =
   | "grid" // a grid inside this one (2026-11-15): the section that holds it stands for a child grid and opens it
   | "kanban" // a kanban board: columns of cards moved between them (the plan is one)
   | "design" // a chapter of the design language, live on its tokens
+  | "collection" // a collector: gathers what the cards wired into it make (pictures, characters) and can lay it out in a section; tiles drag out as copies
   | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
   | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
 
@@ -626,6 +630,7 @@ export function boardMaps(doc: Y.Doc) {
     slack: doc.getMap<SlackSectionState>(BOARD.slack),
     characters: doc.getMap<CharacterState>(BOARD.characters),
     agents: doc.getMap<PostedAgent[]>(BOARD.agents),
+    collections: doc.getMap<CollectionState>(BOARD.collections),
   };
 }
 

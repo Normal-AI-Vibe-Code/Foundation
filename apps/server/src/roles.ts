@@ -23,6 +23,7 @@ export type BoardRole = "admin" | "member" | "viewer";
 /** tools that only look, which a viewer may use */
 export const READ_TOOLS = new Set([
   "read_board",
+  "read_collection",
   "machines",
   "search",
   "company",

@@ -1941,6 +1941,24 @@
       "status": "next",
       "body": "A viewer should see the nodes with no Generate and no ＋ New. Written, and only the card's viewer state is on `#/design`; not checked in a browser.",
       "issue": 189
+    },
+    {
+      "id": "collections",
+      "title": "Collections: gather a pipeline's pictures and characters, lay them out in a section, drag copies out",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_collections/NOTES.md`). Josh: \"a primitive … that can output images or character cards like we have stored in Character studio into a collection, that can be piped into a section that automatically lays out the products … expanded to be able to drag out copies of those cards onto the grid.\" A collection card (❖) gathers what its wired sources make: a stage node its pictures, Output (now with an output of its own) the finished characters, another collection its items, each once. Lay out in a section, or its output dropped on one: each item a docked card there, later ones following. Expand: tiles that drag out as copies; a character's copy is marked and never an avatar twice. Character pipeline in a section's menu lays the flow with a collection after Output on any grid. Checked: `apps/server/test/collections.test.ts` (6), `e2e/collections.spec.ts` (6), pointer, character-studio, council, card-chrome, section-agents and sub-grid specs. Not done: Rune doesn't draw it; no wire drawn to the section it lays into; nothing goes into mesh-avatar-studio itself; not run on the live studio or in the desktop window."
+    },
+    {
+      "id": "collections-rune",
+      "title": "Rune draws a collection and its drag-out",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "backlog",
+      "body": "The GPU renderer (apps/rune) draws a collection card blank and has no tile drag-out. Bring it to the web renderer's card (panels/CollectionView.tsx)."
     }
   ]
 }

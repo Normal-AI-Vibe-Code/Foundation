@@ -89,6 +89,12 @@ export interface CharacterState {
    * starter set): they read as approved.
    */
   approval?: "pending" | "approved" | "archived";
+  /**
+   * A copy of another character's card (2026-11-17: dragged out of a collection, or laid out by one): the
+   * original's id. A copy shows the character as it was when it was copied; it is never offered as an
+   * avatar a second time, and nothing is generated on it (the original is where its stages are pressed).
+   */
+  copyOf?: string;
 }
 
 /**
@@ -136,7 +142,7 @@ export const PIPELINE_WIRES: ReadonlyArray<{ from: PipelineNodeKey; to: Pipeline
 export const nodeOf = (c: Pick<CharacterState, "form" | "stages">): PipelineNodeKey => nextStage(c) ?? "output";
 
 /** offered as an agent's avatar: finished, and not waiting on (or turned down by) a person */
-export const characterChoosable = (c: Pick<CharacterState, "ready" | "approval">) => c.ready && (c.approval === undefined || c.approval === "approved");
+export const characterChoosable = (c: Pick<CharacterState, "ready" | "approval" | "copyOf">) => c.ready && !c.copyOf && (c.approval === undefined || c.approval === "approved");
 
 // ---------- moods: what an avatar shows ----------
 

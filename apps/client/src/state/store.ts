@@ -2069,6 +2069,7 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   kanban: [1480, 980],
   design: [1180, 900],
   pipeline: [1480, 330],
+  collection: [360, 420],
 };
 
 export function addPanel(
