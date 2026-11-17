@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-17T05:42:05.515Z",
+  "syncedAt": "2026-11-17T07:03:30.197Z",
   "columns": [
     {
       "id": "needs-you",
@@ -1879,7 +1879,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "review",
-      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-tools/NOTES.md`). Josh: \"the VM takes over Ctrl+scroll … I am unable to click in and copy the text that I need … design the vm start interface and add desktop feature a little better … terminal tools for copying out text that are standardized, and the ability to full-screen the vm into another tab\". The same tools row under the terminal and the desktop (Copy, Copy all, Paste, a window of its own); Ctrl+C copies a selection and is still the interrupt without one; the desktop's copied text reaches the clipboard, Ctrl+V reaches the machine; Ctrl+scroll is always the grid's zoom; machine.html as a tab or an app window; Start and Add a desktop as one centred, iconed column that grows with the card. Checked: `e2e/machines-tools.spec.ts` on Kiri (Ubuntu), `test/machine-words.test.ts`, `#/design` day and night. Not done: the Tauri window of its own not pressed; viewers get no clipboard."
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-tools/NOTES.md`). Josh: \"the VM takes over Ctrl+scroll … I am unable to click in and copy the text that I need … design the vm start interface and add desktop feature a little better … terminal tools for copying out text that are standardized, and the ability to full-screen the vm into another tab\". The same tools row under the terminal and the desktop (Copy, Copy all, Paste, a window of its own); Ctrl+C copies a selection and is still the interrupt without one; the desktop's copied text reaches the clipboard, Ctrl+V reaches the machine; Ctrl+scroll is always the grid's zoom; machine.html as a tab or an app window; Start and Add a desktop as one centred, iconed column that grows with the card. Checked: `e2e/machines-tools.spec.ts` on Kiri (Ubuntu), `test/machine-words.test.ts`, `#/design` day and night. Not done: the Tauri window of its own not pressed; viewers get no clipboard.",
+      "issue": 191
     },
     {
       "id": "pipes-older-server",
@@ -1968,7 +1969,8 @@
       "milestone": "crew",
       "area": "pipeline",
       "status": "review",
-      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_collections/NOTES.md`). Josh: \"a primitive … that can output images or character cards like we have stored in Character studio into a collection, that can be piped into a section that automatically lays out the products … expanded to be able to drag out copies of those cards onto the grid.\" A collection card (❖) gathers what its wired sources make: a stage node its pictures, Output (now with an output of its own) the finished characters, another collection its items, each once. Lay out in a section, or its output dropped on one: each item a docked card there, later ones following. Expand: tiles that drag out as copies; a character's copy is marked and never an avatar twice. Character pipeline in a section's menu lays the flow with a collection after Output on any grid. Checked: `apps/server/test/collections.test.ts` (6), `e2e/collections.spec.ts` (6), pointer, character-studio, council, card-chrome, section-agents and sub-grid specs. Not done: Rune doesn't draw it; no wire drawn to the section it lays into; nothing goes into mesh-avatar-studio itself; not run on the live studio or in the desktop window."
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_collections/NOTES.md`). Josh: \"a primitive … that can output images or character cards like we have stored in Character studio into a collection, that can be piped into a section that automatically lays out the products … expanded to be able to drag out copies of those cards onto the grid.\" A collection card (❖) gathers what its wired sources make: a stage node its pictures, Output (now with an output of its own) the finished characters, another collection its items, each once. Lay out in a section, or its output dropped on one: each item a docked card there, later ones following. Expand: tiles that drag out as copies; a character's copy is marked and never an avatar twice. Character pipeline in a section's menu lays the flow with a collection after Output on any grid. Checked: `apps/server/test/collections.test.ts` (6), `e2e/collections.spec.ts` (6), pointer, character-studio, council, card-chrome, section-agents and sub-grid specs. Not done: Rune doesn't draw it; no wire drawn to the section it lays into; nothing goes into mesh-avatar-studio itself; not run on the live studio or in the desktop window.",
+      "issue": 192
     },
     {
       "id": "collections-rune",
@@ -1977,7 +1979,8 @@
       "milestone": "crew",
       "area": "pipeline",
       "status": "backlog",
-      "body": "The GPU renderer (apps/rune) draws a collection card blank and has no tile drag-out. Bring it to the web renderer's card (panels/CollectionView.tsx)."
+      "body": "The GPU renderer (apps/rune) draws a collection card blank and has no tile drag-out. Bring it to the web renderer's card (panels/CollectionView.tsx).",
+      "issue": 193
     }
   ]
 }
