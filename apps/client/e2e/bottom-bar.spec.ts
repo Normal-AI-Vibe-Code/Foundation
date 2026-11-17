@@ -283,3 +283,30 @@ test("the tools: a terminal that runs a line for an admin, the change log, the f
   await admin.locator(".tool-close").click();
   await expect(pane).toHaveCount(0);
 });
+
+test("the bar folds as a pane comes in from the right, and as the grid's council stands beside it: never under either", async () => {
+  await admin.setViewportSize({ width: 1000, height: 800 });
+  await settle(admin, 500);
+  const label = admin.locator("[data-hud] .hud-search .hud-label");
+  await expect(label).toBeVisible();
+  // the agents pane comes in: the room left is narrower than the whole bar, so the words go and the icons stay
+  await admin.locator("[data-hud-agents]").click();
+  await expect(admin.locator(".agents-pane")).toBeVisible();
+  await settle(admin, 600);
+  await expect(label).toBeHidden();
+  const hud = await box(admin, "[data-hud]");
+  const pane = await box(admin, ".agents-pane");
+  expect(hud.x + hud.width).toBeLessThanOrEqual(pane.x);
+  await admin.screenshot({ path: `${SHOTS}/16_bar-folded-for-a-pane.png` });
+  await admin.locator("[data-hud-agents]").click();
+  await expect(admin.locator(".agents-pane")).toHaveCount(0);
+  // the grid's council at the bottom right: the bar keeps to the room it leaves
+  await admin.locator("[data-council-open]").click();
+  await settle(admin, 900);
+  const bar = await box(admin, "[data-hud]");
+  const row = await box(admin, ".council.is-board .council-row");
+  expect(bar.x + bar.width).toBeLessThanOrEqual(row.x + 2);
+  await admin.screenshot({ path: `${SHOTS}/17_bar-beside-the-council.png` });
+  await admin.keyboard.press("Escape");
+  await admin.setViewportSize({ width: 1440, height: 900 });
+});

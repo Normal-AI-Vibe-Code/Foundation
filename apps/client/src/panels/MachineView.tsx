@@ -37,7 +37,7 @@ import { HOLDS_KEYS, escEscToLeave } from "../lib/keysHeld";
 import { getUi, setUi } from "../state/ui";
 import { KeysLine, useRingWidth } from "./MachineViewBits";
 import { AgentUse, Desktop, ViewSwitch, useMachineView } from "./MachineViewDesktop";
-import { IoStrip } from "./MachineViewIo";
+import { IoView } from "./MachineViewIo";
 import { desktopRecipe } from "./machineWords";
 import { AgentGlyph, DesktopGlyph, LockGlyph, PullGlyph, ShieldGlyph, TerminalGlyph } from "../shell/glyphs";
 import { copyText, mountTerminal, readClipboard, type MachineTerminal } from "./machineTerminal";
@@ -112,7 +112,7 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
           </span>
         )}
         {m.image && <code className="machine-image">{m.image}</code>}
-        {m.state === "running" && <ViewSwitch view={view} onView={setView} />}
+        {m.state === "running" && <ViewSwitch view={view} onView={setView} panelId={panel.id} />}
         {m.state === "running" && <Ports panel={panel} m={m} />}
       </div>
       <MachineAsks panelId={panel.id} viewer={viewer} />
@@ -124,6 +124,8 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
           <div className="machine-poster">{m.name} is running</div>
         ) : view === "desktop" ? (
           <Desktop panel={panel} m={m} viewer={viewer} />
+        ) : view === "io" ? (
+          <IoView panel={panel} viewer={viewer} />
         ) : (
           <Terminal panelId={panel.id} name={m.name} canType={!viewer} />
         )
@@ -140,7 +142,6 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
       ) : (
         <Picker panel={panel} m={m} engine={engine} viewer={viewer} />
       )}
-      {m.state === "running" && onScreen && <IoStrip panel={panel} viewer={viewer} />}
       {!noEngine && <Controls panel={panel} m={m} viewer={viewer} engine={engine} />}
     </div>
   );

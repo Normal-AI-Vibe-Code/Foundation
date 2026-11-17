@@ -1585,8 +1585,48 @@ body.is-carrying * {
   font-size: var(--text-12);
 }
 /* the grid's council is at the bottom right: the bar keeps to the bottom left, at its usual distance from the edges */
+/* the bar's room (GridViewport.tsx): the open paper less the grid's council; it folds the bar as it narrows */
+.hud-room {
+  position: absolute;
+  z-index: 30;
+  bottom: 0;
+  height: 68px;
+  pointer-events: none;
+  container: hud / inline-size;
+}
+.hud-room > .hud {
+  pointer-events: auto;
+}
 .hud.is-aside {
   margin: 0 auto 0 var(--space-5);
+}
+/* narrower than the whole bar: the words go, the icons stay (search, talk and Ask keep their glyphs and their tips) */
+@container hud (max-width: 700px) {
+  .hud .hud-label,
+  .hud .hud-search .f-kbd,
+  .hud .hud-talk .f-kbd {
+    display: none;
+  }
+  .hud .hud-search {
+    min-width: 0;
+    padding: 0 var(--space-4);
+  }
+  .hud .hud-ask {
+    padding: 0 var(--space-3) 0 var(--space-4);
+  }
+}
+/* narrower still: the zoom and the renderer's mark go too (the keys still zoom) */
+@container hud (max-width: 470px) {
+  .hud .hud-zoom,
+  .hud .rune-mark {
+    display: none;
+  }
+}
+/* and at the last: present and commands (P and the command key still work) */
+@container hud (max-width: 380px) {
+  .hud .hud-icons {
+    display: none;
+  }
 }
 /* present and commands: two icons on one pill */
 .hud-icons {

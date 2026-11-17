@@ -44,6 +44,8 @@ export interface UiState {
   strip: number;
   /** the grid's council, open as a band under the top bar (characters/Council.tsx): the grid starts below it */
   councilH: number;
+  /** how wide the grid's council stands at the bottom right (Council.tsx measures it): the bottom bar keeps clear of it */
+  councilW: number;
   /** the top bar's tabs: the spaces open in this window (board ids), in order */
   spaces: string[];
   /** sessions opened in this window, and the one showing in the session column (null: none) */
@@ -126,6 +128,7 @@ let ui: UiState = {
   spacesView: s0.spacesView === "recent" ? "recent" : "all",
   strip: 0,
   councilH: 0,
+  councilW: 0,
   spaces: Array.isArray(s0.spaces) ? s0.spaces.filter((id) => typeof id === "string").slice(0, 24) : [],
   sessions: Array.isArray(s0.sessions) ? s0.sessions.filter((t) => t && typeof t.id === "string").slice(0, 12) : [],
   session: null,

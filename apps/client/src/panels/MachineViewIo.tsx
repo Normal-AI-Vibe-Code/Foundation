@@ -15,9 +15,12 @@
  * card-to-card wires only).
  */
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { MACHINE_IN_PATH, MACHINE_IN_PORT, MACHINE_OUT_PATH, MACHINE_OUT_PORT, NOTE_PORT, TABLE_PORT, type LinkDoc, type MachineIo } from "@foundation/protocol";
-import { addLink, getState, removeLink, subscribe, type PanelMeta } from "../state/store";
+import { addLink, addNote, addSectionAdjacent, getState, removeLink, subscribe, type PanelMeta } from "../state/store";
+import { api } from "../lib/api";
+import { activeBoard } from "../sync/board";
+import { toast } from "../state/ui";
 import { ago, useNow } from "./MachineViewBits";
 
 interface End {
@@ -189,3 +192,71 @@ export function IoLines({
     </div>
   );
 }
+
+/**
+ * The card's Ins & outs, a tab of its head beside Terminal and Desktop (2026-11-17, Josh: "the ins and outs should be
+ * another top level menu option … I don't see anything coming out"). The two lines, larger, with what came out last in
+ * full, what it is (text, or JSON when it parses: the machine decides by what it writes, not a label), and two presses:
+ * send Out to a new note in the section to the right (made when there isn't one), and have the machine write a test line.
+ */
+export function IoView({ panel, viewer }: { panel: PanelMeta; viewer: boolean }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const io = panel.machine?.io;
+  const outPort = panel.ports.find((p) => p.dir === "out" && p.name === MACHINE_OUT_PORT);
+  const links = useSyncExternalStore(subscribe, () => getState().links);
+  const outs = outPort ? Object.values(links).filter((l) => l.from.panel === panel.id && l.from.port === outPort.id) : [];
+  const kind = io?.outAt ? (looksJson(io.outPreview) ? "JSON" : "text") : null;
+  const toTheRight = () => {
+    if (!outPort) return;
+    const st = getState();
+    const home = st.sections[panel.sectionId];
+    if (!home) return;
+    // the section to the right of the machine's: one that starts where it ends and shares a row, else a new one
+    const right = Object.values(st.sections).find((s) => s.c0 === home.c1 + 1 && s.r0 <= home.r1 && s.r1 >= home.r0);
+    const where = right?.id ?? addSectionAdjacent(home.id, "right") ?? home.id;
+    const note = addNote(where, `## Out of ${panel.name}\n\nWhat ${panel.name} writes to \`${MACHINE_OUT_PATH}\` lands here.`);
+    addLink({ from: { panel: panel.id, port: outPort.id }, to: { panel: note.id, port: NOTE_PORT }, label: "out" });
+    toast(`Out goes to a note in ${getState().sections[where]?.name ?? "the next section"}`, "ok");
+  };
+  const tryIt = () => {
+    setBusy("try");
+    void api(`/api/boards/${encodeURIComponent(activeBoard()?.boardId ?? "")}/machines/${encodeURIComponent(panel.id)}/io/try`, { method: "POST", json: {} })
+      .catch((e: Error) => toast(`${panel.name} couldn't write it: ${e.message}`, "bad"))
+      .finally(() => setBusy(null));
+  };
+  return (
+    <div className="machine-io-view" data-machine-io-view>
+      <IoStrip panel={panel} viewer={viewer} />
+      {io?.outAt && (
+        <div className="machine-io-last" data-machine-io-last>
+          <span className="machine-io-dir">Last out</span>
+          <span className="machine-io-kind">{kind}</span>
+          <pre>{io.outPreview || "(empty)"}</pre>
+        </div>
+      )}
+      {!viewer && (
+        <div className="machine-io-acts">
+          {outs.length === 0 && (
+            <button type="button" className="f-pill is-accent" onClick={toTheRight} disabled={!outPort} data-machine-io-right>
+              Out to a new note on the right
+            </button>
+          )}
+          <button type="button" className="f-pill" onClick={tryIt} disabled={busy === "try"} data-machine-io-try data-tip={`The machine writes its name and the time to ${MACHINE_OUT_PATH}`}>
+            {busy === "try" ? "Writing…" : "Write a test line"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const looksJson = (s?: string) => {
+  const t = (s ?? "").trim();
+  if (!/^[[{"]/.test(t) && !/^(true|false|null|-?\d)/.test(t)) return false;
+  try {
+    JSON.parse(t);
+    return true;
+  } catch {
+    return /^[[{]/.test(t);
+  }
+};

@@ -57,6 +57,10 @@ export interface PostedAgent {
   by: string;
   byName: string;
   at: number;
+  /** this seat (2026-11-17: one agent can sit on a council more than once, each its own seat); absent on older ones, whose key is their seat */
+  id?: string;
+  /** the seat's own name ("Zephyr"), worn over its head, on its cursor while it works, and the name its character is chosen by; absent on older ones (they go by `name`) */
+  alias?: string;
 }
 
 export function postedAgentsOf(doc: Y.Doc, place: string): PostedAgent[] {

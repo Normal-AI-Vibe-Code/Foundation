@@ -60,7 +60,7 @@ import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
 import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
 import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
-import { startMachineIo } from "./machineio.ts";
+import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 import { gridOutline } from "./subgrids.ts";
 
@@ -675,6 +675,12 @@ r.post("/api/boards/:id/machines/:panel/start", async (req) => {
   const b = await readJson<{ image?: string; engine?: string; ports?: number[]; desktop?: boolean }>(req);
   return { machine: await startMachine(req.params.id, req.params.panel, u.name, b) };
 });
+// Ins & outs: the machine writes a test line to /foundation/out (it runs a command in it: a person, who can write here)
+r.post("/api/boards/:id/machines/:panel/io/try", async (req) => {
+  const u = requirePerson(req, "Writing to a machine");
+  requireWriter(u, req.params.id);
+  return { io: await tryOut(req.params.id, req.params.panel) };
+});
 r.post("/api/boards/:id/machines/:panel/stop", async (req) => {
   const u = requirePerson(req, "Stopping a machine");
   requireBoard(u, req.params.id);
@@ -760,7 +766,7 @@ r.post("/api/boards/:id/agents", async (req) => {
   requireWriter(u, req.params.id);
   const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
   if (!place || !agent) throw new HttpError(400, "place (a section id, or * for the grid) and agent required");
-  return { agents: postAgent(req.params.id, place, agent, u) };
+  return postAgent(req.params.id, place, agent, u);
 });
 r.post("/api/boards/:id/agents/remove", async (req) => {
   const u = requireUser(req);
@@ -911,10 +917,10 @@ r.post("/api/t3host/stop", (req) => {
 // a thread runs a model on someone's plan or key: a person's press, by someone who can write the board
 r.post("/api/t3host/threads", async (req) => {
   const u = requirePerson(req, "Asking an agent");
-  const body = await readJson<{ board?: string; section?: string; agent?: string; model?: string; text?: string }>(req);
+  const body = await readJson<{ board?: string; section?: string; agent?: string; model?: string; text?: string; as?: string }>(req);
   if (!body.board || !body.section || !body.agent) throw new HttpError(400, "board, section and agent required");
   requireWriter(u, body.board);
-  return askT3(u, { board: body.board, section: body.section, agent: body.agent, model: body.model, text: body.text ?? "" });
+  return askT3(u, { board: body.board, section: body.section, agent: body.agent, model: body.model, text: body.text ?? "", as: body.as });
 });
 r.post("/api/t3host/threads/:id/stop", (req) => {
   const u = requirePerson(req, "Stopping an agent");
@@ -962,13 +968,13 @@ r.get("/api/t3host/presets", (req) => {
 
 r.post("/api/agent", async (req, res) => {
   const user = requireUser(req);
-  const body = await readJson<{ board?: string; prompt?: string; runtime?: string; session?: string; persona?: string }>(req);
+  const body = await readJson<{ board?: string; prompt?: string; runtime?: string; session?: string; persona?: string; as?: string }>(req);
   if (!body.prompt?.trim()) throw new HttpError(400, "say something");
   requireBoard(user, body.board || "company");
   const send = sse(res);
   const session = body.session && /^ses_[a-z0-9]{6,24}$/.test(body.session) ? body.session : undefined;
   // the run lives on the server: closing this stream detaches, it doesn't stop it
-  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, runtime: body.runtime, session, persona: body.persona === "shiba" ? "shiba" : undefined });
+  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, runtime: body.runtime, session, persona: body.persona === "shiba" ? "shiba" : undefined, as: body.as });
   await new Promise<void>((done) => {
     const detach = followRun(r.id, user.id, send, done);
     res.on("close", () => (detach?.(), done()));

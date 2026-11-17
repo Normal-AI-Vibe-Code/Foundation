@@ -53,7 +53,7 @@ function contextBlock(opts: { boardId: string; user: UserInfo; persona?: "shiba"
   if (opts.persona === "shiba") return `<today person="${opts.user.name}"${access}>\n${todayDigest(todayFor(opts.user))}\n</today>`;
   return `<board name="${opts.boardId}" person="${opts.user.name}"${access}>\n${boardDigest(opts.boardId)}\n</board>`;
 }
-import { describeCrewWork, joinCrew, leaveCrew, setDoing, type CrewMember } from "./crew.ts";
+import { describeCrewWork, joinCrew, leaveCrew, setDoing, type CrewMember, seatName } from "./crew.ts";
 import { setHelperStarter } from "./tools.ts";
 import { runScript } from "./script.ts";
 import { claudeCommand, here, type Runtime } from "./rea.ts";
@@ -145,6 +145,8 @@ export async function runAgent(opts: {
   session?: string;
   /** "shiba": the Today page's guide (its own voice and context) */
   persona?: "shiba";
+  /** a council seat's own name ("Zephyr"): its cursor goes by it (posted.ts) */
+  as?: string;
   runId?: string;
   /** the visible agent doing this run */
   crew?: CrewMember;
@@ -246,7 +248,7 @@ export function startRun(opts: Omit<Parameters<typeof runAgent>[0], "emit" | "si
   let crew: CrewMember | undefined;
   if (opts.persona !== "shiba") {
     try {
-      crew = joinCrew({ boardId: opts.boardId, userId: opts.user.id, userName: opts.user.name, runId: r.id, task: opts.prompt, lead: opts.lead });
+      crew = joinCrew({ boardId: opts.boardId, userId: opts.user.id, userName: opts.user.name, runId: r.id, task: opts.prompt, lead: opts.lead, name: seatName(opts.as) });
     } catch (e) {
       emit({ type: "error", message: (e as Error).message });
       end();

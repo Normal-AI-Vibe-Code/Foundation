@@ -36,7 +36,7 @@ import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { useActiveBoard } from "../shell/Presence";
 import type { CrewPeer } from "../shell/Crew";
-import { askCrew } from "../state/sessions";
+import { askCrew, crewAsk } from "../state/sessions";
 import { getState, requestSnap, subscribe } from "../state/store";
 import { camera, onCamera } from "../state/camera";
 import { floorInsets, getUi, setUi, toast, useUi } from "../state/ui";
@@ -55,6 +55,10 @@ export interface CouncilSeat {
   agentName?: string;
   /** "claude", "t3:<id>" */
   agentKey?: string;
+  /** its seat on the council (posted.ts), when it has one of its own: what takes it off */
+  seatId?: string;
+  /** the seat's own name ("Zephyr"): what it wears over its head and what its character is chosen by */
+  alias?: string;
   provider: Provider;
   where?: "cloud" | "local";
   service?: string;
@@ -92,25 +96,40 @@ const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >
 
 // ---------------------------------------------------------------- who sits here
 
-/** the agents of a scope, as seats: the assigned ones (working or at rest), then anyone else at work there */
+/**
+ * The agents of a scope, as seats: the ones seated there (working or at rest), then anyone else at work there.
+ * 2026-11-17 (Josh: "every section has a different council"): a council is its place's alone. The grid's holds the
+ * grid's seats and agents at work outside any section; a section's, its own seats and who works inside it.
+ */
 export function buildSeats(scope: CouncilScope, posted: Record<string, PostedAgent[]>, crew: CrewPeer[], roster: Roster, me: string | undefined, moods: Record<string, Mood>): CouncilSeat[] {
-  const inScope = (p: CrewPeer) => scope.kind === "board" || crewIsIn(p.crew, scope.id, boardWhere);
-  const live = crew.filter(inScope);
+  // an agent asked from a council is that council's while it works, wherever it works (on the asker's screen); others
+  // belong where they work: in a section, that section's council; outside any, the grid's
+  const here = scopeKey(scope);
+  const inScope = (p: CrewPeer) => {
+    const from = askedFrom(p.crew.id);
+    if (from) return from === here;
+    return scope.kind === "board" ? !sectionOfCrew(p.crew, boardWhere) : crewIsIn(p.crew, scope.id, boardWhere);
+  };
+  // a seat with a name of its own is found at work by that name, wherever it works
+  const named = (p: CrewPeer, alias: string) => p.user.name === alias || p.user.name.startsWith(`${alias} `);
+  const live = crew;
   const taken = new Set<string>();
-  const places = scope.kind === "section" ? [scope.id] : [GRID_PLACE, ...Object.keys(posted).filter((p) => p !== GRID_PLACE)];
+  const places = [scope.kind === "section" ? scope.id : GRID_PLACE];
   const out: CouncilSeat[] = [];
   const fromPeer = (p: CrewPeer): Partial<CouncilSeat> => ({ name: p.user.name, hue: p.crew.hue, status: p.crew.status, doing: p.crew.doing, task: p.crew.task, askerName: p.crew.askerName, leadName: p.crew.leadName, mine: p.crew.asker === me, crewId: p.crew.id, mood: moods[p.crew.id] ?? "idle" });
 
   for (const place of places) {
     for (const a of posted[place] ?? []) {
-      // its cursor, if it's at work: the same agent, in this place when the place is a section
-      const peer = live.find((p) => !taken.has(p.crew.id) && (p.crew.via ?? "claude") === a.key && (place === GRID_PLACE || sectionOfCrew(p.crew, boardWhere) === place));
+      // its cursor, if it's at work: by its own name; an older seat (no name of its own), the same agent in this place
+      const peer = live.find((p) => !taken.has(p.crew.id) && (a.alias ? named(p, a.alias) : (p.crew.via ?? "claude") === a.key && inScope(p)));
       if (peer) taken.add(peer.crew.id);
       out.push({
-        id: `${place}:${a.key}`,
-        name: a.name,
+        id: `${place}:${a.id ?? a.key}`,
+        name: a.alias ?? a.name,
         agentName: a.name,
         agentKey: a.key,
+        seatId: a.id,
+        alias: a.alias,
         provider: providerOf(a),
         where: a.where,
         service: a.service,
@@ -121,19 +140,22 @@ export function buildSeats(scope: CouncilScope, posted: Record<string, PostedAge
         hue: hash(`${place}:${a.key}`) % 6,
         status: "idle",
         mood: "idle",
-        ...(peer ? fromPeer(peer) : {}),
+        ...(peer ? { ...fromPeer(peer), name: a.alias ?? peer.user.name } : {}),
       });
     }
   }
+  // names seated on other councils of this grid: at work here, they're still theirs, not this council's
+  const elsewhere = Object.entries(posted).filter(([p]) => !places.includes(p)).flatMap(([, l]) => l.map((a) => a.alias).filter((x): x is string => !!x));
   for (const p of live) {
-    if (taken.has(p.crew.id)) continue;
+    if (taken.has(p.crew.id) || !inScope(p) || elsewhere.some((n) => named(p, n))) continue;
     const via = p.crew.via ?? "claude";
     out.push({ id: p.crew.id, name: p.user.name, agentName: via === "claude" ? "Claude" : undefined, agentKey: via, provider: via === "claude" ? "claude" : providerOf({ name: p.user.name }), hue: p.crew.hue, status: p.crew.status, mood: "idle", ...fromPeer(p) });
   }
   // who each wears: by its agent's name (what Settings → Avatars assigns), unless another seat already wears that one
   const wearAs: string[] = [];
   for (const s of out) {
-    const pick = s.agentName && !wearAs.includes(s.agentName) ? s.agentName : s.name;
+    // a seat with a name of its own wears what was chosen for that name; an older one, its agent's
+    const pick = s.alias ? s.alias : s.agentName && !wearAs.includes(s.agentName) ? s.agentName : s.name;
     wearAs.push(wearAs.includes(pick) ? `${pick} ${wearAs.length}` : pick);
   }
   const worn = seatCharacters(roster, wearAs);
@@ -226,7 +248,7 @@ export function CouncilPreload() {
 // ---------------------------------------------------------------- the view
 
 /** one line to say, typed or spoken: the only way to talk on the council (it opens under whoever you roll over) */
-export function SayBox({ label, placeholder, onSay, focus }: { label: string; placeholder: string; onSay: (text: string) => void; focus?: boolean }) {
+export function SayBox({ label, placeholder, onSay, focus, onClose }: { label: string; placeholder: string; onSay: (text: string) => void; focus?: boolean; onClose?: () => void }) {
   const [text, setText] = useState("");
   const [hearing, setHearing] = useState<Listening | null>(null);
   useEffect(() => () => hearing?.cancel(), [hearing]);
@@ -265,9 +287,21 @@ export function SayBox({ label, placeholder, onSay, focus }: { label: string; pl
       <button type="button" className={`council-say-btn${hearing ? " is-live" : ""}`} aria-pressed={Boolean(hearing)} aria-label={hearing ? "Stop listening" : `Talk: ${label}`} data-tip={hearing ? "Stop and send" : "Talk instead"} data-council-mic onClick={mic}>
         <MicGlyph size={14} />
       </button>
-      <button type="submit" className="council-say-btn is-send" disabled={!text.trim()} aria-label="Send">
-        <SendGlyph size={14} />
-      </button>
+      {onClose ? (
+        text.trim() ? (
+          <button type="submit" className="council-say-btn is-send" aria-label="Send">
+            <SendGlyph size={14} />
+          </button>
+        ) : (
+          <button type="button" className="council-say-btn" aria-label="Close" data-tip="Close" data-council-say-close onClick={onClose}>
+            <CloseGlyph size={12} />
+          </button>
+        )
+      ) : (
+        <button type="submit" className="council-say-btn is-send" disabled={!text.trim()} aria-label="Send">
+          <SendGlyph size={14} />
+        </button>
+      )}
     </form>
   );
 }
@@ -282,10 +316,15 @@ function PlainGhost() {
   );
 }
 
-/** above a head: whose model, where it runs, and whether it can be reached */
-export function SeatMarks({ seat }: { seat: Pick<CouncilSeat, "provider" | "where" | "offline" | "why" | "status"> }) {
+/** above a head: its name (2026-11-17), whose model, where it runs, and whether it can be reached */
+export function SeatMarks({ seat, name }: { seat: Pick<CouncilSeat, "provider" | "where" | "offline" | "why" | "status" | "doing">; name?: string }) {
   return (
     <span className="council-marks">
+      {name && (
+        <b className="council-mark-name" data-council-name data-tip={seat.status === "working" && seat.doing ? seat.doing : undefined}>
+          {name}
+        </b>
+      )}
       <ProviderMark provider={seat.provider} size={20} />
       {seat.where && (
         <span className="council-mark" role="img" aria-label={seat.where === "local" ? "Runs on this computer" : "Runs in the cloud"} data-tip={seat.where === "local" ? "Runs on this computer" : "Remote: runs in the cloud"} data-council-where={seat.where}>
@@ -330,6 +369,8 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
   const canvas = useRef<HTMLCanvasElement>(null);
   const [stage, setStage] = useState<AvatarStage | null>(null);
   const [all, setAll] = useState(false);
+  // a line put away with its ✕ stays away until the pointer leaves that agent
+  const [shut, setShut] = useState<string | null>(null);
 
   // one renderer for every 3D figure; without WebGL they keep their stills
   useEffect(() => {
@@ -359,28 +400,34 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
             <div
               key={s.id}
               role="listitem"
-              className={`council-seat is-${s.status}${s.offline ? " is-offline" : ""}${hot === s.id ? " is-hot" : ""}`}
+              className={`council-seat is-${s.status}${s.offline ? " is-offline" : ""}${hot === s.id ? " is-hot" : ""}${shut === s.id ? " is-shut" : ""}`}
+              onPointerLeave={() => shut === s.id && setShut(null)}
               style={{ ["--crew" as string]: `var(--color-crew-${s.hue % 6})`, ["--i" as string]: i } as CSSProperties}
               data-council-seat={s.name}
               data-council-agent={s.agentKey}
               data-mood={s.offline ? "sad" : s.mood}
             >
-              <SeatMarks seat={s} />
+              <SeatMarks seat={s} name={s.name} />
               <div className="council-crop">
                 <button type="button" className="council-figure" aria-label={`${s.name}${s.character ? `, as ${s.character.name}` : ""}: ${s.offline ? `not connected${s.why ? ` (${s.why})` : ""}` : SEAT_STATUS[s.status]}. Press for what it is`} onClick={() => onAbout?.(s)}>
                   <Avatar character={s.character} mood={s.offline ? "sad" : s.mood} framing="bust" turn={(mid - i) * 0.1} still={s.offline} />
                 </button>
               </div>
-              <div className="council-under">
-                <div className="council-name">
-                  <span className="council-dot" aria-hidden="true" />
-                  <b>{s.name}</b>
-                  {s.agentName && s.agentName !== s.name ? <i>{s.agentName}</i> : s.character ? <i>as {s.character.name}</i> : null}
+              {/* 2026-11-17 (Josh): just a white line over its body, above the section's edge (above the bar, for the
+                  grid's), with the mic and ✕; its name is over its head */}
+              {canAsk && onSay && (
+                <div className="council-under">
+                  <SayBox
+                    label={`Say something to ${s.name}`}
+                    placeholder={s.offline ? `${s.why ?? "Not connected"}` : s.status === "working" && s.doing ? s.doing : `To ${s.name}${s.agentName && s.agentName !== s.name ? ` (${s.agentName})` : ""}…`}
+                    onSay={(t) => onSay(t, [s], false)}
+                    onClose={() => {
+                      setShut(s.id);
+                      (document.activeElement as HTMLElement | null)?.blur();
+                    }}
+                  />
                 </div>
-                {s.status === "working" && s.doing && <div className="council-says">{s.doing}</div>}
-                {s.offline && <div className="council-says is-off">{s.why ?? "Not connected"}</div>}
-                {canAsk && onSay && <SayBox label={`Say something to ${s.name}`} placeholder={`To ${s.name}…`} onSay={(t) => onSay(t, [s], false)} />}
-              </div>
+              )}
             </div>
           ))}
           {canAsk &&
@@ -436,23 +483,35 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
 
 // ---------------------------------------------------------------- wired to the open grid
 
+// ---------------------------------------------------------------- who was asked from where
+
+const scopeKey = (s: CouncilScope) => (s.kind === "board" ? GRID_PLACE : s.id);
+/** the sessions a council started, and which council: so its agent stays on it while it works */
+const launched = new Map<string, string>();
+/** the council an agent at work was asked from, if it was asked from one in this window */
+function askedFrom(crewId: string): string | undefined {
+  const ask = crewAsk(crewId);
+  return ask ? launched.get(ask.session) : undefined;
+}
+
 /** send one line to a seat's agent, in a section: the server's own agent through a session, one of this computer's through its host */
-export async function tellSeat(seat: Pick<CouncilSeat, "agentKey" | "name"> | null, text: string, section: { id: string; name: string } | null): Promise<void> {
+export async function tellSeat(seat: Pick<CouncilSeat, "agentKey" | "name" | "alias"> | null, text: string, section: { id: string; name: string } | null, from?: CouncilScope): Promise<void> {
   const key = seat?.agentKey ?? "claude";
   if (!key.startsWith("t3:")) {
-    askCrew(section ? `In the “${section.name}” section: ${text}` : text);
+    const session = askCrew(section ? `In the “${section.name}” section: ${text}` : text, seat?.alias);
+    if (from) launched.set(session, scopeKey(from));
     return;
   }
   const board = activeBoard()?.boardId;
   const sec = section ?? Object.values(getState().sections).find((s) => !s.parent) ?? null;
   if (!board || !sec) throw new Error("There's no section for it to work in.");
-  await api("/api/t3host/threads", { method: "POST", json: { board, section: sec.id, agent: key.slice(3), text } });
+  await api("/api/t3host/threads", { method: "POST", json: { board, section: sec.id, agent: key.slice(3), text, as: seat?.alias } });
 }
 
 /** say one line to some of a council (none: the server's own agent takes it), and keep it for the panel's Council tab */
 export function sayToCouncil(scope: CouncilScope, text: string, to: CouncilSeat[], all: boolean, sec: { id: string; name: string } | null) {
   const list: Array<CouncilSeat | null> = to.length ? to : [null];
-  for (const s of list) void tellSeat(s, text, sec).catch((e: Error) => toast(`${s?.name ?? "Claude"} couldn't take it: ${e.message}`, "bad"));
+  for (const s of list) void tellSeat(s, text, sec, scope).catch((e: Error) => toast(`${s?.name ?? "Claude"} couldn't take it: ${e.message}`, "bad"));
   logSaid(scope, text, to.length ? to.map((s) => s.name) : ["Claude"], all);
   toast(to.length > 1 ? `Sent to ${to.length} agents` : `Sent to ${to[0]?.name ?? "Claude"}`, "agent");
 }
@@ -536,6 +595,26 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
       window.removeEventListener("resize", fit);
     };
   }, [card, ui.agents, ui.agentInfo, ui.search]);
+
+  // the grid's council at the bottom right: how wide it stands, so the bottom bar's room leaves it clear (GridViewport)
+  useEffect(() => {
+    if (scope.kind !== "board") return;
+    const el = standEl.current;
+    if (!el) return;
+    const measure = () => {
+      const row = el.querySelector(".council-row")?.getBoundingClientRect().width ?? 0;
+      const tools = el.querySelector(".council-tools")?.getBoundingClientRect().width ?? 0;
+      // the figures, the buttons, the gap between them, the council's own right padding, and a gutter before the bar
+      setUi({ councilW: Math.ceil(row + tools + 8 + 16 + 16) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    for (const n of el.querySelectorAll(".council-row, .council-tools")) ro.observe(n);
+    return () => {
+      ro.disconnect();
+      setUi({ councilW: 0 });
+    };
+  }, [scope.kind, seats.length]);
 
   const sec = section ? { id: section.id, name: section.name } : null;
   const f = floorInsets(ui);

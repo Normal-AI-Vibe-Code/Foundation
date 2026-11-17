@@ -82,12 +82,12 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
   const did = useDid(useMemo(() => [seat.name, ...(seat.agentName ? [seat.agentName] : [])], [seat.name, seat.agentName]));
   const section = sectionId ? sections[sectionId] : seat.place && seat.place !== GRID_PLACE ? sections[seat.place] : undefined;
   const sec = section ? { id: section.id, name: section.name } : null;
-  const wearName = seat.agentName ?? seat.name;
+  // a seat with a name of its own wears what was chosen for that name (2026-11-17: two Claudes, two characters)
+  const wearName = seat.alias ?? seat.agentName ?? seat.name;
   const ready = readyCharacters(roster);
   return (
     <div className="agents-scroll agent-info-body">
       <div className="agent-info-figure" style={{ ["--crew" as string]: `var(--color-crew-${seat.hue % 6})` }}>
-        <span className="council-plinth" aria-hidden="true" />
         <Avatar character={seat.character} mood={seat.mood} framing="full" still={still} />
         <span className="council-provider">
           <ProviderMark provider={seat.provider} where={seat.where} size={26} />
@@ -109,7 +109,7 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
         <dt>Agent</dt>
         <dd>
           {seat.agentName ?? seat.name}
-          {seat.agentName && seat.agentName !== seat.name ? `, at work as ${seat.name}` : ""}
+          {seat.alias ? `, seated here as ${seat.alias}` : seat.agentName && seat.agentName !== seat.name ? `, at work as ${seat.name}` : ""}
         </dd>
         <dt>Model by</dt>
         <dd>{PROVIDER_NAME[seat.provider]}</dd>
@@ -189,7 +189,7 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
           </button>
         )}
         {!viewer && seat.place && seat.agentKey && (
-          <button type="button" className="f-pill agent-info-off" onClick={() => void unpostAgent(seat.place!, seat.agentKey!).catch((e: Error) => toast(e.message, "bad"))}>
+          <button type="button" className="f-pill agent-info-off" onClick={() => void unpostAgent(seat.place!, seat.seatId ?? seat.agentKey!).catch((e: Error) => toast(e.message, "bad"))}>
             Take off this council
           </button>
         )}

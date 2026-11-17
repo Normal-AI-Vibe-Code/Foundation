@@ -193,19 +193,21 @@ export function AddAgent({ onDone }: { onDone(): void }) {
     if (!found) return;
     setBusy("add");
     try {
-      await postAgent(place, found.key);
-      if (picked) await chooseAvatar(found.name, picked.id).catch(() => {});
+      // a new seat with a name of its own: its character is chosen for that name, so a second Claude doesn't re-dress the first
+      const seat = await postAgent(place, found.key);
+      const who = seat?.alias ?? found.name;
+      if (picked) await chooseAvatar(who, picked.id).catch(() => {});
       let opened = "";
       if (session && found.key.startsWith("t3:")) {
         const board = activeBoard()?.boardId;
         const sec = sectionId ?? Object.values(getState().sections).find((s) => !s.parent)?.id;
         if (board && sec) {
-          await api("/api/t3host/threads", { method: "POST", json: { board, section: sec, agent: found.key.slice(3), text: `You are ${found.name}, now on the council of ${placeName}. Read the grid, say in one line what you see here, and wait to be asked.` } })
+          await api("/api/t3host/threads", { method: "POST", json: { board, section: sec, agent: found.key.slice(3), as: seat?.alias, text: `You are ${who} (${found.name}), now on the council of ${placeName}. Read the grid, say in one line what you see here, and wait to be asked.` } })
             .then(() => (opened = ", with its own session"))
-            .catch((e: Error) => toast(`${found.name} is added, but its session didn't open: ${e.message}`, "warn"));
+            .catch((e: Error) => toast(`${who} is added, but its session didn't open: ${e.message}`, "warn"));
         }
       }
-      toast(`${found.name} is on the council of ${placeName}${opened}`, "agent");
+      toast(`${who} (${found.name}) is on the council of ${placeName}${opened}`, "agent");
       onDone();
     } catch (e) {
       said(e);
@@ -384,7 +386,7 @@ export function AddAgent({ onDone }: { onDone(): void }) {
           {KINDS.map((x) => {
             const all = x.ways.map((w) => agentFor(x, w.id, agents)).filter(Boolean) as AvailableAgent[];
             const a = all.find((y) => y.ready) ?? all[0];
-            const words = a ? (a.ready ? (here.has(a.key) ? "already here" : "ready") : (a.why ?? "not ready")) : x.ways.length > 1 ? `${x.ways.length} ways to connect` : t3On ? "not connected yet" : "needs this computer's agents";
+            const words = a ? (a.ready ? (here.has(a.key) ? "ready · one here already" : "ready") : (a.why ?? "not ready")) : x.ways.length > 1 ? `${x.ways.length} ways to connect` : t3On ? "not connected yet" : "needs this computer's agents";
             return (
               <button key={x.id} type="button" className={`add-kind${kind === x.id ? " is-on" : ""}`} data-add-kind={x.id} aria-pressed={kind === x.id} onClick={() => (setKind(x.id), setWay(null), setFormError(null))}>
                 <ProviderMark provider={x.id} size={28} />
@@ -462,23 +464,26 @@ export function AddAgent({ onDone }: { onDone(): void }) {
         !connected ? "wait" : "open",
         "",
         <div className="add-final">
-          {found && here.has(found.key) ? (
-            <p className="add-note">{found.name} is already on this council.</p>
-          ) : (
+          {found && here.has(found.key) && (
+            <p className="add-note" data-add-again-note>
+              {found.name} already sits on this council. Adding it again seats another one, with a name, a character and sessions of its own.
+            </p>
+          )}
+          {
             <>
               {found?.key.startsWith("t3:") && (
                 <label className="add-check">
                   <input type="checkbox" checked={session} onChange={(e) => setSession(e.target.checked)} />
                   <span>
-                    Open its own session, named {found.name}, in {sectionId ? placeName : "the first section"} (it reads the grid once, on {found.where === "local" ? "this computer" : "its plan"})
+                    Open its own session in {sectionId ? placeName : "the first section"} (it reads the grid once, on {found.where === "local" ? "this computer" : "its plan"})
                   </span>
                 </label>
               )}
               <button type="button" className="f-pill is-agent" disabled={!found || busy === "add"} onClick={() => void add()} data-add-submit>
-                {busy === "add" ? "Adding…" : `Add ${found?.name ?? "it"} to ${placeName}`}
+                {busy === "add" ? "Adding…" : `${found && here.has(found.key) ? "Add another" : "Add"} ${found?.name ?? "it"} to ${placeName}`}
               </button>
             </>
-          )}
+          }
         </div>,
       )}
     </div>

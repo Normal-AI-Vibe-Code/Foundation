@@ -16,9 +16,21 @@
 import * as Y from "yjs";
 import { BOARD_SCHEMA, boardMaps, isHostable, readTracks, setHuddleState, setNoteText, tableCellMap, uid, type GridTracks, type ObjectDoc, type PanelDoc, type SectionDoc } from "@foundation/protocol";
 import { editBoard, getBoard, listBoards } from "./boards.ts";
+import { nameOldSeats } from "./posted.ts";
+import { roster, setAvatar } from "./characters.ts";
 
 export function migrateAllBoards() {
   for (const b of listBoards()) migrateBoard(b.id);
+  // council seats from before they had names of their own (posted.ts): named once, keeping the character each wore
+  const avatars = roster().avatars;
+  const system = { id: "system", email: "system@foundation.local", name: "Foundation", color: "#888", role: "admin" as const };
+  for (const b of listBoards()) nameOldSeats(b.id, (n) => avatars[n], (alias, ch) => {
+    try {
+      setAvatar(system, alias, ch);
+    } catch {
+      /* a character no longer ready: the seat goes back to the steady pick */
+    }
+  });
 }
 
 export function migrateBoard(id: string) {

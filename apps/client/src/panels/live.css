@@ -1072,8 +1072,25 @@
   background: var(--color-panel);
   flex-shrink: 0;
 }
-.machine-view + .machine-ports {
+.machine-view + .machine-ports,
+.machine-view + .machine-full + .machine-ports {
   margin-left: 0;
+}
+/* full screen, beside Desktop */
+.machine-full {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.machine-full:hover {
+  color: var(--color-frost);
 }
 .machine-view-tab {
   height: 18px;
@@ -2061,4 +2078,46 @@ html:has(.machine-window) body {
 /* in a window of its own the page is at its own size: no growing */
 .machine-window .machine-tools {
   --tools-k: 1;
+}
+
+/* a machine's Ins & outs (MachineViewIo.tsx IoView): the two lines, what came out last, and the two presses */
+.machine-io-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow: auto;
+}
+.machine-io-view .machine-io {
+  font-size: var(--text-13);
+}
+.machine-io-last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+.machine-io-kind {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+}
+.machine-io-last pre {
+  flex-basis: 100%;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-void);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.5 var(--font-code);
+  white-space: pre-wrap;
+  max-height: 180px;
+  overflow: auto;
+}
+.machine-io-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }

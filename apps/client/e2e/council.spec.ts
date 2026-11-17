@@ -210,12 +210,25 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   // above its head: whose model, that it runs in the cloud, and that it's connected
   await expect(seat.locator('[data-council-where="cloud"]')).toBeVisible();
   await expect(seat.locator("[data-council-offline]")).toHaveCount(0);
-  // rolled over, a line to write or talk to it opens under... over it (the grid's stands on the bottom edge)
-  await seat.locator(".council-figure").hover();
+  // rolled over, a white line over its body, above the bottom bar, with the mic and ✕ (2026-11-17)
+  await seat.locator(".council-marks").hover();
   await expect(seat.locator("[data-council-say] input")).toBeVisible();
   await expect(seat.locator("[data-council-mic]")).toBeVisible();
-  // it wears a character, live, and a bead says whose model it is
-  await expect(seat.locator(".council-name")).toContainText("as Mochi");
+  await expect(seat.locator("[data-council-say-close]")).toBeVisible();
+  const line = (await seat.locator("[data-council-say]").boundingBox())!;
+  const hudBox = (await ada.locator("[data-hud]").boundingBox())!;
+  expect(line.y + line.height).toBeLessThan(hudBox.y);
+  expect(await seat.locator("[data-council-say]").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(255, 255, 255)");
+  // ✕ puts it away until the pointer leaves
+  await seat.locator("[data-council-say-close]").click();
+  await expect(seat.locator("[data-council-say] input")).toBeHidden();
+  await ada.mouse.move(10, 300);
+  await seat.locator(".council-marks").hover();
+  await expect(seat.locator("[data-council-say] input")).toBeVisible();
+  // its own name over its head, beside its marks (a seat's name, not "Claude"); it wears a character, live, and a bead says whose model it is
+  const seatName = (await seat.locator("[data-council-name]").innerText()).trim();
+  expect(seatName).not.toBe("");
+  expect(seatName).not.toBe("Claude");
   await expect(seat.locator(".avatar-3d")).toHaveClass(/is-live/, { timeout: 15_000 });
   await expect(seat.locator('.provider-mark[data-provider="claude"]')).toBeVisible();
   const n = await frames(ada, ".council-stage");
@@ -232,7 +245,7 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   expect(posted["*"][0].byName).toBe("Ada Test");
 
   // pressed: the agent on the right, and the council keeps to the paper that's left
-  await seat.locator(".council-figure").click();
+  await seat.locator(".council-figure").click({ position: { x: 52, y: 40 } });
   const info = ada.locator(".agent-info");
   await expect(info).toBeVisible();
   await expect(info.locator('[data-agent-where="cloud"]')).toContainText("In the cloud");
@@ -283,16 +296,16 @@ test("an agent at work stands in the council on its cursor's colour, wearing a c
   expect(colours.seat).not.toBe("");
   expect(colours.seat).toBe(colours.cursor);
   // under its cursor's name it says which agent it is; it wears the character, live, and says what its cursor says
-  await expect(seat.locator(".council-name")).toContainText("Claude");
+  await expect(seat.locator("[data-council-name]")).toHaveText(name);
   await expect(seat).toHaveAttribute("data-council-agent", "claude");
   await expect(seat.locator(".avatar-3d")).toHaveClass(/is-live/, { timeout: 15_000 });
-  await expect(seat.locator(".council-says")).not.toBeEmpty();
+  await expect(seat.locator("[data-council-name]")).toHaveAttribute("data-tip", /.+/);
   await expect.poll(async () => seat.getAttribute("data-mood"), { timeout: 10_000 }).toMatch(/thinking|working/);
   await settle(ada, 300);
   await ada.screenshot({ path: `${SHOTS}/13_council-agent-at-work.png` });
 
   // pressed: its pane shows it head to toe, with what it was asked and who for
-  await seat.locator(".council-figure").click();
+  await seat.locator(".council-figure").click({ position: { x: 52, y: 40 } });
   const info = ada.locator(".agent-info");
   await expect(info).toHaveAttribute("data-agent-info", name);
   await expect(info.locator(".avatar-3d")).toHaveAttribute("data-framing", "full");
@@ -348,9 +361,10 @@ await council.locator("[data-council-all]").click();
     expect(head.y - sec.y).toBeLessThan(6);
   };
   await over(supply);
-  // Depot's council: the agent building it
+  // Depot's council: the agent building it was asked from the grid's council, so it stays the grid's while it works
+  // (2026-11-17: "every section has a different council"); Depot's has nobody of its own
   await councilOf(depot, "Depot");
-  await expect(council.locator(".council-seat:not(.council-ghost)").first()).toBeVisible({ timeout: 10_000 });
+  await expect(council).toHaveAttribute("data-council", "0");
   await over(depot);
   await ada.screenshot({ path: `${SHOTS}/16_council-of-a-section.png` });
   await ada.keyboard.press("Escape");

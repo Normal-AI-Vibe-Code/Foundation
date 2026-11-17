@@ -28,7 +28,7 @@ import type { UserInfo } from "@foundation/protocol";
 import { config } from "./config.ts";
 import { createSession, revokeSession } from "./auth.ts";
 import { boardDigest, editBoard, getBoard } from "./boards.ts";
-import { aim, joinCrew, leaveCrew, setDoing, type CrewMember } from "./crew.ts";
+import { aim, joinCrew, leaveCrew, seatName, setDoing, type CrewMember } from "./crew.ts";
 import { HttpError } from "./http.ts";
 import { BOARD_TOOLS_FILE, interruptT3Thread, onT3Work, startT3Thread, t3Host, type T3Work } from "./t3host.ts";
 
@@ -71,7 +71,7 @@ export function t3Bound(threadId: string) {
 const short = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /** a person asks one of T3's agents for something in a section */
-export async function askT3(user: UserInfo, input: { board: string; section: string; agent: string; model?: string; text: string }) {
+export async function askT3(user: UserInfo, input: { board: string; section: string; agent: string; model?: string; text: string; as?: string }) {
   const text = (input.text ?? "").trim();
   if (!text) throw new HttpError(400, "Say what you need.");
   if (t3Host().state !== "running") throw new HttpError(409, "T3 isn't running. Start it from the agents pane.");
@@ -83,7 +83,7 @@ export async function askT3(user: UserInfo, input: { board: string; section: str
   // its place on the board first: a board that's full says so before anything is spent
   let member: CrewMember;
   try {
-    member = joinCrew({ boardId: input.board, userId: user.id, userName: user.name, runId: `t3:${Date.now()}:${Math.random()}`, task: text, name: agent.name, via: `t3:${agent.id}` });
+    member = joinCrew({ boardId: input.board, userId: user.id, userName: user.name, runId: `t3:${Date.now()}:${Math.random()}`, task: text, name: seatName(input.as) ?? agent.name, via: `t3:${agent.id}` });
   } catch (e) {
     throw new HttpError(409, (e as Error).message);
   }

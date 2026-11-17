@@ -314,25 +314,15 @@
   opacity: 0.34;
 }
 
-/* under an agent you roll over: its name, what it's saying, and a line to write or talk to it */
+/* an agent you roll over: a white line over its body (2026-11-17, Josh: "just a white box … above the section, with the
+   close and mic button"), above the section's edge; the grid's, above the bottom bar. Its name is over its head */
 .council-under {
   position: absolute;
   z-index: 8;
-  top: 100%;
+  bottom: var(--space-3);
   left: 50%;
-  width: 248px;
+  width: 232px;
   translate: -50% 4px;
-  padding: var(--space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  border-radius: var(--radius-pane);
-  background: color-mix(in srgb, var(--color-raise) 86%, transparent);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
-  box-shadow:
-    var(--shadow-lift),
-    0 0 0 1px var(--color-line);
   opacity: 0;
   visibility: hidden;
   transition:
@@ -349,9 +339,72 @@
   translate: -50% 0;
   transition-delay: 0s;
 }
+.council-seat.is-shut:not(:has(.council-say.is-held)) .council-under {
+  opacity: 0;
+  visibility: hidden;
+}
+/* the grid's stands on the window's bottom edge: the line sits over the body, clear of the bottom bar */
 .council.is-board .council-under {
-  top: auto;
-  bottom: calc(100% + 2px);
+  bottom: 64px;
+}
+.council-under .council-say {
+  height: 34px;
+  background: var(--color-over-room);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px color-mix(in srgb, var(--color-room-shade) 8%, transparent);
+}
+.council-under .council-say:focus-within {
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1.5px var(--color-agent);
+}
+.council-under .council-say-text {
+  color: var(--color-room-shade);
+}
+.council-under .council-say-text::placeholder {
+  color: color-mix(in srgb, var(--color-room-shade) 48%, transparent);
+}
+.council-under .council-say-btn {
+  color: color-mix(in srgb, var(--color-room-shade) 62%, transparent);
+}
+.council-under .council-say-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-agent) 14%, transparent);
+  color: var(--color-agent);
+}
+/* the name, first over the head, beside its marks */
+.council-mark-name {
+  max-width: 60px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* where it runs, smaller beside the name, so a head's marks keep within its own figure's width */
+.council-marks .council-mark[data-council-where] {
+  width: 16px;
+  height: 16px;
+}
+.council-seat.is-working .council-mark-name {
+  box-shadow: 0 0 0 1.5px var(--crew);
+}
+/* a mesh avatar (the runtime fits its picture to the bottom of its canvas): the canvas takes the picture's own 3:4 at the
+   figure's full height, centred, so the head is at the top and the chest shows, as a silhouette's does (2026-11-17: it
+   stood low and small, under its marks) */
+.council-figure .avatar-mesh > .avatar-canvas {
+  left: 50%;
+  width: auto;
+  height: 100%;
+  aspect-ratio: 896 / 1200;
+  translate: -50% 0;
 }
 .council-name {
   display: flex;

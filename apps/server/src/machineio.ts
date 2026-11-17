@@ -75,7 +75,8 @@ export function ensureMachinePorts(boardId: string, panelId: string): { in: Port
   return editBoard(boardId, "machines", (doc) => {
     const o = boardMaps(doc).objects.get(panelId) as PanelDoc;
     const inPort = o.ports.find((p) => p.dir === "in" && p.name === MACHINE_IN_PORT) ?? { id: uid("port"), name: MACHINE_IN_PORT, dir: "in" as const, type: "json" };
-    const outPort = o.ports.find((p) => p.dir === "out" && p.name === MACHINE_OUT_PORT) ?? { id: uid("port"), name: MACHINE_OUT_PORT, dir: "out" as const, type: "json" };
+    // what comes out is text until the machine writes something that parses as JSON (tick sets it then)
+    const outPort = o.ports.find((p) => p.dir === "out" && p.name === MACHINE_OUT_PORT) ?? { id: uid("port"), name: MACHINE_OUT_PORT, dir: "out" as const, type: "text" };
     const ports = [...o.ports.filter((p) => p !== inPort && p !== outPort), inPort, outPort];
     boardMaps(doc).objects.set(panelId, { ...o, ports });
     return { in: inPort, out: outPort };
@@ -292,7 +293,10 @@ async function tick(k: string): Promise<void> {
       (doc, p) => {
         // a note or a table at the other end is written here; an app reads the card's output through its wire
         for (const l of outOf) deliver(doc, l.to, out);
-        return { ...p, outputs: { ...(p.outputs ?? {}), [ports.out.id]: out } };
+        // the port says what came out (2026-11-17): text, or JSON when what it wrote parses as more than a string
+        const type = typeof out === "string" ? "text" : "json";
+        const typed = p.ports.map((x) => (x.id === ports.out.id && x.type !== type ? { ...x, type } : x));
+        return { ...p, ports: typed, outputs: { ...(p.outputs ?? {}), [ports.out.id]: out } };
       },
     );
   } catch (e) {
@@ -365,3 +369,18 @@ export function stopMachineIo() {
 }
 
 export { NOTE_PORT };
+
+/**
+ * A person's press on the card's Ins & outs (2026-11-17, Josh: "try to get that vm to output something and pipe it into
+ * a card"): the machine writes one line to /foundation/out (its name and the time, from inside it), and the server reads
+ * it back at once, so whatever `out` is wired to shows it. It runs a command in the machine: index.ts lets only a
+ * person who can write the board press it.
+ */
+export async function tryOut(boardId: string, panelId: string): Promise<MachineIo | undefined> {
+  const dir = MACHINE_OUT_PATH.slice(0, MACHINE_OUT_PATH.lastIndexOf("/")) || "/";
+  await execSh(boardId, panelId, `mkdir -p ${dir} && printf 'Hello from %s at %s\n' "$(hostname)" "$(date -u +%H:%M:%S) UTC" > ${MACHINE_OUT_PATH}`, { timeoutS: 15 });
+  watchMachine(boardId, panelId);
+  await lookNow(boardId, panelId);
+  const p = boardMaps(getBoard(boardId).doc).objects.get(panelId) as PanelDoc | undefined;
+  return p?.machine?.io;
+}

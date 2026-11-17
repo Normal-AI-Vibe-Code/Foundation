@@ -31,6 +31,11 @@ export const CREW_NAMES = [
   "Ibis", "Cinder", "Lyra", "Shale", "Merlin", "Talc", "Gannet", "Deneb",
 ];
 
+/** a council seat's name, as a cursor may wear it: a word or two of letters, at most 24 (anything else: the crew picks one) */
+export function seatName(raw: unknown): string | undefined {
+  return typeof raw === "string" && /^\p{L}[\p{L}\p{N} '-]{0,23}$/u.test(raw.trim()) ? raw.trim() : undefined;
+}
+
 /** how many hues the browsers know (violet mixes on tokens; DESIGN §2) */
 export const CREW_HUES = 6;
 /** helpers one ask may call in, and agents one board may hold at once */

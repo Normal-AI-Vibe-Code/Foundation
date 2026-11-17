@@ -1027,9 +1027,12 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
           pinned on the right), talk, the zoom, present and commands, then the council beside Ask, and Ask's own
           pill with the agents' settings at its end. When the grid's council stands at the bottom right, the bar
           goes to the bottom left */}
+      {/* the bar's room: the open paper, less the grid's council when it stands at the right. The bar folds into
+          icons as the room narrows (2026-11-17, Josh: "the bottom bar should collapse as the panel on the right is
+          coming in"): shell.css, @container hud */}
+      <div className="hud-room" style={{ left: insets.left, right: insets.right + (councilBoard ? ui.councilW : 0) }}>
       <motion.div
         className={`hud${councilBoard ? " is-aside" : ""}`}
-        style={{ left: insets.left, right: insets.right }}
         layout="position"
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -1076,6 +1079,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
           </button>
         </div>
       </motion.div>
+      </div>
     </div>
   );
 }

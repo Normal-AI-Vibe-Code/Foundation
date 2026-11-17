@@ -133,21 +133,35 @@ test("agents that can be assigned: the server's own first; what each is comes fr
   assert.equal(providerOfT3({ driver: "claudeAgent", name: "Claude" }), "claude");
 });
 
-test("assigning an agent to a section: once, kept on the grid, said in the activity; taken off again", () => {
+test("seating an agent on a section's council: each seat its own, with its own name; kept on the grid, said in the activity; taken off again", () => {
   const id = createBoardRow("Supply");
   const sec = seed(id);
   const one = postAgent(id, sec.id, "claude", ada);
-  assert.equal(one.length, 1);
-  assert.deepEqual({ key: one[0].key, name: one[0].name, where: one[0].where, byName: one[0].byName }, { key: "claude", name: "Claude", where: "cloud", byName: "Ada Lovelace" });
-  assert.equal(postAgent(id, sec.id, "claude", ada).length, 1, "the same agent isn't on a council twice");
-  assert.equal(postAgent(id, GRID_PLACE, "claude", ada).length, 1, "the grid's council is its own place");
+  assert.equal(one.agents.length, 1);
+  assert.deepEqual({ key: one.seat.key, name: one.seat.name, where: one.seat.where, byName: one.seat.byName }, { key: "claude", name: "Claude", where: "cloud", byName: "Ada Lovelace" });
+  assert.match(one.seat.id ?? "", /^seat_[0-9a-f]{12}$/);
+  assert.ok(one.seat.alias && one.seat.alias !== "Claude");
+  // 2026-11-17: Claude again is a second seat (its own session, its own character), not the first one replaced
+  const two = postAgent(id, sec.id, "claude", ada);
+  assert.equal(two.agents.length, 2, "the same agent can sit twice");
+  assert.notEqual(two.seat.id, one.seat.id);
+  assert.notEqual(two.seat.alias, one.seat.alias, "each seat has a name of its own");
+  const grid = postAgent(id, GRID_PLACE, "claude", ada);
+  assert.equal(grid.agents.length, 1, "the grid's council is its own place");
+  assert.ok(![one.seat.alias, two.seat.alias].includes(grid.seat.alias), "no two seats on a grid share a name");
   const doc = getBoard(id).doc;
-  assert.equal(postedAgentsOf(doc, sec.id).length, 1);
-  assert.ok(boardMaps(doc).activity.toArray().some((a) => /put Claude on the council of Section 1/.test(a.text)));
+  assert.equal(postedAgentsOf(doc, sec.id).length, 2);
+  assert.ok(boardMaps(doc).activity.toArray().some((a) => a.text === `put ${one.seat.alias} (Claude) on the council of Section 1`));
   assert.throws(() => postAgent(id, "sec_nope", "claude", ada), /No such section/);
   assert.throws(() => postAgent(id, sec.id, "t3:codex", ada), /isn't on this computer right now/);
   assert.throws(() => postAgent(id, sec.id, "gpt-9", ada), /No such agent/);
-  assert.equal(unpostAgent(id, sec.id, "claude", ada).length, 0);
+  for (let i = 2; i < 6; i++) postAgent(id, sec.id, "claude", ada);
+  assert.throws(() => postAgent(id, sec.id, "claude", ada), /6 agents at most/);
+  // off by its seat: the other Claudes stay
+  const left = unpostAgent(id, sec.id, one.seat.id!, ada);
+  assert.equal(left.length, 5);
+  assert.ok(!left.some((p) => p.id === one.seat.id));
+  for (const p of left) unpostAgent(id, sec.id, p.id!, ada);
   assert.equal(boardMaps(doc).agents.has(sec.id), false);
   assert.equal(postedAgentsOf(doc, GRID_PLACE).length, 1);
 });
@@ -208,4 +222,22 @@ test("Foundation's own grids are laid out once: the plan is a kanban in one sect
   assert.deepEqual(sources, DESIGN_CHAPTERS.map((c) => c.id).sort());
   for (const s of dm.sections.values()) assert.ok(s.host, `${s.name} hosts its chapter`);
   assert.equal(listBoards().find((b) => b.id === design.id)!.name, "Design language");
+});
+
+test("seats from before names: each gets an id and a name once, and keeps the character it wore", async () => {
+  const { nameOldSeats } = await import("../src/posted.ts");
+  const id = createBoardRow("Old seats");
+  const sec = seed(id);
+  const old = (key: string, at: number) => ({ key, name: "Claude", provider: "claude", where: "cloud" as const, service: "x", tools: true, by: ada.id, byName: ada.name, at });
+  getBoard(id).doc.transact(() => boardMaps(getBoard(id).doc).agents.set(sec.id, [old("claude", 1), old("t3:claudeAgent", 2)]));
+  const wore: Record<string, string> = { Claude: "chr_monkey", "Claude 1": "chr_cat" };
+  const worn: Record<string, string> = {};
+  assert.equal(nameOldSeats(id, (n) => wore[n], (a, c) => (worn[a] = c)), 2);
+  const seats = postedAgentsOf(getBoard(id).doc, sec.id);
+  assert.ok(seats.every((s) => s.id && s.alias));
+  assert.notEqual(seats[0].alias, seats[1].alias);
+  assert.deepEqual(worn, { [seats[0].alias!]: "chr_monkey", [seats[1].alias!]: "chr_cat" });
+  // once: a second pass names nothing and changes nothing
+  assert.equal(nameOldSeats(id, (n) => wore[n], (a, c) => (worn[a] = c)), 0);
+  assert.deepEqual(postedAgentsOf(getBoard(id).doc, sec.id), seats);
 });

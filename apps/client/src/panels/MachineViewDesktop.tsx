@@ -27,20 +27,22 @@ import { SERVER_NAME, api } from "../lib/api";
 import { desktopRefusal as refusalWords, olderServer } from "./machineWords";
 import { askRestart } from "../server/desktop";
 import { AgentGlyph, DesktopGlyph, LockGlyph, PackageGlyph, PopOutGlyph, PullGlyph, WarnGlyph } from "../shell/glyphs";
-import { putInUse } from "../lib/cardUse";
+import { putInUse, toggleFullscreen } from "../lib/cardUse";
+import { keys } from "../lib/keys";
 import { getUi, setUi, toast, useUi } from "../state/ui";
 import { KeysLine, ago, boardId, useNow, useRingWidth } from "./MachineViewBits";
 import { copyText, readClipboard } from "./machineTerminal";
 import { MachineTools, copiedWords, openMachineWindow, useFlash } from "./MachineTools";
 
-export type MachineViewName = "terminal" | "desktop";
+export type MachineViewName = "terminal" | "desktop" | "io";
 
 /** which view a card shows is each person's own, kept for the tab */
 export function useMachineView(panelId: string): [MachineViewName, (v: MachineViewName) => void] {
   const k = `foundation-machine-view:${panelId}`;
   const [view, set] = useState<MachineViewName>(() => {
     try {
-      return sessionStorage.getItem(k) === "desktop" ? "desktop" : "terminal";
+      const v = sessionStorage.getItem(k);
+      return v === "desktop" || v === "io" ? v : "terminal";
     } catch {
       return "terminal";
     }
@@ -58,16 +60,25 @@ export function useMachineView(panelId: string): [MachineViewName, (v: MachineVi
   ];
 }
 
-/** the head's switch between the shell and the desktop */
-export function ViewSwitch({ view, onView }: { view: MachineViewName; onView?: (v: MachineViewName) => void }) {
+/** the head's switch between the shell and the desktop, and (2026-11-17, Josh: "the full screen icon should be next to the desktop") full screen right beside it */
+export function ViewSwitch({ view, onView, panelId, only = ["terminal", "desktop", "io"] }: { view: MachineViewName; onView?: (v: MachineViewName) => void; panelId?: string; only?: MachineViewName[] }) {
   return (
-    <span className="machine-view" role="tablist" aria-label="What this card shows">
-      {(["terminal", "desktop"] as const).map((v) => (
-        <button key={v} role="tab" aria-selected={view === v} className={`machine-view-tab${view === v ? " is-on" : ""}`} onClick={() => onView?.(v)} data-tip={v === "terminal" ? "The machine's shell, shared by everyone here" : "The machine's graphical desktop"}>
-          {v === "terminal" ? "Terminal" : "Desktop"}
+    <>
+      <span className="machine-view" role="tablist" aria-label="What this card shows">
+        {only.map((v) => (
+          <button key={v} role="tab" aria-selected={view === v} className={`machine-view-tab${view === v ? " is-on" : ""}`} onClick={() => onView?.(v)} data-tip={v === "terminal" ? "The machine's shell, shared by everyone here" : v === "desktop" ? "The machine's graphical desktop" : "What's wired in, what comes out, and where it goes"} data-machine-view={v}>
+            {v === "terminal" ? "Terminal" : v === "desktop" ? "Desktop" : "Ins & outs"}
+          </button>
+        ))}
+      </span>
+      {panelId && (
+        <button type="button" className="machine-full" onClick={() => void toggleFullscreen(panelId)} aria-label="Full screen" data-tip="Full screen" data-kbd={keys("mod+enter")} data-machine-full>
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+            <path d="M8.5 2.5h3v3M5.5 11.5h-3v-3M11.5 2.5 8 6M2.5 11.5 6 8" />
+          </svg>
         </button>
-      ))}
-    </span>
+      )}
+    </>
   );
 }
 

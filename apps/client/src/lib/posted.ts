@@ -70,14 +70,17 @@ export function usePosted(): Posted {
 
 export const fetchAvailable = () => api<{ agents: AvailableAgent[]; t3: "off" | "starting" | "running" | "error" }>("/api/agents/available");
 
-export async function postAgent(place: string, agent: string) {
+/** seat an agent on a council: a new seat each time (the same agent can sit twice), with its own name; the seat comes back */
+export async function postAgent(place: string, agent: string): Promise<PostedAgent | null> {
   const board = activeBoard()?.boardId;
-  if (!board) return;
-  await api(`/api/boards/${encodeURIComponent(board)}/agents`, { method: "POST", json: { place, agent } });
+  if (!board) return null;
+  const r = await api<{ agents: PostedAgent[]; seat: PostedAgent }>(`/api/boards/${encodeURIComponent(board)}/agents`, { method: "POST", json: { place, agent } });
+  return r.seat ?? null;
 }
 
-export async function unpostAgent(place: string, agent: string) {
+/** take a seat off: its id, or (an older seat) its agent's key */
+export async function unpostAgent(place: string, seatOrKey: string) {
   const board = activeBoard()?.boardId;
   if (!board) return;
-  await api(`/api/boards/${encodeURIComponent(board)}/agents/remove`, { method: "POST", json: { place, agent } });
+  await api(`/api/boards/${encodeURIComponent(board)}/agents/remove`, { method: "POST", json: { place, agent: seatOrKey } });
 }

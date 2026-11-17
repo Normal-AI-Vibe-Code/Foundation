@@ -119,7 +119,7 @@ function MachineWindow() {
       <header className="machine-window-head">
         <span className="machine-window-glyph">{view === "desktop" ? <DesktopGlyph /> : <TerminalGlyph />}</span>
         <strong className="machine-window-name">{name}</strong>
-        <ViewSwitch view={view} onView={setView} />
+        <ViewSwitch view={view} onView={setView} only={["terminal", "desktop"]} />
         <span className="machine-window-keys">{viewer ? "View only: you're watching" : "Every key goes to the machine here · Foundation's shortcuts are off"}</span>
       </header>
       <div className="machine-body machine-window-body is-running">

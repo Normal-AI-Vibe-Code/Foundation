@@ -106,13 +106,14 @@ async function follow(id: string, open: (ctrl: AbortController, on: (e: AgentEve
 }
 const stopped = new Set<string>();
 
-export async function sendToSession(id: string, prompt: string, runtime?: string) {
+/** `as`: a council seat's own name, which its cursor wears while it works */
+export async function sendToSession(id: string, prompt: string, runtime?: string, as?: string) {
   const text = prompt.trim();
   const r = runs.get(id) ?? EMPTY;
   if (!text || r.busy) return;
   if (r.turns.length === 0) renameSession(id, titleOf(text));
   patch(id, (x) => ({ ...x, loaded: true, turns: [...x.turns, { prompt: text, events: [], status: "running", at: Date.now() }] }));
-  await follow(id, (ctrl, on) => streamAgent({ board: activeBoard()?.boardId ?? "company", prompt: text, runtime, session: id }, on, ctrl.signal));
+  await follow(id, (ctrl, on) => streamAgent({ board: activeBoard()?.boardId ?? "company", prompt: text, runtime, session: id, as }, on, ctrl.signal));
 }
 
 /** said out loud (the talk button, V): into the agent session on screen if it's free, else a new one — sent at once */
@@ -179,10 +180,10 @@ async function followHelper(session: string, runId: string, name: string) {
  * in a session of its own that runs without opening a tab, so the board
  * stays in view while you watch it work. Several can run at once.
  */
-export function askCrew(text: string): string {
+export function askCrew(text: string, as?: string): string {
   const id = newSessionId();
   const pref = localStorage.getItem("foundation-runtime");
-  void sendToSession(id, text, pref && pref !== "auto" ? pref : undefined).then(() => {
+  void sendToSession(id, text, pref && pref !== "auto" ? pref : undefined, as).then(() => {
     // no tab shows this run, so a failure says so here, in the agent's name and its own words
     const t = runs.get(id)?.turns.at(-1);
     if (t?.status !== "error") return;
