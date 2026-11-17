@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "madeAt": "2026-11-16",
+  "madeAt": "2026-11-17",
   "characters": [
     {
       "name": "Ember",
@@ -272,7 +272,7 @@
       "name": "Sage",
       "set": "animals",
       "form": "mesh",
-      "identity": "A calm young snow monkey: soft fluffy cream-tan fur around a bare peach-pink face, large round pink ears, a small flat nose. Sitting upright, serene. Soft painterly illustration in warm peach and cream with gentle light. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
+      "identity": "A calm young snow monkey: soft fluffy cream-tan fur around a bare peach-pink face, large round pink ears, a small flat nose. Shown from the top of the head to the waist, torso up, the body and arms running straight off the bottom edge of the picture (no rounded cut-off, no vignette, no oval or circular crop). Soft painterly illustration in warm peach and cream with gentle light. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
       "height": 1.6,
       "files": {
         "front": {
@@ -339,6 +339,231 @@
         },
         "mavatar": {
           "file": "taro-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Shiro",
+      "set": "animals",
+      "form": "mesh",
+      "identity": "A white shiba inu: snow-white and cream fur all over with the faintest warm shading, pale pink inner ears, a black nose. Flat storybook illustration with soft grainy shading and clean shapes, exactly in the style of a cheerful cartoon shiba mascot: fluffy fur, small pointed ears with pink insides, a black nose, sitting upright with its front paws together. Its face is more fox-like than round: a slimmer, longer muzzle that narrows to the nose, a defined cheek ruff that comes to soft points, slightly taller and sharper ears, and almond-shaped eyes; still clearly a shiba inu, not a fox. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "shiro-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "shiro-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "shiro-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "shiro-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Kuro",
+      "set": "animals",
+      "form": "mesh",
+      "identity": "A black-and-tan shiba inu: glossy black fur on the head, ears and back, tan eyebrow spots, tan cheeks and legs, a cream muzzle, chest and belly, a black nose. Flat storybook illustration with soft grainy shading and clean shapes, exactly in the style of a cheerful cartoon shiba mascot: fluffy fur, small pointed ears with pink insides, a black nose, sitting upright with its front paws together. Its face is more fox-like than round: a slimmer, longer muzzle that narrows to the nose, a defined cheek ruff that comes to soft points, slightly taller and sharper ears, and almond-shaped eyes; still clearly a shiba inu, not a fox. Seen from the front, facing the viewer squarely, with both eyes open and clearly visible (round dark eyes with a small white highlight), and the mouth closed in a gentle smile.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "kuro-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "kuro-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "kuro-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "kuro-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Ember",
+      "set": "abstract",
+      "form": "mesh",
+      "identity": "A fuzzy coral-red flame creature: a soft tufted body shaped like a small three-pointed flame, which is also its head, with two round black eyes with small white highlights and a small curved mouth on the front, two smooth glossy red arms ending in rounded mitten hands. Soft fuzzy felt texture in coral red, drawn as a flat illustration with gentle shading. Seen from the front, facing the viewer squarely, both eyes open, the mouth closed in a small smile.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "ember-mesh-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "ember-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "ember-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "ember-mesh-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Shade",
+      "set": "abstract",
+      "form": "mesh",
+      "identity": "A smooth white gumdrop character: a rounded egg-shaped body that is also its head, a small rounded green tuft on top, wearing oversized translucent green sunglasses through which two round dark eyes with white highlights are clearly visible, a small closed smile, short stubby white arms. Smooth matte surfaces in white and fresh green, drawn as a flat illustration with gentle shading. Seen from the front, facing the viewer squarely.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "shade-mesh-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "shade-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "shade-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "shade-mesh-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Scout",
+      "set": "abstract",
+      "form": "mesh",
+      "identity": "A small vinyl-toy explorer child: a round head with a simple face of two round dark eyes with white highlights and a small closed smile, a mustard-yellow hooded raincoat with two small round bear ears on the hood (hood up), drawn as a flat illustration with smooth matte toy surfaces. Seen from the front, facing the viewer squarely, both eyes open.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "scout-mesh-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "scout-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "scout-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "scout-mesh-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Yuki",
+      "set": "abstract",
+      "form": "mesh",
+      "identity": "A small sleepy spirit child: a smooth round head with a straight-cut white bob and blunt bangs, two tiny pink cat ears, two round dark eyes with white highlights open and calm, a tiny closed mouth, soft blush on the cheeks, wearing a plain sage-green cloak dress with short sleeves. Smooth matte clay-like surfaces in white and sage green, drawn as a flat illustration. Seen from the front, facing the viewer squarely, both eyes open.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "yuki-mesh-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "yuki-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "yuki-mesh-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "yuki-mesh-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Dot",
+      "set": "abstract",
+      "form": "mesh",
+      "identity": "A character that is a single perfect circle: a flat coral-orange disc with a soft paper grain, two round black eyes with small white highlights set wide apart in its upper half, and a small curved closed smile below them. Nothing else: no arms, no legs, no ears, no outline. A flat geometric illustration, the circle large and centred. Seen straight on.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "dot-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "dot-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "dot-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "dot-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Quad",
+      "set": "abstract",
+      "form": "mesh",
+      "identity": "A character that is a single rounded square: a flat federal-blue square with generously rounded corners and a soft paper grain, two round white eyes with black pupils set wide apart in its upper half, and a short straight closed mouth with a slight upward curve. Nothing else: no arms, no legs, no outline. A flat geometric illustration, the square large and centred. Seen straight on.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "quad-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "quad-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "quad-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "quad-mavatar.mavatar",
+          "mime": "application/zip"
+        }
+      }
+    },
+    {
+      "name": "Tri",
+      "set": "abstract",
+      "form": "mesh",
+      "identity": "A character that is a single soft triangle: a flat moss-green equilateral triangle, point up, with rounded corners and a soft paper grain, two round black eyes with small white highlights side by side in its lower half, and a small curved closed smile below them. Nothing else: no arms, no legs, no outline. A flat geometric illustration, the triangle large and centred. Seen straight on.",
+      "height": 1.6,
+      "files": {
+        "front": {
+          "file": "tri-front.jpg",
+          "mime": "image/jpeg"
+        },
+        "portrait": {
+          "file": "tri-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "thumb": {
+          "file": "tri-portrait.jpg",
+          "mime": "image/jpeg"
+        },
+        "mavatar": {
+          "file": "tri-mavatar.mavatar",
           "mime": "application/zip"
         }
       }

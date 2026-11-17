@@ -41,11 +41,15 @@ const file = db.prepare("select name, mime, sha256 from files where id = ?");
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 const characters = [];
+const slugs = new Set();
 let bytes = 0;
 for (const r of rows) {
   const c = JSON.parse(r.state);
   if (!c.ready || (only.length && !only.includes(c.name.toLowerCase()))) continue;
-  const slug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  // two characters may share a name (Ember in 3D and as a mesh avatar): the second one's files say which it is
+  let slug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  if (slugs.has(slug)) slug = `${slug}-${c.form}`;
+  slugs.add(slug);
   const files = {};
   const seen = new Map(); // one copy of a picture that plays two roles (a sheet that is also the still)
   for (const role of ROLES) {
