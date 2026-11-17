@@ -12,6 +12,7 @@
 
 import { PipelineBody } from "./PipelineView";
 import { CollectionBody } from "./CollectionView";
+import { UploaderBody } from "./UploaderView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
 import { CadPreview } from "../cad/CadPreview";
@@ -19,8 +20,9 @@ import { MODEL_EXT } from "../cad/model";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { drawnScale, isHosted, MINI_HEADER, emitPort, getState, subscribe, inputValue, movePanel, removePanel, requestSnap, resizePanel, sectionBodyRect, updatePanel, usePanel, type PanelMeta } from "../state/store";
 import { ObjectFrame } from "../components/ObjectFrame";
-import { beginConnect, beginDetach, usePortLayout } from "../shell/AgentLayer";
+import { beginConnect, beginDetach, beginGather, usePortLayout } from "../shell/AgentLayer";
 import { landingsOf, toneOf } from "../shell/ports";
+import { CHARACTER_TYPE } from "@foundation/protocol";
 import { api, fetchFile, uploadFile } from "../lib/api";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
 import { askAgent, toast, useUi } from "../state/ui";
@@ -70,6 +72,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   design: "◐",
   pipeline: "⇢",
   collection: "❖",
+  uploader: "⇪",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -136,6 +139,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <PipelineBody panel={panel} />
     ) : panel.panel === "collection" ? (
       <CollectionBody panel={panel} />
+    ) : panel.panel === "uploader" ? (
+      <UploaderBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (
@@ -163,7 +168,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
             data-port-id={p.id}
             data-type={p.type ?? "json"}
             style={{ top: l.y, height: l.height, ["--wire-tone" as string]: toneOf(p.type) }}
-            onPointerDown={(e) => (p.dir === "out" ? beginConnect(e, panel.id, p.id) : undefined)}
+            onPointerDown={(e) => (p.dir === "out" ? beginConnect(e, panel.id, p.id) : p.type === CHARACTER_TYPE ? beginGather(e, panel.id, p.id) : undefined)}
             {...portHoverProps(panel.id, p.id)}
           >
             {label}

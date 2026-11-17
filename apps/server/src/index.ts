@@ -55,6 +55,7 @@ import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
 import { buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
+import { avatarRoutes, startAvatars } from "./avatars.ts";
 import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, bringInStarter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter, setApproval } from "./characters.ts";
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
@@ -784,6 +785,8 @@ r.post("/api/system-grids/:key", (req) => {
   return openSystemGrid(req.params.key);
 });
 
+avatarRoutes(r);
+
 /** make the Character studio board (or say where the one there is) */
 r.post("/api/characters/studio", (req) => {
   const u = requireUser(req);
@@ -1091,7 +1094,9 @@ resumeCharacters();
 // characters this build carries that this install hasn't had yet (a fresh install, or a studio made from an older set)
 void bringInStarter()
   .then((n) => n && console.log(`  characters         brought in ${n} from the starter set`))
-  .catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`));
+  .catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`))
+  // Foundation's avatars on the studio, and their timers (avatars.ts)
+  .finally(() => startAvatars());
 
 // Started by the desktop app (src-tauri/src/server.rs), the server lives exactly as long as the app:
 // the app holds the other end of stdin, and however the app ends (quit, crash, Task Manager) that
