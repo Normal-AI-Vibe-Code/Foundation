@@ -67,7 +67,9 @@ test("a section at rest wears its council's mark and says it opens as a grid; th
   await expect(menu).toBeVisible();
   const labels = (await menu.locator(".menu-item").allInnerTexts()).map((t) => t.replace(/^\S+\s+/, "").trim());
   expect(labels[0]).toBe("Council: ask this section's agents…");
-  for (const want of ["Text box", "Markdown note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine", "Open as its own grid"]) expect(labels).toContain(want);
+  for (const want of ["Text box", "Markdown note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine"]) expect(labels).toContain(want);
+  // the grid's own actions are a row of icons now (2026-11-17), each named on roll-over
+  await expect(menu.locator('.menu-iconrow button[aria-label="Open as its own grid"]')).toHaveAttribute("data-tip", "Open as its own grid");
   await expect(menu.locator(".menu-item.is-agent")).toHaveCount(2);
   // it fits the window, whatever its length
   const m = (await menu.boundingBox())!;

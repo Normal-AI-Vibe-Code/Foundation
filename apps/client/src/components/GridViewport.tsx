@@ -1,5 +1,6 @@
-import { inUse, modHeld, modKeyDown, releaseCard } from "../lib/cardUse";
+import { inUse, releaseCard } from "../lib/cardUse";
 import { cardWheel } from "../lib/cardScroll";
+import { installScrollHint, noteAltScroll } from "../lib/scrollHint";
 import { keys } from "../lib/keys";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "motion/react";
@@ -621,12 +622,12 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     // No card takes the wheel (lib/cardUse.ts): over an app, a map, a terminal or a list it pans the grid,
     // and ⌘/Ctrl-wheel zooms it. Only the card in use (⌘/Ctrl-click, or full screen) has its own wheel.
     // Caught on the way down, so a card's own scroller (xterm, maplibre, a list) never sees it.
-    // The one exception: ⌘/Ctrl-wheel over a card with more in it than fits scrolls through that card
-    // (lib/cardScroll.ts), and zooms again once it has reached the end and rested a beat.
+    // Alt-wheel over a card with more in it than fits scrolls through that card (lib/cardScroll.ts);
+    // ⌘/Ctrl-wheel always zooms (2026-11-17: the zoom key does one thing).
     const h = (e: WheelEvent) => {
       if (inUse(e.target)) return;
       e.preventDefault();
-      if (modHeld(e) && cardWheel(e, modKeyDown())) {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && cardWheel(e, noteAltScroll)) {
         e.stopPropagation();
         return;
       }
@@ -636,6 +637,9 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     el.addEventListener("wheel", h, { passive: false, capture: true });
     return () => el.removeEventListener("wheel", h, { capture: true });
   }, [onWheel]);
+
+  // the mark on a card with more than fits: "Alt + scroll" (lib/scrollHint.ts)
+  useEffect(() => (containerRef.current ? installScrollHint(containerRef.current) : undefined), []);
 
   const getScale = useCallback(() => zoom.value, [zoom]);
 

@@ -353,8 +353,9 @@ test("a section's tools, rename, drag, right-click menu and remove; a note's bar
   let studio = await sectionOf("Studio work");
   p = await at(studio, studio.w - 200, 500);
   await page.mouse.click(p.x, p.y, { button: "right" });
-  await expect(page.locator(".context-menu")).toContainText("Insert section left");
-  await expect(page.locator(".context-menu")).toContainText("Split column");
+  // (the grid's own actions are a row of icons since 2026-11-17: each is named by its label, not by words beside it)
+  await expect(page.locator('.context-menu .menu-iconrow button[aria-label="Insert section left"]')).toBeVisible();
+  await expect(page.locator('.context-menu .menu-iconrow button[aria-label="Split column"]')).toBeVisible();
   await page.screenshot({ path: `${OUT}/section-menu-rune.png` });
   await page.keyboard.press("Escape");
   await expect(page.locator(".context-menu")).toHaveCount(0);

@@ -16,7 +16,13 @@ import { FullscreenBar, FullscreenButton, useFullscreenCard } from "./Fullscreen
  * the card's content moves down to make room for it (2026-11-16, Josh: "The
  * Cards roll over menu covers up the card contents, it should push it down");
  * `icons` (images, video) slides a few round buttons out from behind the
- * card's right edge, and the card itself is the drag handle.
+ * card's right edge, and a round grip shows in its top-left corner.
+ *
+ * What a left press picks up (2026-11-17, Josh: "left mouse is always grabs,
+ * where it really should only grab on the grid, or a top handle of a section
+ * or a menu"): a card moves by its bar, or by its grip where it has no bar,
+ * and by nothing else. A press on a card's body is the body's own: a button, a
+ * link, a caret, a selection. A tap on a video still plays or pauses it.
  *
  * Making room never changes the card's own box (the section's flow doesn't
  * move): the body clips, and what's inside it either gets shorter from the
@@ -49,7 +55,7 @@ interface Props {
   chrome?: "bar" | "icons";
   /** for `icons` chrome: the buttons that slide out (remove is added last) */
   icons?: ReactNode;
-  /** for `icons` chrome: a press on the card that didn't become a drag */
+  /** for `icons` chrome: a click on the card's body (a video plays or pauses) */
   onTap?(): void;
   /** full screen: an address to open in a tab from its bar */
   openUrl?: string;
@@ -143,7 +149,8 @@ export function ObjectFrame({
   const onHeaderDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.button !== 0) return;
-      if ((e.target as HTMLElement).closest("button, input, select")) return;
+      // a button, and the row of them (a near miss between two isn't a grab)
+      if ((e.target as HTMLElement).closest("button, input, select, a, .header-actions")) return;
       e.stopPropagation();
       setActiveObject(id);
       const d = dragRef.current;
@@ -208,8 +215,7 @@ export function ObjectFrame({
       return;
     }
     if (d.moved) onMove(spring.x.goal, spring.y.goal);
-    else onTap?.();
-  }, [spring, onMove, onTap]);
+  }, [spring, onMove]);
 
   // ----- resize -----
   const resizeRef = useRef({ active: false, startX: 0, startY: 0 });
@@ -327,9 +333,18 @@ export function ObjectFrame({
             </motion.div>
           )}
         </AnimatePresence>
-        <div className={"frame-body " + (bodyClass ?? "")} {...(chrome === "icons" ? dragHandlers : {})}>
+        <div className={"frame-body " + (bodyClass ?? "")} onClick={chrome === "icons" && onTap ? () => onTap() : undefined}>
           {children}
         </div>
+        {chrome === "icons" && (
+          // no bar to hold it by: a grip in the corner, there while the pointer is on the card
+          <div className="frame-grip" role="button" aria-label={`Move ${title}`} data-tip="Drag to move" {...dragHandlers}>
+            <div className="grip mini">
+              <span />
+              <span />
+            </div>
+          </div>
+        )}
         {overlay}
         {onResize && (
           <div
