@@ -8,8 +8,12 @@
  * The pipeline is WildChild's, staged so a person looks at each result before
  * credits go into the next:
  *
- *   inspiration → sheet (front view) → views → model → rig → clips      (form "model": a 3D skeletal character)
- *   inspiration → sheet (front view) → views (a portrait) → mesh         (form "mesh": a 2D mesh avatar)
+ *   inspiration → sheet (front view) → expressions → views → model → rig → clips      (form "model": a 3D skeletal character)
+ *   inspiration → sheet (front view) → expressions → views (a portrait) → mesh         (form "mesh": a 2D mesh avatar)
+ *
+ * `expressions` (2026-11-17) is one picture: the same character in a grid of labelled emotions and poses,
+ * drawn from the sheet. The views are then drawn from the sheet and it. Characters made before it have
+ * none: for them it is optional (`stagePassed`), an extra they can be given without redoing anything.
  *
  * Lineage is the Vision Archive's: every generated image keeps its prompt
  * word for word, the provider's model, and the hashes of the references it
@@ -19,13 +23,16 @@
 /** 3D skeletal (Meshy: model, rig, clips) or 2D mesh avatar (mesh-avatar: a drawn portrait that blinks, talks and emotes) */
 export type CharacterForm = "model" | "mesh";
 
-export type CharacterStageKey = "sheet" | "views" | "model" | "rig" | "clips" | "mesh";
+export type CharacterStageKey = "sheet" | "expressions" | "views" | "model" | "rig" | "clips" | "mesh";
 
 /** the stages of each form, in order */
 export const CHARACTER_STAGES: Record<CharacterForm, CharacterStageKey[]> = {
-  model: ["sheet", "views", "model", "rig", "clips"],
-  mesh: ["sheet", "views", "mesh"],
+  model: ["sheet", "expressions", "views", "model", "rig", "clips"],
+  mesh: ["sheet", "expressions", "views", "mesh"],
 };
+
+/** what the expressions sheet shows, panel by panel, in reading order (the prompt names them; mesh-avatar-studio reads the blink and the open mouth) */
+export const EXPRESSION_PANELS = ["neutral", "happy", "sad", "surprised", "thinking", "talking", "blink", "waving"] as const;
 
 export interface CharacterStage {
   state: "running" | "done" | "failed";
@@ -43,6 +50,8 @@ export interface CharacterStage {
 export interface CharacterFiles {
   /** the sheet: the character from the front, whole body */
   front?: string;
+  /** the expression-and-pose sheet: the same character in a grid of labelled emotions and poses, drawn from the sheet */
+  expressions?: string;
   back?: string;
   side?: string;
   /** mesh form: head and shoulders, clear background (what the mesh avatar is cut from) */
@@ -81,6 +90,50 @@ export interface CharacterState {
    */
   approval?: "pending" | "approved" | "archived";
 }
+
+/**
+ * A stage a character is past. Done is past; and `expressions` is past, without having been drawn, on a
+ * character made before that stage existed (a later stage of its is already done): it stays where it is,
+ * and can be given its expressions as an extra.
+ */
+export function stagePassed(c: Pick<CharacterState, "form" | "stages">, stage: CharacterStageKey): boolean {
+  if (c.stages[stage]?.state === "done") return true;
+  if (stage !== "expressions" || c.stages.expressions) return false;
+  const order = CHARACTER_STAGES[c.form];
+  return order.slice(order.indexOf("expressions") + 1).some((s) => c.stages[s]?.state === "done");
+}
+
+/** the stage a character is at: the first it isn't past (undefined: every stage is done, it's finished) */
+export function nextStage(c: Pick<CharacterState, "form" | "stages">): CharacterStageKey | undefined {
+  return CHARACTER_STAGES[c.form].find((s) => !stagePassed(c, s));
+}
+
+/**
+ * The studio's flow, a node per stage, between a set's Inspiration and its Characters (2026-11-17):
+ *
+ *   inspiration → sheet → expressions → views → mesh ─────────────→ output
+ *                                             ↘ model → rig → clips ↗
+ *
+ * Each node is a `pipeline` card (`node`: its key, `source`: the set) and the wires between them are the
+ * grid's own links. A character is at the node of its `nextStage`; finished, at `output`.
+ */
+export type PipelineNodeKey = "inspiration" | CharacterStageKey | "output";
+export const PIPELINE_NODES: readonly PipelineNodeKey[] = ["inspiration", "sheet", "expressions", "views", "mesh", "model", "rig", "clips", "output"];
+/** the wires of the flow: from a node's output to the next node's input, and what travels along it */
+export const PIPELINE_WIRES: ReadonlyArray<{ from: PipelineNodeKey; to: PipelineNodeKey; carries: string }> = [
+  { from: "inspiration", to: "sheet", carries: "pictures" },
+  { from: "sheet", to: "expressions", carries: "sheet" },
+  { from: "expressions", to: "views", carries: "expressions" },
+  { from: "views", to: "mesh", carries: "portrait" },
+  { from: "views", to: "model", carries: "back and side" },
+  { from: "model", to: "rig", carries: "model" },
+  { from: "rig", to: "clips", carries: "skeleton" },
+  { from: "mesh", to: "output", carries: "mesh avatar" },
+  { from: "clips", to: "output", carries: "3D character" },
+];
+
+/** the node a character stands at in the flow */
+export const nodeOf = (c: Pick<CharacterState, "form" | "stages">): PipelineNodeKey => nextStage(c) ?? "output";
 
 /** offered as an agent's avatar: finished, and not waiting on (or turned down by) a person */
 export const characterChoosable = (c: Pick<CharacterState, "ready" | "approval">) => c.ready && (c.approval === undefined || c.approval === "approved");

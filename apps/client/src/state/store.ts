@@ -2064,7 +2064,7 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   huddle: [560, 420],
   slack: [420, 520],
   crew: [380, 440],
-  character: [460, 620],
+  character: [460, 720],
   grid: [720, 520],
   kanban: [1480, 980],
   design: [1180, 900],

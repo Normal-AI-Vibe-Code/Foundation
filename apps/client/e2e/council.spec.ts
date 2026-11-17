@@ -9,7 +9,7 @@
  *   button saying its cost first; when the clips land it's "on the council"
  *   and the card plays it live, a mood at a time.
  * - A press with an agent's bearer is refused: spending needs a person.
- * - A mesh avatar's stages are sheet, portrait and a .mavatar brought in.
+ * - A mesh avatar's stages are sheet, expressions, portrait and a .mavatar brought in.
  * - With nobody at work the council is the bench: the characters there are.
  * - An agent at work sits in the council under its own name, on its cursor's
  *   colour, wearing a character; it's drawn live (one canvas for every seat),
@@ -67,11 +67,11 @@ test("⌘K opens the Character studio: one board, inspiration, the pipeline and 
   studio = await boardId(ada);
   const names = await ada.evaluate(() => Object.values((window as unknown as { __foundation: Store }).__foundation.getState().sections).map((s) => s.name).sort());
   expect(names).toEqual(["Characters · Abstract", "Characters · Animals", "Characters · Anime", "Inspiration · Abstract", "Inspiration · Animals", "Inspiration · Anime", "Pipeline · Abstract", "Pipeline · Animals", "Pipeline · Anime"]);
-  // between a set's inspiration and its characters, the flow: five nodes and a way to start one there
-  const flow = ada.locator('[data-pipeline="animals"]');
-  await expect(flow.locator("[data-pipe-node]")).toHaveCount(6);
-  await expect(flow.locator('[data-pipe-node="output"]')).toContainText("0 approved");
-  await expect(flow.locator("[data-pipe-new]")).toHaveCount(2);
+  // between a set's inspiration and its characters, the flow: a node card per stage and a way to start one there
+  // (e2e/character-studio.spec.ts walks it)
+  await expect(ada.locator('[data-pipe-node][data-pipe-set="animals"]')).toHaveCount(9);
+  await expect(ada.locator('[data-pipe-node="output"][data-pipe-set="animals"]')).toContainText("0 approved");
+  await expect(ada.locator('[data-pipe-node="sheet"][data-pipe-set="animals"] [data-pipe-new]')).toHaveCount(1);
   // opening it again opens the same one
   const again = await ctx.request.post(`${CLIENT}/api/characters/studio`);
   expect(await again.json()).toEqual({ id: studio, made: false });
@@ -96,8 +96,14 @@ test("a 3D character, a press at a time: each button says its cost, the card sho
   await expect(stage(ada, "Mochi", "views").locator("button")).toHaveCount(0);
   await ada.screenshot({ path: `${SHOTS}/10_card-new.png` });
 
+  // the stand-in is one for every check on this server: count from what it had been asked before these presses
+  const asked = ((await (await ctx.request.get(`${MESHY}/_sent`)).json()) as { sent: unknown[] }).sent.length;
   await press(ada, "Mochi", "sheet", /Draw the sheet · 9/);
   await expect(c.locator('[data-char-file="front"] img')).toBeVisible();
+  // the expressions sheet is its own press, and the views wait for it
+  await expect(stage(ada, "Mochi", "views").locator("button")).toHaveCount(0);
+  await press(ada, "Mochi", "expressions", /Draw the expressions · 9/);
+  await expect(c.locator('[data-char-file="expressions"] img')).toBeVisible();
   await press(ada, "Mochi", "views", /Draw the back and side · 18/);
   await expect(c.locator('[data-char-file="back"] img')).toBeVisible();
   await expect(c.locator('[data-char-file="side"] img')).toBeVisible();
@@ -109,13 +115,16 @@ test("a 3D character, a press at a time: each button says its cost, the card sho
   // finished, and waiting on a person's word before anyone can wear it
   await expect(c.locator(".char-tag.is-pending")).toHaveText("waiting for approval");
 
-  // what the stand-in was asked for, in order: the pipeline's five stages
-  const sent = ((await (await ctx.request.get(`${MESHY}/_sent`)).json()) as { sent: Array<{ endpoint: string; request: Record<string, unknown> }> }).sent;
-  expect(sent.map((s) => s.endpoint)).toEqual(["image-to-image", "image-to-image", "image-to-image", "multi-image-to-3d", "rigging", "animations"]);
+  // what the stand-in was asked for, in order: the pipeline's six stages (the sheet, the expressions, two views, …)
+  const sent = ((await (await ctx.request.get(`${MESHY}/_sent`)).json()) as { sent: Array<{ endpoint: string; request: Record<string, unknown> }> }).sent.slice(asked);
+  expect(sent.map((s) => s.endpoint)).toEqual(["image-to-image", "image-to-image", "image-to-image", "image-to-image", "multi-image-to-3d", "rigging", "animations"]);
   expect(String(sent[0].request.prompt)).toMatch(/^Front view\. A cheerful shiba in a teal s/); // the stand-in keeps the first 40 characters
-  expect((sent[5].request.action_ids as number[]).length).toBe(8);
+  expect(String(sent[1].request.prompt)).toMatch(/^Expression and pose sheet/);
+  expect((sent[6].request.action_ids as number[]).length).toBe(8);
 
-  // the card plays it: a live model, its clip changing with the mood
+  // the card plays it: a live model, its clip changing with the mood. The sheet is longer than its card now
+  // and the last press was at its foot: back up to the stage, the pointer on it (the card under the pointer plays)
+  await c.locator(".char-view").hover();
   const live = c.locator(".avatar-3d");
   await expect(live).toHaveClass(/is-live/, { timeout: 15_000 });
   const before = await frames(ada, `[data-character-card="Mochi"] canvas.avatar-canvas`);

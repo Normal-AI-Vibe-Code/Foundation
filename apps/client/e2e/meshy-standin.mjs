@@ -1,5 +1,6 @@
 // A stand-in Meshy for checks (MESHY_API_BASE): it takes image, model, rigging and animation tasks,
-// finishes each on the second ask, and serves what a real one would: a PNG for an image, and for a
+// finishes each on the second ask, and serves what a real one would: a PNG for an image (an eight-panel
+// grid when the prompt asks for an expression sheet), and for a
 // model or its clips a real GLB — a small skinned figure with Meshy's joint names and one clip per
 // requested action, so the board's own viewer loads it and plays it. Nothing is charged anywhere.
 //
@@ -30,17 +31,35 @@ const chunk = (type, data) => {
   c.writeUInt32BE(crc(td));
   return Buffer.concat([len, td, c]);
 };
-/** a 3:4 picture: a figure's silhouette on a pale ground, tinted by `seed` so each is its own file */
-function png(seed) {
-  const w = 96, h = 128;
+/**
+ * A 3:4 picture: a figure's silhouette on a pale ground, tinted by `seed` so each is its own file. With
+ * `grid`, a 4:3 expressions sheet instead: the same figure eight times, four across and two down, each a
+ * little different (its eyes shut in the seventh, its mouth open in the sixth), as the real one is asked for.
+ */
+function png(seed, grid = false) {
+  const w = grid ? 192 : 96, h = grid ? 144 : 128;
   const tint = [(seed * 53) % 200 + 40, (seed * 97) % 180 + 50, (seed * 151) % 160 + 70];
+  const dark = tint.map((v) => Math.round(v * 0.35));
   const raw = Buffer.alloc((w * 3 + 1) * h);
   for (let y = 0; y < h; y++) {
     raw[y * (w * 3 + 1)] = 0;
     for (let x = 0; x < w; x++) {
-      const head = (x - 48) ** 2 + (y - 36) ** 2 < 18 ** 2;
-      const body = Math.abs(x - 48) < 16 && y > 54 && y < 112;
-      const c = head || body ? tint : [244, 241, 232];
+      let c = [244, 241, 232];
+      if (grid) {
+        // each panel is 48 × 72: the 96 × 128 figure at half size
+        const panel = Math.floor(y / 72) * 4 + Math.floor(x / 48);
+        const px = (x % 48) * 2, py = (y % 72) * 2 - 8;
+        const head = (px - 48) ** 2 + (py - 36) ** 2 < 18 ** 2;
+        const body = Math.abs(px - 48) < 16 - (panel % 3) * 2 && py > 54 && py < 112;
+        const eye = Math.abs(Math.abs(px - 48) - 7) < 3 && Math.abs(py - 32) < (panel === 6 ? 1 : 3);
+        const mouth = Math.abs(px - 48) < 5 && Math.abs(py - 44) < (panel === 5 ? 4 : 1);
+        if (eye || mouth) c = dark;
+        else if (head || body) c = tint;
+      } else {
+        const head = (x - 48) ** 2 + (y - 36) ** 2 < 18 ** 2;
+        const body = Math.abs(x - 48) < 16 && y > 54 && y < 112;
+        if (head || body) c = tint;
+      }
       raw.set(c, y * (w * 3 + 1) + 1 + x * 3);
     }
   }
@@ -185,7 +204,7 @@ createServer((req, res) => {
     if (!t) return say(404, { message: "no such file" });
     res.writeHead(200);
     if (dl[2].endsWith(".glb")) return res.end(glb(t.endpoint === "animations" ? (t.body.action_ids ?? [0]).map((a) => `Action_${a}`) : [], t.n));
-    return res.end(png(t.n + (dl[2].startsWith("preview") ? 7 : 0)));
+    return res.end(png(t.n + (dl[2].startsWith("preview") ? 7 : 0), String(t.body.prompt ?? "").startsWith("Expression and pose sheet")));
   }
   if (!/^Bearer \S+/.test(req.headers.authorization ?? "")) return say(401, { message: "no key" });
   const [, endpoint, id] = /^\/([a-z0-9-]+)(?:\/([^/]+))?$/.exec(url.pathname) ?? [];

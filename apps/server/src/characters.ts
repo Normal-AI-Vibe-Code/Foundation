@@ -6,7 +6,8 @@
  * (meshy.ts), one press at a time:
  *
  *   sheet   the character from the front, drawn from the inspiration images and its words
- *   views   model form: the back and one side, turned from the sheet · mesh form: a head-and-shoulders portrait
+ *   expressions   the same character in a grid of labelled emotions and poses, drawn from the sheet
+ *   views   model form: the back and one side, turned from the sheet · mesh form: a head-and-shoulders portrait (both drawn from the sheet and the expressions)
  *   model   a textured 3D model from the views
  *   rig     a skeleton fitted to the model
  *   clips   one clip per mood, in one file: what a council seat plays
@@ -27,7 +28,10 @@
  *    person, an agent's delete_card), the character leaves the board's map
  *    with it, so every open browser's roster and council follow at once. Its
  *    row and its files stay (the archive is never deleted), and a card that
- *    comes back (a device that was offline) gets its character back.
+ *    comes back (a device that was offline) gets its character back;
+ *  - the studio's middle row is the flow as cards: a node per stage, wired with the grid's own links
+ *    (test/studio-pipeline.test.ts); a character that finishes in a Pipeline section is put into its
+ *    set's Characters section, where the section's own flow gives it a place.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -41,14 +45,18 @@ import {
   logActivity,
   MOOD_CLIPS,
   MOODS,
+  PIPELINE_NODES,
+  PIPELINE_WIRES,
   putNote,
   uid,
   type CharacterFiles,
   type CharacterForm,
   type CharacterStageKey,
   type CharacterState,
+  type LinkDoc,
   type MediaDoc,
   type PanelDoc,
+  type PipelineNodeKey,
   type SectionDoc,
   type UserInfo,
 } from "@foundation/protocol";
@@ -100,7 +108,8 @@ create table if not exists crew_avatars (name text primary key, character_id tex
 // ---------- what each stage asks for ----------
 
 /** which task of a stage this is, and so which file its result becomes */
-type Role = "front" | "back" | "side" | "portrait" | "model" | "rig" | "clips";
+type Role = "front" | "expressions" | "back" | "side" | "portrait" | "model" | "rig" | "clips";
+type ImageRole = "front" | "expressions" | "back" | "side" | "portrait";
 
 interface TaskRow {
   id: string;
@@ -140,6 +149,7 @@ const imageCost = () => IMAGE_COST[imageModel()] ?? 12;
 export function stageCost(form: CharacterForm, stage: CharacterStageKey): number {
   switch (stage) {
     case "sheet":
+    case "expressions":
       return imageCost();
     case "views":
       return form === "model" ? imageCost() * 2 : imageCost();
@@ -183,12 +193,77 @@ const PORTRAIT = [
   "Flat even light, no cast shadows, a plain flat mid-grey background with nothing on it, no text, no logos, no watermark.",
 ].join(" ");
 
+// The expression-and-pose sheet (2026-11-17, Josh: "robust character sheets with multiple emotions and poses
+// before sending it into mesh avatar studio"). One image, eight labelled panels in EXPRESSION_PANELS' order,
+// drawn from the accepted sheet so nothing about the character is invented twice. What each panel is for:
+// the neutral, blink and talking panels are the faces a mesh avatar needs drawn (a closed eye, an open
+// mouth); the rest are the moods a council seat shows. The words that matter most are the ones that keep
+// the eight figures the same character at the same scale, because a grid invites drift.
+const EXPRESSIONS_SAME = "Expression and pose sheet of exactly the character in the first reference image: the same face, proportions, colours, markings and clothes, in the same style, drawn eight times in one image.";
+const EXPRESSIONS_GRID = "A tidy grid, four across and two down, evenly spaced, nothing overlapping and nothing cropped, with a short plain label in small capitals under each.";
+const EXPRESSIONS_END = "Only the face and the pose change from one to the next: the proportions, colours, markings and clothes stay identical. Flat even light, no cast shadows, no frames or borders round the panels, no other text, no logos, no watermark, no other figures, nothing held in the hands.";
+const EXPRESSIONS: Record<CharacterForm, string> = {
+  // 3D: whole figures, so each mood reads in the body as well as the face
+  model: [
+    EXPRESSIONS_SAME,
+    EXPRESSIONS_GRID,
+    "Each is the whole figure, head to toe, at the same scale, standing on the same flat ground line and facing the viewer.",
+    "In reading order: NEUTRAL (standing relaxed, arms at the sides, mouth closed); HAPPY (a wide smile, arms a little raised);",
+    "SAD (head and shoulders lowered, brows raised in the middle, mouth turned down); SURPRISED (eyes wide, the mouth a small round o, arms out from the sides);",
+    "THINKING (one hand to the chin, eyes up to one side, mouth closed); TALKING (the mouth clearly open mid-word, one hand gesturing);",
+    "BLINK (both eyes fully closed, mouth closed, otherwise the neutral pose); WAVING (one arm raised high with the hand open, smiling).",
+    EXPRESSIONS_END,
+    "Plain flat off-white background.",
+  ].join(" "),
+  // mesh avatar: busts that register with one another, so a panel can be laid over the portrait
+  mesh: [
+    EXPRESSIONS_SAME,
+    EXPRESSIONS_GRID,
+    "Each is a head-and-shoulders bust at the same scale and in the same framing, facing the viewer squarely, the head upright and not tilted, the same size and in the same place in its panel every time, so one panel could be laid over another.",
+    "In reading order: NEUTRAL (both eyes open and looking at the viewer, mouth closed, relaxed); HAPPY (a wide smile, the eyes a little narrowed);",
+    "SAD (brows raised in the middle, eyes lowered, mouth turned down); SURPRISED (eyes wide, brows high, the mouth a small round o);",
+    "THINKING (eyes up to one side, mouth closed and a little to one side); TALKING (the mouth clearly open mid-word, eyes open);",
+    "BLINK (both eyes fully closed in a clean line, mouth closed, nothing else changed from neutral); WAVING (smiling, one open hand raised beside the face and not covering it).",
+    EXPRESSIONS_END,
+    // the portrait's ground, for the same reason: mid-grey cuts away cleanly where white takes white fur and hair with it
+    "A plain flat mid-grey background with nothing on it.",
+  ].join(" "),
+};
+const WITH_EXPRESSIONS: Record<"turn" | "portrait", string> = {
+  turn: "The second reference image is the same character's expression sheet: use it only to keep the face, colours and details the same. Draw one figure, never a grid, and no labels.",
+  portrait: "The second reference image is the same character's expression sheet: match its NEUTRAL panel's face exactly. Draw one portrait, never a grid, and no labels.",
+};
+
+/**
+ * A character's words as the image model reads them. The card's editor keeps them as markdown (a heading,
+ * a list, bold); a prompt is plain sentences, so the marks go and each line ends where the next begins.
+ * Words with no markup pass through unchanged.
+ */
+export function plainWords(text: string): string {
+  const lines: Array<{ text: string; heading: boolean }> = [];
+  for (const raw of text.replace(/\r/g, "").split("\n")) {
+    const heading = /^\s{0,3}#{1,6}\s+/.test(raw);
+    const line = raw
+      .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+|\d+[.)]\s+)/, "")
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/<\/?u>/gi, "")
+      .replace(/\*\*|__|~~|`/g, "")
+      .replace(/(^|[\s(])[_*]([^_*\n]+)[_*](?=$|[\s).,;:!?])/g, "$1$2")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (line && !/^-{3,}$/.test(line)) lines.push({ text: line, heading });
+  }
+  return lines.map((l, i) => (i < lines.length - 1 && !/[.!?:;,]$/.test(l.text) ? `${l.text}${l.heading ? ":" : "."}` : l.text)).join(" ");
+}
+
 /** the prompt for one image of a character, word for word as it's sent and kept */
-export function characterPrompt(c: Pick<CharacterState, "form" | "identity">, role: "front" | "back" | "side" | "portrait"): string {
-  const who = c.identity.trim();
+export function characterPrompt(c: Pick<CharacterState, "form" | "identity"> & { files?: Pick<CharacterFiles, "expressions"> }, role: ImageRole): string {
+  const who = plainWords(c.identity);
+  const sheet = Boolean(c.files?.expressions);
   if (role === "front") return `Front view. ${who} ${c.form === "model" ? MODEL_RULES : MESH_RULES} ${ORIGINAL}`;
-  if (role === "portrait") return `${PORTRAIT} ${who}`;
-  return `${VIEW[role]} ${TURN} ${who} ${MODEL_RULES}`;
+  if (role === "expressions") return `${EXPRESSIONS[c.form]} ${who}`;
+  if (role === "portrait") return `${PORTRAIT}${sheet ? ` ${WITH_EXPRESSIONS.portrait}` : ""} ${who}`;
+  return `${VIEW[role]} ${TURN}${sheet ? ` ${WITH_EXPRESSIONS.turn}` : ""} ${who} ${MODEL_RULES}`;
 }
 
 // ---------- reading and keeping a character ----------
@@ -310,44 +385,143 @@ export async function costs() {
 
 // ---------- the studio board ----------
 
+/** a character card's size when it's made (tools.ts and the client's store say the same) */
+const CARD_W = 460;
+const CARD_H = 720;
+
 export const STUDIO_SETS = ["Anime", "Animals", "Abstract"] as const;
 const inspirationName = (set: string) => `Inspiration · ${set}`;
 const charactersName = (set: string) => `Characters · ${set}`;
 const pipelineName = (set: string) => `Pipeline · ${set}`;
-const PIPELINE_ROW_H = 1040;
 
-/** a set's pipeline section: the flow card at its top, and room under it for characters in the making */
+// ---- the flow, as cards: a node per stage, joined by the grid's own wires (2026-11-17) ----
+//
+//   Inspiration → Sheet → Expressions → Views → Mesh avatar ───────────────→ Output
+//                                             ↘ Meshy model → Skeleton → Moods ↗
+//
+// The nodes float in a band across the top of a set's Pipeline section; cards in the making are docked,
+// and the section's flow puts them under the band. The first four and the last are as tall as both lanes,
+// so the band is one block with nothing docked beside it.
+const NODE_W = 200;
+const NODE_H = 290;
+const NODE_GAP = 56; // room for a wire to turn between two columns
+const LANE_GAP = 40;
+const NODE_TALL = NODE_H * 2 + LANE_GAP;
+const NODE_AT: Record<PipelineNodeKey, { name: string; col: number; lane: 0 | 1; tall?: boolean }> = {
+  inspiration: { name: "Inspiration", col: 0, lane: 0, tall: true },
+  sheet: { name: "Sheet", col: 1, lane: 0, tall: true },
+  expressions: { name: "Expressions", col: 2, lane: 0, tall: true },
+  views: { name: "Views", col: 3, lane: 0, tall: true },
+  mesh: { name: "Mesh avatar", col: 4, lane: 0 },
+  model: { name: "Meshy model", col: 4, lane: 1 },
+  rig: { name: "Skeleton", col: 5, lane: 1 },
+  clips: { name: "Moods", col: 6, lane: 1 },
+  output: { name: "Output", col: 7, lane: 0, tall: true },
+};
+const WIRE_TYPE: Record<string, string> = { model: "cad", skeleton: "cad", "3D character": "cad", "mesh avatar": "data" };
+/** wide enough for the band at full size (eight columns of nodes), and tall enough for the band and a shelf of cards in the making */
+export const STUDIO_COL_W = 8 * NODE_W + 7 * NODE_GAP + 68;
+const PIPELINE_ROW_H = NODE_TALL + CARD_H + 150;
+
+/**
+ * Lay a set's flow into its Pipeline section: the nine node cards and the wires between them. `first` is a
+ * card to make the first node of (the one flow card of 2026-11-16), so an upgrade removes nothing.
+ */
+function layFlow(doc: import("yjs").Doc, sec: SectionDoc, set: string, first?: PanelDoc) {
+  const m = boardMaps(doc);
+  const cards = new Map<PipelineNodeKey, PanelDoc>();
+  const now = Date.now();
+  PIPELINE_NODES.forEach((node, i) => {
+    const at = NODE_AT[node];
+    const ports = [
+      ...PIPELINE_WIRES.filter((w) => w.to === node).map((w) => ({ id: uid("port"), name: w.carries, dir: "in" as const, type: WIRE_TYPE[w.carries] ?? "image" })),
+      ...PIPELINE_WIRES.filter((w) => w.from === node).map((w) => ({ id: uid("port"), name: w.carries, dir: "out" as const, type: WIRE_TYPE[w.carries] ?? "image" })),
+    ];
+    const card: PanelDoc = {
+      ...(node === "inspiration" && first ? first : { id: uid("pnl"), kind: "panel" as const, panel: "pipeline" as const, bornAt: now + i }),
+      sectionId: sec.id,
+      name: at.name,
+      x: at.col * (NODE_W + NODE_GAP),
+      y: at.lane * (NODE_H + LANE_GAP),
+      float: true,
+      w: NODE_W,
+      h: at.tall ? NODE_TALL : NODE_H,
+      ports,
+      source: set.toLowerCase(),
+      node,
+    };
+    m.objects.set(card.id, card);
+    cards.set(node, card);
+  });
+  for (const w of PIPELINE_WIRES) {
+    const from = cards.get(w.from)!;
+    const to = cards.get(w.to)!;
+    const link: LinkDoc = { id: uid("lnk"), from: { panel: from.id, port: from.ports.find((p) => p.dir === "out" && p.name === w.carries)!.id }, to: { panel: to.id, port: to.ports.find((p) => p.dir === "in" && p.name === w.carries)!.id }, label: w.carries, createdBy: "Foundation" };
+    m.links.set(link.id, link);
+  }
+}
+
+/** a set's pipeline section: the flow's nodes across its top, and room under them for characters in the making */
 function addPipeline(doc: import("yjs").Doc, set: string, c: number, r: number) {
   const m = boardMaps(doc);
   const sec: SectionDoc = { id: uid("sec"), name: pipelineName(set), c0: c, r0: r, c1: c, r1: r };
   m.sections.set(sec.id, sec);
-  const card: PanelDoc = { id: uid("pnl"), kind: "panel", panel: "pipeline", sectionId: sec.id, name: `${set} pipeline`, x: 0, y: 0, float: false, bornAt: Date.now(), w: 1480, h: 330, ports: [], source: set.toLowerCase() };
-  m.objects.set(card.id, card);
+  layFlow(doc, sec, set);
 }
 
 /**
- * A studio from before the pipeline (2026-11-16) gets its middle row: between each set's Inspiration and
- * Characters, a Pipeline section with the flow card. Sections below move down a row; nothing else changes.
- * Done once (a studio that has any Pipeline section is left alone).
+ * Bring a studio from before to the layout there is now, a step at a time, each done once:
+ *
+ *  1. a studio from before the pipeline (2026-11-16) gets its middle row: between each set's Inspiration
+ *     and Characters, a Pipeline section. Sections below move down a row;
+ *  2. a Pipeline section that holds the one flow card of 2026-11-16 (or nothing of the flow) gets the flow
+ *     as nodes (2026-11-17): the flow card becomes the first node, so nothing is taken away, and the cards
+ *     in the making keep their section (its flow puts them under the nodes);
+ *  3. the tracks grow to hold it (never shrink): a set's column to the nodes' width, the pipeline row to
+ *     the nodes and a shelf of cards.
+ *
+ * A Pipeline section that already has a node is left alone, whatever a person did with the others.
  */
 export function upgradeStudio(boardId: string) {
   editBoard(boardId, "characters", (doc) => {
     const m = boardMaps(doc);
-    const top = [...m.sections.values()].filter((s) => !s.parent);
-    if (top.some((s) => /^pipeline\s*·/i.test(s.name))) return;
-    const insp = top.filter((s) => /^inspiration\s*·/i.test(s.name) && s.r0 === 0 && s.r1 === 0);
-    if (!insp.length) return;
-    const tracks = m.grid.get("tracks") ?? { cols: [DEFAULT_COL_W], rows: [DEFAULT_ROW_H] };
-    m.grid.set("tracks", { cols: tracks.cols, rows: [tracks.rows[0], PIPELINE_ROW_H, ...tracks.rows.slice(1)] });
-    for (const s of top) if (s.r0 >= 1) m.sections.set(s.id, { ...s, r0: s.r0 + 1, r1: s.r1 + 1 });
-    for (const s of top) if (s.r0 === 0 && s.r1 >= 1) m.sections.set(s.id, { ...s, r1: s.r1 + 1 });
-    const taken = new Set<number>();
-    for (const s of insp) {
-      const set = s.name.replace(/^inspiration\s*·\s*/i, "").trim();
-      for (let col = s.c0; col <= s.c1; col++) taken.add(col);
-      if (set) addPipeline(doc, set, s.c0, 1);
+    const tops = () => [...m.sections.values()].filter((s) => !s.parent);
+    const said: string[] = [];
+    if (!tops().some((s) => /^pipeline\s*·/i.test(s.name))) {
+      const top = tops();
+      const insp = top.filter((s) => /^inspiration\s*·/i.test(s.name) && s.r0 === 0 && s.r1 === 0);
+      if (!insp.length) return;
+      const tracks = m.grid.get("tracks") ?? { cols: [DEFAULT_COL_W], rows: [DEFAULT_ROW_H] };
+      m.grid.set("tracks", { cols: tracks.cols, rows: [tracks.rows[0], PIPELINE_ROW_H, ...tracks.rows.slice(1)] });
+      for (const s of top) if (s.r0 >= 1) m.sections.set(s.id, { ...s, r0: s.r0 + 1, r1: s.r1 + 1 });
+      for (const s of top) if (s.r0 === 0 && s.r1 >= 1) m.sections.set(s.id, { ...s, r1: s.r1 + 1 });
+      for (const s of insp) {
+        const set = s.name.replace(/^inspiration\s*·\s*/i, "").trim();
+        if (set) addPipeline(doc, set, s.c0, 1);
+      }
+      said.push("added the pipeline row: how a character is made, between its inspiration and the characters");
     }
-    logActivity(doc, { who: "Foundation", role: "agent", text: "added the pipeline row: how a character is made, between its inspiration and the characters" });
+    const grown: SectionDoc[] = [];
+    for (const sec of tops().filter((s) => /^pipeline\s*·/i.test(s.name))) {
+      const flow = [...m.objects.values()].filter((o): o is PanelDoc => o.sectionId === sec.id && o.kind === "panel" && o.panel === "pipeline");
+      const set = sec.name.replace(/^pipeline\s*·\s*/i, "").trim();
+      if (set && !flow.some((o) => o.node)) layFlow(doc, sec, set, flow[0]);
+      else if (!said.length) continue;
+      grown.push(sec);
+    }
+    if (grown.length) {
+      const tracks = m.grid.get("tracks") ?? { cols: [DEFAULT_COL_W], rows: [DEFAULT_ROW_H] };
+      const cols = [...tracks.cols];
+      const rows = [...tracks.rows];
+      for (const sec of grown) {
+        // a section over one column and one row is what the studio makes; one a person stretched is already theirs
+        if (sec.c0 === sec.c1 && cols[sec.c0] !== undefined) cols[sec.c0] = Math.max(cols[sec.c0], STUDIO_COL_W);
+        if (sec.r0 === sec.r1 && rows[sec.r0] !== undefined) rows[sec.r0] = Math.max(rows[sec.r0], PIPELINE_ROW_H);
+      }
+      m.grid.set("tracks", { cols, rows });
+      if (!said.length) said.push("drew the pipeline as nodes: a card for each stage, wired in order, each with the characters that are at it");
+    }
+    for (const text of said) logActivity(doc, { who: "Foundation", role: "agent", text });
   });
 }
 const titled = (set: string) => set.trim().replace(/^./, (c) => c.toUpperCase());
@@ -378,13 +552,14 @@ Characters for the council are made here, a stage at a time:
 
 1. **Inspiration.** Drop images into an *Inspiration* section. They set a set's style, mood and palette.
 2. **Sheet.** A character card draws its front view from the images you pick and the words you give it.
-3. **Views.** The back and a side (for a 3D character), or a head-and-shoulders portrait (for a mesh avatar).
-4. **Model, rig, clips.** A textured model, a skeleton, and a clip for each mood: idle, thinking, working, talking, happy, sad, surprised, waving.
-5. **Mesh.** A portrait becomes a mesh avatar that blinks, talks and emotes (built with mesh-avatar-studio and brought in as a \`.mavatar\`).
+3. **Expressions.** The same character eight times in one picture: neutral, happy, sad, surprised, thinking, talking, a blink, waving.
+4. **Views.** The back and a side (for a 3D character), or a head-and-shoulders portrait (for a mesh avatar), drawn from the sheet and the expressions.
+5. **Model, rig, clips.** A textured model, a skeleton, and a clip for each mood: idle, thinking, working, talking, happy, sad, surprised, waving.
+6. **Mesh.** A portrait becomes a mesh avatar that blinks, talks and emotes (built with mesh-avatar-studio and brought in as a \`.mavatar\`).
 
-Each stage is a press, and each button says what it costs before you press it. Look at what came back before paying for the next one. A finished character can sit on the council of any board.`;
+The middle row is that flow as nodes: each shows the characters that are at it, and **Generate** on one runs its next stage. Each stage is a press, and each button says what it costs before you press it. Look at what came back before paying for the next one. A finished character moves down into its set's Characters, and once approved can sit on the council of any board.`;
 
-/** the Character studio: one board, made once. Its sections are a row of inspiration and a row of characters, a column per set. */
+/** the Character studio: one board, made once. Its sections are a row of inspiration, a row of the pipeline's nodes and a row of characters, a column per set. */
 export function openStudio(user: UserInfo): { id: string; made: boolean } {
   const known = new Set(listBoards().map((b) => b.id));
   const was = all<{ board_id: string }>("select board_id from character_boards order by made_at").find((b) => known.has(b.board_id));
@@ -396,7 +571,7 @@ export function openStudio(user: UserInfo): { id: string; made: boolean } {
   run("insert into character_boards (board_id, made_by, made_at) values (?, ?, ?)", id, user.id, Date.now());
   editBoard(id, "characters", (doc) => {
     const m = boardMaps(doc);
-    m.grid.set("tracks", { cols: new Array(STUDIO_SETS.length).fill(DEFAULT_COL_W), rows: [DEFAULT_ROW_H, PIPELINE_ROW_H, DEFAULT_ROW_H] });
+    m.grid.set("tracks", { cols: new Array(STUDIO_SETS.length).fill(STUDIO_COL_W), rows: [DEFAULT_ROW_H, PIPELINE_ROW_H, DEFAULT_ROW_H] });
     STUDIO_SETS.forEach((set, c) => {
       const insp: SectionDoc = { id: uid("sec"), name: inspirationName(set), c0: c, r0: 0, c1: c, r1: 0 };
       const chars: SectionDoc = { id: uid("sec"), name: charactersName(set), c0: c, r0: 2, c1: c, r1: 2 };
@@ -405,7 +580,7 @@ export function openStudio(user: UserInfo): { id: string; made: boolean } {
       addPipeline(doc, set, c, 1);
       if (c === 0) putNote(doc, { id: uid("note"), kind: "note", sectionId: insp.id, name: "How it works", x: 0, y: 0, float: false, bornAt: Date.now(), w: 460, h: 520, text: HOW });
     });
-    logActivity(doc, { who: user.name, role: "human", text: "made the Character studio: inspiration and characters, a column for each set" });
+    logActivity(doc, { who: user.name, role: "human", text: "made the Character studio: inspiration, the pipeline and characters, a column for each set" });
   });
   // the board opens at once; the starter set walks on a moment later
   void seedStarter(id, user).catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`));
@@ -461,7 +636,8 @@ export async function seedStarter(boardId: string, user: UserInfo): Promise<numb
     if (!row) continue;
     const c = stateOf(row);
     c.files = files;
-    for (const stage of CHARACTER_STAGES[c.form]) c.stages[stage] = { state: "done", by: "the starter set" };
+    // every stage it went through; the expressions sheet only where the set carries one (the first sets were made before it)
+    for (const stage of CHARACTER_STAGES[c.form]) if (stage !== "expressions" || files.expressions) c.stages[stage] = { state: "done", by: "the starter set" };
     keep(row, c);
     n++;
   }
@@ -496,6 +672,8 @@ export interface NewCharacter {
   section?: string;
 }
 
+/** a character's words, as the card's editor keeps them (markdown: the marks count toward this, the prompt gets the plain words) */
+const IDENTITY_MAX = 1600;
 const HEIGHT = (h: unknown, form: CharacterForm) => (typeof h === "number" && h > 0.1 && h < 4 ? Math.round(h * 100) / 100 : form === "mesh" ? 1.6 : 1);
 
 function cleanRefs(boardId: string, refs: unknown): string[] {
@@ -514,7 +692,7 @@ export function createCharacter(boardId: string, actor: { name: string; id: stri
     name,
     set: set.toLowerCase(),
     form,
-    identity: (n.identity ?? "").trim().slice(0, 1200),
+    identity: (n.identity ?? "").trim().slice(0, IDENTITY_MAX),
     refs: cleanRefs(boardId, n.refs),
     stages: {},
     files: {},
@@ -527,7 +705,7 @@ export function createCharacter(boardId: string, actor: { name: string; id: stri
   editBoard(boardId, "characters", (doc) => {
     const m = boardMaps(doc);
     const sec = (n.section && ([...m.sections.values()].find((s) => s.id === n.section || s.name.trim().toLowerCase() === n.section!.trim().toLowerCase()))) || sectionNamed(doc, charactersName(set));
-    const panel: PanelDoc = { id: panelId, kind: "panel", panel: "character", sectionId: sec.id, name, x: 0, y: 0, float: false, bornAt: Date.now(), w: 460, h: 620, ports: [], createdBy: actor.name };
+    const panel: PanelDoc = { id: panelId, kind: "panel", panel: "character", sectionId: sec.id, name, x: 0, y: 0, float: false, bornAt: Date.now(), w: CARD_W, h: CARD_H, ports: [], createdBy: actor.name };
     m.objects.set(panelId, panel);
     m.characters.set(panelId, c);
     logActivity(doc, { who: actor.name, role: actor.human ? "human" : "agent", text: `added a character, “${name}” (${form === "model" ? "3D" : "mesh avatar"}, ${set})`, objectId: panelId });
@@ -552,7 +730,7 @@ export function editCharacter(boardId: string, panelId: string, patch: Partial<P
   const row = mustRow(boardId, panelId);
   const c = stateOf(row);
   if (typeof patch.name === "string" && patch.name.trim()) c.name = patch.name.trim().slice(0, 60);
-  if (typeof patch.identity === "string") c.identity = patch.identity.trim().slice(0, 1200);
+  if (typeof patch.identity === "string") c.identity = patch.identity.trim().slice(0, IDENTITY_MAX);
   if (patch.refs) c.refs = cleanRefs(boardId, patch.refs);
   if (patch.height !== undefined) c.height = HEIGHT(patch.height, c.form);
   keep(row, c);
@@ -587,7 +765,7 @@ interface Plan {
 
 /** what a stage sends: one task per result */
 function plan(c: CharacterState, stage: CharacterStageKey): Plan[] {
-  const image = (role: "front" | "back" | "side" | "portrait", refs: string[], extra: Record<string, unknown> = {}): Plan => {
+  const image = (role: ImageRole, refs: string[], extra: Record<string, unknown> = {}): Plan => {
     const prompt = characterPrompt(c, role);
     return {
       role,
@@ -602,11 +780,17 @@ function plan(c: CharacterState, stage: CharacterStageKey): Plan[] {
     case "sheet":
       if (!c.identity.trim()) throw new HttpError(400, "Say what the character is first: a line or two of who it is and what it wears");
       return [image("front", c.refs)];
+    case "expressions":
+      if (!c.files.front) throw new HttpError(400, "Draw the sheet first");
+      // eight panels, four across and two down: a wide picture, drawn from the accepted sheet alone
+      return [image("expressions", [c.files.front], { aspect_ratio: "4:3" })];
     case "views": {
       if (!c.files.front) throw new HttpError(400, "Draw the sheet first");
-      // a turnaround is drawn from the accepted front (and the first inspiration image, for its surface)
-      const refs = [c.files.front, ...c.refs.slice(0, 1)];
-      return c.form === "model" ? [image("back", refs), image("side", refs)] : [image("portrait", [c.files.front])];
+      // drawn from the accepted front, then the expressions sheet where there is one (so the face is the one
+      // already agreed), then for a turnaround the first inspiration image, for its surface
+      const own = [c.files.front, ...(c.files.expressions ? [c.files.expressions] : [])];
+      const refs = [...own, ...c.refs.slice(0, 1)];
+      return c.form === "model" ? [image("back", refs), image("side", refs)] : [image("portrait", own)];
     }
     case "model": {
       if (!c.files.front) throw new HttpError(400, "Draw the sheet first");
@@ -637,6 +821,27 @@ function plan(c: CharacterState, stage: CharacterStageKey): Plan[] {
     case "mesh":
       throw new HttpError(400, "A mesh avatar is built with mesh-avatar-studio and brought in as a .mavatar file");
   }
+}
+
+/**
+ * A character that has just finished goes to its set's output: out of the Pipeline section it was made in
+ * and into `Characters · <Set>`, docked, as the newest card there, so the section's own flow gives it the
+ * next free place (nothing overlaps, nothing else moves). A card a person keeps somewhere else stays there.
+ */
+function placeFinished(row: CharRow, c: CharacterState): boolean {
+  let moved = false;
+  editBoard(row.board_id, "characters", (doc) => {
+    const m = boardMaps(doc);
+    const card = m.objects.get(row.panel_id);
+    const from = card && m.sections.get(card.sectionId);
+    if (!card || !from || !/^pipeline\s*·/i.test(from.name)) return;
+    const to = sectionNamed(doc, charactersName(titled(c.set)));
+    if (to.id === from.id) return;
+    m.objects.set(card.id, { ...card, sectionId: to.id, float: false, x: 0, y: 0, bornAt: Date.now() });
+    logActivity(doc, { who: "Foundation", role: "system", text: `put “${c.name}” into ${to.name}`, objectId: card.id });
+    moved = true;
+  });
+  return moved;
 }
 
 const pollMs = () => Number(process.env.FOUNDATION_MESHY_POLL_MS ?? 5000);
@@ -677,9 +882,11 @@ export async function startStage(boardId: string, panelId: string, stage: Charac
     sends.push({ id, p, request });
   }
 
-  // the stages after this one are about what it's replacing
-  for (const s of order.slice(order.indexOf(stage) + 1)) delete c.stages[s];
-  const after: Record<CharacterStageKey, Array<keyof CharacterFiles>> = { sheet: ["back", "side", "portrait", "model", "clips", "mavatar", "thumb"], views: ["model", "clips", "mavatar"], model: ["clips"], rig: ["clips"], clips: [], mesh: [] };
+  // the stages after this one are about what it's replacing. Not after the expressions: that sheet adds to a
+  // character and replaces nothing, so drawing it (for one made before the stage existed, or again) leaves
+  // the views, the model and the avatar that were paid for where they are.
+  if (stage !== "expressions") for (const s of order.slice(order.indexOf(stage) + 1)) delete c.stages[s];
+  const after: Record<CharacterStageKey, Array<keyof CharacterFiles>> = { sheet: ["expressions", "back", "side", "portrait", "model", "clips", "mavatar", "thumb"], expressions: [], views: ["model", "clips", "mavatar"], model: ["clips"], rig: ["clips"], clips: [], mesh: [] };
   for (const f of after[stage]) delete c.files[f];
   c.stages[stage] = { state: "running", progress: 0, by: user.name, at: pressedAt };
   keep(row, c);
@@ -734,7 +941,7 @@ async function land(t: TaskRow, task: MeshyTask) {
     return file.id;
   };
   let fileId: string | undefined;
-  if (t.role === "front" || t.role === "back" || t.role === "side" || t.role === "portrait") {
+  if (t.role === "front" || t.role === "expressions" || t.role === "back" || t.role === "side" || t.role === "portrait") {
     fileId = await bring(task.image_urls?.[0], t.role === "front" ? "sheet" : t.role);
     if (!fileId) throw new Error("Meshy finished the image but gave none");
     // read the state again: another view of the same stage may have landed while this downloaded
@@ -795,6 +1002,7 @@ async function follow(taskRowId: string) {
         if (c.stages[t.stage]?.state === "done") {
           const row = rowById(t.character_id)!;
           editBoard(row.board_id, "characters", (doc) => logActivity(doc, { who: "Meshy", role: "agent", text: `finished “${c.name}”’s ${t.stage}${c.ready && t.stage === "clips" ? ": ready for the council" : ""}`, objectId: row.panel_id }));
+          if (c.ready && t.stage === "clips") placeFinished(row, c);
         }
         balanceAt = 0;
         return;
@@ -840,6 +1048,7 @@ export async function attachMavatar(boardId: string, panelId: string, body: Buff
   c.stages.mesh = { state: "done", by: user.name, at: Date.now() };
   keep(row, c);
   editBoard(boardId, "characters", (doc) => logActivity(doc, { who: user.name, role: "human", text: `brought in “${c.name}”’s mesh avatar: ready for the council`, objectId: panelId }));
+  placeFinished(row, c);
   return c;
 }
 
