@@ -10,39 +10,8 @@ import { openDetail } from "../lib/detail";
 import { renderMarkdown } from "../utils/markdown";
 import type { Exchange } from "./model";
 
-type Part = { kind: "text"; text: string } | { kind: "code"; lang: string; text: string };
-
-/** the answer in parts: prose, and each fenced block on its own (an unclosed fence, still arriving, is code too) */
-export function partsOf(answer: string): Part[] {
-  const out: Part[] = [];
-  const lines = answer.split(/\r?\n/);
-  let text: string[] = [];
-  let code: string[] | null = null;
-  let lang = "";
-  const flush = () => {
-    if (text.join("\n").trim()) out.push({ kind: "text", text: text.join("\n") });
-    text = [];
-  };
-  for (const l of lines) {
-    const fence = /^\s*```(.*)$/.exec(l);
-    if (fence) {
-      if (code) {
-        out.push({ kind: "code", lang, text: code.join("\n") });
-        code = null;
-      } else {
-        flush();
-        code = [];
-        lang = fence[1].trim().split(/\s+/)[0] ?? "";
-      }
-      continue;
-    }
-    if (code) code.push(l);
-    else text.push(l);
-  }
-  if (code) out.push({ kind: "code", lang, text: code.join("\n") });
-  flush();
-  return out;
-}
+import { partsOf } from "./talk";
+export { partsOf };
 
 const COMMANDS = new Set(["bash", "sh", "shell", "zsh", "powershell", "ps1", "cmd", "console"]);
 

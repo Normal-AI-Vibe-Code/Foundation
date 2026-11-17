@@ -135,7 +135,7 @@ test("a text box is written as formatted text and kept as the note's markdown; t
   await kai.screenshot({ path: `${SHOTS}/02_kai-text-box-at-rest.png` });
 });
 
-test("the chip brings the section's council up on top of it; a line from there brings an agent in, for everyone", async () => {
+test("the chip opens the section's council as a band at its top; a line from there brings an agent in, for everyone", async () => {
   const chip = (p: Page) => p.locator(`.section-card[data-section-id="${section.id}"] .sec-agents-chip`);
   // the tools take the corner under the pointer, so the mark at rest is pressed from elsewhere
   await ada.mouse.move(700, 880);
@@ -147,12 +147,14 @@ test("the chip brings the section's council up on top of it; a line from there b
   await expect(council).toHaveAttribute("data-council", "0");
   // it stands inside the window, over the section, under the top bar
   await settle(ada, 700);
-  const sec = (await ada.locator(`.section-card[data-section-id="${section.id}"]`).boundingBox())!;
-  const bar = (await council.locator(".council-bar").boundingBox())!;
-  const mid = bar.x + bar.width / 2;
-  expect(mid).toBeGreaterThan(Math.max(0, sec.x) - 1);
-  expect(mid).toBeLessThan(Math.min(1440, sec.x + sec.width) + 1);
-  expect(bar.y).toBeGreaterThanOrEqual(44);
+  const card = ada.locator(`.section-card[data-section-id="${section.id}"]`);
+  const sec = (await card.boundingBox())!;
+  const band = (await card.locator(".council-place.is-section").boundingBox())!;
+  const head = (await card.locator(".section-header").boundingBox())!;
+  // a band at the section's top, inside it; the header is pushed down under it
+  expect(Math.abs(band.x - sec.x)).toBeLessThan(3);
+  expect(Math.abs(band.y - sec.y)).toBeLessThan(3);
+  expect(head.y).toBeGreaterThanOrEqual(band.y + band.height - 2);
   await ada.screenshot({ path: `${SHOTS}/03_council-nobody-here.png` });
 
   await council.locator(".council-ask-text").fill("make a table of the parts, and get help");

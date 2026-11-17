@@ -21,7 +21,7 @@ export async function openCharacterStudio() {
 /** "Characters · Anime" and "Inspiration · Anime" are the anime set's sections */
 function setOfSection(sectionId: string): string {
   const name = getState().allSections[sectionId]?.name ?? "";
-  const m = /^(?:characters|inspiration)\s*·\s*(.+)$/i.exec(name.trim());
+  const m = /^(?:characters|inspiration|pipeline)\s*·\s*(.+)$/i.exec(name.trim());
   return m ? m[1] : name.trim() || "Abstract";
 }
 

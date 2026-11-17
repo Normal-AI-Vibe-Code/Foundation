@@ -73,7 +73,17 @@ export interface CharacterState {
   height: number;
   /** it can sit on the council: a model with its clips, or a mesh avatar */
   ready: boolean;
+  /**
+   * A person's word on it (2026-11-16). A character made in the pipeline is "pending" until someone
+   * approves it; only approved ones are offered when an agent's avatar is chosen; "archived" keeps it
+   * and its files but takes it out of the choice. Absent on characters from before this (and the
+   * starter set): they read as approved.
+   */
+  approval?: "pending" | "approved" | "archived";
 }
+
+/** offered as an agent's avatar: finished, and not waiting on (or turned down by) a person */
+export const characterChoosable = (c: Pick<CharacterState, "ready" | "approval">) => c.ready && (c.approval === undefined || c.approval === "approved");
 
 // ---------- moods: what an avatar shows ----------
 

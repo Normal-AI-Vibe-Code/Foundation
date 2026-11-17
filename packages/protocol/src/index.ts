@@ -186,6 +186,7 @@ export type PanelKind =
   | "grid" // a grid inside this one (2026-11-15): the section that holds it stands for a child grid and opens it
   | "kanban" // a kanban board: columns of cards moved between them (the plan is one)
   | "design" // a chapter of the design language, live on its tokens
+  | "pipeline" // the Character studio's flow for one set: inspiration → sheet → views → Meshy or mesh avatar → characters (`source`: the set)
   | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
 
 export interface Port {

@@ -10,6 +10,7 @@
  * once engaged (click), so panning the grid over them stays smooth.
  */
 
+import { PipelineBody } from "./PipelineView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
 import { CadPreview } from "../cad/CadPreview";
@@ -66,6 +67,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   grid: "▦",
   kanban: "▥",
   design: "◐",
+  pipeline: "⇢",
 };
 
 export const PanelView = memo(function PanelView({ panel, pos, isActive, getScale, hosted }: Props) {
@@ -124,6 +126,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <KanbanBody panel={panel} />
     ) : panel.panel === "design" ? (
       <DesignBody panel={panel} />
+    ) : panel.panel === "pipeline" ? (
+      <PipelineBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (

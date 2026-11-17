@@ -128,14 +128,14 @@ let BOARD = "";
 const state = (panel: string) => boardMaps(getBoard(BOARD).doc).characters.get(panel)!;
 const done = (panel: string, stage: string) => until(`${stage} to finish`, () => (state(panel).stages as Record<string, { state: string }>)[stage]?.state !== "running" && state(panel));
 
-test("the studio is one board, made once: a row of inspiration and a row of characters, a column per set", () => {
+test("the studio is one board, made once: inspiration, the pipeline and characters, a column per set", () => {
   const made = chars.openStudio(ada);
   assert.equal(made.made, true);
   BOARD = made.id;
   assert.deepEqual(chars.openStudio(vic), { id: BOARD, made: false });
   assert.equal(listBoards().filter((b) => b.name === "Character studio").length, 1);
   const names = [...boardMaps(getBoard(BOARD).doc).sections.values()].map((s) => s.name).sort();
-  assert.deepEqual(names, ["Characters · Abstract", "Characters · Animals", "Characters · Anime", "Inspiration · Abstract", "Inspiration · Animals", "Inspiration · Anime"]);
+  assert.deepEqual(names, ["Characters · Abstract", "Characters · Animals", "Characters · Anime", "Inspiration · Abstract", "Inspiration · Animals", "Inspiration · Anime", "Pipeline · Abstract", "Pipeline · Animals", "Pipeline · Anime"]);
 });
 
 test("an agent adds a character; a viewer can't; nothing is sent to Meshy for it", async () => {

@@ -268,6 +268,43 @@ export async function costs() {
 export const STUDIO_SETS = ["Anime", "Animals", "Abstract"] as const;
 const inspirationName = (set: string) => `Inspiration · ${set}`;
 const charactersName = (set: string) => `Characters · ${set}`;
+const pipelineName = (set: string) => `Pipeline · ${set}`;
+const PIPELINE_ROW_H = 1040;
+
+/** a set's pipeline section: the flow card at its top, and room under it for characters in the making */
+function addPipeline(doc: import("yjs").Doc, set: string, c: number, r: number) {
+  const m = boardMaps(doc);
+  const sec: SectionDoc = { id: uid("sec"), name: pipelineName(set), c0: c, r0: r, c1: c, r1: r };
+  m.sections.set(sec.id, sec);
+  const card: PanelDoc = { id: uid("pnl"), kind: "panel", panel: "pipeline", sectionId: sec.id, name: `${set} pipeline`, x: 0, y: 0, float: false, bornAt: Date.now(), w: 1480, h: 330, ports: [], source: set.toLowerCase() };
+  m.objects.set(card.id, card);
+}
+
+/**
+ * A studio from before the pipeline (2026-11-16) gets its middle row: between each set's Inspiration and
+ * Characters, a Pipeline section with the flow card. Sections below move down a row; nothing else changes.
+ * Done once (a studio that has any Pipeline section is left alone).
+ */
+export function upgradeStudio(boardId: string) {
+  editBoard(boardId, "characters", (doc) => {
+    const m = boardMaps(doc);
+    const top = [...m.sections.values()].filter((s) => !s.parent);
+    if (top.some((s) => /^pipeline\s*·/i.test(s.name))) return;
+    const insp = top.filter((s) => /^inspiration\s*·/i.test(s.name) && s.r0 === 0 && s.r1 === 0);
+    if (!insp.length) return;
+    const tracks = m.grid.get("tracks") ?? { cols: [DEFAULT_COL_W], rows: [DEFAULT_ROW_H] };
+    m.grid.set("tracks", { cols: tracks.cols, rows: [tracks.rows[0], PIPELINE_ROW_H, ...tracks.rows.slice(1)] });
+    for (const s of top) if (s.r0 >= 1) m.sections.set(s.id, { ...s, r0: s.r0 + 1, r1: s.r1 + 1 });
+    for (const s of top) if (s.r0 === 0 && s.r1 >= 1) m.sections.set(s.id, { ...s, r1: s.r1 + 1 });
+    const taken = new Set<number>();
+    for (const s of insp) {
+      const set = s.name.replace(/^inspiration\s*·\s*/i, "").trim();
+      for (let col = s.c0; col <= s.c1; col++) taken.add(col);
+      if (set) addPipeline(doc, set, s.c0, 1);
+    }
+    logActivity(doc, { who: "Foundation", role: "agent", text: "added the pipeline row: how a character is made, between its inspiration and the characters" });
+  });
+}
 const titled = (set: string) => set.trim().replace(/^./, (c) => c.toUpperCase());
 
 function freeCell(doc: import("yjs").Doc): { c: number; r: number } {
@@ -306,17 +343,21 @@ Each stage is a press, and each button says what it costs before you press it. L
 export function openStudio(user: UserInfo): { id: string; made: boolean } {
   const known = new Set(listBoards().map((b) => b.id));
   const was = all<{ board_id: string }>("select board_id from character_boards order by made_at").find((b) => known.has(b.board_id));
-  if (was) return { id: was.board_id, made: false };
+  if (was) {
+    upgradeStudio(was.board_id);
+    return { id: was.board_id, made: false };
+  }
   const id = createBoardRow("Character studio", { kind: "grid" });
   run("insert into character_boards (board_id, made_by, made_at) values (?, ?, ?)", id, user.id, Date.now());
   editBoard(id, "characters", (doc) => {
     const m = boardMaps(doc);
-    m.grid.set("tracks", { cols: new Array(STUDIO_SETS.length).fill(DEFAULT_COL_W), rows: [DEFAULT_ROW_H, DEFAULT_ROW_H] });
+    m.grid.set("tracks", { cols: new Array(STUDIO_SETS.length).fill(DEFAULT_COL_W), rows: [DEFAULT_ROW_H, PIPELINE_ROW_H, DEFAULT_ROW_H] });
     STUDIO_SETS.forEach((set, c) => {
       const insp: SectionDoc = { id: uid("sec"), name: inspirationName(set), c0: c, r0: 0, c1: c, r1: 0 };
-      const chars: SectionDoc = { id: uid("sec"), name: charactersName(set), c0: c, r0: 1, c1: c, r1: 1 };
+      const chars: SectionDoc = { id: uid("sec"), name: charactersName(set), c0: c, r0: 2, c1: c, r1: 2 };
       m.sections.set(insp.id, insp);
       m.sections.set(chars.id, chars);
+      addPipeline(doc, set, c, 1);
       if (c === 0) putNote(doc, { id: uid("note"), kind: "note", sectionId: insp.id, name: "How it works", x: 0, y: 0, float: false, bornAt: Date.now(), w: 460, h: 520, text: HOW });
     });
     logActivity(doc, { who: user.name, role: "human", text: "made the Character studio: inspiration and characters, a column for each set" });
@@ -434,6 +475,8 @@ export function createCharacter(boardId: string, actor: { name: string; id: stri
     files: {},
     height: HEIGHT(n.height, form),
     ready: false,
+    // made in the pipeline: a person approves it before it's offered as an agent's avatar (the starter set arrives approved)
+    approval: actor.human || actor.name !== "Foundation" ? "pending" : undefined,
   };
   const panelId = uid("pnl");
   editBoard(boardId, "characters", (doc) => {
@@ -446,6 +489,17 @@ export function createCharacter(boardId: string, actor: { name: string; id: stri
   });
   run("insert into characters (id, board_id, panel_id, state, created_by, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)", c.id, boardId, panelId, JSON.stringify(c), actor.id, Date.now(), Date.now());
   return { ...c, boardId, panelId };
+}
+
+/** a person's word on a character: approved (offered as an avatar), archived (kept, not offered), or back to pending */
+export function setApproval(boardId: string, panelId: string, approval: "pending" | "approved" | "archived", user: UserInfo): CharacterState {
+  const row = mustRow(boardId, panelId);
+  const c = stateOf(row);
+  if (approval === "approved" && !c.ready) throw new HttpError(409, `${c.name} isn't finished yet: it needs its last stage before it can be approved.`);
+  c.approval = approval;
+  keep(row, c);
+  editBoard(boardId, "characters", (doc) => logActivity(doc, { who: user.name, role: "human", text: approval === "approved" ? `approved ${c.name} for the council` : approval === "archived" ? `archived ${c.name}` : `put ${c.name} back in the pipeline`, objectId: panelId }));
+  return c;
 }
 
 /** change a character's words: its name, what it is, what it's drawn from, how tall. Stages already made stay as they are. */

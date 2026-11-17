@@ -6,7 +6,7 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { boardMaps, seatCrew, type CharacterState } from "@foundation/protocol";
+import { boardMaps, characterChoosable, seatCrew, type CharacterState } from "@foundation/protocol";
 import { api, fetchFile } from "../lib/api";
 import { activeBoard, onBoardChange } from "../sync/board";
 
@@ -76,7 +76,8 @@ export function useRoster(): Roster {
   return useSyncExternalStore(subscribe, () => roster);
 }
 
-export const readyCharacters = (r: Roster) => r.characters.filter((c) => c.ready);
+/** the characters an agent can wear: finished and approved (protocol characterChoosable) */
+export const readyCharacters = (r: Roster) => r.characters.filter(characterChoosable);
 
 /** each agent name's character, for the agents in a room (protocol's seatCrew, over the ready ones) */
 export function seats(r: Roster, names: readonly string[]): Record<string, RosterCharacter | undefined> {

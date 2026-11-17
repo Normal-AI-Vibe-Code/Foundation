@@ -247,3 +247,32 @@
   font: 400 var(--text-11) / 1.3 var(--font-sans);
   color: var(--color-dim);
 }
+
+/* a person's word on a character: approve, archive, restore */
+.char-approval {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.char-approval > span {
+  flex: 1;
+  min-width: 0;
+}
+.char-approval[data-char-approval="pending"] {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.char-tag.is-pending {
+  color: var(--color-warn);
+}
+.char-tag.is-archived {
+  color: var(--color-dim);
+}
+.char-body:has([data-char-approval="archived"]) .char-view {
+  opacity: 0.5;
+}

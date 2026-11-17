@@ -58,7 +58,7 @@ test.beforeAll(async ({ browser }) => {
   ctx = a.context;
 });
 
-test("⌘K opens the Character studio: one board, inspiration and characters, a column per set", async () => {
+test("⌘K opens the Character studio: one board, inspiration, the pipeline and characters, a column per set", async () => {
   await ada.keyboard.press("Control+k");
   await ada.keyboard.type("Character studio");
   await ada.locator(".cmd-row", { hasText: "Open the Character studio" }).first().click();
@@ -66,7 +66,12 @@ test("⌘K opens the Character studio: one board, inspiration and characters, a 
   await waitLive(ada);
   studio = await boardId(ada);
   const names = await ada.evaluate(() => Object.values((window as unknown as { __foundation: Store }).__foundation.getState().sections).map((s) => s.name).sort());
-  expect(names).toEqual(["Characters · Abstract", "Characters · Animals", "Characters · Anime", "Inspiration · Abstract", "Inspiration · Animals", "Inspiration · Anime"]);
+  expect(names).toEqual(["Characters · Abstract", "Characters · Animals", "Characters · Anime", "Inspiration · Abstract", "Inspiration · Animals", "Inspiration · Anime", "Pipeline · Abstract", "Pipeline · Animals", "Pipeline · Anime"]);
+  // between a set's inspiration and its characters, the flow: five nodes and a way to start one there
+  const flow = ada.locator('[data-pipeline="animals"]');
+  await expect(flow.locator("[data-pipe-node]")).toHaveCount(6);
+  await expect(flow.locator('[data-pipe-node="output"]')).toContainText("0 approved");
+  await expect(flow.locator("[data-pipe-new]")).toHaveCount(2);
   // opening it again opens the same one
   const again = await ctx.request.post(`${CLIENT}/api/characters/studio`);
   expect(await again.json()).toEqual({ id: studio, made: false });
@@ -101,7 +106,8 @@ test("a 3D character, a press at a time: each button says its cost, the card sho
   await expect(c).not.toHaveAttribute("data-character-ready", "true");
   await press(ada, "Mochi", "clips", /Animate the moods · 24/);
   await expect(c).toHaveAttribute("data-character-ready", "true");
-  await expect(c.locator(".char-tag.is-ready")).toHaveText("on the council");
+  // finished, and waiting on a person's word before anyone can wear it
+  await expect(c.locator(".char-tag.is-pending")).toHaveText("waiting for approval");
 
   // what the stand-in was asked for, in order: the pipeline's five stages
   const sent = ((await (await ctx.request.get(`${MESHY}/_sent`)).json()) as { sent: Array<{ endpoint: string; request: Record<string, unknown> }> }).sent;
@@ -120,6 +126,16 @@ test("a 3D character, a press at a time: each button says its cost, the card sho
   await ada.screenshot({ path: `${SHOTS}/11_card-ready-happy.png` });
 });
 
+test("a finished character waits for a person's approval; approved, it's one an agent can wear", async () => {
+  const mochi = card(ada, "Mochi");
+  await expect(mochi.locator("[data-char-approval]")).toHaveAttribute("data-char-approval", "pending");
+  const before = ((await (await ctx.request.get(`${CLIENT}/api/characters`)).json()) as { characters: Array<{ name: string; approval?: string }> }).characters.find((c) => c.name === "Mochi")!;
+  expect(before.approval).toBe("pending");
+  await mochi.locator("[data-char-approval] .f-pill.is-accent").dispatchEvent("click");
+  await expect(mochi.locator("[data-char-approval]")).toHaveAttribute("data-char-approval", "approved");
+  await expect(mochi.locator(".char-tag.is-ready")).toHaveText("on the council");
+});
+
 test("a press with an agent's bearer is refused: spending credits needs a person at a browser", async () => {
   const id = await frame(ada, "Mochi");
   const token = ((await (await ctx.request.post(`${CLIENT}/api/agent/token`)).json()) as { token: string }).token;
@@ -136,22 +152,32 @@ test("the grid's council drops from the top bar; with nobody assigned it says so
   const council = ada.locator(".council");
   await expect(council).toHaveAttribute("data-council", "0");
   await expect(council.locator(".council-count")).toHaveText("nobody yet");
-  // under the top bar, in the middle of the open paper (once it has come down)
+  // a band under the top bar, as wide as the open paper; the grid starts below it
   await settle(ada, 700);
-  const bar = (await council.locator(".council-bar").boundingBox())!;
-  expect(bar.y).toBeGreaterThanOrEqual(44);
-  expect(bar.y).toBeLessThan(120);
+  const bar = (await ada.locator(".council-place.is-board").boundingBox())!;
   const paper = await ada.evaluate(() => {
     const pane = document.querySelector<HTMLElement>(".side-pane");
     return { left: pane ? pane.getBoundingClientRect().right : 0, right: window.innerWidth };
   });
-  expect(Math.abs(bar.x + bar.width / 2 - (paper.left + paper.right) / 2)).toBeLessThan(24);
+  expect(bar.y).toBe(44);
+  expect(Math.abs(bar.x - paper.left)).toBeLessThan(2);
+  expect(Math.abs(bar.x + bar.width - paper.right)).toBeLessThan(2);
+  const insetTop = await ada.evaluate(() => Number(getComputedStyle(document.querySelector(".world-mask")!).getPropertyValue("--floor-t").replace("px", "")));
+  expect(insetTop).toBe(44 + bar.height);
 
-  // ＋: the agents that could sit; Claude (the script runtime here) is one
+  // ＋ opens the agents panel on Add an agent: who (already listed: nothing to look for), connect, avatar, add
   await council.locator("[data-council-add]").click();
-  const add = council.locator("[data-council-add-menu]");
-  await expect(add.locator('[data-council-add-agent="claude"]')).toContainText("In the cloud");
-  await add.locator('[data-council-add-agent="claude"]').click();
+  const add = ada.locator("[data-add-agent]");
+  await expect(add.locator('[data-add-kind="claude"]')).toContainText("ready");
+  await expect(add.locator('[data-add-step="2"]')).toHaveAttribute("data-add-state", "wait");
+  await add.locator('[data-add-kind="claude"]').click();
+  await expect(add.locator('[data-add-connect="ready"]')).toContainText("in the cloud");
+  // an avatar is chosen already (the approved character), so skipping the step still gives it a face
+  await expect(add.locator(".add-avatar.is-on")).toHaveAttribute("data-add-avatar", "Mochi");
+  await settle(ada, 300);
+  await ada.screenshot({ path: `${SHOTS}/12a_adding-an-agent.png` });
+  await add.locator("[data-add-submit]").click();
+  await expect(ada.locator("[data-add-agent]")).toHaveCount(0);
   const seat = council.locator('[data-council-agent="claude"]');
   await expect(seat).toBeVisible();
   await expect(seat).toHaveClass(/is-idle/);
@@ -181,9 +207,9 @@ test("the grid's council drops from the top bar; with nobody assigned it says so
   await expect(info).toContainText("To the whole grid, by Ada Test");
   await expect(info.locator(".avatar-3d")).toHaveAttribute("data-framing", "full");
   await settle(ada, 500);
-  const moved = (await council.locator(".council-bar").boundingBox())!;
+  const moved = (await ada.locator(".council-place.is-board").boundingBox())!;
   const infoBox = (await info.boundingBox())!;
-  expect(Math.abs(moved.x + moved.width / 2 - (paper.left + infoBox.x) / 2)).toBeLessThan(24);
+  expect(Math.abs(moved.x + moved.width - infoBox.x)).toBeLessThan(2);
   await settle(ada, 600);
   await ada.screenshot({ path: `${SHOTS}/12b_agent-pane.png` });
 
@@ -278,15 +304,18 @@ test("a section's council stands on top of its section and holds only that secti
   await councilOf(supply, "Supply");
   await expect(ada.locator(".council-place.is-section")).toHaveCount(1);
   await expect(council).toHaveAttribute("data-council", "0");
-  // it stands over its section: inside the section's width, at its top
+  // it is part of its section: a band at the section's top, as wide as it, with the header pushed down under it
   const over = async (id: string) => {
     await settle(ada, 700);
-    const sec = (await ada.locator(`.section-card[data-section-id="${id}"]`).boundingBox())!;
-    const bar = (await council.locator(".council-bar").boundingBox())!;
-    const mid = bar.x + bar.width / 2;
-    expect(mid).toBeGreaterThan(Math.max(0, sec.x) - 1);
-    expect(mid).toBeLessThan(Math.min(1440, sec.x + sec.width) + 1);
-    expect(bar.y).toBeGreaterThanOrEqual(44);
+    const card = ada.locator(`.section-card[data-section-id="${id}"]`);
+    await expect(card.locator(".council-place.is-section")).toHaveCount(1);
+    const sec = (await card.boundingBox())!;
+    const band = (await card.locator(".council-place.is-section").boundingBox())!;
+    const head = (await card.locator(".section-header").boundingBox())!;
+    expect(Math.abs(band.x - sec.x)).toBeLessThan(3);
+    expect(Math.abs(band.width - sec.width)).toBeLessThan(4);
+    expect(Math.abs(band.y - sec.y)).toBeLessThan(3);
+    expect(head.y).toBeGreaterThanOrEqual(band.y + band.height - 2);
   };
   await over(supply);
   // Depot's council: the agent building it

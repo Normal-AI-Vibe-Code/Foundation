@@ -1,0 +1,119 @@
+/* The Character studio's flow card (panels/PipelineView.tsx). On tokens only. */
+
+.pipeline {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  container-type: inline-size;
+}
+.pipe-flow {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+.pipe-node {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+}
+.pipe-node.is-out {
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px color-mix(in srgb, var(--color-agent) 45%, var(--color-line));
+}
+.pipe-kind {
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pipe-node b {
+  font: 600 var(--text-16) / 1.2 var(--font-sans);
+}
+.pipe-what {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.pipe-count {
+  margin-top: auto;
+  color: var(--color-frost);
+  font: 600 var(--text-12) / 1.2 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.pipe-count.is-none {
+  color: var(--color-dim);
+  font-weight: 400;
+}
+.pipe-count.is-running {
+  color: var(--color-agent);
+}
+.pipe-pics {
+  display: flex;
+  gap: var(--space-1);
+}
+.pipe-pics img,
+.pipe-pics span {
+  width: 30px;
+  height: 38px;
+  border-radius: var(--radius-paper);
+  object-fit: cover;
+  background: var(--color-panel);
+}
+/* the wires between nodes: a road, the wire on it, and a packet moving along while something is in the flow */
+.pipe-wire {
+  flex: none;
+  align-self: center;
+  width: 36px;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(var(--color-pulse), var(--color-pulse)) center / 100% 2px no-repeat,
+    color-mix(in srgb, var(--color-frost) 8%, transparent);
+  opacity: 0.6;
+}
+.pipe-fork {
+  flex: 1.15 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.pipe-fork .pipe-what {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pipe-acts {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+@container (max-width: 900px) {
+  .pipe-flow {
+    flex-direction: column;
+    overflow: auto;
+  }
+  .pipe-wire {
+    width: 9px;
+    height: 18px;
+    background:
+      linear-gradient(var(--color-pulse), var(--color-pulse)) center / 2px 100% no-repeat,
+      color-mix(in srgb, var(--color-frost) 8%, transparent);
+  }
+}

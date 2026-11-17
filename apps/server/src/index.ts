@@ -53,7 +53,7 @@ import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
 import { buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
-import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter } from "./characters.ts";
+import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter, setApproval } from "./characters.ts";
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
 import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
@@ -803,6 +803,14 @@ r.post("/api/boards/:id/characters/:panel/edit", async (req) => {
   const u = requireUser(req);
   requireBoard(u, req.params.id);
   return { character: editCharacter(req.params.id, req.params.panel, await readJson<NewCharacter>(req)) };
+});
+// a person's word on a character: approve it for the council, archive it, or put it back in the pipeline
+r.post("/api/boards/:id/characters/:panel/approval", async (req) => {
+  const u = requirePerson(req, "Approving a character");
+  requireWriter(u, req.params.id);
+  const { approval } = await readJson<{ approval?: string }>(req);
+  if (approval !== "approved" && approval !== "archived" && approval !== "pending") throw new HttpError(400, "approval is approved, archived or pending");
+  return { character: setApproval(req.params.id, req.params.panel, approval, u) };
 });
 r.get("/api/boards/:id/characters/:panel/tasks", (req) => {
   requireBoard(requireUser(req), req.params.id);

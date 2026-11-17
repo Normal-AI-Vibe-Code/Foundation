@@ -190,6 +190,11 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
     }
   };
 
+  const approve = (approval: "approved" | "archived" | "pending") =>
+    api(url("/approval"), { method: "POST", json: { approval } }).then(
+      () => toast(approval === "approved" ? `${c.name} is approved for the council` : approval === "archived" ? `${c.name} is archived` : `${c.name} is back in the pipeline`, "ok"),
+      (e: Error) => toast(e.message, "bad"),
+    );
   const words = identity ?? c.identity;
   return (
     <div ref={host} className="char-body wheel-own" data-character-card={c.name} data-character-ready={c.ready || undefined} onPointerEnter={takeStage} onPointerMove={takeStage}>
@@ -202,9 +207,44 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
         <div className="char-tags">
           <span className="char-tag">{c.set}</span>
           <span className="char-tag">{c.form === "model" ? "3D character" : "mesh avatar"}</span>
-          {c.ready && <span className="char-tag is-ready">on the council</span>}
+          {c.ready && c.approval !== "pending" && c.approval !== "archived" && <span className="char-tag is-ready">on the council</span>}
+          {c.ready && c.approval === "pending" && <span className="char-tag is-pending">waiting for approval</span>}
+          {c.approval === "archived" && <span className="char-tag is-archived">archived</span>}
         </div>
       </div>
+
+      {/* a person's word on it: only approved characters are offered as an agent's avatar */}
+      {(c.ready || c.approval === "archived") && !viewer && (
+        <div className="char-approval" data-char-approval={c.approval ?? "approved"}>
+          {c.approval === "pending" && (
+            <>
+              <span>Finished. Approve it and agents can wear it.</span>
+              <button type="button" className="f-pill is-accent" onClick={() => void approve("approved")}>
+                Approve
+              </button>
+              <button type="button" className="f-pill" onClick={() => void approve("archived")}>
+                Archive
+              </button>
+            </>
+          )}
+          {c.approval === "archived" && (
+            <>
+              <span>Archived: kept, with its files, and not offered as an avatar.</span>
+              <button type="button" className="f-pill" onClick={() => void approve(c.ready ? "approved" : "pending")}>
+                Restore
+              </button>
+            </>
+          )}
+          {c.approval !== "pending" && c.approval !== "archived" && (
+            <>
+              <span>Approved: offered when an agent's avatar is chosen.</span>
+              <button type="button" className="f-pill" onClick={() => void approve("archived")}>
+                Archive
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {c.ready && (
         <div className="char-moods" role="group" aria-label="Try a mood">

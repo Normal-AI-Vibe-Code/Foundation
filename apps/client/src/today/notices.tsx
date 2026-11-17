@@ -25,18 +25,8 @@ let now = NONE;
 const subs = new Set<() => void>();
 let timer: ReturnType<typeof setInterval> | null = null;
 
-export function countNotices(focus: Array<Pick<FocusItem, "kind" | "tone">>): Omit<Notices, "update"> {
-  let people = 0;
-  let agents = 0;
-  let changes = 0;
-  for (const f of focus) {
-    if (f.kind === "related") continue;
-    if (f.tone === "agent") agents++;
-    else if (f.kind === "ask" || f.kind === "mention" || f.kind === "stage") people++;
-    else changes++;
-  }
-  return { people, agents, changes };
-}
+import { countNotices } from "./talk";
+export { countNotices };
 
 async function read() {
   if (document.hidden) return;

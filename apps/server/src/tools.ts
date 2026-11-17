@@ -175,6 +175,7 @@ const PANEL_SIZES: Record<PanelKind, [number, number]> = {
   grid: [720, 520],
   kanban: [1480, 980],
   design: [1180, 900],
+  pipeline: [1480, 330],
   app: [720, 520],
   link: [640, 460],
   file: [420, 340],

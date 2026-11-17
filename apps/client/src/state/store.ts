@@ -2068,6 +2068,7 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   grid: [720, 520],
   kanban: [1480, 980],
   design: [1180, 900],
+  pipeline: [1480, 330],
 };
 
 export function addPanel(
