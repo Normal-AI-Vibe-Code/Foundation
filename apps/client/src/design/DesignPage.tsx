@@ -6,6 +6,8 @@
 
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
+import { ShibaDot } from "../today/notices";
+import { ShibaTalk } from "../today/ShibaTalk";
 import { PROVIDER_NAME, ProviderMark } from "../characters/providers";
 import { Group, Row, Seg } from "../settings/SettingsSpace";
 import "../panels/system-cards.css";
@@ -144,7 +146,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   machines: ["Machines"],
   agents: ["The crew", "Agents in a section", "Agents in the section"],
   council: ["The council"],
-  today: ["Today and the Shiba"],
+  today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
   own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Rune renderer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
@@ -845,6 +847,13 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         note="Home, before the boards. Vision's ethereal shiba fills the room and is the agent's face: warm paper at rest, lilac while it listens, frosted blue while it thinks, dusk while it speaks. Its words are set at 40 (the one size above 32). The day sits beside it on glass: focus rows by kind (overdue red, owned amber, agent violet), goals with a blue bar, and the company apps as chips in the top bar (dashed when not linked). What the Shiba talks about wears the violet ring."
       >
         <TodayDemo />
+      </Section>
+
+      <Section
+        title="Today's row, what the Shiba says, adding an agent"
+        note="Today's row in the side menu is a pill: the Shiba at 18 px (two soft lights turning in a disc, CSS only), the word, and a badge when something waits on you. Over the Shiba's room everything is white: an answer's prose, its plan as a card, and anything long and literal folded to one line that opens on the right. Adding an agent is four steps on one sheet in the agents panel: who, connect, avatar, add; the open step is ringed violet, a settled one ticks green, a waiting one steps back."
+      >
+        <TodayPartsDemo />
       </Section>
 
       <Section title="The Slack board" note="One space with a section for every Slack channel, each kept current with its channel: a Summary note, a Latest note (the newest top-level messages) and the channel's latest images, newest first; a new one takes the first place and the rest move along. Each section wears a live Slack mark beside its count: Slack's octothorpe in the ink (the brand's colours stay out of the chrome), a word and a state dot. Live breathes green: Slack sends what's posted as it's posted. Polling is a still amber dot: the Slack app isn't running, so channels are read in turn while someone looks. Join is a hollow amber dot: the app isn't in the channel, and a press has it join. Offline is red, and the roll-over says why. Beside it, ✦: violet while agents write and keep the summaries, which only a person turns on.">
@@ -1786,6 +1795,74 @@ function SlackMarks() {
 }
 
 /** the council, still: four agents, one standing (no characters are loaded here, so the seats show their marks) */
+/** Today's pill and badge, the Shiba's folds and plan over its room, and the add-an-agent sheet, still */
+function TodayPartsDemo() {
+  return (
+    <div className="design-today-parts" data-design-today-parts>
+      <div className="design-today-menu">
+        <button className="pane-row pane-place pane-today is-current">
+          <ShibaDot />
+          <span className="pane-label">Today</span>
+          <span className="pane-badge">3</span>
+        </button>
+        <button className="pane-row pane-place pane-today">
+          <ShibaDot />
+          <span className="pane-label">Today</span>
+        </button>
+      </div>
+      <div className="design-today-room">
+        <ShibaRoom mood="speaking" maxFps={24} />
+        <div className="today-veil" aria-hidden />
+        <div className="design-today-talk">
+          <ShibaTalk
+            large
+            exchange={{
+              answer: ["Two things first: the stator STEP, then the bearing loads.", "", "```bash", "npm run plan:pull", "npm test", "```"].join("\n"),
+              tools: [
+                { name: "today", words: "read your day" },
+                { name: "search", words: "looked for the stator STEP" },
+              ],
+              plan: { goal: "Get the rim drive ready for Friday", steps: [{ text: "Upload the stator STEP", status: "done" }, { text: "Sign off the bearing loads", status: "active" }, { text: "Send the review link", status: "pending" }] },
+            }}
+          />
+        </div>
+      </div>
+      <div className="design-add-agent add-agent">
+        <section className="add-step is-done">
+          <header className="add-step-head">
+            <span className="add-step-n">✓</span>
+            <b>Who</b>
+            <span className="add-step-sum">Kimi</span>
+          </header>
+        </section>
+        <section className="add-step is-open">
+          <header className="add-step-head">
+            <span className="add-step-n">2</span>
+            <b>Connect</b>
+          </header>
+          <p className="add-note">Kimi is one of this computer's agents. They run from one program (T3) that Foundation starts and stops; it's off.</p>
+          <div>
+            <button className="f-pill is-accent">Start this computer's agents</button>
+          </div>
+        </section>
+        <section className="add-step is-wait">
+          <header className="add-step-head">
+            <span className="add-step-n">3</span>
+            <b>Avatar</b>
+            <span className="add-step-sum">after it's connected</span>
+          </header>
+        </section>
+        <section className="add-step is-wait">
+          <header className="add-step-head">
+            <span className="add-step-n">4</span>
+            <b>Add</b>
+          </header>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 /** Settings' rows, a grid that stands for a child grid, and the provider beads */
 function SettingsDemo() {
   const [scheme, setScheme] = useState("system");

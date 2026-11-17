@@ -1581,6 +1581,60 @@
       "status": "backlog",
       "body": "Not tried: the desktop in the packaged app (and Ctrl+W / Ctrl+T in its terminal), a real Docker engine, macOS or Linux hosts. Not built: a browser in the desktop (Ubuntu's Firefox is a snap), a clipboard between it and the grid, sound, a size other than 1280 × 800, a `screen` output port.",
       "issue": 153
+    },
+    {
+      "id": "today-council-agents",
+      "title": "Today in white, the council as a band, adding an agent, the studio's pipeline",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Built 2026-11-16 (SPEC §0.6, §3, §7; `docs/evidence/2026-11-16_today-council-agents/`). Today's pill with the Shiba and a badge, the room in white with a glass composer, answers drawn as markdown, pictures, a plan and folds that open on the right. The council is a band under the top bar (grid) or at the top of its section. ＋ opens Add an agent in the agents panel (who, connect, avatar, add); Background lists sessions. The Character studio has a pipeline row with a flow card, and characters are approved or archived. For a person: restart this computer's server, then add a real agent."
+    },
+    {
+      "id": "agent-sign-in-vm",
+      "title": "Sign an agent in from Foundation: a machine with a browser, shown as a browser tool",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "machines",
+      "status": "next",
+      "body": "Josh, 2026-11-16: the agent adding process should go through all the steps to log in with an account, in a built-in unique Kiri VM and browser rendered as a browser tool. Today the Connect step only says how to sign in at a terminal. Needs: a browser inside a machine's desktop (Ubuntu's Firefox is a snap; use a deb or Chromium), the agent's program installed and signed in there or its sign-in page opened there, the desktop shown in the agents panel as a browser pane, and the session's credentials kept in that machine. Depends on *machines-desktop-more* and *agent-machines*."
+    },
+    {
+      "id": "agent-panel-panes",
+      "title": "The agent panel as a workplace: chat, changes, files, terminal, browser, background tasks, plan",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "next",
+      "body": "Josh, 2026-11-16: use Claude Code's architecture to show how agents work, with the agent panel as the primary chat interface to Foundation. Today the panel has three faces (at work, add, background) and the agent's own pane has facts and a box to write to it. Build an agent's session as panes: the conversation (with the components Today now draws), what it changed on the grid, its files, its terminal and browser when it has a machine, its plan, and its background tasks; and keep-awake while it works."
+    },
+    {
+      "id": "t3-on-the-grid",
+      "title": "T3 inside Foundation: its sessions readable and continuable in the panel, and whole on a grid",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Josh, 2026-11-16: a mini version of T3 on the right panel that expands into a full version, in Foundation's style on the grid, with all of T3's features. Today Background lists T3's sessions with Open and Stop, and Open T3 puts T3 in a browser tab. Next: read a session's messages in the panel, reply to it, then a T3 card on a grid."
+    },
+    {
+      "id": "session-components",
+      "title": "The session column and council replies drawn like Today's answers",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Today draws the Shiba's answers as markdown with pictures, a plan card and folded code, commands and steps that open in the detail pane. The session column (✦ Ask) and what a council's agents answer still draw the old way. Use the same parts there."
+    },
+    {
+      "id": "section-band-wires",
+      "title": "A section's council band moves its cards but not its wires",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "wires",
+      "status": "backlog",
+      "body": "While a section's council band is open, the section's header and cards are 236 px lower (a transform) and the wire layer still routes to where the ports were. Either make the band part of the section's layout (the body's rect starts under it) or offset that section's port points while it's open."
     }
   ]
 }

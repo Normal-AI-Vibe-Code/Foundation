@@ -808,10 +808,15 @@ a.today-chip:active {
   max-width: 720px;
   color: var(--color-over-room);
 }
-.shiba-prose {
+.shiba-talk .shiba-prose {
+  height: auto;
   padding: 0;
+  overflow: visible;
   color: inherit;
   font: 400 var(--text-16) / 1.5 var(--font-sans);
+}
+.shiba-talk .shiba-prose :is(h1, h2, h3, h4, strong, li, p, blockquote) {
+  color: inherit;
 }
 .shiba-talk.is-large .shiba-prose > p:first-child {
   font: 300 clamp(var(--text-20), 2.3vw, var(--text-32)) / 1.2 var(--font-display);
@@ -931,4 +936,40 @@ a.today-chip:active {
 }
 .shiba-plan-more {
   opacity: 0.7;
+}
+
+/* ---------- #/design: Today's row, the Shiba's answer, the add-an-agent sheet ---------- */
+
+.design-today-parts {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.design-today-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.design-today-parts .design-today-room {
+  height: 360px;
+}
+.design-today-talk {
+  position: absolute;
+  inset: auto var(--space-5) var(--space-5) var(--space-5);
+}
+@media (max-width: 1000px) {
+  .design-today-parts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.design-today-parts .today-veil {
+  background: color-mix(in srgb, var(--color-room-shade) 46%, transparent);
+}
+.design-today-talk {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  --ink: var(--color-over-room);
+  --ink-soft: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  color: var(--color-over-room);
 }
