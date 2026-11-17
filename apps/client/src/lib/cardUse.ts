@@ -4,8 +4,10 @@
  * allow them to be fullscreened").
  *
  * A card on the grid is something you look at and move. The wheel always pans
- * the grid and ⌘/Ctrl-wheel always zooms it, wherever the pointer is: over a
- * live app, a map, a terminal or a list. To use what's inside a card:
+ * the grid, wherever the pointer is: over a live app, a map, a terminal or a
+ * list. ⌘/Ctrl-wheel zooms the grid, except over a card with more in it than
+ * fits, where it scrolls through that card (lib/cardScroll.ts, 2026-11-16).
+ * To use what's inside a card:
  *
  *   - ⌘-click (Ctrl-click elsewhere) puts it **in use** in place: the app,
  *     map, list or terminal takes the pointer and the wheel while the pointer
@@ -72,6 +74,14 @@ export async function toggleFullscreen(id: string) {
 
 let installed = false;
 let pointer: { x: number; y: number } | null = null;
+let keyDown = false;
+
+/**
+ * Whether a person is really holding ⌘/Ctrl. A trackpad pinch reaches the page as a Ctrl-wheel with no key
+ * down, and that is always the grid's zoom; the key itself (seen on keydown, and on any pointer move, which
+ * carries the real keys) is what lets the wheel scroll through a card.
+ */
+export const modKeyDown = () => keyDown;
 
 /**
  * Once per page: the modifier hint, ⌘↵ / Ctrl+Enter, and keeping "in use" in
@@ -81,8 +91,19 @@ export function installCardUse() {
   if (installed || typeof window === "undefined") return;
   installed = true;
   const root = document.documentElement;
-  const held = (on: boolean) => root.classList.toggle("use-key-held", on);
-  window.addEventListener("pointermove", (e) => (pointer = { x: e.clientX, y: e.clientY }), { passive: true, capture: true });
+  const held = (on: boolean) => {
+    keyDown = on;
+    root.classList.toggle("use-key-held", on);
+  };
+  window.addEventListener(
+    "pointermove",
+    (e) => {
+      pointer = { x: e.clientX, y: e.clientY };
+      // the key went down or came up while the window wasn't listening (another window had the keyboard)
+      if (modHeld(e) !== keyDown) held(modHeld(e));
+    },
+    { passive: true, capture: true },
+  );
   // ⌘/Ctrl and the main button on any card puts it in use (a terminal's scrollback, a list, a map, an app)
   window.addEventListener(
     "pointerdown",

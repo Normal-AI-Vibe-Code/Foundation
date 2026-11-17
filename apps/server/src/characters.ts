@@ -22,7 +22,12 @@
  *    its references (the Vision Archive's lineage);
  *  - results come into the archive as files; a stage done again leaves the
  *    old files there;
- *  - people can't write the `characters` map (boards.ts SERVER_MAPS).
+ *  - people can't write the `characters` map (boards.ts SERVER_MAPS);
+ *  - a character goes with its card: whoever takes the card off the board (a
+ *    person, an agent's delete_card), the character leaves the board's map
+ *    with it, so every open browser's roster and council follow at once. Its
+ *    row and its files stay (the archive is never deleted), and a card that
+ *    comes back (a device that was offline) gets its character back.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -49,7 +54,7 @@ import {
 } from "@foundation/protocol";
 import { config } from "./config.ts";
 import { all, db, one, run } from "./db.ts";
-import { createBoardRow, editBoard, getBoard, listBoards } from "./boards.ts";
+import { createBoardRow, editBoard, getBoard, listBoards, onBoardOpen, type Board } from "./boards.ts";
 import { storeFile, type FileRow } from "./files.ts";
 import { imageSize } from "./construct.ts";
 import { HttpError } from "./http.ts";
@@ -208,6 +213,34 @@ function keep(row: CharRow, c: CharacterState) {
     else m.characters.delete(row.panel_id);
   });
 }
+
+/**
+ * A character goes with its card. People can't write the `characters` map, so when a person took a
+ * character's card off the board the map still held it: the server's roster dropped the character
+ * (its card was gone), but no browser heard, and it stayed on every council and in every picker until
+ * a reload (2026-11-16, Josh: "I attempted to delete Taro and couldn't"). The server follows the card
+ * instead: gone, its character leaves the map; back, it returns from its row. Rows and files stay.
+ */
+function followCards(board: Board) {
+  const m = boardMaps(board.doc);
+  m.objects.observe((ev) => {
+    const gone: string[] = [];
+    const back: string[] = [];
+    for (const [id, ch] of ev.changes.keys) {
+      if (ch.action === "delete" && m.characters.has(id)) gone.push(id);
+      else if (ch.action === "add" && !m.characters.has(id) && (m.objects.get(id) as PanelDoc | undefined)?.panel === "character") back.push(id);
+    }
+    if (!gone.length && !back.length) return;
+    board.doc.transact(() => {
+      for (const id of gone) m.characters.delete(id);
+      for (const id of back) {
+        const row = rowByPanel(board.id, id);
+        if (row) m.characters.set(id, stateOf(row));
+      }
+    }, "characters");
+  });
+}
+onBoardOpen(followCards);
 
 const cardThere = (row: CharRow) => boardMaps(getBoard(row.board_id).doc).objects.has(row.panel_id);
 

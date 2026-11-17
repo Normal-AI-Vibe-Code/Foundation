@@ -359,10 +359,31 @@ test("the starter set walks onto a studio board ready, and nothing is sent to Me
   assert.equal(await chars.seedStarter(BOARD, ada), 0);
 });
 
-test("a character whose card is gone leaves the roster", () => {
-  const mochi = chars.roster().characters.find((c) => c.name === "Mochi")!;
-  getBoard(BOARD).doc.transact(() => boardMaps(getBoard(BOARD).doc).objects.delete(mochi.panelId));
-  assert.ok(!chars.roster().characters.some((c) => c.id === mochi.id));
+test("a character goes with its card: off the roster and out of the board's map; its row and files stay; a card that comes back brings it back", () => {
+  const who = chars.roster().characters.find((c) => Object.keys(c.files).length > 0)!;
+  const m = boardMaps(getBoard(BOARD).doc);
+  const card = structuredClone(m.objects.get(who.panelId)!);
+  const was = structuredClone(state(who.panelId));
+  const files = Object.values(was.files) as string[];
+  assert.ok(files.length > 0, "it has files to keep");
+  getBoard(BOARD).doc.transact(() => m.objects.delete(who.panelId));
+  assert.ok(!chars.roster().characters.some((c) => c.id === who.id), "off the roster");
+  // the board's map lets go of it too: that is what tells every open browser (their rosters watch that map)
+  assert.equal(m.characters.has(who.panelId), false, "out of the board's characters map");
+  // nothing is deleted: its row is there, and so is every file it made
+  assert.ok(one("select id from characters where id = ?", who.id), "its row stays");
+  for (const f of files) assert.ok(one("select id from files where id = ?", f), `file ${f} stays in the archive`);
+  // an agent's delete_card does the same
+  const sage = chars.createCharacter(BOARD, { name: "Agent", id: ada.id, human: false }, { name: "Sage", set: "animals", form: "mesh", identity: "A calm snow monkey." });
+  assert.ok(m.characters.has(sage.panelId));
+  getBoard(BOARD).doc.transact(() => m.objects.delete(sage.panelId), "agent");
+  assert.equal(m.characters.has(sage.panelId), false);
+  // the card comes back (a device that was offline): the character returns with it, as it was
+  getBoard(BOARD).doc.transact(() => m.objects.set(who.panelId, card));
+  assert.deepEqual(state(who.panelId), was);
+  assert.ok(chars.roster().characters.some((c) => c.id === who.id), "back on the roster");
+  getBoard(BOARD).doc.transact(() => m.objects.delete(who.panelId));
+  assert.ok(!chars.roster().characters.some((c) => c.id === who.id));
 });
 
 test("the mood machine: arriving waves, reading thinks, writing works, finishing cheers, and a beat plays out", () => {

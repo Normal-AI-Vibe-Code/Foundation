@@ -85,7 +85,7 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
       onRemove={() => removeNote(note.id)}
       bodyClass={note.rich ? "note-body is-rich" : "note-body"}
     >
-      <div style={{ height: note.h }} className="note-inner">
+      <div style={{ ["--h" as string]: `${note.h}px` }} className="note-inner bar-reflow">
         {note.createdBy && !editing && (
           <AgentPill name={note.createdBy} tip={`Written by ${note.createdBy}, an agent`} />
         )}

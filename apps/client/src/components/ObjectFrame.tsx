@@ -1,5 +1,5 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
-import { motion } from "motion/react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { MINI_HEADER, liveObjPos, setActiveObject, setObjectFloat } from "../state/store";
 import { Spring2D, presets } from "../physics/spring";
 import { countRender } from "../state/renders";
@@ -12,9 +12,18 @@ import { FullscreenBar, FullscreenButton, useFullscreenCard } from "./Fullscreen
  * handle, remove button, springy entrance.
  *
  * Cards rest clean — no menu bar. Their chrome is called by the pointer:
- * `bar` (default) slides a glass bar in over the card's top edge on hover;
+ * `bar` (default) slides a glass bar in at the card's top edge on hover, and
+ * the card's content moves down to make room for it (2026-11-16, Josh: "The
+ * Cards roll over menu covers up the card contents, it should push it down");
  * `icons` (images, video) slides a few round buttons out from behind the
  * card's right edge, and the card itself is the drag handle.
+ *
+ * Making room never changes the card's own box (the section's flow doesn't
+ * move): the body clips, and what's inside it either gets shorter from the
+ * top (`.bar-reflow`: lists, notes, anything that lays itself out again
+ * cheaply, so its last line and its bottom controls stay in the card) or just
+ * slides (`.bar-slide`: a live app, a terminal, a model — nothing that would
+ * have to resize a document).
  */
 interface Props {
   id: string;
@@ -44,6 +53,8 @@ interface Props {
   onTap?(): void;
   /** full screen: an address to open in a tab from its bar */
   openUrl?: string;
+  /** removing it loses something a person paid for or made: ✕ asks first, saying this (deletes need confirm) */
+  confirmRemove?: { name: string; note: string };
 }
 
 export function ObjectFrame({
@@ -67,10 +78,32 @@ export function ObjectFrame({
   icons,
   onTap,
   openUrl,
+  confirmRemove,
 }: Props) {
   countRender("ObjectFrame");
   const fullscreen = useFullscreenCard() === id;
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // ----- remove: a card that would lose something asks first -----
+  const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!confirming) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setConfirming(false);
+    };
+    const away = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.(".frame-confirm")) setConfirming(false);
+    };
+    window.addEventListener("keydown", key, true);
+    window.addEventListener("pointerdown", away, true);
+    return () => {
+      window.removeEventListener("keydown", key, true);
+      window.removeEventListener("pointerdown", away, true);
+    };
+  }, [confirming]);
+  const askRemove = () => (confirmRemove ? setConfirming(true) : onRemove());
 
   const spring = useMemo(
     () => new Spring2D(pos.x, pos.y, presets.drag),
@@ -215,7 +248,7 @@ export function ObjectFrame({
   return (
     <div
       ref={rootRef}
-      className={`frame-anchor chrome-${chrome}`}
+      className={`frame-anchor chrome-${chrome}${confirming ? " is-confirming" : ""}`}
       style={{ width }}
       {...Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]))}
     >
@@ -223,7 +256,7 @@ export function ObjectFrame({
         <div className="frame-icons">
           {icons}
           <FullscreenButton id={id} round />
-          <button className="frame-icon is-remove" data-tip="Remove" aria-label="Remove" onClick={onRemove}>
+          <button className="frame-icon is-remove" data-tip="Remove" aria-label="Remove" onClick={askRemove}>
             ✕
           </button>
         </div>
@@ -254,12 +287,46 @@ export function ObjectFrame({
               >
                 {float ? "✥" : "⌗"}
               </button>
-              <button className="icon-btn is-remove" data-tip="Remove" aria-label="Remove" onClick={onRemove}>
+              <button className="icon-btn is-remove" data-tip={confirmRemove ? "Remove…" : "Remove"} aria-label="Remove" onClick={askRemove}>
                 ✕
               </button>
             </div>
           </div>
         )}
+        <AnimatePresence>
+          {confirming && confirmRemove && (
+            <motion.div
+              className="confirm-pop frame-confirm"
+              role="alertdialog"
+              aria-label={`Remove ${confirmRemove.name}?`}
+              initial={{ opacity: 0, y: -10, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.94 }}
+              transition={{ type: "spring", stiffness: 400, damping: 26 }}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <span>
+                Remove <b>{confirmRemove.name}</b>? {confirmRemove.note}
+              </span>
+              <span className="frame-confirm-acts">
+                <motion.button
+                  className="confirm-btn danger"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => {
+                    setConfirming(false);
+                    onRemove();
+                  }}
+                >
+                  Remove
+                </motion.button>
+                <motion.button className="confirm-btn" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} onClick={() => setConfirming(false)}>
+                  Keep
+                </motion.button>
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className={"frame-body " + (bodyClass ?? "")} {...(chrome === "icons" ? dragHandlers : {})}>
           {children}
         </div>

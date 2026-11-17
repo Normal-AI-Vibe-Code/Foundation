@@ -668,8 +668,8 @@
       "kind": "bug",
       "milestone": "polish",
       "area": "panels",
-      "status": "needs-you",
-      "body": "Seen while checking machine pages (2026-11-07): the bar that drops in over a card's top edge on hover sits over the machine card's head, where its published ports are pills (`:8080 ↗`), so they're hard to press. Options: move the port pills to the card's foot (as the huddle card moved its controls to the bottom for the same reason); start the head below the bar's 30 px; or let the bar skip machine cards and put its actions in the foot. DESIGN puts the pills in the head today, so this is Josh's call.",
+      "status": "done",
+      "body": "Seen while checking machine pages (2026-11-07): the bar that drops in over a card's top edge on hover sits over the machine card's head, where its published ports are pills (`:8080 ↗`), so they're hard to press. Options: move the port pills to the card's foot (as the huddle card moved its controls to the bottom for the same reason); start the head below the bar's 30 px; or let the bar skip machine cards and put its actions in the foot. DESIGN puts the pills in the head today, so this is Josh's call. Settled 2026-11-16: the bar no longer covers the card's content (it is given 38 px of room), and ports sit outside the body.",
       "issue": 61
     },
     {
@@ -1635,6 +1635,33 @@
       "area": "wires",
       "status": "backlog",
       "body": "While a section's council band is open, the section's header and cards are 236 px lower (a transform) and the wire layer still routes to where the ports were. Either make the band part of the section's layout (the body's rect starts under it) or offset that section's port points while it's open."
+    },
+    {
+      "id": "card-chrome",
+      "title": "Card chrome: remove a character, the bar makes room, Ctrl-wheel through a card, a 2 px scroll line, a resize gleam",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "review",
+      "body": "Built 2026-11-16 (`docs/evidence/2026-11-16_card-chrome/NOTES.md`). A character card's ✕ asks first and the character leaves every council with its card; the hover bar gives the card's content 38 px of room instead of covering it; Ctrl/⌘-wheel scrolls through a card with more in it than fits; scroll bars are a 2 px light line; the resize corner is a gleam shown on hover. A ✕ that does nothing on a character was not reproduced: if it happens again, note where it was pressed."
+    },
+    {
+      "id": "card-chrome-elsewhere",
+      "title": "Card chrome on the cards and machines not looked at",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "next",
+      "body": "The bar's room was checked on a note, a live app, a character and a design chapter. Look at Slack, huddle, kanban, machine and file cards (a terminal's bottom line slides under the card's edge while hovered), run the frame-rate check, and try ⌘-wheel, a pinch and a character's ✕ in the desktop window, on a Mac and on a trackpad."
+    },
+    {
+      "id": "character-restore",
+      "title": "Bring back a character whose card was removed",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "pipeline",
+      "status": "backlog",
+      "body": "Removing a character's card keeps its record and files, but nothing in the app puts it back on the grid. Offer removed characters in the pipeline card (or the Character studio's menu) with Restore."
     }
   ]
 }
