@@ -182,6 +182,17 @@ export function archiveFile(id: string) {
   run("update files set archived_at = ? where id = ? and archived_at is null", Date.now(), id);
 }
 
+/** a stored file's row and bytes, read now (small files: pictures), or null when there's no such file or its bytes are gone */
+export function fileBytesSync(id: string): { row: FileRow; body: Buffer } | null {
+  const row = one<FileRow>("select * from files where id = ?", id);
+  if (!row) return null;
+  try {
+    return { row, body: readFileSync(filePath(row.sha256)) };
+  } catch {
+    return null;
+  }
+}
+
 /** Stream a file with HTTP range support so video scrubs and big CAD files stream. */
 export function serveFile(req: Req, res: ServerResponse, id: string) {
   const row = one<FileRow>("select * from files where id = ?", id);

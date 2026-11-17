@@ -15,7 +15,8 @@
 import { portHover, sayValue, setPortHover, usePortHover } from "./portHover";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { LinkDoc } from "@foundation/protocol";
-import { addLink, applyWireClip, getState, gridSize, objectWorldRect, removeLink, subscribe, uid, updatePanel, usePanel, wireBackstage, wireClipRect, type PanelMeta } from "../state/store";
+import { addLink, applyWireClip, getState, gridSize, objectWorldRect, removeLink, sectionAtWorld, subscribe, uid, updatePanel, usePanel, wireBackstage, wireClipRect, type PanelMeta } from "../state/store";
+import { boardTool } from "../lib/collectionDrag";
 import { toast } from "../state/ui";
 import { useActiveBoard } from "./Presence";
 import { toWorld, camera } from "../state/camera";
@@ -114,6 +115,15 @@ function startDrag(e: React.PointerEvent, from: { panel: string; port: string },
       }
     }
     if (!to) {
+      // a collection's output let go over a section (not on a card): it lays its items out there
+      const src = st.panels[d.from.panel];
+      const sec = src?.panel === "collection" && !d.overPanel ? sectionAtWorld(d.x, d.y) : null;
+      if (src && sec) {
+        void boardTool<{ into: string | null; laid: number }>("collection_lay_out", { collection: src.id, section: sec.id })
+          .then((r) => toast(`Laying ${src.name} out in ${sec.name}${r.laid ? `: ${r.laid} laid` : ""}`, "ok"))
+          .catch((e) => toast((e as Error).message, "bad"));
+        return;
+      }
       if (d.detached) toast("Disconnected");
       return;
     }
@@ -440,6 +450,13 @@ export const PortWires = memo(function PortWires() {
                 className="pipe-hit"
                 data-route
                 onPointerDown={(e) => {
+                  // a press on a port the wire lands on is the port's: an output starts another wire (a stage's
+                  // output wired on into a collection too), a wired input lifts this one off to re-route
+                  const port = document.elementsFromPoint(e.clientX, e.clientY).find((el) => el.classList.contains("port")) as HTMLElement | undefined;
+                  if (port?.dataset.panel && port.dataset.portId) {
+                    if (port.classList.contains("port-out")) return beginConnect(e, port.dataset.panel, port.dataset.portId);
+                    return beginDetach(e, port.dataset.panel, port.dataset.portId);
+                  }
                   e.stopPropagation();
                   setSelected(l.id);
                 }}

@@ -6,6 +6,7 @@
 
 import { openCouncil } from "../lib/councilOpen";
 import { newCharacter } from "../lib/characterStudio";
+import { addCollection, addCharacterPipeline } from "../lib/collections";
 import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { toast } from "../state/ui";
@@ -106,6 +107,8 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     ...tellSlack,
     { icon: "☺", label: "Character: 3D", action: () => void newCharacter(section.id, "model") },
     { icon: "☺", label: "Character: mesh avatar", action: () => void newCharacter(section.id, "mesh") },
+    { icon: "❖", label: "Collection", action: () => addCollection(section.id, at(360, 420)) },
+    { icon: "⇢", label: "Character pipeline", action: () => void addCharacterPipeline(section) },
     { icon: "◨", label: "All agents on this grid", action: () => openAgentsPane(section.id) },
     ]),
     ...tag("grid", [

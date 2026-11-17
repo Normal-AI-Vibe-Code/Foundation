@@ -127,6 +127,7 @@ import { CardChromeDemo } from "./CardChromeDemo";
 import { SubGridDemo } from "./SubGridDemo";
 import { PointerDemo } from "./PointerDemo";
 import { CharacterStudioDemo } from "./CharacterStudioDemo";
+import { CollectionDemo } from "./CollectionDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -153,7 +154,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   live: ["Huddles and Slack", "The Slack board"],
   machines: ["Machines"],
   agents: ["The crew", "Agents in a section", "Agents in the section"],
-  council: ["The council"],
+  council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
   own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Rune renderer"],
 };
@@ -1134,6 +1135,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       <Section title="The council" note="The agents at work on a section or the whole board, seated along the foot of the window as characters (☺ in the top bar, on a section's tools, in its right-click menu, and ⌘K). A glass bar, pane radius, risen on the settle spring; seats stagger in 45 ms apart on the spring. Each seat is 124 × 156: its character from the chest up over a plinth washed in its agent's cursor colour (--color-crew-n, the same hue as its cursor and its presence dot) with a 3 px rule of that colour at the foot, what its cursor says above it on raised paper with a hairline tinted the same, and under it the colour's dot, the agent's name in 12/600 and “as <character>” in dim 11. A seat's mood is the agent's state: it waves when it arrives, thinks while it reads, works while it writes, talks when it asks you something, cheers when it's done, holds its head on an error. Pressed, a seat stands (208 × 332, head to toe on a round wash of its colour) and a card beside it says what it was asked and for whom, with Follow, Stop and the characters it can appear as (the one worn ringed in its colour). With nobody at work the seats are the bench: the characters there are, on a neutral plinth, and one waves when pointed at. Below, a composer on a pill; Ask is the violet pill, because an agent will act. 3D characters are drawn on one canvas laid over the bar, so six seats cost one renderer; the board above stays live, since only the bar takes the pointer.">
         <CouncilDemo />
         <CharacterStudioDemo />
+      </Section>
+
+      <Section title="Collections" note="A collection gathers what the cards wired into it make: from the Character studio's flow, a stage's wire brings the pictures drawn there (sheets, expression sheets, portraits) and Output's brings the finished characters; another collection brings what it holds. ❖ in a section's right-click menu, and Character pipeline lays the whole flow into a section with one after Output. Folded (360 × 420) it is a stack of the five newest, fanned 9 px and 2.2° apart and opening wider on roll-over on the spring; Expand opens it to 920 × 700, a grid of tiles at least 140 wide, each on raised paper with a hairline (a character's tinted violet, as an agent's work is). A tile is pressed and pulled out as a copy, lifted as a carried card is; the tile stays, at 45 %, while its copy is out. Lay out in pipes it into a section, where each thing becomes a docked card the section arranges; its output dragged onto a section does the same. On tokens only.">
+        <CollectionDemo />
       </Section>
 
       <Section

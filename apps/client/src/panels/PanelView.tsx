@@ -11,6 +11,7 @@
  */
 
 import { PipelineBody } from "./PipelineView";
+import { CollectionBody } from "./CollectionView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
 import { CadPreview } from "../cad/CadPreview";
@@ -68,6 +69,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   kanban: "▥",
   design: "◐",
   pipeline: "⇢",
+  collection: "❖",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -132,6 +134,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <DesignBody panel={panel} />
     ) : panel.panel === "pipeline" ? (
       <PipelineBody panel={panel} />
+    ) : panel.panel === "collection" ? (
+      <CollectionBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (

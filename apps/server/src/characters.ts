@@ -45,6 +45,7 @@ import {
   logActivity,
   MOOD_CLIPS,
   MOODS,
+  OUTPUT_PORT,
   PIPELINE_NODES,
   PIPELINE_WIRES,
   putNote,
@@ -423,11 +424,45 @@ const WIRE_TYPE: Record<string, string> = { model: "cad", skeleton: "cad", "3D c
 export const STUDIO_COL_W = 8 * NODE_W + 7 * NODE_GAP + 68;
 const PIPELINE_ROW_H = NODE_TALL + CARD_H + 150;
 
+const outputPort = () => ({ id: uid("port"), name: OUTPUT_PORT, dir: "out" as const, type: "data" });
+
+/** Output nodes from before it had an output of its own (2026-11-17) get one, once */
+export function giveOutputsAPort(doc: import("yjs").Doc): number {
+  const m = boardMaps(doc);
+  let n = 0;
+  for (const o of [...m.objects.values()]) {
+    if (o.kind !== "panel" || o.panel !== "pipeline" || o.node !== "output" || o.ports.some((p) => p.dir === "out")) continue;
+    m.objects.set(o.id, { ...o, ports: [...o.ports, outputPort()] });
+    n++;
+  }
+  return n;
+}
+
+/** a pipeline section's tracks grown to hold the flow (never shrunk; a section a person stretched over more than one track is theirs) */
+export function growForFlow(doc: import("yjs").Doc, sec: SectionDoc, extraW = 0) {
+  const m = boardMaps(doc);
+  // a board that was never resized keeps no tracks yet: its default ones
+  const tracks = sec.parent ? m.sections.get(sec.parent)?.grid : (m.grid.get("tracks") ?? { cols: [DEFAULT_COL_W], rows: [DEFAULT_ROW_H] });
+  if (!tracks) return;
+  const cols = [...tracks.cols];
+  const rows = [...tracks.rows];
+  if (sec.c0 === sec.c1 && cols[sec.c0] !== undefined) cols[sec.c0] = Math.max(cols[sec.c0], STUDIO_COL_W + extraW);
+  if (sec.r0 === sec.r1 && rows[sec.r0] !== undefined) rows[sec.r0] = Math.max(rows[sec.r0], PIPELINE_ROW_H);
+  if (sec.parent) {
+    const parent = m.sections.get(sec.parent)!;
+    m.sections.set(parent.id, { ...parent, grid: { cols, rows } });
+  } else m.grid.set("tracks", { cols, rows });
+}
+
+/** where the flow's Output node stands, so a card can be put after it */
+export const FLOW_END_X = 8 * (NODE_W + NODE_GAP);
+export const FLOW_H = NODE_TALL;
+
 /**
  * Lay a set's flow into its Pipeline section: the nine node cards and the wires between them. `first` is a
  * card to make the first node of (the one flow card of 2026-11-16), so an upgrade removes nothing.
  */
-function layFlow(doc: import("yjs").Doc, sec: SectionDoc, set: string, first?: PanelDoc) {
+export function layFlow(doc: import("yjs").Doc, sec: SectionDoc, set: string, first?: PanelDoc): Map<PipelineNodeKey, PanelDoc> {
   const m = boardMaps(doc);
   const cards = new Map<PipelineNodeKey, PanelDoc>();
   const now = Date.now();
@@ -436,6 +471,8 @@ function layFlow(doc: import("yjs").Doc, sec: SectionDoc, set: string, first?: P
     const ports = [
       ...PIPELINE_WIRES.filter((w) => w.to === node).map((w) => ({ id: uid("port"), name: w.carries, dir: "in" as const, type: WIRE_TYPE[w.carries] ?? "image" })),
       ...PIPELINE_WIRES.filter((w) => w.from === node).map((w) => ({ id: uid("port"), name: w.carries, dir: "out" as const, type: WIRE_TYPE[w.carries] ?? "image" })),
+      // the flow's end: the finished characters, for a collection to gather (2026-11-17)
+      ...(node === "output" ? [outputPort()] : []),
     ];
     const card: PanelDoc = {
       ...(node === "inspiration" && first ? first : { id: uid("pnl"), kind: "panel" as const, panel: "pipeline" as const, bornAt: now + i }),
@@ -459,6 +496,7 @@ function layFlow(doc: import("yjs").Doc, sec: SectionDoc, set: string, first?: P
     const link: LinkDoc = { id: uid("lnk"), from: { panel: from.id, port: from.ports.find((p) => p.dir === "out" && p.name === w.carries)!.id }, to: { panel: to.id, port: to.ports.find((p) => p.dir === "in" && p.name === w.carries)!.id }, label: w.carries, createdBy: "Foundation" };
     m.links.set(link.id, link);
   }
+  return cards;
 }
 
 /** a set's pipeline section: the flow's nodes across its top, and room under them for characters in the making */
@@ -521,6 +559,7 @@ export function upgradeStudio(boardId: string) {
       m.grid.set("tracks", { cols, rows });
       if (!said.length) said.push("drew the pipeline as nodes: a card for each stage, wired in order, each with the characters that are at it");
     }
+    if (giveOutputsAPort(doc)) said.push("gave each Output node an output of its own: wire it to a collection to gather the finished characters");
     for (const text of said) logActivity(doc, { who: "Foundation", role: "agent", text });
   });
 }
@@ -855,6 +894,7 @@ const watching = new Set<string>();
 export async function startStage(boardId: string, panelId: string, stage: CharacterStageKey, user: UserInfo, opts: { confirm?: boolean } = {}): Promise<CharacterState> {
   const row = mustRow(boardId, panelId);
   const c = stateOf(row);
+  if (c.copyOf) throw new HttpError(400, `this card is a copy of “${c.name}”: its stages are pressed on the original`);
   const order = CHARACTER_STAGES[c.form];
   if (!order.includes(stage)) throw new HttpError(400, `a ${c.form === "model" ? "3D character" : "mesh avatar"} has no ${stage} stage`);
   if (!meshyConfigured()) throw new HttpError(503, "Meshy isn't connected: set MESHY_API_KEY in Foundation's .env");
@@ -1039,6 +1079,7 @@ export function resumeCharacters() {
 export async function attachMavatar(boardId: string, panelId: string, body: Buffer, user: UserInfo): Promise<CharacterState> {
   const row = mustRow(boardId, panelId);
   const c = stateOf(row);
+  if (c.copyOf) throw new HttpError(400, `this card is a copy of “${c.name}”: bring the .mavatar in on the original`);
   if (c.form !== "mesh") throw new HttpError(400, "only a mesh avatar takes a .mavatar");
   // a .mavatar is a zip archive (mesh-avatar docs/format.md)
   if (body.length < 4 || body.readUInt32LE(0) !== 0x04034b50) throw new HttpError(400, "that isn't a .mavatar file");
@@ -1058,4 +1099,34 @@ export function characterTasks(boardId: string, panelId: string) {
   return all<TaskRow>("select * from character_tasks where character_id = ? order by started_at", row.id).map((t) => ({
     id: t.id, stage: t.stage, role: t.role, endpoint: t.endpoint, model: t.model, prompt: t.prompt, refHashes: JSON.parse(t.ref_hashes) as string[], by: t.by_name, at: t.started_at, status: t.status, credits: t.credits, error: t.error, fileId: t.file_id,
   }));
+}
+
+// ---------- copies (2026-11-17: a collection's character dragged out, or laid out in a section) ----------
+
+/**
+ * A copy of a character's card, on the same board: a card of its own with a row of its own (so it stands
+ * after a reload, and its pictures load), showing the character as it is now. It is marked `copyOf`, so it
+ * is never offered as an avatar twice and no stage is pressed on it. `from` is the original's character id.
+ */
+export function copyCharacter(boardId: string, from: string, place: { sectionId: string; x?: number; y?: number; float?: boolean }, actor: { name: string; id: string }): { panelId: string; character: CharacterState } {
+  const row = rowById(from);
+  if (!row) throw new HttpError(404, "that character is gone");
+  const was = stateOf(row);
+  const original = was.copyOf ?? was.id;
+  const c: CharacterState = { ...structuredClone(was), id: uid("chr"), copyOf: original };
+  const panelId = uid("pnl");
+  run("insert into characters (id, board_id, panel_id, state, created_by, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)", c.id, boardId, panelId, JSON.stringify(c), actor.id, Date.now(), Date.now());
+  editBoard(boardId, "characters", (doc) => {
+    const m = boardMaps(doc);
+    const panel: PanelDoc = { id: panelId, kind: "panel", panel: "character", sectionId: place.sectionId, name: c.name, x: Math.max(0, Math.round(place.x ?? 0)), y: Math.max(0, Math.round(place.y ?? 0)), float: place.float ?? false, bornAt: Date.now(), w: CARD_W, h: CARD_H, ports: [], createdBy: actor.name };
+    m.objects.set(panelId, panel);
+    m.characters.set(panelId, c);
+  });
+  return { panelId, character: c };
+}
+
+/** a character's state by its id (any board), or null */
+export function characterById(id: string): CharacterState | null {
+  const row = rowById(id);
+  return row ? stateOf(row) : null;
 }

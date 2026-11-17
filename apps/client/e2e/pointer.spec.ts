@@ -596,7 +596,7 @@ test("3 · a section's menu: the council, Add and Live side by side, the grid's 
   expect(a.y).toBeGreaterThan((await box(first)).y + 20);
   const texts = async (c: Locator) => (await c.locator(".menu-item").allInnerTexts()).map((t) => t.replace(/^\S+\s+/, "").trim());
   expect(await texts(cols.nth(0))).toEqual(["Text box", "Markdown note", "Table", "Map", "Image, video or file…", "App or web page…"]);
-  expect(await texts(cols.nth(1))).toEqual(["Agents card", "Huddle", "Slack channel", "Machine", "Character: 3D", "Character: mesh avatar", "All agents on this grid"]);
+  expect(await texts(cols.nth(1))).toEqual(["Agents card", "Huddle", "Slack channel", "Machine", "Character: 3D", "Character: mesh avatar", "Collection", "Character pipeline", "All agents on this grid"]);
 
   // the grid's own actions: a row of icons along the bottom, no words, each named on roll-over
   const row = menu.locator(".menu-iconrow");

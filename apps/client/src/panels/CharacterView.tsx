@@ -193,8 +193,9 @@ export function CharacterSheet({ character, boardId = "", panelId = "", viewer =
         <p className="char-tags">
           <span className="char-tag">{c.set}</span>
           <span className="char-tag">{c.form === "model" ? "3D character" : "mesh avatar"}</span>
-          {c.ready && c.approval !== "pending" && c.approval !== "archived" && <span className="char-tag is-ready">on the council</span>}
-          {c.ready && c.approval === "pending" && <span className="char-tag is-pending">waiting for approval</span>}
+          {c.copyOf && <span className="char-tag is-copy" data-tip="A copy: the character as it was when it was copied. Its stages are pressed on the original">copy</span>}
+          {c.ready && !c.copyOf && c.approval !== "pending" && c.approval !== "archived" && <span className="char-tag is-ready">on the council</span>}
+          {c.ready && !c.copyOf && c.approval === "pending" && <span className="char-tag is-pending">waiting for approval</span>}
           {c.approval === "archived" && <span className="char-tag is-archived">archived</span>}
           {!c.ready && c.approval !== "archived" && <span className="char-tag is-making">{running ? `on its ${STAGE_WORDS[running].name.toLowerCase()}` : next ? `next: ${STAGE_WORDS[next].name.toLowerCase()}` : "in the making"}</span>}
         </p>
@@ -398,7 +399,8 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
       character={c}
       boardId={board()}
       panelId={panel.id}
-      viewer={ui.role === "viewer"}
+      // a copy (dragged out of a collection, or laid out by one) shows the character; its original is where it's pressed
+      viewer={ui.role === "viewer" || Boolean(c?.copyOf)}
       price={price}
       inspiration={inspiration}
       live={live}

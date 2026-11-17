@@ -69,6 +69,7 @@ import { flowformCall, flowformTools } from "./flowformlink.ts";
 import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, stepTarget, travel, type CrewMember } from "./crew.ts";
 import { saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
+import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
 
 /** the person a tool acts for (Today's tools are theirs, not the board's) */
 function personOf(ctx: ToolCtx): UserInfo {
@@ -177,6 +178,7 @@ const PANEL_SIZES: Record<PanelKind, [number, number]> = {
   kanban: [1480, 980],
   design: [1180, 900],
   pipeline: [1480, 330],
+  collection: [360, 420],
   app: [720, 520],
   link: [640, 460],
   file: [420, 340],
@@ -522,6 +524,60 @@ export const TOOLS: BoardTool[] = [
       });
       touch(ctx, undefined, `removed a card`);
       return "deleted";
+    },
+  }),
+  def({
+    name: "add_character_pipeline",
+    description:
+      "Lay the Character studio's process into a section of this board: a set's flow as node cards (Inspiration → Sheet → Expressions → Views → Mesh avatar → Output, and the 3D lane Meshy model → Skeleton → Moods), wired, with a collection after Output gathering the finished characters. The section is renamed `Pipeline · <Set>`. Nothing is generated: every stage is a person's press on a node.",
+    schema: z.object({ section: z.string().describe("the section's id or name"), set: z.string().describe("the set's name: Anime, Animals, a name someone gives"), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { section, set }) => {
+      const doc = getBoard(ctx.boardId).doc;
+      const sec = findSection(doc, section);
+      if (!sec) throw new HttpError(404, `no section ${section}`);
+      return addCharacterPipeline(ctx.boardId, sec.id, set, ctx.actor);
+    },
+  }),
+  def({
+    name: "read_collection",
+    description: "What a collection card holds (pictures and characters, each with its key), and the section it lays out into.",
+    schema: z.object({ collection: z.string() }),
+    run: (ctx, { collection }) => {
+      const st = collectionOf(getBoard(ctx.boardId).doc, collection);
+      return { into: st.into ?? null, items: st.items.map((i) => ({ key: i.key, kind: i.kind, name: i.name, from: i.from, src: i.src })) };
+    },
+  }),
+  def({
+    name: "collection_lay_out",
+    description:
+      "Pipe a collection into a section: every item it holds is laid there as a card of its own (a picture as an image card, a character as a copy of its card), docked so the section arranges them, and what it gathers later follows. section: null stops it (the cards already laid stay).",
+    schema: z.object({ collection: z.string(), section: z.string().nullable().describe("a section's id or name, or null to stop"), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { collection, section }) => layOutCollection(ctx.boardId, collection, section, ctx.actor),
+  }),
+  def({
+    name: "collection_copy",
+    description: "Copy one of a collection's items out onto the grid, into a section: floating at x, y in the section's content when given, otherwise docked in its flow. A character comes out as a copy of its card (never offered as an avatar twice; its stages stay pressed on the original).",
+    schema: z.object({ collection: z.string(), item: z.string().describe("the item's key, from read_collection"), section: z.string(), x: z.number().optional(), y: z.number().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { collection, item, section, x, y }) => copyOut(ctx.boardId, collection, item, section, x !== undefined || y !== undefined ? { x, y } : null, { name: ctx.actor, id: ctx.userId }),
+  }),
+  def({
+    name: "collection_put",
+    description: "Put a picture (an image file in the archive, by its file id) or a character (its id or its card's id) into a collection by hand.",
+    schema: z.object({ collection: z.string(), file_id: z.string().optional(), character: z.string().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { collection, file_id, character }) => ({ item: putIn(ctx.boardId, collection, { file: file_id, character }, ctx.actor) }),
+  }),
+  def({
+    name: "collection_take_out",
+    description: "Take an item out of a collection. Requires confirm: true. Cards laid out or copied from it stay where they are, and its file stays archived.",
+    schema: z.object({ collection: z.string(), item: z.string(), confirm: z.boolean(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { collection, item, confirm }) => {
+      if (!confirm) return "not taken out: pass confirm: true after checking with the person";
+      return { left: takeOut(ctx.boardId, collection, item, ctx.actor) };
     },
   }),
   def({
