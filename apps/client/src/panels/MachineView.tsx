@@ -38,7 +38,7 @@ import { unscaleMouse } from "./scaledMouse";
 import { putInUse } from "../lib/cardUse";
 import { HOLDS_KEYS, escEscToLeave } from "../lib/keysHeld";
 import { getUi, setUi } from "../state/ui";
-import { KeysLine } from "./MachineViewBits";
+import { KeysLine, useRingWidth } from "./MachineViewBits";
 import { AgentUse, Desktop, ViewSwitch, useMachineView } from "./MachineViewDesktop";
 import { IoStrip } from "./MachineViewIo";
 
@@ -550,6 +550,8 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
   // the caret is in the shell: the card says so, and it is in use (the wheel scrolls its scrollback)
   const [hasKeys, setHasKeys] = useState(false);
   const inUse = useUi().engaged === panelId;
+  const well = useRef<HTMLDivElement>(null);
+  useRingWidth(well, hasKeys);
   // a click elsewhere (or anything else that ends the card's use) takes the keys back from the shell
   useEffect(() => {
     if (!inUse && el.current?.contains(document.activeElement)) xterm.current?.blur();
@@ -685,7 +687,7 @@ const Terminal = memo(function Terminal({ panelId, canType }: { panelId: string;
     };
   }, [boardId, panelId, canType]);
   return (
-    <div className={`machine-term-wrap${hasKeys ? " has-keys" : ""}`}>
+    <div ref={well} className={`machine-term-wrap${hasKeys ? " has-keys" : ""}`}>
       {/* keys go to the shell, not the board's shortcuts (lib/keysHeld.ts) */}
       <div ref={el} className="machine-term wheel-own" {...{ [HOLDS_KEYS]: "" }} onKeyDown={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} />
       {hasKeys && canType && <KeysLine />}

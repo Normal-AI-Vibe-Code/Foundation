@@ -60,6 +60,7 @@ async function connect() {
   r.background = "transparent";
   r.addEventListener("connect", () => {
     tries = 0;
+    everOpen = true;
     const c = screen.querySelector("canvas");
     say("connected", { w: c?.width ?? 0, h: c?.height ?? 0 });
   });
@@ -74,9 +75,12 @@ async function connect() {
   });
 }
 
+let everOpen = false;
+
 function again(reason: string) {
   if (over) return;
-  if (tries >= 6) return say("closed", { reason, final: true });
+  // seven tries and never once open: the server isn't taking this socket at all (it isn't running, or it is a Foundation from before desktops)
+  if (tries >= 6) return say("closed", { reason: everOpen ? reason : "Foundation's server didn't open the desktop's connection. It may not be running, or it may be older than this app: restart it, then try again.", final: true });
   say("closed", { reason: "Reconnecting…", final: false });
   retry = setTimeout(() => void connect(), 600 * 2 ** tries++);
 }
