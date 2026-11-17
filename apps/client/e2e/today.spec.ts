@@ -22,9 +22,9 @@ test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps
   await expect(page.locator(".today")).toBeVisible();
   await expect(page.locator(".top-bar")).toBeVisible();
   await expect(page.locator(".side-pane")).toBeVisible();
-  // Today is the top bar's (at its right end, since 2026-11-17), not a row of the side menu
+  // Today is the top bar's (in its top-left corner, since 2026-11-17), not a row of the side menu
   await expect(page.locator('.side-pane [data-place="today"]')).toHaveCount(0);
-  await expect(page.locator(".top-bar .top-tools [data-top-today]")).toHaveClass(/is-on/);
+  await expect(page.locator(".top-bar .top-left [data-top-today]")).toHaveClass(/is-on/);
   // what's waiting (the ask above) is counted right beside the word
   await expect(page.locator(".top-bar [data-top-today] [data-today-badge]")).toBeVisible();
   await expect(page.locator(".side-pane .pane-seg-btn")).toHaveText(["Recent", "All Grids"]);

@@ -821,11 +821,14 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 55%, var(--color-line-strong));
   background: var(--color-agent-dim);
 }
-/* in the tools at the right: what's waiting sits right against the word, not pushed to an edge */
-.top-tools .top-today {
+/* in the top left (2026-11-17): the window's corner; what's waiting sits right against the word. Over the open
+   menu it keeps the corner and the fold keeps the menu's right edge */
+.top-left .top-today {
   flex: none;
-  margin-right: var(--space-2);
   padding-right: var(--space-3);
+}
+.top-left.is-over-pane .top-today {
+  margin-right: auto;
 }
 .top-today .pane-badge {
   margin-left: calc(-1 * var(--space-1));

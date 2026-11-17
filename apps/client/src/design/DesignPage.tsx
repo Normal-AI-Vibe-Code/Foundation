@@ -1910,7 +1910,7 @@ function TodayPartsDemo() {
   return (
     <div className="design-today-parts" data-design-today-parts>
       <div className="design-today-menu">
-        {/* in the top bar's tools (2026-11-17): what's waiting sits right beside the word */}
+        {/* in the top bar's left corner (2026-11-17): what's waiting sits right beside the word */}
         <button className="top-today is-on">
           <ShibaDot size={16} />
           Today

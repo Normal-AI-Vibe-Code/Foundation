@@ -1,9 +1,9 @@
 /**
- * The top bar, drawn on the floor. Left to right: the side menu's fold (at the menu's right edge,
- * lined off from the tabs), Settings as a pill while you're there, a tab for every grid open in
- * this window, ＋ (a new grid; its caret offers the other canvases: a presentation, a web page),
- * then on the right the people here, Today (with what's waiting on you beside the word;
- * 2026-11-17: out of the side menu), and the built-in tools (shell/Tools.tsx: a terminal, a
+ * The top bar, drawn on the floor. Left to right: Today in the window's corner (with what's waiting
+ * on you beside the word; 2026-11-17, Josh: to the top left, from the right end), the side menu's
+ * fold (at the menu's right edge, lined off from the tabs), Settings as a pill while you're there,
+ * a tab for every grid open in this window, ＋ (a new grid; its caret offers the other canvases: a
+ * presentation, a web page), then on the right the people here and the built-in tools (shell/Tools.tsx: a terminal, a
  * browser, the files, what changed, this computer's agents). Search, the council, the agents,
  * commands and present moved to the bottom bar on 2026-11-17; the server and the day/night orb
  * to the side menu's foot.
@@ -69,9 +69,19 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
 
   return (
     <header className="top-bar">
-      {/* over the side menu: its fold, at the menu's right edge, and a line down to the menu's own edge
-          between it and the tabs. The tabs start where the menu ends */}
+      {/* the top left: Today in the window's corner, then the side menu's fold (over the open menu, at its right
+          edge) and a line down to the menu's own edge between it and the tabs. The tabs start where the menu ends */}
       <div className={`top-left${ui.pane ? " is-over-pane" : ""}`} style={ui.pane ? { width: Math.max(0, ui.paneW - 16) } : undefined}>
+        {/* Today, in the window's top-left corner (2026-11-17, Josh): the Shiba very small, the word, and what's waiting right beside it */}
+        <button className={`top-today${place.kind === "today" ? " is-on" : ""}`} onClick={goToday} data-tip={notices.total ? `Today: ${notices.words}` : "Today: the Shiba, your todos, the apps"} data-top-today data-place="today">
+          <ShibaDot size={16} />
+          Today
+          {notices.total > 0 && (
+            <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
+              {notices.total > 99 ? "99+" : notices.total}
+            </span>
+          )}
+        </button>
         <button
           className={`top-btn pane-fold${spacesOpen ? " is-on" : ""}`}
           onClick={() => setUi(spacesOpen ? { pane: false } : { pane: true, paneView: "spaces" })}
@@ -204,16 +214,6 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
 
       <div className="top-tools">
         {place.kind === "grid" && <PresenceStack />}
-        {/* Today, first of the tools: the Shiba very small, the word, and what's waiting right beside it */}
-        <button className={`top-today${place.kind === "today" ? " is-on" : ""}`} onClick={goToday} data-tip={notices.total ? `Today: ${notices.words}` : "Today: the Shiba, your todos, the apps"} data-top-today data-place="today">
-          <ShibaDot size={16} />
-          Today
-          {notices.total > 0 && (
-            <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
-              {notices.total > 99 ? "99+" : notices.total}
-            </span>
-          )}
-        </button>
         {/* the built-in tools (2026-11-17): a terminal, a browser, the files, what changed, and this computer's agents (T3) */}
         <ToolButtons />
       </div>
