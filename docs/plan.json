@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-17T04:09:03.397Z",
+  "syncedAt": "2026-11-17T05:42:05.515Z",
   "columns": [
     {
       "id": "needs-you",
@@ -89,7 +89,8 @@
       "milestone": "polish",
       "area": "shell",
       "status": "review",
-      "body": "Josh, 2026-11-17. Bottom bar: search (a window over its pill, pinnable to the right; its line the grid's hairline), talk, zoom, present and commands, the council beside Ask, Ask's pill with the agents' settings. The grid's council stands at the bottom right with the bar at the bottom left; a section's at its right by its Council button; three places, close together, empty places breathing. The agents panel has a line under its tabs. Side menu foot: the server pill the menu's width above Settings, the orb left of you, edges on the Settings icon. The grid's WebGL paper survives a lost context (it froze on its last colour). Tools at the top right: terminal, browser, files, change log, T3 (server and Vision's T3 client). The Add sheet opens T3 inside Foundation and turns on agents T3 ships switched off. Checked: `e2e/bottom-bar.spec.ts` (7), `test/hostterm.test.ts` (3), and council, section-crew, one-interface and today e2e; evidence in `docs/evidence/2026-11-17_bottom-bar/`."
+      "body": "Josh, 2026-11-17. Bottom bar: search (a window over its pill, pinnable to the right; its line the grid's hairline), talk, zoom, present and commands, the council beside Ask, Ask's pill with the agents' settings. The grid's council stands at the bottom right with the bar at the bottom left; a section's at its right by its Council button; three places, close together, empty places breathing. The agents panel has a line under its tabs. Side menu foot: the server pill the menu's width above Settings, the orb left of you, edges on the Settings icon. The grid's WebGL paper survives a lost context (it froze on its last colour). Tools at the top right: terminal, browser, files, change log, T3 (server and Vision's T3 client). The Add sheet opens T3 inside Foundation and turns on agents T3 ships switched off. Checked: `e2e/bottom-bar.spec.ts` (7), `test/hostterm.test.ts` (3), and council, section-crew, one-interface and today e2e; evidence in `docs/evidence/2026-11-17_bottom-bar/`.",
+      "issue": 190
     },
     {
       "id": "machine-port-stale",
