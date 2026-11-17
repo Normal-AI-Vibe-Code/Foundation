@@ -171,7 +171,7 @@ const portSchema = z.object({
 });
 
 const PANEL_SIZES: Record<PanelKind, [number, number]> = {
-  character: [460, 620],
+  character: [460, 720],
   grid: [720, 520],
   kanban: [1480, 980],
   design: [1180, 900],

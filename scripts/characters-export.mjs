@@ -21,7 +21,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const data = resolve(root, process.env.FOUNDATION_DATA_DIR ?? "data");
 const out = join(root, "apps/server/starter/characters");
 const only = process.argv.slice(2).map((n) => n.toLowerCase());
-const ROLES = ["front", "back", "side", "portrait", "thumb", "clips", "mavatar"];
+const ROLES = ["front", "expressions", "back", "side", "portrait", "thumb", "clips", "mavatar"];
 
 const db = new DatabaseSync(join(data, "foundation.db"), { readOnly: true });
 const boards = new Set(db.prepare("select board_id from character_boards").all().map((b) => b.board_id));

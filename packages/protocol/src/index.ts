@@ -186,7 +186,7 @@ export type PanelKind =
   | "grid" // a grid inside this one (2026-11-15): the section that holds it stands for a child grid and opens it
   | "kanban" // a kanban board: columns of cards moved between them (the plan is one)
   | "design" // a chapter of the design language, live on its tokens
-  | "pipeline" // the Character studio's flow for one set: inspiration → sheet → views → Meshy or mesh avatar → characters (`source`: the set)
+  | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
   | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
 
 export interface Port {
@@ -215,6 +215,8 @@ export interface PanelDoc extends ObjectBaseDoc {
   board?: string;
   /** what a "kanban" card shows ("plan": Foundation's own plan) or which chapter a "design" card draws */
   source?: string;
+  /** which node of the Character studio's flow a "pipeline" card is (characters.ts PIPELINE_NODES); absent on the one-card flow of 2026-11-16 */
+  node?: string;
   /** connector id for panel === "connector" */
   connector?: string;
   /** Slack channel id — a "slack" card's channel, or the channel a huddle was opened for */

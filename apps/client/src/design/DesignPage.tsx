@@ -120,6 +120,7 @@ import type { UploadItem } from "../lib/uploads";
 import { snippetHtml } from "../lib/snippet";
 import { RuneDesign } from "../rune/RendererTab";
 import { CardChromeDemo } from "./CardChromeDemo";
+import { CharacterStudioDemo } from "./CharacterStudioDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -1056,6 +1057,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
 
       <Section title="The council" note="The agents at work on a section or the whole board, seated along the foot of the window as characters (☺ in the top bar, on a section's tools, in its right-click menu, and ⌘K). A glass bar, pane radius, risen on the settle spring; seats stagger in 45 ms apart on the spring. Each seat is 124 × 156: its character from the chest up over a plinth washed in its agent's cursor colour (--color-crew-n, the same hue as its cursor and its presence dot) with a 3 px rule of that colour at the foot, what its cursor says above it on raised paper with a hairline tinted the same, and under it the colour's dot, the agent's name in 12/600 and “as <character>” in dim 11. A seat's mood is the agent's state: it waves when it arrives, thinks while it reads, works while it writes, talks when it asks you something, cheers when it's done, holds its head on an error. Pressed, a seat stands (208 × 332, head to toe on a round wash of its colour) and a card beside it says what it was asked and for whom, with Follow, Stop and the characters it can appear as (the one worn ringed in its colour). With nobody at work the seats are the bench: the characters there are, on a neutral plinth, and one waves when pointed at. Below, a composer on a pill; Ask is the violet pill, because an agent will act. 3D characters are drawn on one canvas laid over the bar, so six seats cost one renderer; the board above stays live, since only the bar takes the pointer.">
         <CouncilDemo />
+        <CharacterStudioDemo />
       </Section>
 
       <Section

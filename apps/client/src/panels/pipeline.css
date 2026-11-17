@@ -1,55 +1,203 @@
-/* The Character studio's flow card (panels/PipelineView.tsx). On tokens only. */
+/* The Character studio's flow (panels/PipelineView.tsx): a node per stage. On the grid a node is its own
+   card and the wires are the grid's; in one frame (.pipe-flow) the nodes are drawn as raised paper and the
+   wires with them. On tokens only. */
 
-.pipeline {
+.pipe-node {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  container-type: inline-size;
-}
-.pipe-flow {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  align-items: stretch;
-}
-.pipe-node {
-  flex: 1 1 0;
+  gap: var(--space-3);
+  /* the sides stay clear of the card's ports, which sit on its edges */
+  padding: var(--space-4) var(--space-5);
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  container: pipe / inline-size;
+}
+.pipe-node.is-inline {
   border-radius: var(--radius-card);
   background: var(--color-raise);
   box-shadow:
     var(--shadow-sheet),
     0 0 0 1px var(--color-line);
 }
-.pipe-node.is-out {
+.pipe-node.is-inline.is-out {
   box-shadow:
     var(--shadow-sheet),
     0 0 0 1px color-mix(in srgb, var(--color-agent) 45%, var(--color-line));
 }
 .pipe-kind {
+  flex: none;
   color: var(--color-moss);
-  font: 600 var(--text-11) / 1.2 var(--font-sans);
-  letter-spacing: 0.08em;
+  font: 600 var(--text-11) / 1.3 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
   text-transform: uppercase;
 }
-.pipe-node b {
+.pipe-kind > i {
+  font-style: normal;
+  color: var(--color-mist);
+  font-variant-numeric: tabular-nums;
+}
+.pipe-name {
+  flex: none;
   font: 600 var(--text-16) / 1.2 var(--font-sans);
 }
-.pipe-what {
+/* what it takes and what it makes: two quiet lines, the labels in a column */
+.pipe-io {
+  flex: none;
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+}
+.pipe-io > dt {
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.45 var(--font-sans);
+}
+.pipe-io > dd {
+  margin: 0;
   color: var(--color-mist);
-  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  font: 400 var(--text-11) / 1.45 var(--font-sans);
+}
+
+/* ---------- the characters at a node ---------- */
+
+.pipe-tiles {
+  flex: 1 1 0;
+  min-height: 0;
+  list-style: none;
+  margin: 0 calc(var(--space-2) * -1);
+  padding: 0 var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.pipe-tile {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pipe-tile-open {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pipe-tile-pic {
+  width: 32px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-paper);
+  background: var(--color-abyss);
+  color: var(--color-dim);
+  overflow: hidden;
+}
+.pipe-tile-pic > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pipe-tile-pic > i {
+  font-style: normal;
+}
+.pipe-tile-open:hover .pipe-tile-pic {
+  border-color: var(--color-line-strong);
+}
+.pipe-tile-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.pipe-tile-words > b {
+  font: 600 var(--text-12) / 1.3 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipe-tile-words > span {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipe-tile.is-running .pipe-tile-words > span {
+  color: var(--color-agent);
+}
+.pipe-tile.is-failed .pipe-tile-words > span {
+  color: var(--color-bad);
+}
+.pipe-tile.is-pending .pipe-tile-words > span {
+  color: var(--color-warn);
+}
+/* working: a violet bead that breathes, and the stage's own progress rule under the tile */
+.pipe-busy {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-agent);
+  animation: pipe-breathe 1.2s var(--ease-out-soft, ease-out) infinite alternate;
+}
+@keyframes pipe-breathe {
+  from {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pipe-busy {
+    animation: none;
+  }
+}
+.pipe-progress {
+  display: block;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(to right, var(--color-agent) var(--p), var(--color-line) var(--p));
+}
+.pipe-generate {
+  align-self: stretch;
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- a node's foot: how many are here, and ＋ New on the Sheet ---------- */
+
+.pipe-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 28px;
 }
 .pipe-count {
   margin-top: auto;
   color: var(--color-frost);
   font: 600 var(--text-12) / 1.2 var(--font-sans);
   font-variant-numeric: tabular-nums;
+}
+.pipe-foot > .pipe-count {
+  margin-top: 0;
 }
 .pipe-count.is-none {
   color: var(--color-dim);
@@ -59,61 +207,192 @@
   color: var(--color-agent);
 }
 .pipe-pics {
-  display: flex;
-  gap: var(--space-1);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
+  gap: var(--space-2);
+  align-content: start;
+  min-height: 0;
+  overflow: hidden;
 }
 .pipe-pics img,
 .pipe-pics span {
-  width: 30px;
-  height: 38px;
+  width: 100%;
+  aspect-ratio: 3 / 4;
   border-radius: var(--radius-paper);
   object-fit: cover;
   background: var(--color-panel);
 }
-/* the wires between nodes: a road, the wire on it, and a packet moving along while something is in the flow */
-.pipe-wire {
+
+/* ---------- ＋ New: a name, a line, what to draw it from ---------- */
+
+.pipe-new {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.pipe-field {
   flex: none;
-  align-self: center;
-  width: 36px;
-  height: 9px;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+  resize: none;
+}
+.pipe-field::placeholder {
+  color: var(--color-dim);
+}
+.pipe-field:focus {
+  outline: none;
+  border-color: var(--color-pulse);
+}
+.pipe-forms {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
+.pipe-form {
+  flex: 1 1 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-pill);
-  background:
-    linear-gradient(var(--color-pulse), var(--color-pulse)) center / 100% 2px no-repeat,
-    color-mix(in srgb, var(--color-frost) 8%, transparent);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+  cursor: pointer;
+}
+.pipe-form.is-on {
+  border-color: var(--color-pulse);
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.pipe-picks {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.pipe-pick {
+  width: 30px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-paper);
+  background: var(--color-abyss);
+  overflow: hidden;
+  cursor: pointer;
   opacity: 0.6;
 }
-.pipe-fork {
-  flex: 1.15 1 0;
-  min-width: 0;
+.pipe-pick > img,
+.pipe-pick > span {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pipe-pick:hover:not(:disabled),
+.pipe-pick.is-on {
+  opacity: 1;
+}
+.pipe-pick.is-on {
+  border-color: var(--color-agent);
+  box-shadow: 0 0 0 1px var(--color-agent);
+}
+.pipe-hint {
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.pipe-new-acts {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---------- the whole flow in one frame ---------- */
+
+.pipe-flow {
+  height: 100%;
+  padding: var(--space-5);
+  overflow: auto;
+}
+.pipe-band {
+  position: relative;
+}
+.pipe-slot {
+  position: absolute;
+}
+.pipe-wires {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+/* a wire: a road, and the line on it (DESIGN.md → Wires) */
+.pipe-road {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-frost) 8%, transparent);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pipe-line {
+  fill: none;
+  stroke: var(--color-wire);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
+}
+
+/* a narrow node (a person made its card smaller): the labels over their lines */
+@container pipe (max-width: 130px) {
+  .pipe-io {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------- on #/design (design/CharacterStudioDemo.tsx): the card at its widths, the flow in a frame ---------- */
+
+.studio-demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+.studio-demo-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+.studio-demo-card {
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
-.pipe-fork .pipe-what {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+.studio-demo-card > figcaption {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.4 var(--font-sans);
+}
+.studio-demo-frame {
+  position: relative;
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
   overflow: hidden;
 }
-.pipe-acts {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  color: var(--color-mist);
-  font: 400 var(--text-12) / 1.4 var(--font-sans);
-}
-@container (max-width: 900px) {
-  .pipe-flow {
-    flex-direction: column;
-    overflow: auto;
-  }
-  .pipe-wire {
-    width: 9px;
-    height: 18px;
-    background:
-      linear-gradient(var(--color-pulse), var(--color-pulse)) center / 2px 100% no-repeat,
-      color-mix(in srgb, var(--color-frost) 8%, transparent);
-  }
+.studio-demo-flow {
+  border-radius: var(--radius-pane);
+  background: var(--color-panel);
+  overflow: hidden;
 }
