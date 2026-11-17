@@ -2899,7 +2899,7 @@ body.is-viewer .frame-grip {
 }
 
 /* 2026-11-17: a card's ✕ keeps a 26 px press on the screen however small the card is drawn (it was 8 px at
-   30 %, with the drag handle all round it, so a near miss picked the card up). --view-scale: lib/viewScale.ts */
+   30 %, with the drag handle all round it, so a near miss picked the card up). --view-scale: how small the card is drawn, measured when the pointer comes onto it (ObjectFrame.tsx) */
 .frame-header .icon-btn.is-remove,
 .frame-icons .frame-icon.is-remove {
   position: relative;

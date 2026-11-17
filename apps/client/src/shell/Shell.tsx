@@ -15,7 +15,6 @@ import { cardOf, fullscreenCard, installCardUse, modHeld } from "../lib/cardUse"
 
 import { DetailPane } from "./DetailPane";
 import { Council, CouncilPreload } from "../characters/Council";
-import { startViewScale } from "../lib/viewScale";
 import { AgentInfoPane } from "../characters/AgentInfo";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -55,8 +54,6 @@ function typing(e: KeyboardEvent) {
 
 /** the grid this device had open last (never one of Foundation's own, which Settings opens) */
 const lastGrid = () => new URLSearchParams(window.location.search).get("board") || localStorage.getItem("foundation-board") || "company";
-
-startViewScale();
 
 export function Shell({ user, route }: { user: UserInfo; route: string }) {
   const ui = useUi();

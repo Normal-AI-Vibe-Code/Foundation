@@ -256,6 +256,11 @@ export function ObjectFrame({
       ref={rootRef}
       className={`frame-anchor chrome-${chrome}${confirming ? " is-confirming" : ""}`}
       style={{ width }}
+      // how small this card is drawn right now (the grid's zoom times its section's fit), for the ✕'s press area (App.css)
+      onPointerEnter={(e) => {
+        const el = e.currentTarget;
+        if (el.offsetWidth) el.style.setProperty("--view-scale", (el.getBoundingClientRect().width / el.offsetWidth).toFixed(3));
+      }}
       {...Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]))}
     >
       {chrome === "icons" && (
