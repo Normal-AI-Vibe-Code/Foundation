@@ -27,6 +27,8 @@
  * DeepSeek, to either group.
  */
 
+import { AddAgent } from "./AddAgent";
+import { BackgroundTasks } from "./BackgroundTasks";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { api } from "../lib/api";
 import { crewTeams, togetherWords, type CrewTeam } from "../lib/sectionCrew";
@@ -109,9 +111,30 @@ export function AgentsPane() {
     (id) => sections[id]?.name,
     ui.agentsAt,
   );
+  const tabs = (
+    <nav className="agents-tabs" role="tablist" aria-label="The agents panel">
+      {(["agents", "add", "tasks"] as const).map((t) => (
+        <button key={t} type="button" role="tab" aria-selected={ui.agentsTab === t} className={`agents-tab${ui.agentsTab === t ? " is-on" : ""}`} data-agents-tab={t} onClick={() => setUi({ agentsTab: t })}>
+          {t === "agents" ? "At work" : t === "add" ? "＋ Add an agent" : "Background"}
+        </button>
+      ))}
+      <button className="top-btn" onClick={() => setUi({ agents: false })} aria-label="Close the agents panel" data-tip="Close">
+        ✕
+      </button>
+    </nav>
+  );
+  if (ui.agentsTab !== "agents")
+    return (
+      <aside className="agents-pane floor-pane" style={{ width: ui.agentsW }} aria-label="Agents" data-agents-pane={ui.agentsTab}>
+        <FloorEdge side="left" value={ui.agentsW} {...WIDTHS.agents} onChange={(w) => setUi({ agentsW: w })} label="Agents" />
+        {tabs}
+        <div className="agents-scroll">{ui.agentsTab === "add" ? <AddAgent onDone={() => setUi({ agentsTab: "agents", agents: false })} /> : <BackgroundTasks />}</div>
+      </aside>
+    );
   return (
-    <aside className="agents-pane floor-pane" style={{ width: ui.agentsW }} aria-label="Agents">
+    <aside className="agents-pane floor-pane" style={{ width: ui.agentsW }} aria-label="Agents" data-agents-pane="agents">
       <FloorEdge side="left" value={ui.agentsW} {...WIDTHS.agents} onChange={(w) => setUi({ agentsW: w })} label="Agents" />
+      {tabs}
       <AgentsPaneBody places={places} count={crew.length} onClose={() => setUi({ agents: false })} onGo={(id) => requestSnap({ kind: "section", id })} live foot={<T3Block viewer={ui.role === "viewer"} admin={ui.role === "admin"} section={askSection(ui.agentsAt, sections, active)} />} />
     </aside>
   );

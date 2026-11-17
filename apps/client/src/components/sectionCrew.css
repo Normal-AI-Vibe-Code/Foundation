@@ -777,3 +777,291 @@ body.is-connecting .sec-crew,
     transition: none;
   }
 }
+
+/* ---------- the agents panel's faces (2026-11-16): at work, adding one, the background ---------- */
+
+.agents-tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 40px;
+  margin: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+}
+.agents-tabs .top-btn {
+  margin-left: auto;
+}
+.agents-tab {
+  height: 26px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.agents-tab:hover {
+  color: var(--color-frost);
+}
+.agents-tab.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+}
+.agents-tab[data-agents-tab="add"] {
+  color: var(--color-agent);
+}
+.agents-pane[data-agents-pane="agents"] .agents-head {
+  display: none;
+}
+
+/* adding an agent: four steps on one sheet */
+.add-agent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-6);
+}
+.add-lede,
+.add-note {
+  margin: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+.add-lede b,
+.add-note b {
+  color: var(--color-frost);
+}
+.add-note code {
+  font: 400 var(--text-11) / 1 var(--font-code);
+  padding: 1px 4px;
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+  color: var(--color-frost);
+}
+.add-note.is-ok {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  color: var(--color-frost);
+}
+.add-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-pulse);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.add-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.add-step.is-open {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-agent) 45%, var(--color-line));
+}
+.add-step.is-wait {
+  opacity: 0.55;
+}
+.add-step-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+}
+.add-step-n {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+}
+.add-step.is-open .add-step-n {
+  background: var(--color-agent);
+  color: var(--color-on-fill);
+}
+.add-step.is-done .add-step-n {
+  background: var(--color-ok);
+  color: var(--color-on-fill);
+}
+.add-step-sum {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+}
+.add-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.add-kind {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.add-kind:hover {
+  background: var(--color-agent-dim);
+}
+.add-kind.is-on {
+  background: var(--color-raise);
+  box-shadow: 0 0 0 1px var(--color-agent);
+}
+.add-kind-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+}
+.add-kind-text b {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+}
+.add-kind-state {
+  max-width: 120px;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.25 var(--font-sans);
+  text-align: right;
+}
+.add-kind-state.is-ok {
+  color: var(--color-ok);
+}
+.add-connect,
+.add-final {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.add-avatars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: var(--space-2);
+}
+.add-avatars .add-note {
+  grid-column: 1 / -1;
+}
+.add-avatar {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  overflow: hidden;
+  cursor: pointer;
+}
+.add-avatar .avatar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 12%;
+  animation: none;
+  border-radius: 0;
+}
+.add-avatar:hover {
+  border-color: var(--color-line-strong);
+}
+.add-avatar.is-on {
+  border-color: var(--color-agent);
+  box-shadow: 0 0 0 2px var(--color-agent);
+}
+.add-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+
+/* the background: sessions and runs */
+.bg-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.bg-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.bg-state {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.bg-open {
+  margin-left: auto;
+  height: 24px;
+}
+.bg-task {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+}
+.bg-task-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+}
+.bg-task-text b {
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bg-task.is-working .bg-task-text b::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--color-agent);
+  animation: f-breathe 1.6s var(--ease-out-soft) infinite;
+}
+.bg-task.is-error .bg-task-text span {
+  color: var(--color-bad);
+}
+.bg-task-acts {
+  display: inline-flex;
+  gap: var(--space-1);
+}

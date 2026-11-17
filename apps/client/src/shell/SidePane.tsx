@@ -13,6 +13,7 @@
  * opened from the grid's tab.
  */
 
+import { ShibaDot, useNotices } from "../today/notices";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
@@ -46,6 +47,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
   /** the grid being dragged, and the row (or "top") it's over */
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const notices = useNotices();
 
   const listed = useMemo(() => boards.filter((b) => !isSystemGrid(b.id)), [boards]);
   const recent = useMemo(() => {
@@ -162,9 +164,14 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
         <motion.aside key="pane" className="side-pane floor-pane" style={{ width: ui.paneW }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={paneSpring} aria-label="Foundation menu">
           <div className="pane-scroll">
             <section className="pane-group">
-              <button className={`pane-row pane-place${place.kind === "today" ? " is-current" : ""}`} onClick={goToday} data-place="today">
-                <span className="pane-glyph is-agent">◌</span>
+              <button className={`pane-row pane-place pane-today${place.kind === "today" ? " is-current" : ""}`} onClick={goToday} data-place="today" data-tip={notices.words}>
+                <ShibaDot />
                 <span className="pane-label">Today</span>
+                {notices.total > 0 && (
+                  <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
+                    {notices.total > 99 ? "99+" : notices.total}
+                  </span>
+                )}
               </button>
             </section>
 

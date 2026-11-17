@@ -469,3 +469,171 @@
 .shell.is-away .crew-guide {
   visibility: hidden;
 }
+
+/* ---------- Today's row in the side menu (2026-11-16): a pill, the Shiba very small, and what's waiting ---------- */
+
+.pane-today {
+  width: calc(100% - var(--space-2));
+  margin: 0 var(--space-1);
+  height: 36px;
+  padding: 0 var(--space-3) 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.pane-today.is-current {
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 60%, var(--color-line-strong)),
+    var(--shadow-sheet);
+}
+.pane-today .pane-label {
+  font-weight: 600;
+}
+/* the Shiba, 18 px: two soft lights turning in a disc. CSS only, on the compositor */
+.shiba-dot {
+  position: relative;
+  flex: none;
+  display: inline-block;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-warn) 30%, var(--color-raise));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 30%, transparent);
+}
+.shiba-dot::before,
+.shiba-dot::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  border-radius: 50%;
+  will-change: transform;
+}
+.shiba-dot::before {
+  background: radial-gradient(closest-side at 34% 38%, color-mix(in srgb, var(--color-agent) 85%, transparent), transparent 62%);
+  animation: shiba-dot-turn 7s linear infinite;
+}
+.shiba-dot::after {
+  background: radial-gradient(closest-side at 66% 64%, color-mix(in srgb, var(--color-bad) 55%, var(--color-warn)), transparent 60%);
+  animation: shiba-dot-turn 11s linear infinite reverse;
+}
+.shiba-dot[data-mood="thinking"]::before,
+.shiba-dot[data-mood="speaking"]::before,
+.shiba-dot[data-mood="listening"]::before {
+  animation-duration: 2.4s;
+}
+.shiba-dot[data-mood="thinking"]::after,
+.shiba-dot[data-mood="speaking"]::after,
+.shiba-dot[data-mood="listening"]::after {
+  animation-duration: 3.6s;
+}
+@keyframes shiba-dot-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.pane-badge {
+  flex: none;
+  margin-left: auto;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+  color: var(--color-on-fill);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shiba-dot::before,
+  .shiba-dot::after {
+    animation: none;
+  }
+}
+
+/* ---------- what a conversation folded away, on the right (shell/DetailPane.tsx) ---------- */
+
+.detail-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail-copy {
+  height: 24px;
+}
+.detail-body {
+  user-select: text;
+}
+.detail-meta {
+  margin-bottom: var(--space-3);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.detail-code {
+  margin: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.55 var(--font-code);
+  white-space: pre;
+}
+.detail-code.is-small {
+  margin-top: var(--space-2);
+  font-size: var(--text-11);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.detail-steps,
+.detail-plan {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.detail-step-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+.detail-step-head code {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-code);
+}
+.detail-goal {
+  margin: 0 0 var(--space-4);
+  font: 600 var(--text-14) / 1.4 var(--font-sans);
+}
+.detail-plan li {
+  display: flex;
+  gap: var(--space-3);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+}
+.detail-plan li[data-status="done"] {
+  color: var(--color-dim);
+  text-decoration: line-through;
+}
+.detail-box {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-paper);
+  font-size: 10px;
+}
+.detail-plan li[data-status="done"] .detail-box {
+  background: var(--color-agent);
+  border-color: var(--color-agent);
+  color: var(--color-on-fill);
+}

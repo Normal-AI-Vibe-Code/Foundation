@@ -23,6 +23,8 @@ function inline(s: string): string {
     .replace(/&lt;u&gt;(.+?)&lt;\/u&gt;/g, "<u>$1</u>")
     .replace(/~~([^~]+)~~/g, "<s>$1</s>")
     .replace(/(^|[\s(>*~])_([^_\n]+)_(?=$|[\s).,;:!?<*~])/g, "$1<em>$2</em>")
+    // a picture: one of Foundation's files (/files/…), or the web's
+    .replace(/!\[([^\]]*)\]\(((?:https?:\/\/|\/files\/)[^\s)]+)\)/g, '<img class="md-img" src="$2" alt="$1" loading="lazy">')
     .replace(
       /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
       '<a href="$2" data-ext="1">$1</a>',

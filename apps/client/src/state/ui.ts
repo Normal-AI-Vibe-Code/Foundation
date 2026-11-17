@@ -42,6 +42,8 @@ export interface UiState {
   spacesView: "recent" | "all";
   /** a strip the open place lays under the top bar (Settings' tabs over a grid): the grid frames itself below it */
   strip: number;
+  /** the grid's council, open as a band under the top bar (characters/Council.tsx): the grid starts below it */
+  councilH: number;
   /** the top bar's tabs: the spaces open in this window (board ids), in order */
   spaces: string[];
   /** sessions opened in this window, and the one showing in the session column (null: none) */
@@ -60,8 +62,12 @@ export interface UiState {
   agents: boolean;
   agentsW: number;
   agentsAt: string | null;
+  /** which face of the agents panel shows: who's at work, adding one, or what runs in the background */
+  agentsTab: "agents" | "add" | "tasks";
   /** an agent's own pane on the right (characters/AgentInfo.tsx), opened from a council; it takes the agents pane's place and width */
   agentInfo: boolean;
+  /** something a conversation folded away, open on the right (shell/DetailPane.tsx); it shares the agents pane's place and width */
+  detail: boolean;
   /** cards the showing session touched — ringed on the grid */
   touched: string[];
   /** my role on the board that's showing: a viewer reads, and edits snap back */
@@ -108,6 +114,7 @@ let ui: UiState = {
   paneView: s0.paneView === "info" ? "info" : "spaces",
   spacesView: s0.spacesView === "recent" ? "recent" : "all",
   strip: 0,
+  councilH: 0,
   spaces: Array.isArray(s0.spaces) ? s0.spaces.filter((id) => typeof id === "string").slice(0, 24) : [],
   sessions: Array.isArray(s0.sessions) ? s0.sessions.filter((t) => t && typeof t.id === "string").slice(0, 12) : [],
   session: null,
@@ -118,7 +125,9 @@ let ui: UiState = {
   agents: (s0.agents ?? false) && !s0.search,
   agentsW: clampW(s0.agentsW, WIDTHS.agents),
   agentsAt: null,
+  agentsTab: "agents",
   agentInfo: false,
+  detail: false,
   touched: [],
   role: "member",
 };
@@ -137,9 +146,10 @@ export function setUi(patch: Partial<UiState>) {
   ui = { ...ui, ...patch };
   if (patch.session !== undefined && patch.session !== before.session) ui.touched = patch.touched ?? [];
   // one pane on the right: the one just opened takes the other's place
-  if (ui.agentInfo && !before.agentInfo) ui.search = ui.agents = false;
-  else if (ui.agents && !before.agents) ((ui.search = false), (ui.agentInfo = false));
-  else if (ui.search && !before.search) ui.agents = ui.agentInfo = false;
+  if (ui.detail && !before.detail) ui.search = ui.agents = ui.agentInfo = false;
+  else if (ui.agentInfo && !before.agentInfo) ui.search = ui.agents = ui.detail = false;
+  else if (ui.agents && !before.agents) ((ui.search = false), (ui.agentInfo = false), (ui.detail = false));
+  else if (ui.search && !before.search) ui.agents = ui.agentInfo = ui.detail = false;
   if (!ui.agents) ui.agentsAt = null;
   // opening a session or search (or widening one) on a narrow screen: the side pane gives way
   const opened = (ui.session && !before.session) || (ui.search && !before.search) || (ui.agents && !before.agents) || (ui.agentInfo && !before.agentInfo) || ui.sessionW > before.sessionW || ui.searchW > before.searchW || ui.agentsW > before.agentsW;
@@ -197,7 +207,7 @@ if (typeof window !== "undefined") {
 export function floorInsets(u: UiState = ui) {
   if (u.presenting) return { left: 0, top: 0, right: 0, bottom: 0 };
   const session = u.session ? u.sessionW : 0;
-  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR + u.strip, right: u.search ? u.searchW : u.agents || u.agentInfo ? u.agentsW : 0, bottom: 0 };
+  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR + u.strip + u.councilH, right: u.search ? u.searchW : u.agents || u.agentInfo || u.detail ? u.agentsW : 0, bottom: 0 };
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;

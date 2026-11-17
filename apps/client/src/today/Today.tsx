@@ -8,13 +8,14 @@
  * when you ask, so its words and the page never disagree.
  */
 
+import { ShibaTalk } from "./ShibaTalk";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { UserInfo } from "@foundation/protocol";
 import { createShiba, type OrbMood } from "@foundation/ui/shiba";
 import { listen, voiceAvailable, type Listening } from "../lib/voice";
 import { api } from "../lib/api";
 import { floorInsets, useUi } from "../state/ui";
-import { ask, loadToday, newConversation, restoreConversation, saveGoal, setHeard, stopAsking, useToday, wordsLevel, type CompanyApp, type FocusItem, type Goal, type Mood } from "./model";
+import { ask, loadToday, restoreConversation, saveGoal, setHeard, stopAsking, useToday, wordsLevel, type CompanyApp, type FocusItem, type Goal, type Mood } from "./model";
 import "./today.css";
 
 // ---------- the Shiba ----------
@@ -263,6 +264,8 @@ export function Today({ user }: { user: UserInfo }) {
     sub = t.loadError;
   }
   const earlier = t.exchanges.slice(-4, last ? -1 : undefined);
+  // an answer is drawn as what it is (markdown, pictures, a plan, folded code and steps), not as one line of type
+  const rich = !!last && last.status !== "error" && !!last.answer && t.heard === null;
 
   return (
     <div ref={room} className={`today${narrow ? " is-narrow" : ""}`} data-mood={t.mood} style={{ left: insets.left, top: insets.top, right: insets.right }}>
@@ -275,7 +278,7 @@ export function Today({ user }: { user: UserInfo }) {
             {earlier.map((x, i) => (
               <li key={x.id} style={{ ["--age" as string]: earlier.length - i }}>
                 <span className="today-said">{x.ask}</span>
-                {x.answer && <span className="today-answered">{x.answer.trim()}</span>}
+                {x.answer && <span className="today-answered">{x.answer.trim().replace(/```[\s\S]*?(```|$)/g, " […] ")}</span>}
               </li>
             ))}
           </ol>
@@ -283,9 +286,15 @@ export function Today({ user }: { user: UserInfo }) {
         <p className="today-eyebrow" data-mood={t.mood}>
           {eyebrow}
         </p>
-        <h1 className="today-line" aria-live="polite">
-          {line}
-        </h1>
+        {rich ? (
+          <div className="today-line is-rich" aria-live="polite">
+            <ShibaTalk exchange={last!} large />
+          </div>
+        ) : (
+          <h1 className="today-line" aria-live="polite">
+            {line}
+          </h1>
+        )}
         {sub && <p className="today-sub">{sub}</p>}
 
         <form
@@ -309,11 +318,6 @@ export function Today({ user }: { user: UserInfo }) {
             {running ? "Stop" : "Ask"}
           </button>
         </form>
-        {t.exchanges.length > 0 && (
-          <button className="today-ghost" onClick={newConversation} data-tip="Start a new conversation with the Shiba">
-            New conversation
-          </button>
-        )}
       </main>
 
       <aside className="today-state" aria-label="Today">

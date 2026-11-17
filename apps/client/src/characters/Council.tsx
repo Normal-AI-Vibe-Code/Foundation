@@ -7,9 +7,12 @@
  * sits idle under its own name. Each wears a small mark of whose model it is at its top right
  * (Claude, ChatGPT, Kimi, DeepSeek…).
  *
- * Where it stands: a section's council comes up on top of that section and stays with it as the view
- * moves; the grid's council drops from under the top bar, in the middle of the open paper (so when
- * the agent's pane opens on the right, it moves over to stay in the middle).
+ * Where it stands (2026-11-16: "a full interface panel … push down where the tabs are located … not as
+ * a floating window on the section, but pushing down the header of the section"): it is a band, part
+ * of the interface, never a window over it. The grid's council is a band under the top bar, as wide as
+ * the open paper; the grid starts below it. A section's council is a band at the top of its section,
+ * inside it, and the section's header and cards move down under it. In both, the agents stand along
+ * the band's lower edge, cut off at the chest by it, as if behind a desk.
  *
  * What it's for: talking to them. One line goes to all of them, or to the ones you select by pressing
  * their seats. ＋ assigns another agent; ⓘ opens the selected agent on the right: what service it is,
@@ -20,21 +23,21 @@
  * usually a blink.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
 import type { Mood } from "@foundation/protocol";
 import { closeCouncil, councilSelection, selectSeat, useCouncilOpen, useCouncilSelection, type CouncilScope } from "../lib/councilOpen";
 import { useCrew, boardWhere } from "../lib/crewWatch";
 import { crewIsIn, sectionOfCrew } from "../lib/sectionCrew";
-import { GRID_PLACE, fetchAvailable, postAgent, usePosted, type AvailableAgent, type PostedAgent } from "../lib/posted";
+import { GRID_PLACE, usePosted, type AvailableAgent, type PostedAgent } from "../lib/posted";
 import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { useActiveBoard } from "../shell/Presence";
 import type { CrewPeer } from "../shell/Crew";
-import { camera, onCamera } from "../state/camera";
 import { askCrew } from "../state/sessions";
-import { getState, sectionCardRect, subscribe } from "../state/store";
-import { floorInsets, setUi, toast, useUi } from "../state/ui";
+import { getState, subscribe } from "../state/store";
+import { TOP_BAR, floorInsets, setUi, toast, useUi } from "../state/ui";
 import { goSettings } from "../lib/place";
 import { Avatar, StageContext } from "./Avatar";
 import { AvatarStage } from "./actor";
@@ -73,6 +76,9 @@ export interface CouncilSeat {
   character?: RosterCharacter;
   mood: Mood;
 }
+
+/** the band's height: under the top bar (px on screen), and at the top of a section (px of the grid) */
+export const COUNCIL_H = 236;
 
 export const SEAT_STATUS: Record<CouncilSeat["status"], string> = { idle: "at rest", working: "at work", done: "done", stopped: "stopped", error: "hit an error" };
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -294,8 +300,9 @@ export function CouncilView({ title, seats, selected, canAsk, available, details
                   data-tip={adding ? undefined : "Add an agent to this council"}
                   data-council-add
                   onClick={() => {
-                    if (!adding) onAddOpen();
-                    setAdding((a) => !a);
+                    onAddOpen();
+                    // the design page shows the old menu's rows as a specimen; live, adding happens in the agents panel
+                    if (available !== undefined) setAdding((a) => !a);
                   }}
                 >
                   ＋
@@ -405,7 +412,6 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
   const selected = useCouncilSelection();
   const sections = useSyncExternalStore(subscribe, sectionsOf);
   const section = sectionId ? sections[sectionId] : undefined;
-  const [available, setAvailable] = useState<{ agents: AvailableAgent[]; t3: string } | null>(null);
   const el = useRef<HTMLDivElement>(null);
 
   // a section that's gone takes its council with it
@@ -423,75 +429,50 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
       const t = e.target as HTMLElement | null;
       // Esc in the field clears the field first, as everywhere
       if (t?.closest(".council-ask") && (t as HTMLInputElement).value) return;
+      // Esc closes the council and nothing else: the grid's own Esc (step up a level, reframe) waits for the next press
+      e.stopPropagation();
       closeCouncil();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 
-  // where it stands: under the top bar in the middle of the open paper (the grid's), or on top of its section
-  useLayoutEffect(() => {
-    const bar = el.current?.querySelector<HTMLElement>(".council-bar");
-    if (!bar) return;
-    const place = () => {
-      const f = floorInsets();
-      const w = bar.offsetWidth;
-      const h = bar.offsetHeight;
-      const paperL = f.left + 16;
-      const paperR = window.innerWidth - f.right - 16;
-      let cx = (paperL + paperR) / 2;
-      let y = f.top + 12;
-      if (scope.kind === "section") {
-        const st = getState();
-        const s = st.sections[scope.id];
-        if (s) {
-          const r = sectionCardRect(st.grid, s);
-          const k = camera.scale || 1;
-          const left = Math.max(paperL, r.x * k + camera.x);
-          const right = Math.min(paperR, (r.x + r.w) * k + camera.x);
-          if (right > left) cx = (left + right) / 2;
-          // on top of the section: at its top edge, never under the top bar or off the foot of the window
-          y = Math.max(f.top + 12, Math.min(window.innerHeight - h - 80, r.y * k + camera.y + 8));
-        }
-      }
-      const x = Math.max(paperL, Math.min(paperR - w, cx - w / 2));
-      bar.style.translate = `${Math.round(x)}px ${Math.round(y)}px`;
-    };
-    place();
-    const offCam = onCamera(place);
-    const offStore = subscribe(place);
-    const ro = new ResizeObserver(place);
-    ro.observe(bar);
-    window.addEventListener("resize", place);
-    return () => {
-      offCam();
-      offStore();
-      ro.disconnect();
-      window.removeEventListener("resize", place);
-    };
-  }, [scope, ui.pane, ui.paneW, ui.session, ui.sessionW, ui.search, ui.searchW, ui.agents, ui.agentsW, ui.agentInfo, ui.strip]);
+  // the grid's band takes its height off the top of the grid (the camera frames below it); a section's
+  // marks its card, whose header and cards move down under it (council.css)
+  useEffect(() => {
+    if (scope.kind !== "board") return;
+    setUi({ councilH: COUNCIL_H });
+    return () => setUi({ councilH: 0 });
+  }, [scope.kind]);
+  const [card, setCard] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    if (scope.kind !== "section") return setCard(null);
+    const node = document.querySelector<HTMLElement>(`.section-card[data-section-id="${CSS.escape(scope.id)}"]`);
+    setCard(node);
+    node?.classList.add("has-council");
+    return () => node?.classList.remove("has-council");
+  }, [scope, section?.id]);
 
-  const place = scope.kind === "section" ? scope.id : GRID_PLACE;
   const sec = section ? { id: section.id, name: section.name } : null;
-  return (
-    <div ref={el} className={`council-place is-${scope.kind}`}>
+  const f = floorInsets(ui);
+  const band = (
+    <div
+      ref={el}
+      className={`council-place is-${scope.kind}`}
+      style={scope.kind === "board" ? { left: f.left, right: f.right, top: TOP_BAR + ui.strip, height: COUNCIL_H } : { height: COUNCIL_H }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onWheel={(e) => scope.kind === "section" || e.stopPropagation()}
+    >
       <CouncilView
         title={title}
         seats={seats}
         selected={selected}
         canAsk={ui.role !== "viewer"}
-        available={available}
         detailsOpen={ui.agentInfo}
         onSelect={selectSeat}
         onClose={closeCouncil}
         onDetails={() => setUi({ agentInfo: !ui.agentInfo })}
-        onAddOpen={() => void fetchAvailable().then(setAvailable, (e: Error) => toast(e.message, "bad"))}
-        onAdd={(a) =>
-          void postAgent(place, a.key).then(
-            () => toast(`${a.name} is on the council of ${title}`, "agent"),
-            (e: Error) => toast(e.message, "bad"),
-          )
-        }
+        onAddOpen={() => setUi({ agents: true, agentsTab: "add" })}
         onSay={(text, to) => {
           const list: Array<CouncilSeat | null> = to.length ? to : [null];
           for (const s of list) void tellSeat(s, text, sec).catch((e: Error) => toast(`${s?.name ?? "Claude"} couldn't take it: ${e.message}`, "bad"));
@@ -500,4 +481,7 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
       />
     </div>
   );
+  // a section's band lives inside its section, in the grid's own space; the grid's is the shell's
+  if (scope.kind === "section") return card ? createPortal(band, card) : null;
+  return band;
 }

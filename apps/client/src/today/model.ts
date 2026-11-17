@@ -58,6 +58,10 @@ export interface Exchange {
   ask: string;
   answer: string;
   steps: string[];
+  /** each tool it called, to open on the right: its name, what that was in words, what it was given */
+  tools?: Array<{ name: string; words: string; input?: unknown }>;
+  /** the plan it keeps (set_plan), when it keeps one */
+  plan?: { goal: string; steps: Array<{ text: string; status: "pending" | "active" | "done" }> };
   status: "running" | "done" | "error";
   error?: string;
   /** from an earlier visit: shown in the history, never as the room's words */
@@ -138,6 +142,7 @@ export async function restoreConversation() {
       ask: t.prompt,
       answer: t.events.filter((e): e is Extract<AgentEvent, { type: "text" }> => e.type === "text").map((e) => e.text).join(""),
       steps: [],
+      tools: t.events.filter((e): e is Extract<AgentEvent, { type: "tool" }> => e.type === "tool" && e.name !== "point_today" && e.name !== "set_plan").map((e) => ({ name: e.name, words: stepWords(e.name, e.input), input: e.input })),
       status: (t.status === "error" ? "error" : "done") as Exchange["status"],
       restored: true,
     }));
@@ -209,6 +214,10 @@ export async function ask(prompt: string) {
         } else if (e.type === "tool") {
           if (e.name === "point_today") set({ pointed: ((e.input as { ids?: string[] })?.ids ?? []).slice(0, 6) });
           if (e.name === "set_goal" || e.name === "set_profile") changed = true;
+          if (e.name === "set_plan") {
+            const p = e.input as { goal?: string; steps?: Array<{ text: string; status: "pending" | "active" | "done" }> } | undefined;
+            if (p && Array.isArray(p.steps)) patch({ plan: { goal: String(p.goal ?? ""), steps: p.steps.filter((x) => x && typeof x.text === "string") } });
+          } else if (e.name !== "point_today") patch({ tools: [...(cur().tools ?? []), { name: e.name, words: stepWords(e.name, e.input), input: e.input }] });
           patch({ steps: [...cur().steps, stepWords(e.name, e.input)] });
           if (s.mood === "idle") set({ mood: "thinking" });
         } else if (e.type === "tool_result") {
