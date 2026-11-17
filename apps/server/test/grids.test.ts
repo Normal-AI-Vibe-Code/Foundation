@@ -2,8 +2,9 @@
  * Grids of grids, the agents assigned to a place, a person's settings, and Foundation's own grids
  * (2026-11-15).
  *
- *  - A grid put inside another gets a section on its parent that stands for it; taken out, that
- *    section goes; a loop is refused; the link wears the child's name.
+ *  - A grid put inside another gets a section on its parent that stands for it; taken out, the
+ *    card stays where it was, as a preview and a link (2026-11-17; test/subgrids.test.ts has the
+ *    rest); a loop is refused; the link wears the child's name.
  *  - An agent assigned to a section stays there (in the board's `agents` map, which only the server
  *    writes); what it is (service, cloud or local) is the server's reading, never the request's.
  *  - A setting is one of its known values, per person.
@@ -80,24 +81,30 @@ test("a loop is refused, in words; a page can't hold grids", () => {
   assert.match((setBoardParent("nope", fans) as { error: string }).error, /No such grid/);
 });
 
-test("moved to another grid, or back to the top: the old parent loses its section, the new one gains it", () => {
+test("moved to another grid, or back to the top: the new parent gains a section, and the one it left keeps its card (2026-11-17)", () => {
   const fans = listBoards().find((b) => b.name === "Fans")!.id;
   const rim = listBoards().find((b) => b.name.startsWith("Rim drive"))!.id;
   const motors = createBoardRow("Motors");
   seed(motors);
   const before = boardMaps(getBoard(fans).doc).sections.size;
   setBoardParent(rim, motors);
-  assert.equal(links(fans).length, 0);
-  assert.equal(boardMaps(getBoard(fans).doc).sections.size, before - 1, "the section that only stood for it is gone");
+  assert.equal(links(fans).length, 1, "the grid it left keeps a preview of it and a link to where it went");
+  assert.equal(boardMaps(getBoard(fans).doc).sections.size, before, "and the section that card fills");
+  assert.match(boardMaps(getBoard(fans).doc).activity.toArray().at(-1)!.text, /moved out of this grid: now inside Motors/);
   assert.equal(links(motors).length, 1);
   setBoardParent(rim, null);
   assert.equal(row(rim).parent, null);
-  assert.equal(links(motors).length, 0);
+  assert.equal(links(motors).length, 1);
+  assert.match(boardMaps(getBoard(motors).doc).activity.toArray().at(-1)!.text, /now at the top of All Grids/);
   // the grids' own sections were never touched
   assert.ok([...boardMaps(getBoard(motors).doc).sections.values()].some((s) => s.name === "Section 1"));
+  // back where a card was left: that card is the link again, not a second one
+  setBoardParent(rim, fans);
+  assert.equal(links(fans).length, 1);
+  assert.equal(boardMaps(getBoard(fans).doc).sections.size, before);
 });
 
-test("a section that stood for a child and holds something else is kept, without the child", () => {
+test("a section that stood for a child and holds something else keeps both when the child leaves", () => {
   const top = createBoardRow("Programme");
   const kid = createBoardRow("Budget");
   seed(top);
@@ -109,7 +116,7 @@ test("a section that stood for a child and holds something else is kept, without
   setBoardParent(kid, null);
   const m = boardMaps(getBoard(top).doc);
   assert.ok(m.sections.has(card.sectionId));
-  assert.equal(m.sections.get(card.sectionId)!.host, undefined);
+  assert.ok(m.objects.has(card.id), "the card stays: a preview and a link");
   assert.ok(m.objects.has("note_x"));
 });
 

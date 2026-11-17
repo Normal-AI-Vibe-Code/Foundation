@@ -589,3 +589,37 @@
   color: var(--color-dim);
   font-weight: 400;
 }
+/* a section open in this window only: the pill offers to make it a real grid (asked once, here) */
+.level-make {
+  flex: none;
+  height: 26px;
+  margin-left: var(--space-3);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.level-make:hover {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.level-make.is-go {
+  background: var(--color-pulse);
+  box-shadow: none;
+  color: var(--color-on-fill);
+  font-weight: 600;
+}
+.level-make-ask {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-4);
+  min-width: 0;
+}
+.level-make-words {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}

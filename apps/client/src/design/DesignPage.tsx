@@ -121,6 +121,7 @@ import type { UploadItem } from "../lib/uploads";
 import { snippetHtml } from "../lib/snippet";
 import { RuneDesign } from "../rune/RendererTab";
 import { CardChromeDemo } from "./CardChromeDemo";
+import { SubGridDemo } from "./SubGridDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -1064,6 +1065,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         note="Settings is a place inside Foundation: the side menu stays, a strip of tabs sits under the top bar, and the first tab is the settings themselves, as groups of rows on paper (the name in 13/600, what it means in mist 12, the choice at the right as a segmented pill). Plan and Design language are grids. A grid can sit inside another: in the side menu's All Grids it's a row one step in under its parent, and on the parent grid a section stands for it (a card with its name, what it holds and Open the grid). Whose model an agent is shows as a bead in the ink: Claude, ChatGPT, Kimi, DeepSeek, Gemini, Grok, Cursor, a local model."
       >
         <SettingsDemo />
+        <SubGridDemo />
       </Section>
 
       <Section title="Text box" note={`A note written as formatted text: what you see is what's kept. Click in it to write; a toolbar rides the card's foot while it has the caret (raised paper, card radius, 34 tall): the style (Body, Title, Heading, Subheading), bold, italic, underline, strikethrough, bulleted and numbered lists, quote, link, clear. A mark that's on is the pulse tint. ${keys("mod+B")}, ${keys("mod+I")} and ${keys("mod+U")} work as in any word processor. Under it, it is the note's own markdown in the note's shared text, so search, agents and the other renderer read it as they read any note; underline is kept as <u>. From the right-click menu (Text box), and from an empty section's Write.`}>

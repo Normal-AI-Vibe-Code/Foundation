@@ -1398,6 +1398,38 @@ body.rewiring {
   background: color-mix(in srgb, var(--color-bad) 85%, black);
 }
 
+/* "Make it its own grid?" (lib/subgrid.ts): the same popover, with room for a sentence and one blue action */
+.confirm-pop.grid-ask {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  width: min(440px, calc(100% - 20px));
+  white-space: normal;
+  line-height: 1.45;
+}
+.grid-ask-words {
+  flex: 1 1 100%;
+}
+.grid-ask-words b {
+  color: var(--color-frost);
+}
+.confirm-btn.primary {
+  background: var(--color-pulse);
+  border-color: var(--color-pulse);
+  color: var(--color-on-fill);
+}
+.confirm-btn.primary:hover {
+  background: color-mix(in srgb, var(--color-pulse) 88%, var(--color-frost));
+  color: var(--color-on-fill);
+}
+.confirm-btn.primary:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+/* a viewer can open a grid, not make one */
+body.is-viewer .sec-rest-open.is-make {
+  display: none;
+}
+
 /* ============ object frame (notes, images, videos) ============ */
 
 .frame-anchor {

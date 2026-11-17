@@ -60,6 +60,7 @@ import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, rest
 import { addDesktop, setAgentsMay } from "./machinedesktop.ts";
 import { startMachineIo } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
+import { gridOutline } from "./subgrids.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -297,25 +298,24 @@ r.post("/api/boards/:id", async (req) => {
   }
   return { board: listBoards().find((b) => b.id === id) };
 });
-/** what a grid holds, for the card that stands for it on its parent: its sections (top level), how many cards in each */
+/** what a grid holds, for the card that stands for it on another grid: its tracks, its sections at their places, their cards as blocks */
 r.get("/api/boards/:id/outline", (req) => {
-  const id = req.params.id;
-  requireBoard(requireUser(req), id);
-  const row = listBoards().find((b) => b.id === id);
-  if (!row) throw new HttpError(404, "No such grid");
-  const m = boardMaps(getBoard(id).doc);
-  const all = [...m.sections.values()];
-  const cards = [...m.objects.values()];
-  // a section's cards: its own, and those of every section inside it
-  const within = (sec: string): string[] => [sec, ...all.filter((s) => s.parent === sec).flatMap((s) => within(s.id))];
-  const sections = all
-    .filter((s) => !s.parent)
-    .sort((a, b) => a.r0 - b.r0 || a.c0 - b.c0)
-    .map((s) => {
-      const ids = new Set(within(s.id));
-      return { id: s.id, name: s.name, cards: cards.filter((o) => ids.has(o.sectionId)).length, grids: ids.size - 1 };
-    });
-  return { sections, cards: cards.length, updatedAt: row.updated_at };
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  return gridOutline(req.params.id, u);
+});
+/**
+ * "Open as its own grid": the section becomes a grid inside this one, its cards move into it, and the
+ * section keeps a card that previews it (subgrids.ts). The board tool `extract_section` by its other door:
+ * a viewer is refused, and the same request_id answers with what was done the first time.
+ */
+r.post("/api/boards/:id/sections/:section/extract", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  if (!listBoards().some((b) => b.id === req.params.id)) throw new HttpError(404, "No such grid");
+  const body = await readJson<{ request_id?: string }>(req);
+  const out = await runTool(httpToolCtx(req.params.id, u, isPerson(req)), "extract_section", { section: req.params.section, ...(typeof body.request_id === "string" ? { request_id: body.request_id } : {}) });
+  return { result: out, board: listBoards().find((b) => b.id === (out as { board: string }).board) };
 });
 r.get("/api/boards/:id/presence", (req) => {
   requireBoard(requireUser(req), req.params.id);

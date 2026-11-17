@@ -16,8 +16,8 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import type { WebSocket } from "ws";
-import { appendSection, boardMaps, describeBoard, logActivity, noteTextOf, readTracks, tableCellsOf, uid, type ObjectDoc, type PanelDoc } from "@foundation/protocol";
-import { all, indexDoc, one, run, unindexDoc } from "./db.ts";
+import { appendSection, boardMaps, describeBoard, logActivity, noteTextOf, tableCellsOf, uid, type ObjectDoc, type PanelDoc } from "@foundation/protocol";
+import { all, db, indexDoc, one, run, unindexDoc } from "./db.ts";
 
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
@@ -113,6 +113,7 @@ export function updateBoardRow(id: string, patch: { name?: string; folder?: stri
     // the section that stands for it in its parent grid wears its name
     const parent = one<{ parent: string | null }>("select parent from boards where id = ?", id)?.parent;
     if (parent) linkChildGrid(parent, id, patch.name);
+    renameLeftovers(id, patch.name);
   }
   if (patch.folder !== undefined) run("update boards set folder = ? where id = ?", patch.folder, id);
   if (patch.url !== undefined) run("update boards set url = ? where id = ?", patch.url, id);
@@ -205,7 +206,8 @@ function indexBoard(board: Board) {
     seen.add(ref);
     indexDoc("board", ref, board.id, o.name, objectText(o, o.kind === "note" ? noteTextOf(board.doc, o) : undefined, o.kind === "table" ? tableCellsOf(board.doc, o.id) : undefined) + " " + sectionName(o.sectionId));
   }
-  for (const ref of indexedRefs.get(board.id) ?? []) if (!seen.has(ref)) unindexDoc("board", ref);
+  // only what this board indexed: a card moved to another grid keeps its id, and that grid's entry stays
+  for (const ref of indexedRefs.get(board.id) ?? []) if (!seen.has(ref)) unindexDoc("board", ref, board.id);
   indexedRefs.set(board.id, seen);
 }
 
@@ -404,29 +406,54 @@ function linkChildGrid(parentId: string, childId: string, name: string) {
   });
 }
 
-/** take a child's card off the grid it left; the section it stood in goes too when it was a column of its own with nothing else in it */
-function unlinkChildGrid(parentId: string, childId: string) {
-  editBoard(parentId, "system", (doc) => {
-    const { m, card, section } = childLink(doc, childId);
-    if (!card) return;
-    m.objects.delete(card.id);
-    if (!section) return;
-    const others = [...m.objects.values()].some((o) => o.sectionId === section.id);
-    const inner = [...m.sections.values()].some((s) => s.parent === section.id);
-    const siblings = [...m.sections.values()].filter((s) => !s.parent && s.id !== section.id);
-    const tracks = readTracks(doc);
-    const wholeColumn = !section.parent && section.c0 === section.c1 && section.r0 === 0 && section.r1 === tracks.rows.length - 1 && !siblings.some((s) => s.c0 <= section.c0 && s.c1 >= section.c0);
-    if (!others && !inner && wholeColumn && siblings.length > 0) {
-      m.sections.delete(section.id);
-      m.grid.set("tracks", { ...tracks, cols: tracks.cols.filter((_, i) => i !== section.c0) });
-      for (const s of siblings) if (s.c0 > section.c0) m.sections.set(s.id, { ...s, c0: s.c0 - 1, c1: s.c1 - 1 });
-    } else m.sections.set(section.id, { ...section, host: undefined });
+// A grid that left the grid it was in (to the top, or into another) leaves its card behind there: the
+// old grid keeps a preview of it and a link to where it went (2026-11-17, Josh: "still maintain a preview
+// in the Grid it used to be in, and maintain a link to the new location"). Which grids hold such a
+// card is written down, so a rename reaches them too. A person takes one away like any card.
+db.exec("create table if not exists grid_leftovers (board_id text not null, child_id text not null, at integer not null, primary key (board_id, child_id))");
+
+/** the grids that keep a card for a grid that was once inside them */
+export function leftoverLinks(childId: string): string[] {
+  return all<{ board_id: string }>("select board_id from grid_leftovers where child_id = ?", childId).map((r) => r.board_id);
+}
+
+/** a card left for a grid that moved went to another grid with its section (subgrids.ts): the note of it follows */
+export function moveLeftover(fromBoard: string, toBoard: string, childId: string) {
+  run("delete from grid_leftovers where board_id = ? and child_id = ?", fromBoard, childId);
+  run("insert or replace into grid_leftovers (board_id, child_id, at) values (?, ?, ?)", toBoard, childId, Date.now());
+}
+
+/** the child left: its card stays on the grid it was in, and that grid's log says where it went */
+function leaveLink(oldParentId: string, childId: string, name: string, where: string) {
+  const kept = editBoard(oldParentId, "system", (doc) => {
+    const { card } = childLink(doc, childId);
+    if (!card) return false;
+    logActivity(doc, { who: "Foundation", role: "system", text: `“${name}” moved out of this grid: now ${where}. Its card here still shows it and opens it`, objectId: card.id });
+    return true;
   });
+  if (kept) run("insert or replace into grid_leftovers (board_id, child_id, at) values (?, ?, ?)", oldParentId, childId, Date.now());
+}
+
+/** rename the cards left behind for a grid, and forget the ones a person has since removed */
+function renameLeftovers(childId: string, name: string) {
+  for (const boardId of leftoverLinks(childId)) {
+    if (!one("select id from boards where id = ?", boardId)) continue;
+    const there = editBoard(boardId, "system", (doc) => {
+      const { m, card, section } = childLink(doc, childId);
+      if (!card) return false;
+      if (card.name !== name) m.objects.set(card.id, { ...card, name });
+      if (section && section.host === card.id && section.name !== name) m.sections.set(section.id, { ...section, name });
+      return true;
+    });
+    if (!there) run("delete from grid_leftovers where board_id = ? and child_id = ?", boardId, childId);
+  }
 }
 
 /**
  * Put a grid inside another (or, with null, back at the top). Refused when it would make a loop.
- * The parent grid gets a section that stands for the child; the one it left loses its.
+ * The parent grid gets a section that stands for the child. The grid it left keeps its card: a
+ * preview of the grid and a link to where it is now (the card asks where the grid is, so it says
+ * "now at the top of All Grids" or "now inside Motors" by itself).
  */
 export function setBoardParent(id: string, parent: string | null): { ok: true } | { error: string } {
   const rows = new Map(listBoards().map((b) => [b.id, b]));
@@ -441,8 +468,17 @@ export function setBoardParent(id: string, parent: string | null): { ok: true } 
     }
   }
   if (me.parent === parent) return { ok: true };
-  if (me.parent && rows.has(me.parent)) unlinkChildGrid(me.parent, id);
   run("update boards set parent = ? where id = ?", parent, id);
-  if (parent) linkChildGrid(parent, id, me.name);
+  if (me.parent && rows.has(me.parent)) leaveLink(me.parent, id, me.name, parent ? `inside ${rows.get(parent)!.name}` : "at the top of All Grids");
+  if (parent) {
+    // back where a card for it was left: that card is its link again
+    run("delete from grid_leftovers where board_id = ? and child_id = ?", parent, id);
+    linkChildGrid(parent, id, me.name);
+  }
   return { ok: true };
+}
+
+/** a section of `parentId` became the grid `childId` (subgrids.ts writes the card that stands for it): the row says so */
+export function adoptChildGrid(childId: string, parentId: string) {
+  run("update boards set parent = ? where id = ?", parentId, childId);
 }

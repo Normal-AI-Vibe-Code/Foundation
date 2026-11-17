@@ -68,6 +68,7 @@ import { writeDigest } from "./digest.ts";
 import { flowformCall, flowformTools } from "./flowformlink.ts";
 import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, stepTarget, travel, type CrewMember } from "./crew.ts";
 import { saveGoal, setProfile, todayFor } from "./today.ts";
+import { extractSection } from "./subgrids.ts";
 
 /** the person a tool acts for (Today's tools are theirs, not the board's) */
 function personOf(ctx: ToolCtx): UserInfo {
@@ -1196,6 +1197,24 @@ export const TOOLS: BoardTool[] = [
       const member = crewMember(ctx.crew);
       if (member) aim(member, { id: sec.id, kind: "section" });
       return { id: sec.id, name };
+    },
+  }),
+  def({
+    name: "extract_section",
+    description:
+      "Make a section a grid of its own (a person presses “Open as its own grid”). A new grid named after the section is made inside this one; the section's cards move into it with their note text, table cells, files and the wires among them, and the section stays where it was, holding a card that previews the new grid and opens it. Wires that crossed the section's edge are let go. Machines, huddles and pipeline stages stay in the section. A section that follows a Slack channel can't. The new grid can then be moved to another grid or to the top of All Grids; this grid keeps the card. Returns the new grid's id (`board`): name it as the board for further writes there. Restructures shared work: do it when asked.",
+    schema: z.object({ section: z.string().describe("the section's name or id"), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { section }) => {
+      const member = crewMember(ctx.crew);
+      const out = extractSection(ctx.boardId, section, {
+        userId: ctx.userId,
+        name: member?.name ?? ctx.actor,
+        role: !member && (ctx.person || ctx.role === "human") ? "human" : "agent",
+        ...(member ? { for: member.userName } : {}),
+      });
+      if (member) aim(member, { id: out.section, kind: "section" });
+      return out;
     },
   }),
   def({
