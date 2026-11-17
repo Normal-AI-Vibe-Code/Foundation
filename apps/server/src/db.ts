@@ -312,6 +312,8 @@ export function indexDoc(source: string, ref: string, boardId: string | null, ti
   );
 }
 
-export function unindexDoc(source: string, ref: string) {
-  run("delete from search_fts where source = ? and ref = ?", source, ref);
+/** take a document out of the index; with `boardId`, only that board's entry (a card that moved to another grid keeps its id) */
+export function unindexDoc(source: string, ref: string, boardId?: string) {
+  if (boardId !== undefined) run("delete from search_fts where source = ? and ref = ? and board_id = ?", source, ref, boardId);
+  else run("delete from search_fts where source = ? and ref = ?", source, ref);
 }

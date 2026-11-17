@@ -203,6 +203,18 @@ function mustRow(boardId: string, panelId: string): CharRow {
   return row;
 }
 
+/**
+ * A character's card is moving to another grid (its section became a grid of its own: subgrids.ts).
+ * Its row goes with it, so the card is still a character there; the caller moves the card and its
+ * entry in the boards' `characters` maps. Returns its state, or null when the card isn't a character.
+ */
+export function moveCharacter(fromBoard: string, toBoard: string, panelId: string): CharacterState | null {
+  const row = rowByPanel(fromBoard, panelId);
+  if (!row) return null;
+  run("update characters set board_id = ?, updated_at = ? where id = ?", toBoard, Date.now(), row.id);
+  return stateOf(row);
+}
+
 /** write a character's state: SQLite, then the board's map (so every browser on the board sees it) */
 function keep(row: CharRow, c: CharacterState) {
   c.ready = c.form === "model" ? Boolean(c.files.clips) : Boolean(c.files.mavatar);
