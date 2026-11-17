@@ -24,7 +24,7 @@ const freePort = () =>
   });
 
 function start(home: string, port: number) {
-  const env: NodeJS.ProcessEnv = { ...process.env, FOUNDATION_PORT: String(port), FOUNDATION_ROOT: home, FOUNDATION_EXIT_WITH_PARENT: "1" };
+  const env: NodeJS.ProcessEnv = { ...process.env, FOUNDATION_PORT: String(port), FOUNDATION_ROOT: home, FOUNDATION_EXIT_WITH_PARENT: "1", FOUNDATION_STARTER_DIR: "" };
   // the folder decides these, not whatever this shell has set
   for (const k of ["FOUNDATION_DATA_DIR", "FOUNDATION_DEV_LOGIN", "FOUNDATION_PUBLIC_URL"]) delete env[k];
   const child = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], { cwd: serverDir, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });

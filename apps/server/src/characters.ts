@@ -104,6 +104,8 @@ create table if not exists character_tasks (
 create index if not exists character_tasks_of on character_tasks(character_id, stage);
 create table if not exists character_boards (board_id text primary key, made_by text, made_at integer not null);
 create table if not exists crew_avatars (name text primary key, character_id text not null, set_by text, at integer not null);
+-- which of the starter set's characters this install has had (form:set:name), so a newer build brings in only the new ones and never one a person retired
+create table if not exists character_starter (key text primary key, character_id text, board_id text, at integer not null);
 `);
 
 // ---------- what each stage asks for ----------
@@ -599,7 +601,7 @@ Characters for the council are made here, a stage at a time:
 The middle row is that flow as nodes: each shows the characters that are at it, and **Generate** on one runs its next stage. Each stage is a press, and each button says what it costs before you press it. Look at what came back before paying for the next one. A finished character moves down into its set's Characters, and once approved can sit on the council of any board.`;
 
 /** the Character studio: one board, made once. Its sections are a row of inspiration, a row of the pipeline's nodes and a row of characters, a column per set. */
-export function openStudio(user: UserInfo): { id: string; made: boolean } {
+export function openStudio(user: UserInfo, o: { seed?: boolean } = {}): { id: string; made: boolean } {
   const known = new Set(listBoards().map((b) => b.id));
   const was = all<{ board_id: string }>("select board_id from character_boards order by made_at").find((b) => known.has(b.board_id));
   if (was) {
@@ -619,10 +621,10 @@ export function openStudio(user: UserInfo): { id: string; made: boolean } {
       addPipeline(doc, set, c, 1);
       if (c === 0) putNote(doc, { id: uid("note"), kind: "note", sectionId: insp.id, name: "How it works", x: 0, y: 0, float: false, bornAt: Date.now(), w: 460, h: 520, text: HOW });
     });
-    logActivity(doc, { who: user.name, role: "human", text: "made the Character studio: inspiration, the pipeline and characters, a column for each set" });
+    logActivity(doc, { who: user.name, role: user.id === FOUNDATION.id ? "system" : "human", text: "made the Character studio: inspiration, the pipeline and characters, a column for each set" });
   });
   // the board opens at once; the starter set walks on a moment later
-  void seedStarter(id, user).catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`));
+  if (o.seed !== false) void seedStarter(id, user).catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`));
   return { id, made: true };
 }
 
@@ -649,19 +651,52 @@ function starterDir(): string | null {
   return tries.find((d) => d && existsSync(join(d, "manifest.json"))) ?? null;
 }
 
+const starterKey = (s: { form: string; set: string; name: string }) => `${s.form}:${s.set.trim().toLowerCase()}:${s.name.trim().toLowerCase()}`;
+
+function readStarter(dir: string): StarterCharacter[] {
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { characters?: StarterCharacter[] };
+  return (manifest.characters ?? []).filter((s) => s && typeof s.name === "string" && typeof s.set === "string" && (s.form === "model" || s.form === "mesh"));
+}
+
+/** who brings the starter set in when no person asked (the server, at boot) */
+const FOUNDATION: UserInfo = { id: "foundation", email: "", name: "Foundation", color: "#888888", role: "admin" };
+
+// one bringing-in at a time: boot and a person opening the studio can't each add the same character
+let starterQueue: Promise<unknown> = Promise.resolve();
+
 /**
- * Bring the starter set onto a newly made studio board: a card each, in its set's Characters section, its
- * pictures and its playable file in the archive, every stage marked done. Nothing is sent to Meshy. Meshy
- * never made these on this install, so a stage that builds on Meshy's copy (the skeleton, the moods)
- * can't be done again from here without making the model again.
+ * Bring the starter set's characters this install hasn't had onto a studio board: a card each, in its set's
+ * Characters section, its pictures and its playable file in the archive, every stage marked done. Nothing is
+ * sent to Meshy. Meshy never made these on this install, so a stage that builds on Meshy's copy (the
+ * skeleton, the moods) can't be done again from here without making the model again.
+ *
+ * A character is had once (`character_starter`): a newer build's set adds only the new ones, and one a person
+ * took off the grid isn't brought back. A studio seeded before that was kept counts what it already holds
+ * (the same name, set and form, retired ones too) as had.
  */
-export async function seedStarter(boardId: string, user: UserInfo): Promise<number> {
+export function seedStarter(boardId: string, user: UserInfo): Promise<number> {
+  const go = starterQueue.then(() => seedStarterNow(boardId, user));
+  starterQueue = go.catch(() => undefined);
+  return go;
+}
+
+async function seedStarterNow(boardId: string, user: UserInfo): Promise<number> {
   const dir = starterDir();
   if (!dir) return 0;
-  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { characters?: StarterCharacter[] };
+  const had = new Set(all<{ key: string }>("select key from character_starter").map((r) => r.key));
+  for (const r of all<CharRow>("select * from characters where board_id = ?", boardId)) {
+    const key = starterKey(stateOf(r));
+    if (had.has(key)) continue;
+    run("insert or ignore into character_starter (key, character_id, board_id, at) values (?, ?, ?, ?)", key, stateOf(r).id, boardId, Date.now());
+    had.add(key);
+  }
   let n = 0;
-  for (const s of manifest.characters ?? []) {
+  for (const s of readStarter(dir)) {
+    const key = starterKey(s);
+    if (had.has(key)) continue;
+    had.add(key);
     const made = createCharacter(boardId, { name: "Foundation", id: user.id, human: false }, { name: s.name, set: s.set, form: s.form, identity: s.identity, height: s.height });
+    run("insert or ignore into character_starter (key, character_id, board_id, at) values (?, ?, ?, ?)", key, made.id, boardId, Date.now());
     const files: CharacterFiles = {};
     for (const [role, f] of Object.entries(s.files) as Array<[keyof CharacterFiles, { file: string; mime: string }]>) {
       // only a plain file name from the manifest's own folder
@@ -680,8 +715,22 @@ export async function seedStarter(boardId: string, user: UserInfo): Promise<numb
     keep(row, c);
     n++;
   }
-  if (n) editBoard(boardId, "characters", (doc) => logActivity(doc, { who: "Foundation", role: "system", text: `brought in the starter set: ${n} characters, ready for the council` }));
+  if (n) editBoard(boardId, "characters", (doc) => logActivity(doc, { who: "Foundation", role: "system", text: had.size > n ? `brought in ${n} new character${n === 1 ? "" : "s"} from the starter set, ready for the council` : `brought in the starter set: ${n} characters, ready for the council` }));
   return n;
+}
+
+/**
+ * At boot: if this build's starter set has characters this install hasn't had, bring them in, making the
+ * studio for them if there isn't one yet. So every Foundation's council has the company's characters (a fresh
+ * install, or one whose studio was made from an older set) without anyone opening the studio first. Spends nothing.
+ */
+export async function bringInStarter(): Promise<number> {
+  const dir = starterDir();
+  if (!dir) return 0;
+  const had = new Set(all<{ key: string }>("select key from character_starter").map((r) => r.key));
+  if (readStarter(dir).every((s) => had.has(starterKey(s)))) return 0;
+  const studio = openStudio(FOUNDATION, { seed: false });
+  return seedStarter(studio.id, FOUNDATION);
 }
 
 /** an image for a set's Inspiration section: into the archive, and onto the board as a picture */

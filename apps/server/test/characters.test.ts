@@ -443,6 +443,42 @@ test("the starter set walks onto a studio board ready, and nothing is sent to Me
   await assert.rejects(() => chars.startStage(BOARD, bao.panelId, "rig", ada), /Make the model first/);
   // with no starter folder, nothing happens
   assert.equal(await chars.seedStarter(BOARD, ada), 0);
+  assert.equal(await chars.bringInStarter(), 0);
+});
+
+test("a newer build's starter set brings in only the characters this install hasn't had, never one a person retired", async () => {
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const dir = join(process.env.FOUNDATION_DATA_DIR!, "starter-fixture-2");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "front.png"), png(30, 40, [120, 200, 90]));
+  writeFileSync(join(dir, "clips.glb"), Buffer.from("glTF starter clips 2"));
+  const one = (name: string) => ({ name, set: "animals", form: "model", identity: `${name}, a dumpling.`, height: 0.5, files: { front: { file: "front.png", mime: "image/png" }, clips: { file: "clips.glb", mime: "model/gltf-binary" } } });
+  const write = (names: string[]) => writeFileSync(join(dir, "manifest.json"), JSON.stringify({ version: 1, characters: names.map(one) }));
+  const named = (n: string) => chars.roster().characters.filter((c) => c.name === n);
+  // Bao came with the last set; a person takes its card off the grid
+  const bao = named("Bao")[0]!;
+  const m = boardMaps(getBoard(BOARD).doc);
+  getBoard(BOARD).doc.transact(() => m.objects.delete(bao.panelId));
+  assert.equal(named("Bao").length, 0);
+  const before = sent.length;
+  process.env.FOUNDATION_STARTER_DIR = dir;
+  try {
+    write(["Bao", "Dumpling"]);
+    assert.equal(await chars.bringInStarter(), 1, "at boot, the one new character, onto the studio there is");
+    assert.equal(named("Dumpling").length, 1);
+    assert.equal(named("Dumpling")[0]!.boardId, BOARD);
+    assert.equal(named("Dumpling")[0]!.ready, true);
+    assert.equal(named("Bao").length, 0, "a retired character isn't brought back");
+    assert.equal(await chars.bringInStarter(), 0, "the next boot has nothing to do");
+    // opening the studio and booting at once add it once
+    write(["Bao", "Dumpling", "Gyoza"]);
+    const both = await Promise.all([chars.seedStarter(BOARD, ada), chars.bringInStarter()]);
+    assert.equal(both[0] + both[1], 1);
+    assert.equal(named("Gyoza").length, 1);
+  } finally {
+    process.env.FOUNDATION_STARTER_DIR = "";
+  }
+  assert.equal(sent.length, before, "nothing was sent to Meshy");
 });
 
 test("a finished mesh avatar goes to its set's Characters too; one a person keeps elsewhere stays there", async () => {
