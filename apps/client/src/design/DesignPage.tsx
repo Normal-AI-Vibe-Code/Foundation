@@ -1833,14 +1833,15 @@ function TodayPartsDemo() {
   return (
     <div className="design-today-parts" data-design-today-parts>
       <div className="design-today-menu">
-        <button className="pane-row pane-place pane-today is-current">
-          <ShibaDot />
-          <span className="pane-label">Today</span>
+        {/* in the top bar's tools (2026-11-17): what's waiting sits right beside the word */}
+        <button className="top-today is-on">
+          <ShibaDot size={16} />
+          Today
           <span className="pane-badge">3</span>
         </button>
-        <button className="pane-row pane-place pane-today">
-          <ShibaDot />
-          <span className="pane-label">Today</span>
+        <button className="top-today">
+          <ShibaDot size={16} />
+          Today
         </button>
       </div>
       <div className="design-today-room">

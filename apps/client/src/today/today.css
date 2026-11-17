@@ -575,18 +575,24 @@ a.today-chip:active {
 
 /* ---------- narrow: the room on top, the day below, one scroll ---------- */
 
+.today-flow {
+  display: contents;
+}
+/* narrow: the room and its veil stay where they are, the whole place, and the words and the panel scroll
+   over them in a layer of their own (the type is white on the room, so the room has to be under all of it) */
 .today.is-narrow {
   display: block;
-  overflow: auto;
 }
-.today.is-narrow .shiba-room,
-.today.is-narrow .today-veil {
-  position: absolute;
-  height: 78vh;
-  bottom: auto;
+.today.is-narrow .today-flow {
+  display: block;
+  position: relative;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 .today.is-narrow .today-words {
-  min-height: 78vh;
+  /* the first screen is the Shiba's; the panel's title shows under it, so there's more */
+  min-height: calc(100% - 72px);
   justify-content: flex-end;
   padding: var(--space-6) var(--space-5) var(--space-6);
 }
@@ -685,15 +691,6 @@ a.today-chip:active {
   --color-pulse: var(--color-over-room);
   --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
   color: var(--color-frost);
-}
-/* narrow: the room still fills the place; the words and the panel scroll over it together */
-.today.is-narrow .shiba-room,
-.today.is-narrow .today-veil {
-  position: sticky;
-  top: 0;
-  height: 100%;
-  margin-bottom: -100%;
-  bottom: auto;
 }
 
 /* Ask the Shiba: glass over the room */
@@ -949,6 +946,7 @@ a.today-chip:active {
 .design-today-menu {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-3);
 }
 .design-today-parts .design-today-room {

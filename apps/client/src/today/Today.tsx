@@ -272,6 +272,9 @@ export function Today({ user }: { user: UserInfo }) {
       <ShibaRoom mood={t.mood} levels={wordsLevel} />
       <div className="today-veil" aria-hidden />
 
+      {/* wide, a pass-through (the words and the panel are the grid's two columns); narrow, the one scroll
+          over the room, which stays put behind it from edge to edge */}
+      <div className="today-flow">
       <main className="today-words">
         {earlier.length > 0 && (
           <ol className="today-stream" aria-label="Earlier in this conversation">
@@ -349,6 +352,7 @@ export function Today({ user }: { user: UserInfo }) {
           {today?.apps.filter((a) => a.id !== "foundation").map((a) => <AppRow key={a.id} app={a} status={a.connector ? (status[a.connector] ?? "unknown") : undefined} pointed={pointed.has(a.id)} />)}
         </section>
       </aside>
+      </div>
     </div>
   );
 }

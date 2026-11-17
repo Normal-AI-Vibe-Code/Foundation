@@ -3,7 +3,8 @@
  * hairline). Folded by the top bar's first button or ⌘\, resized by its right edge. It is open the
  * first time Foundation runs: it is how you get to a grid.
  *
- * Top to bottom: **Today**; then **Grids**, listed two ways: **Recent** (every grid by when this
+ * Top to bottom: **Grids** (Today lives in the top bar's right end since 2026-11-17), listed two
+ * ways, in an outlined pill whose left edge the rows start at: **Recent** (every grid by when this
  * device last opened it, a grid inside another saying which) and **All Grids** (the tree: a grid
  * can hold grids). Drag a grid onto another and it becomes its child, here and on the parent grid
  * itself, where a section stands for it (the server keeps that link: boards.ts). Drag it onto
@@ -14,14 +15,13 @@
  */
 
 import { GearGlyph, PlusGlyph } from "./glyphs";
-import { ShibaDot, useNotices } from "../today/notices";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
 import { WIDTHS, setUi, spaceOpenedAt, toast, useUi } from "../state/ui";
 import { logout } from "../lib/api";
 import { KIND_GLYPH, KIND_NAME, childrenOf, fileGrid, parentOf, wouldLoop, type BoardRow, type SpaceKind } from "../lib/grids";
-import { goSettings, goToday, type Place } from "../lib/place";
+import { goSettings, type Place } from "../lib/place";
 import { initials } from "./Presence";
 import { FloorEdge } from "./FloorEdge";
 
@@ -48,7 +48,6 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
   /** the grid being dragged, and the row (or "top") it's over */
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
-  const notices = useNotices();
 
   const listed = useMemo(() => boards.filter((b) => !isSystemGrid(b.id)), [boards]);
   const recent = useMemo(() => {
@@ -163,19 +162,6 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
     <AnimatePresence initial={false}>
       {ui.pane && (
         <motion.aside key="pane" className="side-pane floor-pane" style={{ width: ui.paneW }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={paneSpring} aria-label="Foundation menu">
-          {/* Today: a small section of its own, lined off */}
-          <section className="pane-band">
-            <button className={`pane-row pane-place pane-today${place.kind === "today" ? " is-current" : ""}`} onClick={goToday} data-place="today" data-tip={notices.words}>
-              <ShibaDot />
-              <span className="pane-label">Today</span>
-              {notices.total > 0 && (
-                <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
-                  {notices.total > 99 ? "99+" : notices.total}
-                </span>
-              )}
-            </button>
-          </section>
-
           {/* how the grids are listed, at the top of them; the rows start at the selector's own left edge */}
           <div className="pane-pick">
             <div className="pane-seg" role="tablist" aria-label="How grids are listed">

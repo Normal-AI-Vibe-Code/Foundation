@@ -667,6 +667,8 @@
 .side-pane .pane-pick .pane-seg {
   flex: 1;
   margin: 0;
+  /* 2026-11-17: outlined, so the pill reads as a control and its left edge is the line the rows start on */
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
 }
 .pane-new {
   flex: none;
@@ -702,15 +704,20 @@
   gap: 0;
   padding-left: 0;
 }
+/* All Grids keeps Recent's padding: a top-level grid starts at the pill's left edge either way, one inside
+   it 16 px further. The caret hangs in the gutter just left of the row's mark, so it never moves the text */
 .side-pane .space-row .space-open {
   padding-left: calc(var(--space-4) + var(--depth, 0) * 16px);
 }
-.side-pane .space-row:has(.grid-caret) .space-open {
-  padding-left: var(--space-2);
-}
 .side-pane .grid-caret {
-  margin: 0 0 0 calc(var(--space-4) - 4px + var(--depth, 0) * 16px);
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: calc(var(--depth, 0) * 16px);
+  width: var(--space-4);
   height: 34px;
+  margin: 0;
+  text-align: center;
 }
 .side-pane .grid-caret.is-none {
   display: none;
@@ -768,9 +775,27 @@
 
 .top-left {
   flex: none;
+  position: relative;
+  align-self: stretch;
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding-right: var(--space-3);
+}
+/* 2026-11-17: over the open menu the fold sits at the menu's right edge */
+.top-left.is-over-pane {
+  justify-content: flex-end;
+}
+/* and a line, the bar's height, between it and the tabs (over the menu, it lands on the menu's own edge) */
+.top-left::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: calc(-1 * var(--space-2));
+  width: 1px;
+  background: var(--color-line);
+  pointer-events: none;
 }
 .top-today {
   height: 28px;
@@ -794,6 +819,15 @@
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 55%, var(--color-line-strong));
   background: var(--color-agent-dim);
 }
+/* in the tools at the right: what's waiting sits right against the word, not pushed to an edge */
+.top-tools .top-today {
+  flex: none;
+  margin-right: var(--space-2);
+  padding-right: var(--space-3);
+}
+.top-today .pane-badge {
+  margin-left: calc(-1 * var(--space-1));
+}
 /* a place you're passing through (Settings): a pill, fully outlined, with room around it */
 .tab-pill {
   flex: none;
@@ -810,21 +844,24 @@
   color: var(--color-frost);
   font: 600 var(--text-13) / 1 var(--font-sans);
 }
-/* the grids' tabs: lines, not cards. A hairline between neighbours; the open one has sides and a top and
-   no foot, so it opens into the grid below it (it covers the bar's own hairline for its width) */
+/* the grids' tabs: lines, not cards (2026-11-17: no top and no corners). Every line runs the bar's full
+   height, to its top edge; the open tab is its two sides and no foot, so it opens into the grid below it
+   (it covers the bar's own hairline for its width), and its name is bold */
 .top-bar .tabs {
   align-self: stretch;
   align-items: flex-end;
   gap: 0;
+  padding-left: var(--space-3);
 }
 .top-bar .tab.is-space {
   position: relative;
-  height: 36px;
+  height: calc(100% + 1px);
   margin-bottom: -1px;
   padding: 0 var(--space-2);
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: var(--radius-pane) var(--radius-pane) 0 0;
+  border: 0;
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
@@ -832,15 +869,19 @@
   content: "";
   position: absolute;
   left: -1px;
-  top: 10px;
-  bottom: 9px;
+  top: 0;
+  bottom: 1px;
   width: 1px;
   background: var(--color-line);
 }
 .top-bar .tab.is-space.is-current {
-  border-color: var(--color-line-strong);
+  border-left-color: var(--color-line-strong);
+  border-right-color: var(--color-line-strong);
   background: var(--color-void);
   color: var(--color-frost);
+}
+.top-bar .tab.is-space.is-current .tab-title {
+  font-weight: 700;
 }
 .top-bar .tab.is-space.is-current::before,
 .top-bar .tab.is-space.is-current + .tab.is-space::before {

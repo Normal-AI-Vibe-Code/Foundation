@@ -1,9 +1,11 @@
 /**
- * The top bar, drawn on the floor. Left to right: the side menu's fold, the place you're in when
- * it isn't a grid (Today, Settings), a tab for every grid open in this window, ＋ (a new grid; its
- * caret offers the other canvases: a presentation, a web page), then the tools on the right — the
- * people here, search, the council, the agents, the command bar, present — the server this app
- * uses (2026-11-15: it lives here, not in a corner), and the day/night orb.
+ * The top bar, drawn on the floor. Left to right: the side menu's fold (at the menu's right edge,
+ * lined off from the tabs), Settings as a pill while you're there, a tab for every grid open in
+ * this window, ＋ (a new grid; its caret offers the other canvases: a presentation, a web page),
+ * then the tools on the right — the people here, Today (with what's waiting on you beside the
+ * word; 2026-11-17: out of the side menu), search, the council, the agents, the command bar,
+ * present — the server this app uses (2026-11-15: it lives here, not in a corner), and the
+ * day/night orb.
  *
  * A tab is a grid: a board whose canvas is a grid, a deck or a web page. The open grid's tab
  * carries its sync dot and its own button (ⓘ) for the grid's people and activity: what belongs to
@@ -16,7 +18,7 @@
 
 import { GearGlyph, SearchGlyph } from "./glyphs";
 import { goToday } from "../lib/place";
-import { ShibaDot } from "../today/notices";
+import { ShibaDot, useNotices } from "../today/notices";
 import { toggleCouncil, useCouncilOpen } from "../lib/councilOpen";
 import { useEffect, useRef, useState } from "react";
 import { COMMANDS_GLYPH, keys } from "../lib/keys";
@@ -44,6 +46,7 @@ interface Props {
 export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRename }: Props) {
   const ui = useUi();
   const council = useCouncilOpen();
+  const notices = useNotices();
   const board = useBoardTick();
   const status = board?.status ?? "connecting";
   const [menu, setMenu] = useState(false);
@@ -70,19 +73,16 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
 
   return (
     <header className="top-bar">
-      {/* over the side menu: its fold and the way to Today. The tabs start where the menu ends */}
-      <div className="top-left" style={ui.pane ? { width: Math.max(0, ui.paneW - 16) } : undefined}>
+      {/* over the side menu: its fold, at the menu's right edge, and a line down to the menu's own edge
+          between it and the tabs. The tabs start where the menu ends */}
+      <div className={`top-left${ui.pane ? " is-over-pane" : ""}`} style={ui.pane ? { width: Math.max(0, ui.paneW - 16) } : undefined}>
         <button
           className={`top-btn pane-fold${spacesOpen ? " is-on" : ""}`}
           onClick={() => setUi(spacesOpen ? { pane: false } : { pane: true, paneView: "spaces" })}
-          data-tip={spacesOpen ? "Fold the side menu" : "The side menu: Today, your grids, Settings"}
+          data-tip={spacesOpen ? "Fold the side menu" : "The side menu: your grids, Settings"}
           data-kbd={keys("mod+\\")}
         >
           <PaneGlyph />
-        </button>
-        <button className={`top-today${place.kind === "today" ? " is-on" : ""}`} onClick={goToday} data-tip="Today: the Shiba, your todos, the apps" data-top-today>
-          <ShibaDot size={16} />
-          Today
         </button>
       </div>
       <nav className="tabs" aria-label="Open grids">
@@ -208,6 +208,16 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
 
       <div className="top-tools">
         {place.kind === "grid" && <PresenceStack />}
+        {/* Today, first of the tools: the Shiba very small, the word, and what's waiting right beside it */}
+        <button className={`top-today${place.kind === "today" ? " is-on" : ""}`} onClick={goToday} data-tip={notices.total ? `Today: ${notices.words}` : "Today: the Shiba, your todos, the apps"} data-top-today data-place="today">
+          <ShibaDot size={16} />
+          Today
+          {notices.total > 0 && (
+            <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
+              {notices.total > 99 ? "99+" : notices.total}
+            </span>
+          )}
+        </button>
         <button className={`top-btn${ui.search ? " is-on" : ""}`} onClick={() => setUi({ search: !ui.search })} aria-label="Search" data-tip={`Search, drag onto the grid (${keys("mod+F")})`}>
           <SearchGlyph />
         </button>

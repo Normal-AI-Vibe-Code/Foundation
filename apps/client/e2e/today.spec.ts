@@ -22,8 +22,11 @@ test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps
   await expect(page.locator(".today")).toBeVisible();
   await expect(page.locator(".top-bar")).toBeVisible();
   await expect(page.locator(".side-pane")).toBeVisible();
-  await expect(page.locator('.side-pane [data-place="today"]')).toHaveClass(/is-current/);
-  await expect(page.locator(".top-bar [data-top-today]")).toHaveClass(/is-on/);
+  // Today is the top bar's (at its right end, since 2026-11-17), not a row of the side menu
+  await expect(page.locator('.side-pane [data-place="today"]')).toHaveCount(0);
+  await expect(page.locator(".top-bar .top-tools [data-top-today]")).toHaveClass(/is-on/);
+  // what's waiting (the ask above) is counted right beside the word
+  await expect(page.locator(".top-bar [data-top-today] [data-today-badge]")).toBeVisible();
   await expect(page.locator(".side-pane .pane-seg-btn")).toHaveText(["Recent", "All Grids"]);
   await expect(page.locator(".today-line")).toContainText("Tess");
   await expect(page.locator(".shiba-room")).toBeVisible();
@@ -81,7 +84,7 @@ test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps
   await expect(page).toHaveURL(/#\/board$/);
   await expect(page.locator(".today")).toHaveCount(0);
   await expect(page.locator(".side-pane")).toBeVisible();
-  await page.locator('.side-pane [data-place="today"]').click();
+  await page.locator(".top-bar [data-top-today]").click();
   await expect(page.locator(".today")).toBeVisible();
 
   // a link into the board goes straight there, not to Today
