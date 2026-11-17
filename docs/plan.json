@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-17T07:03:30.197Z",
+  "syncedAt": "2026-11-17T07:10:39.400Z",
   "columns": [
     {
       "id": "needs-you",
@@ -1724,12 +1724,12 @@
     },
     {
       "id": "server-restart-4410",
-      "title": "Restart the server the desktop app runs (it is from before desktops, sub-grids and the council's new routes)",
+      "title": "Add a desktop on box-a70f (the server it runs on is restarted)",
       "kind": "hookup",
       "milestone": "apps",
       "area": "machines",
       "status": "needs-you",
-      "body": "The Foundation server on localhost:4410 was started on 2026-11-15 at 19:42 and never restarted, so it runs that hour's code: Add a desktop answered 404 `not found` (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`, `live-server-probe.txt`). After this branch is merged into the checkout it starts from: the server switch, Stop, then Start. Then Desktop → Add a desktop on `box-a70f`, and open the Character studio once (the studio's upgrade to nodes runs then). Nobody restarted it or touched that machine in the 2026-11-17 work. 2026-11-17 (later): the reason \"Stop, then Start\" could not be done is that the app had adopted that server after an update and offered no Stop for it. The switch now offers Restart and Stop for a Foundation server it recognises (once the next release is installed).",
+      "body": "The Foundation server on localhost:4410 was started on 2026-11-15 at 19:42 and never restarted, so it runs that hour's code: Add a desktop answered 404 `not found` (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`, `live-server-probe.txt`). After this branch is merged into the checkout it starts from: the server switch, Stop, then Start. Then Desktop → Add a desktop on `box-a70f`, and open the Character studio once (the studio's upgrade to nodes runs then). Nobody restarted it or touched that machine in the 2026-11-17 work. 2026-11-17 (later): the reason \"Stop, then Start\" could not be done is that the app had adopted that server after an update and offered no Stop for it. The switch now offers Restart and Stop for a Foundation server it recognises (once the next release is installed). 2026-11-17 (later still): restarted from C:\\Dev\\Foundation on main f039b9e; Add a desktop, agents and prefs now answer 401 to a stranger instead of 404 (`live-server-probe.sh`). What is left is a person: Desktop → Add a desktop on `box-a70f`, and the update to desktop 0.3.15 on the update card.",
       "issue": 167
     },
     {
