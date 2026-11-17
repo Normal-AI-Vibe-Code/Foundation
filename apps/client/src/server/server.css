@@ -291,3 +291,33 @@ html[data-server-switch] .huddle-pip ~ .upload-tray-place {
   right: 0;
   transform-origin: top right;
 }
+
+/* ---------- in the side menu's foot, above Settings (2026-11-17): the width of the menu, its panel rising from it ---------- */
+
+.server-switch-place.is-pane {
+  display: block;
+  /* its edges in line with the Settings icon under it (the menu rows' 12 px), and the same space on the right */
+  padding: var(--space-2) var(--space-4);
+}
+.is-pane .server-switch {
+  align-items: stretch;
+}
+.is-pane .server-switch-pill {
+  width: 100%;
+  height: 30px;
+  justify-content: flex-start;
+  padding: 0 var(--space-4);
+}
+.is-pane .server-switch-addr {
+  flex: 1;
+  max-width: none;
+  text-align: left;
+}
+.is-pane .server-switch-lift,
+.is-pane .server-switch[data-still] .server-switch-panel {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + var(--space-3));
+  left: var(--space-3);
+  transform-origin: bottom left;
+}

@@ -35,8 +35,13 @@ import { SectionView } from "./SectionView";
 import { WireLayer } from "./WireLayer";
 import { camera, publishCamera, publishPointer } from "../state/camera";
 import { isNight, onNight } from "@foundation/ui";
-import { floorInsets, getUi, setUi, toggleSession, useUi } from "../state/ui";
+import { floorInsets, getUi, setUi, toggleSearch, toggleSession, useUi } from "../state/ui";
 import { TalkButton } from "../shell/Talk";
+import { SearchPop } from "../shell/SearchPane";
+import { PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
+import { CouncilGlyph } from "../characters/CouncilGlyph";
+import { toggleCouncil, useCouncilOpen } from "../lib/councilOpen";
+import { COMMANDS_GLYPH } from "../lib/keys";
 import { PeerCursors } from "../shell/Presence";
 import { CrewCursors, CrewFollow, CrewGuide } from "../shell/Crew";
 import { LevelBar } from "../shell/LevelBar";
@@ -116,6 +121,8 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
   // the grid's own slice: a press, a drag frame or a keystroke in a card doesn't render the board
   const state = useStoreSlice(gridViewSlice);
   const ui = useUi();
+  // the grid's council stands at the bottom right: the bar steps aside to the bottom left
+  const councilBoard = useCouncilOpen()?.kind === "board";
   const insets = floorInsets(ui);
   // Settings → Renderer: Rune draws the sections and cards on its own canvas (rune/); the camera, its
   // gestures and keys, and the layers above stay here for both engines. The handlers read it through a ref
@@ -1011,25 +1018,29 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
         <CrewFollow />
       </div>
 
-      {/* the HUD: a small search pill and the zoom, bottom centre — everything else is called up */}
+      {/* the bottom bar (2026-11-17, Josh: the top right's tools moved here): search (a window over its pill, or
+          pinned on the right), talk, the zoom, present and commands, then the council beside Ask, and Ask's own
+          pill with the agents' settings at its end. When the grid's council stands at the bottom right, the bar
+          goes to the bottom left */}
       <motion.div
-        className="hud"
+        className={`hud${councilBoard ? " is-aside" : ""}`}
         style={{ left: insets.left, right: insets.right }}
+        layout="position"
         initial={{ y: 40, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 210, damping: 22, delay: 0.05 }}
+        transition={{ type: "spring", stiffness: 210, damping: 22, delay: 0.05, layout: { type: "spring", stiffness: 320, damping: 32 } }}
+        data-hud
       >
-        {!ui.search && (
-          <button className="hud-search f-glass" onClick={() => setUi({ search: true })} title={`Search everything and drag it onto the grid (${keys("mod+F")}) · ${keys("mod+K")} for commands`}>
-            <span className="hud-glyph">⌕</span>
+        <div className="hud-search-slot" data-hud-search>
+          <button className={`hud-search f-glass${ui.searchPop || ui.search ? " is-on" : ""}`} onClick={toggleSearch} aria-pressed={ui.searchPop || ui.search} data-tip={`Search everything and drag it onto the grid · ${keys("mod+K")} for commands`} data-kbd={keys("mod+F")}>
+            <span className="hud-glyph">
+              <SearchGlyph size={15} />
+            </span>
             <span className="hud-label">Search</span>
             <span className="f-kbd">{keys("mod+F")}</span>
           </button>
-        )}
-        <button className={`hud-ask f-glass${ui.session ? " is-on" : ""}`} onClick={toggleSession} aria-pressed={!!ui.session} data-tip={ui.session ? "Put the conversation away" : "Ask the agent: a conversation beside the canvas"} data-kbd={keys("mod+J")}>
-          <span className="hud-glyph">✦</span>
-          <span className="hud-label">Ask</span>
-        </button>
+          <SearchPop />
+        </div>
         <TalkButton />
         <RuneMark />
         <button
@@ -1039,6 +1050,26 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
         >
           <span ref={zoomLabel}>50%</span>
         </button>
+        <div className="hud-icons f-glass" role="group" aria-label="Present and commands">
+          <button className="hud-icon" onClick={() => setUi({ presenting: true })} aria-label="Present" data-tip="Present" data-kbd="P">
+            <PresentGlyph size={15} />
+          </button>
+          <button className="hud-icon" onClick={() => setUi({ command: true })} aria-label="Commands" data-tip="Commands, open an app" data-kbd={keys("mod+K")}>
+            <span className="hud-icon-text">{COMMANDS_GLYPH}</span>
+          </button>
+        </div>
+        <button className={`hud-icon hud-council f-glass${councilBoard ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-pressed={councilBoard} aria-label="Council" data-tip="Council: this grid's agents, as characters. Talk to them, add more" data-council-open>
+          <CouncilGlyph />
+        </button>
+        <div className={`hud-ask-pill f-glass${ui.session ? " is-on" : ""}`}>
+          <button className={`hud-ask${ui.session ? " is-on" : ""}`} onClick={toggleSession} aria-pressed={!!ui.session} data-tip={ui.session ? "Put the conversation away" : "Ask the agent: a conversation beside the canvas"} data-kbd={keys("mod+J")}>
+            <span className="hud-glyph">✦</span>
+            <span className="hud-label">Ask</span>
+          </button>
+          <button className={`hud-ask-gear${ui.agents ? " is-on" : ""}`} onClick={() => setUi({ agents: !ui.agents })} aria-pressed={ui.agents} aria-label="Agents: settings" data-tip="Agents: who's on this grid, add one, what runs in the background" data-hud-agents>
+            <SlidersGlyph size={15} />
+          </button>
+        </div>
       </motion.div>
     </div>
   );

@@ -102,3 +102,82 @@ export function CloseGlyph({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
+
+/** search pinned to the right, or not: a pin */
+export function PinGlyph({ size = 14, on = false }: { size?: number; on?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M6 2.5h4M6.6 2.5l-.6 5-2 2h8l-2-2-.6-5M8 9.5v4.5" fill={on ? "currentColor" : "none"} />
+    </svg>
+  );
+}
+
+/** present: a play mark */
+export function PresentGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M5 3.2v9.6L12.6 8z" />
+    </svg>
+  );
+}
+
+// ---- the built-in tools (shell/Tools.tsx) ----
+
+export function TerminalGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2" />
+      <path d="M4.6 6.2l2 1.8-2 1.8M8.4 10.2h3" />
+    </svg>
+  );
+}
+
+export function BrowserGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <circle cx="8" cy="8" r="6" />
+      <path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6" />
+    </svg>
+  );
+}
+
+export function FilesGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M1.8 4.4c0-.8.6-1.4 1.4-1.4h3l1.4 1.6h5.2c.8 0 1.4.6 1.4 1.4v5.6c0 .8-.6 1.4-1.4 1.4H3.2c-.8 0-1.4-.6-1.4-1.4z" />
+    </svg>
+  );
+}
+
+export function ChangesGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <circle cx="4.2" cy="3.8" r="1.5" />
+      <circle cx="4.2" cy="12.2" r="1.5" />
+      <circle cx="11.8" cy="8" r="1.5" />
+      <path d="M4.2 5.3v5.4M5.6 4.6c3 .6 4.6 1.6 4.8 2.6" />
+    </svg>
+  );
+}
+
+/** T3: three agents' threads, side by side */
+export function T3Glyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M3 3.5h10M8 3.5v9" />
+      <path d="M3.5 8.5h2.5M10 8.5h2.5M3.5 12.5h2.5M10 12.5h2.5" />
+    </svg>
+  );
+}
+
+/** settings for something (the agents, on Ask's pill): three sliders */
+export function SlidersGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M2.5 4.5h4.4M10.1 4.5h3.4M2.5 11.5h2M7.7 11.5h5.8M2.5 8h7.6M13.3 8h.2" />
+      <circle cx="8.5" cy="4.5" r="1.6" />
+      <circle cx="6.1" cy="11.5" r="1.6" />
+      <circle cx="11.7" cy="8" r="1.6" />
+    </svg>
+  );
+}

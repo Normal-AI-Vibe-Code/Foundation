@@ -112,13 +112,15 @@
   z-index: 45;
   overflow: visible;
 }
+/* 2026-11-17 (Josh): the agents stand at the right, beside the buttons that called them (a section's Council
+   button is at its top right; the grid's bar keeps the bottom left) */
 .council {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-5);
+  justify-content: flex-end;
+  gap: var(--space-3);
   padding: 0 var(--space-4);
   pointer-events: none;
   color: var(--color-frost);
@@ -142,7 +144,8 @@
 .council-row {
   display: flex;
   align-items: flex-end;
-  gap: var(--space-4);
+  /* close together: a group, not a lineup */
+  gap: 0;
   min-width: 0;
 }
 .council-none {
@@ -154,7 +157,7 @@
 .council-seat {
   position: relative;
   flex: none;
-  width: 112px;
+  width: 104px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -287,6 +290,24 @@
 .council-ghost .council-figure .avatar-none {
   opacity: 0;
 }
+/* a place waiting for an agent breathes a little and shifts its weight, out of step with its neighbours:
+   something could stand here (transform only, on the figure inside, so the rise and the hover still apply) */
+.council-ghost .council-figure > * {
+  transform-origin: 50% 100%;
+  animation: council-ghost-idle 3.6s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -1.3s);
+}
+@keyframes council-ghost-idle {
+  0% {
+    transform: translateY(0) rotate(-0.8deg) scale(1);
+  }
+  50% {
+    transform: translateY(-2px) rotate(0deg) scale(1.012);
+  }
+  100% {
+    transform: translateY(-1px) rotate(0.8deg) scale(1.004);
+  }
+}
 .council-ghost:hover .council-figure .avatar-still,
 .council-ghost:hover .council-ghost-plain,
 .council-ghost .council-figure:focus-visible .avatar-still {
@@ -319,10 +340,6 @@
     translate var(--dur-quick) var(--ease-out-soft),
     visibility 0s var(--dur-quick);
 }
-.council-seat:first-child .council-under {
-  left: 0;
-  translate: 0 4px;
-}
 .council-seat:hover .council-under,
 .council-seat:focus-within .council-under,
 .council-seat.is-hot .council-under,
@@ -331,9 +348,6 @@
   visibility: visible;
   translate: -50% 0;
   transition-delay: 0s;
-}
-.council-seat:first-child:is(:hover, :focus-within, .is-hot, :has(.council-say.is-held)) .council-under {
-  translate: 0 0;
 }
 .council.is-board .council-under {
   top: auto;
@@ -612,6 +626,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .council-ghost .council-figure > *,
   .council-figure,
   .council-marks,
   .council-tools,
@@ -788,12 +803,15 @@
   animation: none;
 }
 
-/* the grid's council stands on the window's bottom edge: the bar that lives there steps up over their heads */
-.hud {
-  transition: translate var(--dur-pane) var(--ease-out-soft);
+/* the grid's council stands on the window's bottom edge at the right; the bar that lives there moves to the
+   bottom left (GridViewport.tsx, .hud.is-aside), and the council's buttons keep the bar's distance from the
+   window's bottom and right edges */
+.council.is-board {
+  padding-right: var(--space-5);
 }
-.shell:has(.council-place.is-board) .hud {
-  translate: 0 -176px;
+.council.is-board .council-tools {
+  margin-bottom: var(--space-5);
+  padding: 4px;
 }
 
 .design-council-talk {

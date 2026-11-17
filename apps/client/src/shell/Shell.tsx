@@ -44,7 +44,8 @@ import { api } from "../lib/api";
 import { ingest } from "../lib/ingest";
 import { holdsKeys } from "../lib/keysHeld";
 import { getState, requestSnap } from "../state/store";
-import { closeSpaceTab, getUi, noteSpaceOpen, setUi, toast, toggleSession, useUi } from "../state/ui";
+import { closeSpaceTab, getUi, noteSpaceOpen, setUi, toast, toggleSearch, toggleSession, useUi } from "../state/ui";
+import { ToolPane } from "./Tools";
 import { activeBoard, joinBoard, onBoardChange } from "../sync/board";
 
 function typing(e: KeyboardEvent) {
@@ -215,7 +216,7 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
         setUi(u.pane && u.paneView === "info" ? { pane: false } : { pane: true, paneView: "info" });
       } else if (mod && e.key.toLowerCase() === "f" && !e.shiftKey) {
         e.preventDefault();
-        setUi({ search: !getUi().search });
+        toggleSearch();
       } else if (mod && e.key.toLowerCase() === "w" && getUi().spaces.length > 1) {
         e.preventDefault();
         const id = activeBoard()?.boardId;
@@ -276,6 +277,7 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
       <SessionView />
       <SearchPane />
       <AgentsPane />
+      <ToolPane />
       <AgentInfoPane />
       <DetailPane />
       <CouncilPreload />

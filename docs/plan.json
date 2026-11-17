@@ -83,6 +83,15 @@
   ],
   "cards": [
     {
+      "id": "bottom-bar-and-tools",
+      "title": "The bottom bar holds the top right; the top right is the built-in tools; councils at the right; day/night that always reaches the paper",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "shell",
+      "status": "review",
+      "body": "Josh, 2026-11-17. Bottom bar: search (a window over its pill, pinnable to the right; its line the grid's hairline), talk, zoom, present and commands, the council beside Ask, Ask's pill with the agents' settings. The grid's council stands at the bottom right with the bar at the bottom left; a section's at its right by its Council button; three places, close together, empty places breathing. The agents panel has a line under its tabs. Side menu foot: the server pill the menu's width above Settings, the orb left of you, edges on the Settings icon. The grid's WebGL paper survives a lost context (it froze on its last colour). Tools at the top right: terminal, browser, files, change log, T3 (server and Vision's T3 client). The Add sheet opens T3 inside Foundation and turns on agents T3 ships switched off. Checked: `e2e/bottom-bar.spec.ts` (7), `test/hostterm.test.ts` (3), and council, section-crew, one-interface and today e2e; evidence in `docs/evidence/2026-11-17_bottom-bar/`."
+    },
+    {
       "id": "machine-port-stale",
       "title": "A port opened as a page shows its last load after the machine stops",
       "kind": "bug",
@@ -1619,7 +1628,7 @@
       "milestone": "crew",
       "area": "agent",
       "status": "backlog",
-      "body": "Josh, 2026-11-16: a mini version of T3 on the right panel that expands into a full version, in Foundation's style on the grid, with all of T3's features. Today Background lists T3's sessions with Open and Stop, and Open T3 puts T3 in a browser tab. Next: read a session's messages in the panel, reply to it, then a T3 card on a grid.",
+      "body": "Josh, 2026-11-16: a mini version of T3 on the right panel that expands into a full version, in Foundation's style on the grid, with all of T3's features. Today Background lists T3's sessions with Open and Stop, and Open T3 puts T3 in a browser tab. Next: read a session's messages in the panel, reply to it, then a T3 card on a grid. **2026-11-17:** top bar → T3 shows T3 whole in the right panel: Foundation's own T3 started and stopped by a person, and T3's own page (Vision's build of its web client) signed in by a one-time link and framed there. Not yet in Foundation's style, and not on a grid.",
       "issue": 157
     },
     {
@@ -1688,8 +1697,8 @@
       "kind": "plan",
       "milestone": "crew",
       "area": "agent",
-      "status": "next",
-      "body": "Josh, 2026-11-17: mount Claude through the inbuilt terminal. Foundation has no terminal on the computer it runs on: a machine card's terminal is a separate computer and can't sign the host in, so the third way of adding Claude (*Claude Code on this computer*) tells the person to use the computer's own terminal. Give the server a terminal on its own host (a person's, never an agent's; it runs commands on the computer, so it needs the same care as Places) and run the install and `claude` steps in it from the Connect step.",
+      "status": "review",
+      "body": "Josh, 2026-11-17: mount Claude through the inbuilt terminal. Foundation has no terminal on the computer it runs on: a machine card's terminal is a separate computer and can't sign the host in, so the third way of adding Claude (*Claude Code on this computer*) tells the person to use the computer's own terminal. Give the server a terminal on its own host (a person's, never an agent's; it runs commands on the computer, so it needs the same care as Places) and run the install and `claude` steps in it from the Connect step. **2026-11-17: built.** Top bar → Terminal: a shell on the server's computer, in its folder, for an admin, started by their press; the socket opens only with a one-time key minted for that person (`apps/server/src/hostterm.ts`, `test/hostterm.test.ts`, `e2e/bottom-bar.spec.ts`). It is line-mode (no pseudo-terminal), so `npm install -g …` runs in it but a sign-in that wants a real terminal (`claude` login) does not; the Connect step doesn't yet run its commands in it.",
       "issue": 164
     },
     {
@@ -1699,7 +1708,7 @@
       "milestone": "crew",
       "area": "agent",
       "status": "backlog",
-      "body": "The Connect step's links (console.anthropic.com/settings/keys, Kimi's and DeepSeek's key pages) open in the system browser. Show them in Foundation's own browser (a web page space or card) so the steps and the page are side by side. Sign-in pages often refuse to be framed; find out which do first.",
+      "body": "The Connect step's links (console.anthropic.com/settings/keys, Kimi's and DeepSeek's key pages) open in the system browser. Show them in Foundation's own browser (a web page space or card) so the steps and the page are side by side. Sign-in pages often refuse to be framed; find out which do first. **2026-11-17:** a browser is built (top bar → Browser: address, back, forward, reload, open outside, put on the grid). The Connect step's key links still open the system browser: not routed into it, and whether those pages refuse to be framed is unchecked.",
       "issue": 165
     },
     {

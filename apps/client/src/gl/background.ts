@@ -113,6 +113,23 @@ export class ShaderBackground {
     canvas.className = "gl-bg";
     container.prepend(canvas);
     this.canvas = canvas;
+    // The browser keeps only so many WebGL contexts and takes the oldest when a new one needs room (the council's
+    // stage, mesh avatars, CAD, the Shiba). This one is usually the oldest. Lost, its canvas would freeze on its
+    // last frame (day paper at night, or the reverse: 2026-11-17, "sometimes it doesn't change the grid
+    // background"). So: hide it while lost (the CSS paper under it follows the night tokens) and build it again
+    // when the context comes back.
+    canvas.addEventListener("webglcontextlost", (e) => {
+      e.preventDefault();
+      this.program = null;
+      canvas.style.visibility = "hidden";
+    });
+    canvas.addEventListener("webglcontextrestored", () => {
+      if (this.disposed) return;
+      this.setup();
+      canvas.style.visibility = "";
+      this.last = "";
+      this.renderFrame();
+    });
     const gl = canvas.getContext("webgl2", {
       antialias: false,
       depth: false,
@@ -122,7 +139,14 @@ export class ShaderBackground {
     });
     if (!gl) return; // graceful fallback: CSS background remains
     this.gl = gl;
+    if (!this.setup()) return;
+    this.loop();
+  }
 
+  /** compile the program and find its uniforms (again after a lost context comes back) */
+  private setup(): boolean {
+    const gl = this.gl;
+    if (!gl) return false;
     const compile = (type: number, src: string) => {
       const sh = gl.createShader(type)!;
       gl.shaderSource(sh, src);
@@ -135,34 +159,23 @@ export class ShaderBackground {
     };
     const vs = compile(gl.VERTEX_SHADER, VERT);
     const fs = compile(gl.FRAGMENT_SHADER, FRAG);
-    if (!vs || !fs) return;
+    if (!vs || !fs) return false;
     const prog = gl.createProgram()!;
     gl.attachShader(prog, vs);
     gl.attachShader(prog, fs);
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
       console.error("shader link:", gl.getProgramInfoLog(prog));
-      return;
+      return false;
     }
     this.program = prog;
     gl.useProgram(prog);
-    for (const name of [
-      "uResolution",
-      "uOffset",
-      "uScale",
-      "uPointer",
-      "uPointerIn",
-      "uTime",
-      "uDpr",
-      "uNight",
-    ]) {
+    for (const name of ["uResolution", "uOffset", "uScale", "uPointer", "uPointerIn", "uTime", "uDpr", "uNight"]) {
       this.locs[name] = gl.getUniformLocation(prog, name);
     }
     // dummy VAO required by core profile semantics
-    const vao = gl.createVertexArray();
-    gl.bindVertexArray(vao);
-
-    this.loop();
+    gl.bindVertexArray(gl.createVertexArray());
+    return true;
   }
 
   resize(cssW: number, cssH: number) {

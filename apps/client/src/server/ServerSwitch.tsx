@@ -266,13 +266,15 @@ const keep = (k: string, v: string) => {
 let launchChecked = false;
 
 /**
- * The switch itself. Signed in, it sits in the top bar (`where="bar"`, 2026-11-15: always there, so the
- * server this app talks to is never a mystery); before that there is no bar, and it keeps the bottom-right
+ * The switch itself. Signed in, it sits in the side menu's foot above Settings (`where="pane"`, 2026-11-17;
+ * from 2026-11-15 it was in the top bar, `where="bar"`: always there, so the server this app talks to is
+ * never a mystery); before that there is no bar, and it keeps the bottom-right
  * corner wherever the app can point at another server. `day` pins day tokens over the sign-in page.
  */
-export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean; where?: "corner" | "bar" }) {
+export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean; where?: "corner" | "bar" | "pane" }) {
   const current = (SERVER || window.location.origin).replace(/\/$/, "");
-  const bar = where === "bar";
+  // signed in: in the side menu's foot, above Settings (2026-11-17), or in the top bar
+  const bar = where !== "corner";
   const shown = bar || inDesktop || BEARER;
   const ui = useUi();
   const [open, setOpen] = useState(false);
@@ -436,9 +438,9 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
   // beside the search pane when it's open, not over its clipboard
   const right = 16 + (!day && ui.search ? ui.searchW : 0);
   return (
-    <div ref={root} className={`server-switch-place${bar ? " is-bar" : ""}${day ? " f-day" : ""}`} style={bar ? undefined : { right }}>
+    <div ref={root} className={`server-switch-place${bar ? " is-bar" : ""}${where === "pane" ? " is-pane" : ""}${day ? " f-day" : ""}`} style={bar ? undefined : { right }} data-server-where={where}>
       <ServerSwitchView
-        drop={bar}
+        drop={where === "bar"}
         open={open}
         current={current}
         reach={reach}

@@ -24,7 +24,9 @@ import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, listJobs, startJob } from "./jobs.ts";
 import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
-import { addT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3OpenLink, type AddAgentInput } from "./t3host.ts";
+import { requestHostTerminal } from "./hostterm.ts";
+import { changelog } from "./changelog.ts";
+import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
 import { pollHandoffs } from "./vision.ts";
 import { boardPeople, boardRole, canWrite, requireWriter, setBoardRole } from "./roles.ts";
@@ -880,6 +882,14 @@ r.get("/api/t3/threads/:id", async (req) => {
   return t;
 });
 
+// ---------- the built-in terminal (hostterm.ts): a shell on this computer, for an admin, in person ----------
+r.post("/api/host-terminal", (req) => requestHostTerminal(req));
+// what changed in Foundation's own code (changelog.ts): read-only, for anyone signed in
+r.get("/api/changelog", async (req) => {
+  requireUser(req);
+  return changelog(Number(req.query.get("n") ?? 60));
+});
+
 // ---------- Foundation's own T3 instance: the agents this computer has (t3host.ts) ----------
 
 r.get("/api/t3host", (req) => {
@@ -929,6 +939,12 @@ r.post("/api/t3host/agents", async (req) => {
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can add an agent.");
   const body = await readJson<AddAgentInput>(req);
   return { agents: await addT3Agent(body).catch((e) => { throw new HttpError(400, (e as Error).message); }) };
+});
+// turning on one of T3's own agents (Antigravity, Cursor…) lets this computer run its program: an admin, in person
+r.post("/api/t3host/agents/:id/enable", async (req) => {
+  const u = requirePerson(req, "Turning on an agent");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can turn on an agent.");
+  return { agents: await enableT3Agent(req.params.id).catch((e) => { throw new HttpError(400, (e as Error).message); }) };
 });
 r.delete("/api/t3host/agents/:id", async (req) => {
   const u = requirePerson(req, "Removing an agent");

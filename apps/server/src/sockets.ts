@@ -28,6 +28,7 @@ import type { Duplex } from "node:stream";
 import type { UserInfo } from "@foundation/protocol";
 import type { WebSocketServer } from "ws";
 import { hashToken, isServiceToken, requireUser, tokenFrom, userFromRequest, userFromSessionHash } from "./auth.ts";
+import { attachHostTerminal, HOST_TERM_PATH, spendHostTerminalKey } from "./hostterm.ts";
 import { one, run } from "./db.ts";
 import { CLOSE_TOO_OLD, clientTooOld } from "./clientversion.ts";
 import { HttpError, type Req } from "./http.ts";
@@ -108,6 +109,19 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
   const req = rawReq as Req;
   const url = new URL(req.url ?? "/", "http://local");
   req.query = url.searchParams;
+  // the built-in terminal: its one-time key (minted for a person, an admin, by POST /api/host-terminal) is the
+  // only way in; no cookie, bearer or ticket opens it (hostterm.ts)
+  const ht = HOST_TERM_PATH.exec(url.pathname);
+  if (ht) {
+    const who = spendHostTerminalKey(ht[1], req.query.get("key"));
+    if (!who) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachHostTerminal(ht[1], ws, who));
+    return;
+  }
   const user = socketUser(req, url);
   const hm = HUDDLE.exec(url.pathname);
   if (hm && user && canSeeBoard(user, hm[1])) {

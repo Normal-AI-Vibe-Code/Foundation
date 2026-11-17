@@ -143,16 +143,17 @@ test("agents that come into a section join its group; hover shows it, a pin keep
   await kai.screenshot({ path: `${SHOTS}/02_kai-agents-pane.png` });
 
   // Ada asked: her pane has Open and Stop on her lead
-  await ada.locator(".top-btn[aria-label='Agents']").click();
+  await ada.locator("[data-hud-agents]").click();
   await expect(ada.locator(".agents-pane .agent-row").first().locator(".crew-row-btn", { hasText: "Open" })).toBeVisible({ timeout: 8000 });
   await settle(ada, 700);
   await ada.screenshot({ path: `${SHOTS}/03_ada-agents-pane.png` });
 
   // search takes the pane's place, and gives it back
-  await kai.locator(".top-btn[aria-label='Search']").click();
+  await kai.locator(".hud-search").click();
+  await kai.locator("[data-search-pin]").click();
   await expect(kai.locator(".search-pane")).toBeVisible();
   await expect(pane).toHaveCount(0);
-  await kai.locator(".top-btn[aria-label='Agents']").click();
+  await kai.locator("[data-hud-agents]").click();
   await expect(pane).toBeVisible();
   await expect(kai.locator(".search-pane")).toHaveCount(0);
 
@@ -248,7 +249,7 @@ test("this computer's agents: a person starts T3, asks an agent in a section, an
 
   // an admin adds Kimi (cloud, a key) and DeepSeek (this computer, no key): two groups
   const admin = (await person(browser, "Root Test", "admin@normal.dev", board)).page;
-  await admin.locator(".top-btn[aria-label='Agents']").click();
+  await admin.locator("[data-hud-agents]").click();
   const at3 = admin.locator(".agents-pane .t3-block");
   await expect(at3).toHaveAttribute("data-t3", "running", { timeout: 8000 });
   await at3.locator(".t3-add-open").click();

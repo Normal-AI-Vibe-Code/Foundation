@@ -527,7 +527,7 @@ const TOKENS = {
 } as const;
 
 /** each token resolved to a colour xterm can paint (night mixes and all), through one probe element */
-function themeFromTokens(el: HTMLElement): ITheme {
+export function themeFromTokens(el: HTMLElement): ITheme {
   const probe = document.createElement("span");
   probe.style.display = "none";
   el.appendChild(probe);

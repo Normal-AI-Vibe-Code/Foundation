@@ -647,6 +647,28 @@ export async function addT3Agent(input: AddAgentInput): Promise<T3Agent[]> {
   return status.agents;
 }
 
+/**
+ * Turn on one of T3's own agents that its settings have off (T3 ships Antigravity, Cursor, Grok and OpenCode off):
+ * the Add sheet's "Turn it on" step, so signing in through T3 isn't a dead end. Its program still has to be on this
+ * computer, and signed in; T3 says so after the refresh.
+ */
+export async function enableT3Agent(id: string): Promise<T3Agent[]> {
+  const a = status.agents.find((x) => x.id === id);
+  if (!a) throw new Error(`T3 has no agent called ${id}.`);
+  const settings = obj(await rpc("server.getSettings", {}));
+  const providers = { ...(obj(settings?.providers) ?? {}) };
+  const instances = obj(settings?.providerInstances) ?? {};
+  if (instances[id]) {
+    await rpc("server.updateSettings", { patch: { providerInstances: { ...instances, [id]: { ...(obj(instances[id]) ?? {}), enabled: true } } } });
+  } else {
+    providers[id] = { ...(obj(providers[id]) ?? {}), enabled: true };
+    await rpc("server.updateSettings", { patch: { providers } });
+  }
+  await rpc("server.refreshProviders", { instanceId: id }).catch(() => {});
+  set({ agents: status.agents.map((x) => (x.id === id ? { ...x, enabled: true, state: x.installed ? x.state : "missing" } : x)) });
+  return status.agents;
+}
+
 export async function removeT3Agent(id: string): Promise<T3Agent[]> {
   if (!added.has(id)) throw new Error("Only agents added from Foundation can be removed here.");
   const settings = obj(await rpc("server.getSettings", {}));

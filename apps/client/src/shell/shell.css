@@ -1584,6 +1584,123 @@ body.is-carrying * {
   font-variant-numeric: tabular-nums;
   font-size: var(--text-12);
 }
+/* the grid's council is at the bottom right: the bar keeps to the bottom left, at its usual distance from the edges */
+.hud.is-aside {
+  margin: 0 auto 0 var(--space-5);
+}
+/* present and commands: two icons on one pill */
+.hud-icons {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+}
+.hud-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.hud-icon:hover {
+  background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+  color: var(--color-frost);
+}
+.hud-icon-text {
+  font: 500 var(--text-14) / 1 var(--font-sans);
+}
+/* the council: its own round button, next to Ask */
+.hud-icon.hud-council {
+  width: 36px;
+  height: 36px;
+  color: var(--color-agent);
+}
+.hud-icon.hud-council.is-on {
+  box-shadow:
+    0 0 0 1.5px var(--color-agent),
+    0 0 0 6px var(--color-agent-dim);
+}
+/* Ask and, at the pill's end, the agents' settings */
+.hud-ask-pill {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  padding-right: 4px;
+}
+.hud-ask-pill .hud-ask {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.hud-ask-pill.is-on {
+  box-shadow:
+    0 0 0 1.5px var(--color-agent),
+    0 0 0 6px var(--color-agent-dim);
+}
+.hud-ask-gear {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  margin-left: 2px;
+  border: 0;
+  border-left: 1px solid var(--color-line);
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.hud-ask-gear:hover,
+.hud-ask-gear.is-on {
+  color: var(--color-agent);
+}
+.hud-search.is-on {
+  color: var(--color-frost);
+  box-shadow: 0 0 0 1px var(--color-line-strong);
+}
+/* search as a window right above the bar's search pill (SearchPane.tsx, mode "pop"); the pin moves it to the right */
+.hud-search-slot {
+  position: relative;
+  display: inline-flex;
+}
+.search-pane.search-pop {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  bottom: calc(100% + var(--space-3));
+  width: min(440px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border-radius: var(--radius-pane);
+  background: var(--color-void);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  overflow: hidden;
+  transform-origin: 20% 100%;
+  animation: search-pop-in var(--dur-pane) var(--ease-out-soft) both;
+}
+@keyframes search-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .search-pane.search-pop {
+    animation: none;
+  }
+}
 
 .presence-stack {
   display: flex;
@@ -4699,4 +4816,317 @@ body.is-viewer .port {
   .design-pickup {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---------- the built-in tools (shell/Tools.tsx, 2026-11-17): buttons at the top bar's right end, one pane on the right ---------- */
+
+.tool-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--space-3);
+  margin-left: var(--space-2);
+  border-left: 1px solid var(--color-line);
+}
+.tool-buttons .top-btn {
+  position: relative;
+}
+.tool-btn-dot {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-dim);
+  box-shadow: 0 0 0 1.5px var(--color-void);
+}
+.tool-btn-dot.is-running {
+  background: var(--color-ok);
+}
+.tool-btn-dot.is-starting {
+  background: var(--color-warn);
+  animation: f-breathe 1.2s var(--ease-out-soft) infinite;
+}
+.tool-btn-dot.is-error {
+  background: var(--color-bad);
+}
+.tool-pane {
+  right: 0;
+  border-left: 1px solid var(--color-line);
+  background: var(--color-void);
+}
+.tool-tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 48px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tool-tab {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tool-tab:hover {
+  color: var(--color-frost);
+}
+.tool-tab.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+}
+.tool-close {
+  margin-left: auto;
+}
+.tool-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tool-body[hidden] {
+  display: none;
+}
+.tool-body > * {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tool-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-5);
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.tool-empty b {
+  color: var(--color-frost);
+  font: 600 var(--text-14) / 1.3 var(--font-sans);
+}
+.tool-empty p {
+  margin: 0;
+  max-width: 52ch;
+}
+.tool-note {
+  margin: var(--space-4) 0;
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+.tool-note.is-inline {
+  margin: 0 0 0 auto;
+}
+.tool-note.is-bad {
+  color: var(--color-bad);
+}
+.tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.tool-term-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+}
+.tool-term-head > span:not(.f-dot) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-term-head code {
+  font: 500 var(--text-11) / 1 var(--font-code);
+  color: var(--color-frost);
+}
+.tool-term-screen {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  background: var(--color-void);
+}
+.tool-term-screen[hidden] {
+  display: none;
+}
+.tool-term-screen .xterm-viewport {
+  background: transparent !important;
+}
+.tool-addr {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 44px;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+.tool-addr-field,
+.tool-filter {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1 var(--font-sans);
+  outline: 0;
+}
+.tool-addr-field:focus,
+.tool-filter:focus {
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.tool-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: var(--color-raise);
+}
+.tool-faces {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 44px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+.tool-faces .tool-filter {
+  margin-left: var(--space-3);
+}
+.tool-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-4) var(--space-6) var(--space-5);
+}
+.tool-files .places,
+.tool-files .places-browser {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.tool-group {
+  padding-top: var(--space-4);
+}
+.tool-count {
+  margin-left: var(--space-2);
+  color: var(--color-dim);
+  font-weight: 500;
+}
+.tool-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tool-log-row {
+  border-bottom: 1px solid var(--color-line);
+}
+.tool-log-head {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: var(--space-3) 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.tool-log-head:disabled {
+  cursor: default;
+}
+.tool-log-head:hover:not(:disabled) .tool-log-subject {
+  color: var(--color-pulse);
+}
+.tool-log-subject {
+  font: 500 var(--text-13) / 1.4 var(--font-sans);
+}
+.tool-log-meta {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+}
+.tool-log-meta code {
+  font: 500 var(--text-11) / 1 var(--font-code);
+  color: var(--color-mist);
+}
+.tool-log-body {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  white-space: pre-wrap;
+}
+.tool-release {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.tool-release summary {
+  cursor: pointer;
+  font: 500 var(--text-13) / 1.4 var(--font-sans);
+}
+.tool-agents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+}
+.tool-agents li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.tool-agents b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+
+/* #/design: the bottom bar on its own, in the page's flow */
+.design-hud {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-6);
+  padding: var(--space-6) var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+}
+.floor-demo .side-pane .pane-foot,
+.floor-demo .side-pane .server-switch-place {
+  flex: none;
 }

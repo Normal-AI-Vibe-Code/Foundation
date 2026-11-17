@@ -24,7 +24,7 @@ import { refreshAvailable, useAvailable } from "../lib/agentsAvailable";
 import { GRID_PLACE, postAgent, usePosted, type AvailableAgent } from "../lib/posted";
 import { councilOpen } from "../lib/councilOpen";
 import { getState } from "../state/store";
-import { toast, useUi } from "../state/ui";
+import { setUi, toast, useUi } from "../state/ui";
 import { activeBoard } from "../sync/board";
 import { openExternal } from "../utils/media";
 import { Still } from "../characters/Avatar";
@@ -33,6 +33,9 @@ import { chooseAvatar, readyCharacters, useRoster, type RosterCharacter } from "
 import { T3AddForm, type T3Agent, type T3Local, type T3Preset } from "./AgentsPane";
 
 export type WayId = "key" | "t3" | "own" | "local";
+
+/** which of T3's own agents drives each kind, signed in through T3 */
+const T3_DRIVER: Partial<Record<Provider, string>> = { claude: "claudeAgent", chatgpt: "codex", gemini: "antigravity" };
 
 /** one way of connecting a kind of agent */
 export interface Way {
@@ -151,7 +154,8 @@ export function AddAgent({ onDone }: { onDone(): void }) {
   // the way in use: the one picked, else one that's already connected, else the first offered
   const way: WayId | null = k ? (wayPick && k.ways.some((w) => w.id === wayPick) ? wayPick : (k.ways.find((w) => agentFor(k, w.id, agents)?.ready)?.id ?? k.ways[0].id)) : null;
   const found: AvailableAgent | undefined = useMemo(() => (k && way ? agentFor(k, way, agents) : undefined), [k, way, agents]);
-  const t3Agent: T3Agent | undefined = found?.key.startsWith("t3:") ? host?.agents.find((a) => `t3:${a.id}` === found.key) : undefined;
+  // T3's own agent for this kind, even one it has switched off (it isn't offered as available until it's on)
+  const t3Agent: T3Agent | undefined = found?.key.startsWith("t3:") ? host?.agents.find((a) => `t3:${a.id}` === found.key) : k ? host?.agents.find((a) => a.driver === T3_DRIVER[k.id]) : undefined;
   const t3On = t3 === "running";
   const connected = !!found && found.ready;
   const picked = ready.find((c) => c.id === avatar) ?? defaultAvatar(ready, roster.avatars);
@@ -176,10 +180,15 @@ export function AddAgent({ onDone }: { onDone(): void }) {
       .catch(said)
       .finally(() => setBusy(null));
   };
-  const openT3 = () =>
-    void api<{ url: string }>("/api/t3host/open", { method: "POST", json: {} })
-      .then((r) => openExternal(r.url))
-      .catch(said);
+  // T3's page opens here, in the T3 tool on the right (2026-11-17), not in another browser
+  const openT3 = () => setUi({ tool: "t3" });
+  const enable = (id: string) => {
+    setBusy("enable");
+    void api(`/api/t3host/agents/${encodeURIComponent(id)}/enable`, { method: "POST" })
+      .then(() => refreshAvailable())
+      .catch(said)
+      .finally(() => setBusy(null));
+  };
   const add = async () => {
     if (!found) return;
     setBusy("add");
@@ -320,23 +329,35 @@ export function AddAgent({ onDone }: { onDone(): void }) {
       );
     // signed in through T3
     const state = t3Agent?.state;
-    const missing = t3On && (!found || state === "missing");
+    const off = t3On && state === "off";
+    const missing = t3On && !off && (!found || state === "missing");
+    // the turn-on step shows while it's off; the steps after it count on from it
+    const extra = off || (t3Agent && t3Agent.enabled === false) ? 1 : 0;
     return (
       <ol className="way-steps">
         {startStep(1)}
-        <WayStep n={2} done={connected || (t3On && !missing)} wait={!t3On} title={`Have ${k.program ?? k.label} on this computer`}>
+        {extra > 0 && (
+          <WayStep n={2} done={!off} wait={!t3On} title={`Turn ${t3Agent?.name ?? k.program ?? k.label} on`}>
+            <p>T3 has it, switched off (it ships that way). Turning it on lets this computer run {k.program ?? k.label} when it's asked to.</p>
+            <button type="button" className="f-pill is-accent" disabled={busy === "enable" || !t3Agent || ui.role !== "admin"} onClick={() => t3Agent && enable(t3Agent.id)} data-add-enable>
+              {busy === "enable" ? "Turning it on…" : "Turn it on"}
+            </button>
+            {ui.role !== "admin" && <p className="way-fine">Only an admin can turn an agent on.</p>}
+          </WayStep>
+        )}
+        <WayStep n={2 + extra} done={connected || (t3On && !missing && !off)} wait={!t3On || off} title={`Have ${k.program ?? k.label} on this computer`}>
           <p>This computer's agents drive {k.program ?? k.label}, and it isn't installed here yet.</p>
           {k.install && <Cmd text={k.install} />}
           {again}
         </WayStep>
-        <WayStep n={3} done={connected} wait={!t3On || missing} title={`Sign in with your ${k.label} account`}>
+        <WayStep n={3 + extra} done={connected} wait={!t3On || missing || off} title={`Sign in with your ${k.label} account`}>
           <p>
             {found?.name ?? k.label} {found?.why ?? "needs signing in"}. Open T3 and sign in from its settings{k.signIn ? ", or in a terminal on this computer:" : "."}
           </p>
           {k.signIn && <Cmd text={k.signIn} />}
           <span className="way-acts">
             <button type="button" className="f-pill is-accent" onClick={openT3} data-add-open-t3>
-              Open T3 to sign in ↗
+              Open T3 to sign in
             </button>
             {again}
           </span>

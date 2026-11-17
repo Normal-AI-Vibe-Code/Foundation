@@ -780,13 +780,20 @@ body.is-connecting .sec-crew,
 
 /* ---------- the agents panel's faces (2026-11-16): at work, adding one, the background ---------- */
 
+/* the tabs sit over a hairline the pane's full width (2026-11-17, Josh: a line between the tabs and what scrolls
+   under them); what scrolls starts a step below it */
 .agents-tabs {
   flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  height: 40px;
-  margin: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  height: 48px;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+.agents-tabs ~ .agents-scroll {
+  padding-top: var(--space-4);
 }
 .agents-tabs .top-btn {
   margin-left: auto;

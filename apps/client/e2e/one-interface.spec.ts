@@ -40,8 +40,8 @@ test("Settings is a place in the shell: the side menu stays, the settings come f
   await expect(ada.locator(".top-bar [data-place-tab=settings]")).toBeVisible();
   await expect(space.locator(".settings-tab")).toHaveText(["General", "Agents", "Avatars", "Plan", "Design language", "Services", "Places", "Renderer", "Releases"]);
   await expect(space.locator(".settings-tab.is-current")).toHaveText("General");
-  // the server this app uses is in the top bar
-  await expect(ada.locator(".top-bar .server-switch-pill")).toBeVisible();
+  // the server this app uses is in the side menu, above Settings (2026-11-17)
+  await expect(ada.locator(".side-pane [data-server-where=pane] .server-switch-pill")).toBeVisible();
   await expect(ada.locator(".top-tools [data-tip='Agent layer (A)']")).toHaveCount(0);
 
   // the colour scheme: night, then day, and the choice is the page's

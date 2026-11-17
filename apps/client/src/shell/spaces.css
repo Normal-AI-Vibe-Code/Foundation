@@ -757,6 +757,8 @@
 }
 .side-pane .pane-foot {
   border-top: 0;
+  /* the orb, then you, from the Settings icon's left edge (2026-11-17) */
+  padding-left: var(--space-4);
 }
 .pane-empty.is-create {
   display: flex;
@@ -906,6 +908,9 @@
 
 /* ---- search: a line with the icon and a suggestion, not a box; chips with an outline ---- */
 
+.search-pane.search-pop .search-head {
+  margin: 0;
+}
 .search-pane .search-head {
   margin: var(--space-2) 0 0;
   padding: 0 var(--space-3) 0 var(--space-5);
@@ -915,9 +920,9 @@
   box-shadow: none;
   border-bottom: 1px solid var(--color-line);
 }
+/* the line under the search line is the grid's own hairline, focused or not (2026-11-17, Josh) */
 .search-pane .search-head:focus-within {
   box-shadow: none;
-  border-bottom-color: var(--color-pulse);
 }
 .search-pane .search-glyph {
   display: inline-grid;

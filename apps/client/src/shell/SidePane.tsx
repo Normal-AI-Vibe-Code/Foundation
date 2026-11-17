@@ -24,6 +24,9 @@ import { KIND_GLYPH, KIND_NAME, childrenOf, fileGrid, parentOf, wouldLoop, type 
 import { goSettings, type Place } from "../lib/place";
 import { initials } from "./Presence";
 import { FloorEdge } from "./FloorEdge";
+import { ServerSwitch } from "../server/ServerSwitch";
+import { NightOrb } from "./NightOrb";
+import { isNight, setNight } from "@foundation/ui";
 
 interface Props {
   user: UserInfo;
@@ -199,6 +202,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             </section>
           </div>
 
+          {/* the server this app talks to, the menu's width, above Settings (2026-11-17: out of the top bar) */}
+          <ServerSwitch where="pane" />
           <section className="pane-band pane-low">
             <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
               <span className="pane-glyph">
@@ -208,6 +213,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             </button>
           </section>
           <footer className="pane-foot">
+            {/* day and night, left of you (2026-11-17: out of the top bar) */}
+            <NightOrb onToggle={() => setNight(!isNight())} />
             <span className="me-avatar" style={{ background: user.color }} title={user.email}>
               {initials(user.name)}
             </span>

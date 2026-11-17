@@ -2,10 +2,11 @@
  * The top bar, drawn on the floor. Left to right: the side menu's fold (at the menu's right edge,
  * lined off from the tabs), Settings as a pill while you're there, a tab for every grid open in
  * this window, ＋ (a new grid; its caret offers the other canvases: a presentation, a web page),
- * then the tools on the right — the people here, Today (with what's waiting on you beside the
- * word; 2026-11-17: out of the side menu), search, the council, the agents, the command bar,
- * present — the server this app uses (2026-11-15: it lives here, not in a corner), and the
- * day/night orb.
+ * then on the right the people here, Today (with what's waiting on you beside the word;
+ * 2026-11-17: out of the side menu), and the built-in tools (shell/Tools.tsx: a terminal, a
+ * browser, the files, what changed, this computer's agents). Search, the council, the agents,
+ * commands and present moved to the bottom bar on 2026-11-17; the server and the day/night orb
+ * to the side menu's foot.
  *
  * A tab is a grid: a board whose canvas is a grid, a deck or a web page. The open grid's tab
  * carries its sync dot and its own button (ⓘ) for the grid's people and activity: what belongs to
@@ -16,21 +17,17 @@
  * (shell/WindowControls.tsx), all on the one line.
  */
 
-import { GearGlyph, SearchGlyph } from "./glyphs";
+import { GearGlyph } from "./glyphs";
+import { ToolButtons } from "./Tools";
 import { goToday } from "../lib/place";
 import { ShibaDot, useNotices } from "../today/notices";
-import { toggleCouncil, useCouncilOpen } from "../lib/councilOpen";
 import { useEffect, useRef, useState } from "react";
-import { COMMANDS_GLYPH, keys } from "../lib/keys";
+import { keys } from "../lib/keys";
 import { motion, AnimatePresence } from "motion/react";
-import { isNight, setNight } from "@foundation/ui";
 import { setUi, useUi } from "../state/ui";
 import { PresenceStack, useBoardTick } from "./Presence";
-import { NightOrb } from "./NightOrb";
 import { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "../lib/grids";
 import type { Place } from "../lib/place";
-import { ServerSwitch } from "../server/ServerSwitch";
-import { CouncilGlyph } from "../characters/CouncilGlyph";
 
 interface Props {
   boards: BoardRow[];
@@ -45,7 +42,6 @@ interface Props {
 
 export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRename }: Props) {
   const ui = useUi();
-  const council = useCouncilOpen();
   const notices = useNotices();
   const board = useBoardTick();
   const status = board?.status ?? "connecting";
@@ -218,23 +214,8 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
             </span>
           )}
         </button>
-        <button className={`top-btn${ui.search ? " is-on" : ""}`} onClick={() => setUi({ search: !ui.search })} aria-label="Search" data-tip={`Search, drag onto the grid (${keys("mod+F")})`}>
-          <SearchGlyph />
-        </button>
-        <button className={`top-btn is-agent${council?.kind === "board" ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-label="Council" data-tip="Council: this grid's agents, as characters. Talk to them, add more" data-council-open>
-          <CouncilGlyph />
-        </button>
-        <button className={`top-btn is-agent${ui.agents ? " is-on" : ""}`} onClick={() => setUi({ agents: !ui.agents })} aria-label="Agents" data-tip="Agents on this grid: who's in which section, and who works together">
-          ✦
-        </button>
-        <button className="top-btn" onClick={() => setUi({ command: true })} data-tip={`Commands, open an app (${keys("mod+K")})`}>
-          {COMMANDS_GLYPH}
-        </button>
-        <button className="top-btn" onClick={() => setUi({ presenting: true })} data-tip="Present (P)">
-          ▶
-        </button>
-        <ServerSwitch where="bar" />
-        <NightOrb onToggle={() => setNight(!isNight())} />
+        {/* the built-in tools (2026-11-17): a terminal, a browser, the files, what changed, and this computer's agents (T3) */}
+        <ToolButtons />
       </div>
     </header>
   );

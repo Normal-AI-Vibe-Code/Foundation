@@ -9,12 +9,12 @@
  * board's recent files and the known apps.
  */
 
-import { SearchGlyph } from "./glyphs";
+import { PinGlyph, SearchGlyph } from "./glyphs";
 import { keys } from "../lib/keys";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SearchHit } from "@foundation/protocol";
 import { api, search } from "../lib/api";
-import { WIDTHS, setUi, toast, useUi } from "../state/ui";
+import { WIDTHS, pinSearch, setUi, toast, useUi } from "../state/ui";
 import { addNote, getState } from "../state/store";
 import { activeBoard } from "../sync/board";
 import { snippetHtml } from "../lib/snippet";
@@ -52,13 +52,27 @@ async function newGridNamed(name: string) {
   }
 }
 
+/** search pinned on the right: a floor pane */
 export function SearchPane() {
   const ui = useUi();
   if (!ui.search || ui.presenting) return null;
-  return <Pane />;
+  return <Pane mode="pinned" />;
 }
 
-function Pane() {
+/**
+ * Search as a window right above the bottom bar's search pill (2026-11-17, Josh: "search should pop up a window
+ * right above it but be able to be pinned to the right"). The bar mounts it inside the pill's slot.
+ */
+export function SearchPop() {
+  const ui = useUi();
+  if (!ui.searchPop || ui.presenting) return null;
+  return <Pane mode="pop" />;
+}
+
+function Pane({ mode }: { mode: "pinned" | "pop" }) {
+  const pop = mode === "pop";
+  const close = () => setUi(pop ? { searchPop: false } : { search: false });
+  const box = useRef<HTMLElement>(null);
   const ui = useUi();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
@@ -67,6 +81,18 @@ function Pane() {
   const [loading, setLoading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const board = activeBoard()?.boardId ?? "company";
+
+  // the window over the bar goes away on a press anywhere else (not the pill that toggles it, nor a pull in progress)
+  useEffect(() => {
+    if (!pop) return;
+    const off = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (box.current?.contains(t) || t?.closest?.("[data-hud-search], .held-card")) return;
+      setUi({ searchPop: false });
+    };
+    window.addEventListener("pointerdown", off, true);
+    return () => window.removeEventListener("pointerdown", off, true);
+  }, [pop]);
 
   useEffect(() => {
     requestAnimationFrame(() => input.current?.focus());
@@ -123,8 +149,8 @@ function Pane() {
   const rest = shown.filter((h) => !images.includes(h));
 
   return (
-    <aside className="search-pane floor-pane" style={{ width: ui.searchW }} aria-label="Search">
-      <FloorEdge side="left" value={ui.searchW} {...WIDTHS.search} onChange={(w) => setUi({ searchW: w })} label="Search" />
+    <aside ref={box} className={pop ? "search-pane search-pop" : "search-pane floor-pane"} style={pop ? undefined : { width: ui.searchW }} aria-label="Search" data-search-mode={mode}>
+      {!pop && <FloorEdge side="left" value={ui.searchW} {...WIDTHS.search} onChange={(w) => setUi({ searchW: w })} label="Search" />}
       <header className="search-head">
         <span className="search-glyph">
           <SearchGlyph />
@@ -135,10 +161,13 @@ function Pane() {
           value={q}
           placeholder="Try “stator”, a file's name, an app, a channel…"
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Escape" && (q ? setQ("") : setUi({ search: false }))}
+          onKeyDown={(e) => e.key === "Escape" && (q ? setQ("") : close())}
         />
         {loading && <span className="thinking-dots"><i /><i /><i /></span>}
-        <button className="top-btn" onClick={() => setUi({ search: false })} title={`Close (${keys("mod+F")})`} aria-label="Close search">
+        <button className={`top-btn${pop ? "" : " is-on"}`} onClick={() => pinSearch(pop)} data-tip={pop ? "Pin to the right" : "Unpin: back over the bar"} aria-label={pop ? "Pin search to the right" : "Unpin search"} aria-pressed={!pop} data-search-pin>
+          <PinGlyph on={!pop} />
+        </button>
+        <button className="top-btn" onClick={close} title={`Close (${keys("mod+F")})`} aria-label="Close search">
           ✕
         </button>
       </header>

@@ -160,8 +160,8 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   await ada.locator("[data-council-open]").click();
   const council = ada.locator(".council");
   await expect(council).toHaveAttribute("data-council", "0");
-  // nobody yet: places to fill, drawn as silhouettes; and nothing to type into
-  await expect(council.locator(".council-ghost")).toHaveCount(4);
+  // nobody yet: three places to fill, drawn as silhouettes; and nothing to type into
+  await expect(council.locator(".council-ghost")).toHaveCount(3);
   await expect(council.locator("input")).toHaveCount(0);
   // it stands on the window's bottom edge, as wide as the open paper; the grid isn't pushed anywhere
   await settle(ada, 700);
@@ -205,8 +205,8 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   await expect(seat).toBeVisible();
   await expect(seat).toHaveClass(/is-idle/);
   await expect(council).toHaveAttribute("data-council", "1");
-  // every place taken or not, there is a silhouette to add another
-  await expect(council.locator(".council-ghost")).toHaveCount(3);
+  // three places: one taken, two silhouettes (once all three are taken, one more silhouette to add another)
+  await expect(council.locator(".council-ghost")).toHaveCount(2);
   // above its head: whose model, that it runs in the cloud, and that it's connected
   await expect(seat.locator('[data-council-where="cloud"]')).toBeVisible();
   await expect(seat.locator("[data-council-offline]")).toHaveCount(0);
@@ -369,7 +369,7 @@ test("#/design shows the council and the agent's pane, day and night", async ({ 
     await expect(demo.locator(".council-seat.is-hot")).toHaveCount(1);
     await expect(demo.locator("[data-council-offline]")).toHaveCount(1);
     await expect(demo.locator(".provider-mark")).not.toHaveCount(0);
-    await expect(demo.locator(".council-ghost")).toHaveCount(2);
+    await expect(demo.locator(".council-ghost")).toHaveCount(1);
     await expect(demo.locator("[data-council-talk]")).toContainText("To all 4");
     await expect(demo.locator(".design-agent-info")).toContainText("ChatGPT");
     await settle(p, 900);

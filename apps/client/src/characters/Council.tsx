@@ -82,8 +82,8 @@ export interface CouncilSeat {
 
 /** how much of a figure shows above the edge it stands behind (px of the grid for a section's, of the screen for the grid's) */
 export const COUNCIL_H = 148;
-/** places shown at least: agents first, the rest silhouettes; always one silhouette more than the agents */
-export const COUNCIL_PLACES = 4;
+/** places shown at least (2026-11-17: three): agents first, the rest silhouettes; once all three are taken, one silhouette more to add another */
+export const COUNCIL_PLACES = 3;
 /** the room a council takes above its edge: the figures and the marks over their heads */
 export const COUNCIL_ROOM = 170;
 

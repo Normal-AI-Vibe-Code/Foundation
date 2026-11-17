@@ -19,6 +19,8 @@ const proxy = {
   "/sync": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
   "/huddle": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
   "/machines": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
+  // the built-in terminal's socket (apps/server/src/hostterm.ts)
+  "/host": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
 };
 
 // Foundation's client. 1430 (Vision's browser edition owns 1420). The server's

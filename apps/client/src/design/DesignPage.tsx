@@ -25,6 +25,9 @@ import type { UpdatePhase } from "../update/updater";
 import { NightOrb } from "../shell/NightOrb";
 import { InfoGlyph } from "../shell/TopBar";
 import { WindowControls } from "../shell/WindowControls";
+import { GearGlyph, MicGlyph, PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
+import { CouncilGlyph } from "../characters/CouncilGlyph";
+import { TOOLS } from "../shell/Tools";
 import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } from "../shell/wireGeometry";
 import { tunnelGeometry } from "../shell/wireGeometry";
 import { AppChip, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
@@ -427,11 +430,14 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
               </span>
             </span>
             <div className="top-tools">
-              <span className="top-btn is-on">⌕</span>
-              <span className="top-btn">{COMMANDS_GLYPH}</span>
-              <span className="top-btn">◇</span>
-              <span className="top-btn">▶</span>
-              <NightOrb onToggle={() => setNight(!isNight())} />
+              {/* 2026-11-17: the top right is the built-in tools; search, the council, commands and present went to the bottom bar */}
+              <div className="tool-buttons">
+                {TOOLS.map((t, i) => (
+                  <span key={t.id} className={`top-btn${i === 0 ? " is-on" : ""}`} data-tip={t.tip}>
+                    {t.glyph}
+                  </span>
+                ))}
+              </div>
             </div>
             <WindowControls demo />
           </header>
@@ -477,6 +483,34 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
                 </div>
               </section>
             </div>
+            {/* the foot (2026-11-17): the server the menu's width above Settings; day and night left of you; edges on the Settings icon's */}
+            <div className="server-switch-place is-bar is-pane">
+              <div className="server-switch">
+                <span className="server-switch-pill">
+                  <i className="server-switch-dot" data-tone="ok" />
+                  <span className="server-switch-addr">localhost:4410</span>
+                  <span className="server-switch-caret">▴</span>
+                </span>
+              </div>
+            </div>
+            <section className="pane-band pane-low">
+              <span className="pane-row pane-place">
+                <span className="pane-glyph">
+                  <GearGlyph />
+                </span>
+                <span className="pane-label">Settings</span>
+              </span>
+            </section>
+            <footer className="pane-foot">
+              <NightOrb onToggle={() => setNight(!isNight())} />
+              <span className="me-avatar" style={{ background: "var(--color-crew-2)" }}>
+                JL
+              </span>
+              <span className="pane-me">
+                <b>Josh Leong</b>
+                <span className="pane-signout">Sign out</span>
+              </span>
+            </footer>
           </aside>
           <section className="session floor-pane" style={{ left: 200, width: 260 }}>
             <div className="plan">
@@ -525,7 +559,45 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
             </div>
           </aside>
         </div>
-        <div className="floor-demo-caption">Side pane · a session (goal, steps; its cards ringed on the grid) · search, dragged from onto the grid</div>
+        <div className="floor-demo-caption">Side pane (its foot: the server, Settings, day and night beside you) · a session (goal, steps; its cards ringed on the grid) · search, dragged from onto the grid · the tools at the top right</div>
+        {/* the bottom bar (2026-11-17): search, talk, the zoom, present and commands, the council beside Ask, Ask's pill with the agents' settings */}
+        <div className="design-hud" data-design-hud>
+          <div className="hud" style={{ position: "relative", inset: "auto", margin: 0 }}>
+            <button className="hud-search f-glass">
+              <span className="hud-glyph">
+                <SearchGlyph size={15} />
+              </span>
+              <span className="hud-label">Search</span>
+              <span className="f-kbd">{keys("mod+F")}</span>
+            </button>
+            <button className="hud-talk f-glass">
+              <MicGlyph size={15} />
+              <span className="f-kbd">Space</span>
+            </button>
+            <button className="hud-zoom f-glass">64%</button>
+            <div className="hud-icons f-glass">
+              <span className="hud-icon">
+                <PresentGlyph size={15} />
+              </span>
+              <span className="hud-icon">
+                <span className="hud-icon-text">{COMMANDS_GLYPH}</span>
+              </span>
+            </div>
+            <button className="hud-icon hud-council f-glass">
+              <CouncilGlyph />
+            </button>
+            <div className="hud-ask-pill f-glass">
+              <button className="hud-ask">
+                <span className="hud-glyph">✦</span>
+                <span className="hud-label">Ask</span>
+              </button>
+              <span className="hud-ask-gear">
+                <SlidersGlyph size={15} />
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="floor-demo-caption">The bottom bar · search opens over its pill (the pin moves it to the right) · when the grid's council stands at the bottom right, the bar steps to the bottom left</div>
       </Section>
 
       <Section title="Chrome on call" note="The grid runs edge to edge. Everything else waits to be called: search is a small pill at the bottom, a card's bar drops in on hover, and an image's icons slide out from behind it.">
@@ -1983,7 +2055,7 @@ function CouncilDemo() {
   ];
   return (
     <div data-design-council>
-      <CouncilView title="Supply" kind="section" seats={seats} ghosts={[undefined, undefined]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline hot="b" />
+      <CouncilView title="Supply" kind="section" seats={seats} ghosts={[undefined]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline hot="b" />
       <div className="design-council-talk agents-pane" style={{ height: 360, display: "flex", flexDirection: "column" }}>
         <CouncilTalkView title="Supply" seats={seats} said={[{ id: 1, at: Date.UTC(2026, 10, 17, 9, 30), text: "Which of the parts are we still short of?", to: seats.map((s) => s.name), all: true }]} viewer={false} onSay={() => {}} onAdd={() => {}} onAbout={() => {}} />
       </div>

@@ -52,9 +52,16 @@ export interface UiState {
   sessionW: number;
   /** text queued into the showing agent session's composer */
   draft: string;
-  /** the search pane on the right */
+  /** the search pane on the right (search pinned there) */
   search: boolean;
   searchW: number;
+  /** search as a window over the bottom bar's search pill (2026-11-17); pinning it moves it to the right pane */
+  searchPop: boolean;
+  /** where ⌘F and the search pill open search: over the bar, or pinned on the right */
+  searchPinned: boolean;
+  /** one of the built-in tools, open in the tool pane on the right (shell/Tools.tsx): it takes the right pane's place */
+  tool: ToolId | null;
+  toolW: number;
   /**
    * the agents pane on the right (it takes search's place, and search takes its): every agent on the
    * board by the section it's in, and who works with whom. `agentsAt`: the section it was opened from, listed first
@@ -74,16 +81,20 @@ export interface UiState {
   role: "admin" | "member" | "viewer";
 }
 
+/** the built-in tools, at the top bar's right end (shell/Tools.tsx) */
+export type ToolId = "terminal" | "browser" | "files" | "changes" | "t3";
+
 export const TOP_BAR = 44;
 export const WIDTHS = {
   pane: { min: 220, max: 420, initial: 272 },
   session: { min: 360, max: 720, initial: 460 },
   search: { min: 300, max: 600, initial: 380 },
   agents: { min: 300, max: 560, initial: 360 },
+  tool: { min: 360, max: 1100, initial: 560 },
 };
 
 const KEY = "foundation-floor";
-type Stored = Pick<UiState, "pane" | "paneW" | "paneView" | "spaces" | "sessions" | "session" | "sessionW" | "search" | "searchW" | "agents" | "agentsW">;
+type Stored = Pick<UiState, "pane" | "paneW" | "paneView" | "spaces" | "sessions" | "session" | "sessionW" | "search" | "searchW" | "agents" | "agentsW" | "searchPinned" | "toolW">;
 
 function stored(): Partial<Stored> & { spacesView?: string } {
   try {
@@ -120,8 +131,12 @@ let ui: UiState = {
   session: null,
   sessionW: clampW(s0.sessionW, WIDTHS.session),
   draft: "",
-  search: s0.search ?? false,
+  search: (s0.search ?? false) && s0.searchPinned === true,
   searchW: clampW(s0.searchW, WIDTHS.search),
+  searchPop: false,
+  searchPinned: s0.searchPinned === true,
+  tool: null,
+  toolW: clampW(s0.toolW, WIDTHS.tool),
   agents: (s0.agents ?? false) && !s0.search,
   agentsW: clampW(s0.agentsW, WIDTHS.agents),
   agentsAt: null,
@@ -146,13 +161,16 @@ export function setUi(patch: Partial<UiState>) {
   ui = { ...ui, ...patch };
   if (patch.session !== undefined && patch.session !== before.session) ui.touched = patch.touched ?? [];
   // one pane on the right: the one just opened takes the other's place
-  if (ui.detail && !before.detail) ui.search = ui.agents = ui.agentInfo = false;
-  else if (ui.agentInfo && !before.agentInfo) ui.search = ui.agents = ui.detail = false;
-  else if (ui.agents && !before.agents) ((ui.search = false), (ui.agentInfo = false), (ui.detail = false));
-  else if (ui.search && !before.search) ui.agents = ui.agentInfo = ui.detail = false;
+  if (ui.detail && !before.detail) ((ui.search = ui.agents = ui.agentInfo = false), (ui.tool = null));
+  else if (ui.agentInfo && !before.agentInfo) ((ui.search = ui.agents = ui.detail = false), (ui.tool = null));
+  else if (ui.agents && !before.agents) ((ui.search = false), (ui.agentInfo = false), (ui.detail = false), (ui.tool = null));
+  else if (ui.search && !before.search) ((ui.agents = ui.agentInfo = ui.detail = false), (ui.tool = null));
+  else if (ui.tool && ui.tool !== before.tool) ui.search = ui.agents = ui.agentInfo = ui.detail = false;
+  // search is in one place at a time: over the bar, or pinned on the right
+  if (ui.search) ui.searchPop = false;
   if (!ui.agents) ui.agentsAt = null;
   // opening a session or search (or widening one) on a narrow screen: the side pane gives way
-  const opened = (ui.session && !before.session) || (ui.search && !before.search) || (ui.agents && !before.agents) || (ui.agentInfo && !before.agentInfo) || ui.sessionW > before.sessionW || ui.searchW > before.searchW || ui.agentsW > before.agentsW;
+  const opened = (ui.session && !before.session) || (ui.search && !before.search) || (ui.agents && !before.agents) || (ui.agentInfo && !before.agentInfo) || (ui.tool && !before.tool) || ui.sessionW > before.sessionW || ui.searchW > before.searchW || ui.agentsW > before.agentsW || ui.toolW > before.toolW;
   if (opened && ui.pane && patch.pane === undefined && typeof window !== "undefined") {
     const f = floorInsets(ui);
     if (window.innerWidth - f.left - f.right < MIN_PAPER) ui.pane = false;
@@ -166,9 +184,9 @@ export function setUi(patch: Partial<UiState>) {
     if (short() > 0 && ui.agents) ui.agents = false;
     if (short() > 0) ui.paneW = Math.max(WIDTHS.pane.min, ui.paneW - short());
   }
-  if ((["pane", "paneW", "paneView", "spacesView", "spaces", "sessions", "session", "sessionW", "search", "searchW", "agents", "agentsW"] as const).some((k) => k in patch)) {
+  if ((["pane", "paneW", "paneView", "spacesView", "spaces", "sessions", "session", "sessionW", "search", "searchW", "agents", "agentsW", "searchPinned", "toolW"] as const).some((k) => k in patch)) {
     try {
-      const keep: Stored & { spacesView: string } = { pane: ui.pane, paneW: ui.paneW, paneView: ui.paneView, spacesView: ui.spacesView, spaces: ui.spaces, sessions: ui.sessions, session: ui.session, sessionW: ui.sessionW, search: ui.search, searchW: ui.searchW, agents: ui.agents, agentsW: ui.agentsW };
+      const keep: Stored & { spacesView: string } = { pane: ui.pane, paneW: ui.paneW, paneView: ui.paneView, spacesView: ui.spacesView, spaces: ui.spaces, sessions: ui.sessions, session: ui.session, sessionW: ui.sessionW, search: ui.search, searchW: ui.searchW, agents: ui.agents, agentsW: ui.agentsW, searchPinned: ui.searchPinned, toolW: ui.toolW };
       localStorage.setItem(KEY, JSON.stringify(keep));
     } catch { /* private window */ }
   }
@@ -196,6 +214,7 @@ export function fitFloor() {
   if (room() < MIN_PAPER && ui.pane) patch.pane = false;
   if (room() - (patch.pane === false ? ui.paneW : 0) < MIN_PAPER && ui.search && ui.session) patch.search = false;
   if (room() - (patch.pane === false ? ui.paneW : 0) < MIN_PAPER && ui.agents && ui.session) patch.agents = false;
+  if (room() - (patch.pane === false ? ui.paneW : 0) < MIN_PAPER && ui.tool && ui.session) patch.tool = null;
   if (Object.keys(patch).length) setUi(patch);
 }
 if (typeof window !== "undefined") {
@@ -207,7 +226,21 @@ if (typeof window !== "undefined") {
 export function floorInsets(u: UiState = ui) {
   if (u.presenting) return { left: 0, top: 0, right: 0, bottom: 0 };
   const session = u.session ? u.sessionW : 0;
-  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR + u.strip + u.councilH, right: u.search ? u.searchW : u.agents || u.agentInfo || u.detail ? u.agentsW : 0, bottom: 0 };
+  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR + u.strip + u.councilH, right: u.search ? u.searchW : u.tool ? u.toolW : u.agents || u.agentInfo || u.detail ? u.agentsW : 0, bottom: 0 };
+}
+
+/** ⌘F and the bar's search pill: search where it was last kept (over the bar, or pinned on the right), or put it away */
+export function toggleSearch() {
+  if (ui.searchPinned) return setUi({ search: !ui.search, searchPop: false });
+  setUi({ searchPop: !ui.searchPop, search: false });
+}
+/** pin search to the right, or bring it back over the bar */
+export function pinSearch(pin: boolean) {
+  setUi(pin ? { searchPinned: true, search: true, searchPop: false } : { searchPinned: false, search: false, searchPop: true });
+}
+/** open a built-in tool in the right pane, or close it if it's the one showing */
+export function toggleTool(id: ToolId) {
+  setUi({ tool: ui.tool === id ? null : id });
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
