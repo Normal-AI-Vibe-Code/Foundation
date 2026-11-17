@@ -31,7 +31,7 @@ export interface AvailableAgent extends Omit<PostedAgent, "by" | "byName" | "at"
 /** whose model a T3 agent is, from how it's driven and what it was added as */
 export function providerOfT3(a: Pick<T3Agent, "driver" | "name" | "added">): string {
   const preset = a.added?.preset?.toLowerCase();
-  if (preset === "kimi" || preset === "deepseek") return preset;
+  if (preset === "kimi" || preset === "deepseek" || preset === "claude") return preset;
   const d = `${a.driver} ${a.name}`.toLowerCase();
   if (d.includes("codex") || d.includes("openai") || d.includes("gpt")) return "chatgpt";
   if (d.includes("antigravity") || d.includes("gemini")) return "gemini";

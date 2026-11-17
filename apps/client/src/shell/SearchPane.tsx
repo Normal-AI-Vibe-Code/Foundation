@@ -9,11 +9,13 @@
  * board's recent files and the known apps.
  */
 
+import { SearchGlyph } from "./glyphs";
 import { keys } from "../lib/keys";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SearchHit } from "@foundation/protocol";
 import { api, search } from "../lib/api";
-import { WIDTHS, setUi, useUi } from "../state/ui";
+import { WIDTHS, setUi, toast, useUi } from "../state/ui";
+import { addNote, getState } from "../state/store";
 import { activeBoard } from "../sync/board";
 import { snippetHtml } from "../lib/snippet";
 import { glyphOf, pictureOf } from "../lib/hits";
@@ -38,6 +40,17 @@ const FILTERS: Array<{ id: Filter; label: string }> = [
   // your Flowform rooms (bring one in as a board) and files (drag out), through your link: FlowformBrowser
   { id: "flowform", label: "Flowform" },
 ];
+
+/** nothing matched: make the thing that was looked for, a grid of that name, opened */
+async function newGridNamed(name: string) {
+  try {
+    const { id } = await api<{ id: string }>("/api/boards", { method: "POST", json: { name, kind: "grid" } });
+    window.dispatchEvent(new Event("foundation:boards"));
+    window.dispatchEvent(new CustomEvent("foundation:board", { detail: id }));
+  } catch (e) {
+    toast((e as Error).message, "bad");
+  }
+}
 
 export function SearchPane() {
   const ui = useUi();
@@ -113,12 +126,14 @@ function Pane() {
     <aside className="search-pane floor-pane" style={{ width: ui.searchW }} aria-label="Search">
       <FloorEdge side="left" value={ui.searchW} {...WIDTHS.search} onChange={(w) => setUi({ searchW: w })} label="Search" />
       <header className="search-head">
-        <span className="search-glyph">⌕</span>
+        <span className="search-glyph">
+          <SearchGlyph />
+        </span>
         <input
           ref={input}
           className="search-field"
           value={q}
-          placeholder="Search the board, files, apps, Slack, Flowform…"
+          placeholder="Try “stator”, a file's name, an app, a channel…"
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && (q ? setQ("") : setUi({ search: false }))}
         />
@@ -139,7 +154,23 @@ function Pane() {
       {filter === "flowform" && <FlowformBrowser filter={q} />}
       <div className="search-results" hidden={filter === "place" || filter === "flowform"}>
         {!q.trim() && shown.length > 0 && <div className="pane-eyebrow">Recent on this board</div>}
-        {q.trim() && !loading && shown.length === 0 && <div className="pane-empty">Nothing for “{q.trim()}”{filter !== "all" ? ` in ${FILTERS.find((f) => f.id === filter)?.label}` : ""}.</div>}
+        {q.trim() && !loading && shown.length === 0 && (
+          <div className="pane-empty is-create" data-search-empty>
+            <span>
+              Nothing for “{q.trim()}”{filter !== "all" ? ` in ${FILTERS.find((f) => f.id === filter)?.label}` : ""}.
+            </span>
+            {ui.role !== "viewer" && (
+              <span className="pane-empty-acts">
+                <button className="f-pill is-accent" onClick={() => void newGridNamed(q.trim())}>
+                  New grid “{q.trim().slice(0, 24)}”
+                </button>
+                <button className="f-pill" onClick={() => void addNote(getState().activeSectionId)}>
+                  New note here
+                </button>
+              </span>
+            )}
+          </div>
+        )}
         {images.length > 0 && (
           <div className="search-tiles">
             {images.map((h) => (

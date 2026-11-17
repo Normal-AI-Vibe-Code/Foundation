@@ -13,6 +13,7 @@
  * opened from the grid's tab.
  */
 
+import { GearGlyph, PlusGlyph } from "./glyphs";
 import { ShibaDot, useNotices } from "../today/notices";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -114,7 +115,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
       <div key={b.id} className="grid-node">
         <div
           className={`space-row${b.id === current && place.kind === "grid" ? " is-current" : ""}${drag === b.id ? " is-dragging" : ""}${over === b.id ? " is-over" : ""}`}
-          style={{ paddingLeft: depth * 14 }}
+          style={{ ["--depth" as string]: depth } as React.CSSProperties}
           data-space-drop={b.id}
           data-space-name={b.name}
           data-space-kind={kind}
@@ -162,39 +163,48 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
     <AnimatePresence initial={false}>
       {ui.pane && (
         <motion.aside key="pane" className="side-pane floor-pane" style={{ width: ui.paneW }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -16 }} transition={paneSpring} aria-label="Foundation menu">
+          {/* Today: a small section of its own, lined off */}
+          <section className="pane-band">
+            <button className={`pane-row pane-place pane-today${place.kind === "today" ? " is-current" : ""}`} onClick={goToday} data-place="today" data-tip={notices.words}>
+              <ShibaDot />
+              <span className="pane-label">Today</span>
+              {notices.total > 0 && (
+                <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
+                  {notices.total > 99 ? "99+" : notices.total}
+                </span>
+              )}
+            </button>
+          </section>
+
+          {/* how the grids are listed, at the top of them; the rows start at the selector's own left edge */}
+          <div className="pane-pick">
+            <div className="pane-seg" role="tablist" aria-label="How grids are listed">
+              {(["recent", "all"] as const).map((v) => (
+                <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${v === "all" && over === "top" ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} {...(v === "all" ? dropProps(null) : {})}>
+                  {v === "recent" ? "Recent" : "All Grids"}
+                </button>
+              ))}
+            </div>
+            {!viewer && (
+              <button className="pane-new" onClick={() => onNew("grid")} aria-label="New grid" data-tip="New grid">
+                <PlusGlyph />
+              </button>
+            )}
+          </div>
+
           <div className="pane-scroll">
             <section className="pane-group">
-              <button className={`pane-row pane-place pane-today${place.kind === "today" ? " is-current" : ""}`} onClick={goToday} data-place="today" data-tip={notices.words}>
-                <ShibaDot />
-                <span className="pane-label">Today</span>
-                {notices.total > 0 && (
-                  <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
-                    {notices.total > 99 ? "99+" : notices.total}
-                  </span>
-                )}
-              </button>
-            </section>
-
-            <section className="pane-group">
-              <div className="pane-eyebrow">
-                Grids
-                {!viewer && (
-                  <span className="pane-eyebrow-acts">
-                    <button className="pane-eyebrow-act" onClick={() => onNew("grid")} aria-label="New grid" data-tip="New grid">
-                      ＋
-                    </button>
-                  </span>
-                )}
-              </div>
-              <div className="pane-seg" role="tablist" aria-label="How grids are listed">
-                {(["recent", "all"] as const).map((v) => (
-                  <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${v === "all" && over === "top" ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} {...(v === "all" ? dropProps(null) : {})}>
-                    {v === "recent" ? "Recent" : "All Grids"}
-                  </button>
-                ))}
-              </div>
               {ui.spacesView === "recent" ? recent.map((b) => row(b, 0, false)) : childrenOf(null, listed).map((b) => row(b, 0, true))}
-              {listed.length === 0 && <div className="pane-empty">No grids yet. ＋ above makes one.</div>}
+              {listed.length === 0 && (
+                <div className="pane-empty is-create">
+                  <span>No grids yet.</span>
+                  {!viewer && (
+                    <button className="f-pill is-accent" onClick={() => onNew("grid")}>
+                      New grid
+                    </button>
+                  )}
+                </div>
+              )}
               {drag && parentOf(boards.find((b) => b.id === drag)!, listed) && (
                 <div className={`grid-top-drop${over === "top" ? " is-over" : ""}`} {...dropProps(null)}>
                   Drop here to bring it to the top
@@ -203,9 +213,11 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             </section>
           </div>
 
-          <section className="pane-group pane-low">
+          <section className="pane-band pane-low">
             <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
-              <span className="pane-glyph">⚙</span>
+              <span className="pane-glyph">
+                <GearGlyph />
+              </span>
               <span className="pane-label">Settings</span>
             </button>
           </section>

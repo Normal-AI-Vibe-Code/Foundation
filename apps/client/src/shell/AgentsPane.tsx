@@ -27,6 +27,7 @@
  * DeepSeek, to either group.
  */
 
+import { CouncilTalk } from "./CouncilTalk";
 import { AddAgent } from "./AddAgent";
 import { BackgroundTasks } from "./BackgroundTasks";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -113,9 +114,9 @@ export function AgentsPane() {
   );
   const tabs = (
     <nav className="agents-tabs" role="tablist" aria-label="The agents panel">
-      {(["agents", "add", "tasks"] as const).map((t) => (
+      {(["council", "agents", "add", "tasks"] as const).map((t) => (
         <button key={t} type="button" role="tab" aria-selected={ui.agentsTab === t} className={`agents-tab${ui.agentsTab === t ? " is-on" : ""}`} data-agents-tab={t} onClick={() => setUi({ agentsTab: t })}>
-          {t === "agents" ? "At work" : t === "add" ? "＋ Add an agent" : "Background"}
+          {t === "council" ? "Council" : t === "agents" ? "At work" : t === "add" ? "＋ Add" : "Background"}
         </button>
       ))}
       <button className="top-btn" onClick={() => setUi({ agents: false })} aria-label="Close the agents panel" data-tip="Close">
@@ -128,7 +129,7 @@ export function AgentsPane() {
       <aside className="agents-pane floor-pane" style={{ width: ui.agentsW }} aria-label="Agents" data-agents-pane={ui.agentsTab}>
         <FloorEdge side="left" value={ui.agentsW} {...WIDTHS.agents} onChange={(w) => setUi({ agentsW: w })} label="Agents" />
         {tabs}
-        <div className="agents-scroll">{ui.agentsTab === "add" ? <AddAgent onDone={() => setUi({ agentsTab: "agents", agents: false })} /> : <BackgroundTasks />}</div>
+        {ui.agentsTab === "council" ? <CouncilTalk viewer={ui.role === "viewer"} /> : <div className="agents-scroll">{ui.agentsTab === "add" ? <AddAgent onDone={() => setUi({ agentsTab: "council" })} /> : <BackgroundTasks />}</div>}
       </aside>
     );
   return (
@@ -398,7 +399,7 @@ const hostOf = (url: string) => {
 };
 
 /** adding Kimi or DeepSeek: which, and where it runs (the cloud with a key, or a model server on this computer) */
-export function T3AddForm({ presets, local, start, busy, error, onWhere, onAdd, onCancel }: { presets: Record<string, T3Preset>; local: T3Local | null; start?: { preset?: string; where?: "cloud" | "local" }; busy?: boolean; error?: string | null; onWhere?: (where: "cloud" | "local", baseUrl: string) => void; onAdd?: (input: T3AddInput) => void; onCancel?: () => void }) {
+export function T3AddForm({ presets, local, start, only, busy, error, onWhere, onAdd, onCancel }: { presets: Record<string, T3Preset>; local: T3Local | null; start?: { preset?: string; where?: "cloud" | "local" }; /** the agent and where it runs are already settled (the guided steps): no pickers */ only?: boolean; busy?: boolean; error?: string | null; onWhere?: (where: "cloud" | "local", baseUrl: string) => void; onAdd?: (input: T3AddInput) => void; onCancel?: () => void }) {
   const names = Object.keys(presets);
   const [preset, setPreset] = useState(start?.preset ?? names[0] ?? "");
   const [where, setWhere] = useState<"cloud" | "local">(start?.where ?? "cloud");
@@ -425,7 +426,7 @@ export function T3AddForm({ presets, local, start, busy, error, onWhere, onAdd, 
       }}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <div className="t3-add-row">
+      <div className="t3-add-row" hidden={only}>
         <div className="pane-seg" role="tablist" aria-label="Which agent">
           {names.map((p) => (
             <button type="button" key={p} role="tab" aria-selected={preset === p} className={`pane-seg-btn${preset === p ? " is-on" : ""}`} onClick={() => pick(p, where)}>

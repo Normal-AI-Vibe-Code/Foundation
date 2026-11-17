@@ -268,7 +268,7 @@ export function Today({ user }: { user: UserInfo }) {
   const rich = !!last && last.status !== "error" && !!last.answer && t.heard === null;
 
   return (
-    <div ref={room} className={`today${narrow ? " is-narrow" : ""}`} data-mood={t.mood} style={{ left: insets.left, top: insets.top, right: insets.right }}>
+    <div ref={room} className={`today${narrow ? " is-narrow" : ""}`} data-mood={t.mood} style={{ paddingLeft: insets.left, paddingTop: insets.top, paddingRight: insets.right }}>
       <ShibaRoom mood={t.mood} levels={wordsLevel} />
       <div className="today-veil" aria-hidden />
 

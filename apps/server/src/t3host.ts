@@ -571,6 +571,9 @@ export async function t3OpenLink(threadId?: string): Promise<string> {
  *        model that's been pulled there. No key, nothing leaves the computer.
  */
 export const T3_PRESETS: Record<string, { name: string; cloud: { baseUrl: string; model: string }; local: { baseUrl: string; model: string } }> = {
+  // Claude on a person's own API key (2026-11-17): Anthropic's endpoint, cloud only. Beside it, T3's own
+  // Claude agent is the one signed in with an account.
+  claude: { name: "Claude (API key)", cloud: { baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
   kimi: { name: "Kimi", cloud: { baseUrl: "https://api.moonshot.ai/anthropic", model: "kimi-k3" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
   deepseek: { name: "DeepSeek", cloud: { baseUrl: "https://api.deepseek.com/anthropic", model: "deepseek-v4-pro" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
 };
@@ -601,6 +604,7 @@ export async function addT3Agent(input: AddAgentInput): Promise<T3Agent[]> {
   const preset = T3_PRESETS[input.preset];
   if (!preset) throw new Error(`No such agent to add: ${input.preset}. Known: ${Object.keys(T3_PRESETS).join(", ")}.`);
   if (input.where !== "cloud" && input.where !== "local") throw new Error("Say where it runs: cloud or local.");
+  if (input.preset === "claude" && input.where === "local") throw new Error("Claude runs in the cloud: add it with an API key, or sign in with an account.");
   const d = preset[input.where];
   const base = (input.baseUrl ?? d.baseUrl).trim().replace(/\/+$/, "");
   if (!/^https?:\/\//i.test(base)) throw new Error("The address must start with http:// or https://.");
@@ -626,9 +630,10 @@ export async function addT3Agent(input: AddAgentInput): Promise<T3Agent[]> {
     enabled: true,
     environment: [
       { name: "ANTHROPIC_BASE_URL", value: base, sensitive: false },
-      // local servers take any token; a cloud key is T3's to keep, marked sensitive
-      { name: "ANTHROPIC_AUTH_TOKEN", value: input.where === "local" ? "local" : key, sensitive: input.where === "cloud" },
-      { name: "ANTHROPIC_API_KEY", value: "", sensitive: false },
+      // local servers take any token; a cloud key is T3's to keep, marked sensitive. Anthropic's own endpoint
+      // takes its key as an API key (x-api-key), the others as a bearer token
+      { name: "ANTHROPIC_AUTH_TOKEN", value: input.where === "local" ? "local" : input.preset === "claude" ? "" : key, sensitive: input.where === "cloud" && input.preset !== "claude" },
+      { name: "ANTHROPIC_API_KEY", value: input.preset === "claude" ? key : "", sensitive: input.preset === "claude" },
       { name: "ANTHROPIC_MODEL", value: model, sensitive: false },
     ],
     config: { homePath: home, customModels: [{ slug: model, name: `${preset.name} · ${model}` }], launchArgs: BOARD_TOOL_ARGS },

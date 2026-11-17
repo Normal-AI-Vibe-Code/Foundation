@@ -64,3 +64,32 @@ export function useCouncilOpen(): CouncilScope | null {
     () => open,
   );
 }
+
+// ---- what was said to a council (this window's; the agents panel's Council tab shows it)
+
+export interface Said {
+  id: number;
+  at: number;
+  text: string;
+  /** who it went to, by name */
+  to: string[];
+  all: boolean;
+  /** "board" or the section's id */
+  place: string;
+}
+let said: Said[] = [];
+let saidN = 0;
+export const placeOf = (scope: CouncilScope) => (scope.kind === "board" ? "board" : scope.id);
+export function logSaid(scope: CouncilScope, text: string, to: string[], all: boolean) {
+  said = [...said.slice(-199), { id: ++saidN, at: Date.now(), text, to, all, place: placeOf(scope) }];
+  emit();
+}
+export function useSaid(): Said[] {
+  return useSyncExternalStore(
+    (fn) => {
+      subs.add(fn);
+      return () => subs.delete(fn);
+    },
+    () => said,
+  );
+}

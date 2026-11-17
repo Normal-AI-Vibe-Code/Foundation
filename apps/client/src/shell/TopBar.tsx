@@ -14,6 +14,9 @@
  * (shell/WindowControls.tsx), all on the one line.
  */
 
+import { GearGlyph, SearchGlyph } from "./glyphs";
+import { goToday } from "../lib/place";
+import { ShibaDot } from "../today/notices";
 import { toggleCouncil, useCouncilOpen } from "../lib/councilOpen";
 import { useEffect, useRef, useState } from "react";
 import { COMMANDS_GLYPH, keys } from "../lib/keys";
@@ -67,21 +70,27 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
 
   return (
     <header className="top-bar">
-      <button
-        className={`top-btn pane-fold${spacesOpen ? " is-on" : ""}`}
-        onClick={() => setUi(spacesOpen ? { pane: false } : { pane: true, paneView: "spaces" })}
-        data-tip={spacesOpen ? "Fold the side menu" : "The side menu: Today, your grids, Settings"}
-        data-kbd={keys("mod+\\")}
-      >
-        <PaneGlyph />
-      </button>
+      {/* over the side menu: its fold and the way to Today. The tabs start where the menu ends */}
+      <div className="top-left" style={ui.pane ? { width: Math.max(0, ui.paneW - 16) } : undefined}>
+        <button
+          className={`top-btn pane-fold${spacesOpen ? " is-on" : ""}`}
+          onClick={() => setUi(spacesOpen ? { pane: false } : { pane: true, paneView: "spaces" })}
+          data-tip={spacesOpen ? "Fold the side menu" : "The side menu: Today, your grids, Settings"}
+          data-kbd={keys("mod+\\")}
+        >
+          <PaneGlyph />
+        </button>
+        <button className={`top-today${place.kind === "today" ? " is-on" : ""}`} onClick={goToday} data-tip="Today: the Shiba, your todos, the apps" data-top-today>
+          <ShibaDot size={16} />
+          Today
+        </button>
+      </div>
       <nav className="tabs" aria-label="Open grids">
-        {place.kind !== "grid" && (
-          <div className="tab is-space is-place is-current" data-place-tab={place.kind}>
-            <span className="tab-main">
-              <span className={`tab-glyph${place.kind === "today" ? " is-agent" : ""}`}>{place.kind === "today" ? "◌" : "⚙"}</span>
-              <span className="tab-title">{place.kind === "today" ? "Today" : "Settings"}</span>
-            </span>
+        {/* a place that isn't a grid has no tab of its own: Settings shows as a pill while you're there (it's passing, not open work) */}
+        {place.kind === "settings" && (
+          <div className="tab-pill" data-place-tab="settings">
+            <GearGlyph size={14} />
+            Settings
           </div>
         )}
         <AnimatePresence initial={false}>
@@ -199,8 +208,8 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
 
       <div className="top-tools">
         {place.kind === "grid" && <PresenceStack />}
-        <button className={`top-btn${ui.search ? " is-on" : ""}`} onClick={() => setUi({ search: !ui.search })} data-tip={`Search, drag onto the grid (${keys("mod+F")})`}>
-          ⌕
+        <button className={`top-btn${ui.search ? " is-on" : ""}`} onClick={() => setUi({ search: !ui.search })} aria-label="Search" data-tip={`Search, drag onto the grid (${keys("mod+F")})`}>
+          <SearchGlyph />
         </button>
         <button className={`top-btn is-agent${council?.kind === "board" ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-label="Council" data-tip="Council: this grid's agents, as characters. Talk to them, add more" data-council-open>
           <CouncilGlyph />

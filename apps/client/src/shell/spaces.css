@@ -643,3 +643,256 @@
   border-color: var(--color-agent);
   color: var(--color-on-fill);
 }
+
+/* ====================== 2026-11-17: the side menu, the tabs and search, redrawn ====================== */
+
+/* ---- the side menu: sections lined off edge to edge, rows the full width, hover and selected told apart ---- */
+
+.side-pane .pane-band {
+  flex: none;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+.side-pane .pane-band.pane-low {
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+.side-pane .pane-pick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+}
+.side-pane .pane-pick .pane-seg {
+  flex: 1;
+  margin: 0;
+}
+.pane-new {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.pane-new:hover {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.side-pane .pane-scroll {
+  padding: 0 0 var(--space-4);
+}
+.side-pane .pane-scroll .pane-group {
+  padding: 0;
+  gap: 0;
+}
+/* a row: the pane's whole width and 34 px, text starting at the selector's left edge */
+.side-pane .pane-row {
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--space-4);
+  border-radius: 0;
+}
+.side-pane .space-row {
+  gap: 0;
+  padding-left: 0;
+}
+.side-pane .space-row .space-open {
+  padding-left: calc(var(--space-4) + var(--depth, 0) * 16px);
+}
+.side-pane .space-row:has(.grid-caret) .space-open {
+  padding-left: var(--space-2);
+}
+.side-pane .grid-caret {
+  margin: 0 0 0 calc(var(--space-4) - 4px + var(--depth, 0) * 16px);
+  height: 34px;
+}
+.side-pane .grid-caret.is-none {
+  display: none;
+}
+/* hover: a quiet ink wash, the full row */
+.side-pane .pane-row:hover,
+.side-pane .space-row:hover .space-open {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+/* selected: the accent's tint and a 2 px bar at the pane's edge. Never the same as hover */
+.side-pane .space-row.is-current .space-open,
+.side-pane .pane-place.is-current {
+  background: var(--color-pulse-dim);
+  box-shadow: inset 2px 0 0 var(--color-pulse);
+  color: var(--color-frost);
+}
+.side-pane .space-row.is-current .space-open:hover,
+.side-pane .pane-place.is-current:hover {
+  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+}
+.side-pane .space-row .space-move {
+  position: absolute;
+  right: var(--space-3);
+}
+/* Today: no longer a pill; a row in its own lined-off section */
+.side-pane .pane-today {
+  width: 100%;
+  margin: 0;
+  height: 36px;
+  padding: 0 var(--space-4);
+  border-radius: 0;
+  box-shadow: none;
+}
+.side-pane .pane-today.is-current {
+  box-shadow: inset 2px 0 0 var(--color-agent);
+  background: var(--color-agent-dim);
+}
+.side-pane .pane-foot {
+  border-top: 0;
+}
+.pane-empty.is-create {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.pane-empty-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- the top bar: the menu's fold and Today over the menu; tabs from the menu's edge, drawn as tabs ---- */
+
+.top-left {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.top-today {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.top-today:hover {
+  color: var(--color-frost);
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.top-today.is-on {
+  color: var(--color-frost);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 55%, var(--color-line-strong));
+  background: var(--color-agent-dim);
+}
+/* a place you're passing through (Settings): a pill, fully outlined, with room around it */
+.tab-pill {
+  flex: none;
+  align-self: center;
+  height: 28px;
+  margin: 0 var(--space-4) 0 var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1 var(--font-sans);
+}
+/* the grids' tabs: lines, not cards. A hairline between neighbours; the open one has sides and a top and
+   no foot, so it opens into the grid below it (it covers the bar's own hairline for its width) */
+.top-bar .tabs {
+  align-self: stretch;
+  align-items: flex-end;
+  gap: 0;
+}
+.top-bar .tab.is-space {
+  position: relative;
+  height: 36px;
+  margin-bottom: -1px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius-pane) var(--radius-pane) 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+.top-bar .tab.is-space + .tab.is-space::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 10px;
+  bottom: 9px;
+  width: 1px;
+  background: var(--color-line);
+}
+.top-bar .tab.is-space.is-current {
+  border-color: var(--color-line-strong);
+  background: var(--color-void);
+  color: var(--color-frost);
+}
+.top-bar .tab.is-space.is-current::before,
+.top-bar .tab.is-space.is-current + .tab.is-space::before {
+  display: none;
+}
+/* the foot it doesn't have: the bar's hairline stops under the open tab */
+.top-bar .tab.is-space.is-current::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-void);
+}
+.top-bar .tab.is-space:not(.is-current):hover {
+  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+}
+.top-bar .tab-new-wrap {
+  margin-left: var(--space-2);
+}
+
+/* ---- search: a line with the icon and a suggestion, not a box; chips with an outline ---- */
+
+.search-pane .search-head {
+  margin: var(--space-2) 0 0;
+  padding: 0 var(--space-3) 0 var(--space-5);
+  height: 44px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  border-bottom: 1px solid var(--color-line);
+}
+.search-pane .search-head:focus-within {
+  box-shadow: none;
+  border-bottom-color: var(--color-pulse);
+}
+.search-pane .search-glyph {
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-mist);
+}
+.search-pane .search-filters {
+  padding: var(--space-4) var(--space-4) var(--space-3) var(--space-5);
+}
+.search-pane .search-chip {
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.search-pane .search-chip.is-on {
+  box-shadow: none;
+}
+/* the bottom bar's search pill: its key chip keeps clear of the pill's rounded end */
+.hud-search {
+  padding-right: var(--space-4);
+}

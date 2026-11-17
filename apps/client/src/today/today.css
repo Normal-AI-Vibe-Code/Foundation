@@ -973,3 +973,43 @@ a.today-chip:active {
   --ink-soft: color-mix(in srgb, var(--color-over-room) 84%, transparent);
   color: var(--color-over-room);
 }
+
+/* ---------- 2026-11-17: Today is a special app: the Shiba is behind every panel, and the panels go clear and white ---------- */
+
+/* the room is the whole window; the words and the Today panel keep to the open paper by padding (Today.tsx) */
+.today {
+  inset: 0;
+  box-sizing: border-box;
+}
+.today .shiba-room,
+.today .today-veil {
+  position: absolute;
+  inset: 0;
+}
+/* the floor's panes over it: no fill of their own, white type, white hairlines */
+.shell.is-place-today :is(.top-bar, .floor-pane) {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 62%, transparent);
+  --color-moss: color-mix(in srgb, var(--color-over-room) 74%, transparent);
+  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+  --color-raise: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  --color-abyss: color-mix(in srgb, var(--color-over-room) 8%, transparent);
+  --color-void: transparent;
+  --color-line: color-mix(in srgb, var(--color-over-room) 24%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-over-room) 44%, transparent);
+  --color-pulse: var(--color-over-room);
+  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  --color-agent: var(--color-over-room);
+  --color-agent-dim: color-mix(in srgb, var(--color-over-room) 18%, transparent);
+  --color-on-fill: var(--color-room-shade);
+  --shadow-sheet: none;
+  background: transparent;
+  color: var(--color-over-room);
+}
+.shell.is-place-today .side-pane .me-avatar {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-over-room) 60%, transparent);
+}
+.shell.is-place-today .server-switch-lift {
+  --color-frost: initial;
+}

@@ -1065,3 +1065,149 @@ body.is-connecting .sec-crew,
   display: inline-flex;
   gap: var(--space-1);
 }
+
+/* ---------- adding an agent: the ways of connecting it, each with steps that tick off (2026-11-17) ---------- */
+
+.add-way {
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.add-way.is-on {
+  box-shadow: inset 0 0 0 1px var(--color-agent);
+  background: color-mix(in srgb, var(--color-agent) 4%, transparent);
+}
+.add-way-head {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.add-way-radio {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--color-line-strong);
+}
+.add-way.is-on .add-way-radio {
+  box-shadow:
+    inset 0 0 0 1.5px var(--color-agent),
+    inset 0 0 0 4px var(--color-raise),
+    inset 0 0 0 8px var(--color-agent);
+}
+.add-way-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  color: var(--color-mist);
+}
+.add-way-text b {
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+  color: var(--color-frost);
+}
+.add-way-body {
+  padding: 0 var(--space-4) var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.way-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.way-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+}
+.way-step-n {
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+}
+.way-step.is-now .way-step-n {
+  background: var(--color-agent);
+  box-shadow: none;
+  color: var(--color-void);
+}
+.way-step.is-done .way-step-n {
+  background: color-mix(in srgb, var(--color-ok) 16%, transparent);
+  box-shadow: none;
+  color: var(--color-ok);
+}
+.way-step.is-wait {
+  opacity: 0.5;
+}
+.way-step-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  color: var(--color-mist);
+}
+.way-step-body > b {
+  font: 600 var(--text-13) / 20px var(--font-sans);
+  color: var(--color-frost);
+}
+.way-step.is-done .way-step-body > b {
+  font-weight: 500;
+  color: var(--color-mist);
+}
+.way-step-body p {
+  margin: 0;
+}
+.way-step-body .t3-add {
+  align-self: stretch;
+}
+.way-fine {
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.way-acts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.add-cmd {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  cursor: pointer;
+}
+.add-cmd code {
+  font: 500 var(--text-12) / 1.4 var(--font-mono, ui-monospace, monospace);
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.add-cmd span {
+  color: var(--color-dim);
+}
+.add-cmd:hover span {
+  color: var(--color-pulse);
+}

@@ -4,6 +4,7 @@
  * from the real tokens so it can't drift. New UI behaviour lands here first.
  */
 
+import { CouncilTalkView } from "../shell/CouncilTalk";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
 import { ShibaDot } from "../today/notices";
@@ -1947,19 +1948,14 @@ function CouncilDemo() {
     { id: "a", name: "Wren", agentName: "Claude", agentKey: "claude", provider: "claude", where: "cloud", service: "Claude Code on the server, on its Claude subscription", tools: true, place: "sec", postedBy: "Ada", hue: 0, status: "working", doing: "adding a table of parts", task: "Make a Supply section with the parts and hook up FactoryForm", askerName: "Ada", mine: true, mood: "working" },
     { id: "b", name: "Codex", agentName: "Codex", agentKey: "t3:codex", provider: "chatgpt", where: "cloud", service: "ChatGPT Plus, signed in on this computer", tools: true, place: "sec", postedBy: "Ada", hue: 2, status: "idle", mood: "idle" },
     { id: "c", name: "Kimi", agentName: "Kimi", agentKey: "t3:kimi", provider: "kimi", where: "local", service: "a model server on this computer (127.0.0.1:11434)", model: "kimi-k3", tools: true, place: "sec", postedBy: "Kai", hue: 3, status: "done", mood: "happy" },
-    { id: "d", name: "DeepSeek", agentName: "DeepSeek", agentKey: "t3:deepseek", provider: "deepseek", where: "cloud", service: "api.deepseek.com, on your key", tools: false, place: "sec", postedBy: "Kai", hue: 1, status: "error", mood: "sad" },
+    { id: "d", name: "DeepSeek", agentName: "DeepSeek", agentKey: "t3:deepseek", provider: "deepseek", where: "cloud", service: "api.deepseek.com, on your key", tools: false, place: "sec", postedBy: "Kai", hue: 1, status: "idle", mood: "sad", offline: true, why: "its key was turned down" },
   ];
-  const available = {
-    t3: "running",
-    agents: [
-      { key: "claude", name: "Claude", provider: "claude", where: "cloud" as const, service: "Claude Code on the server, on its Claude subscription", tools: true, ready: true },
-      { key: "t3:gemini", name: "Gemini", provider: "gemini", where: "cloud" as const, service: "signed in on this computer", tools: true, ready: true },
-      { key: "t3:grok", name: "Grok", provider: "grok", where: "cloud" as const, service: "signed in on this computer", tools: false, ready: false, why: "needs signing in on this computer" },
-    ],
-  };
   return (
     <div data-design-council>
-      <CouncilView title="Supply" seats={seats} selected={["b"]} canAsk available={available} onSelect={() => {}} onSay={() => {}} onAddOpen={() => {}} onAdd={() => {}} onDetails={() => {}} detailsOpen inline adding />
+      <CouncilView title="Supply" kind="section" seats={seats} ghosts={[undefined, undefined]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline hot="b" />
+      <div className="design-council-talk agents-pane" style={{ height: 360, display: "flex", flexDirection: "column" }}>
+        <CouncilTalkView title="Supply" seats={seats} said={[{ id: 1, at: Date.UTC(2026, 10, 17, 9, 30), text: "Which of the parts are we still short of?", to: seats.map((s) => s.name), all: true }]} viewer={false} onSay={() => {}} onAdd={() => {}} onAbout={() => {}} />
+      </div>
       <div className="design-agent-info agents-pane agent-info">
         <header className="agents-head">
           Codex <span className="agents-head-n">at rest</span>

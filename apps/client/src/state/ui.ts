@@ -63,7 +63,7 @@ export interface UiState {
   agentsW: number;
   agentsAt: string | null;
   /** which face of the agents panel shows: who's at work, adding one, or what runs in the background */
-  agentsTab: "agents" | "add" | "tasks";
+  agentsTab: "council" | "agents" | "add" | "tasks";
   /** an agent's own pane on the right (characters/AgentInfo.tsx), opened from a council; it takes the agents pane's place and width */
   agentInfo: boolean;
   /** something a conversation folded away, open on the right (shell/DetailPane.tsx); it shares the agents pane's place and width */

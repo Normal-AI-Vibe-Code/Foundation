@@ -23,15 +23,23 @@ test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps
   await expect(page.locator(".top-bar")).toBeVisible();
   await expect(page.locator(".side-pane")).toBeVisible();
   await expect(page.locator('.side-pane [data-place="today"]')).toHaveClass(/is-current/);
-  await expect(page.locator(".top-bar [data-place-tab=today]")).toBeVisible();
+  await expect(page.locator(".top-bar [data-top-today]")).toHaveClass(/is-on/);
   await expect(page.locator(".side-pane .pane-seg-btn")).toHaveText(["Recent", "All Grids"]);
   await expect(page.locator(".today-line")).toContainText("Tess");
   await expect(page.locator(".shiba-room")).toBeVisible();
-  // the room starts where the side menu ends
+  // the room is the whole window, behind every panel; the side menu and the top bar are clear over it, in white
   const pane = (await page.locator(".side-pane").boundingBox())!;
   const room = (await page.locator(".today").boundingBox())!;
-  expect(Math.abs(room.x - (pane.x + pane.width))).toBeLessThan(2);
-  expect(room.y).toBe(44);
+  expect(room.x).toBe(0);
+  expect(room.y).toBe(0);
+  expect(room.width).toBeGreaterThan(pane.width + 600);
+  const chrome = await page.evaluate(() => {
+    const bg = (sel: string) => getComputedStyle(document.querySelector(sel)!).backgroundColor;
+    const ink = getComputedStyle(document.querySelector(".side-pane .pane-label")!).color.match(/\d+/g)!.map(Number);
+    return { pane: bg(".side-pane"), ink };
+  });
+  expect(chrome.pane).toMatch(/rgba\(.*, 0\)|transparent/);
+  expect(Math.min(...chrome.ink.slice(0, 3))).toBeGreaterThan(215);
 
   // the Today panel: no card, white type over the room
   const panel = page.locator(".today-state");

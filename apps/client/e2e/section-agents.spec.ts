@@ -135,7 +135,7 @@ test("a text box is written as formatted text and kept as the note's markdown; t
   await kai.screenshot({ path: `${SHOTS}/02_kai-text-box-at-rest.png` });
 });
 
-test("the chip opens the section's council as a band at its top; a line from there brings an agent in, for everyone", async () => {
+test("the chip brings the section's council up on its top edge; a line to all from there brings an agent in, for everyone", async () => {
   const chip = (p: Page) => p.locator(`.section-card[data-section-id="${section.id}"] .sec-agents-chip`);
   // the tools take the corner under the pointer, so the mark at rest is pressed from elsewhere
   await ada.mouse.move(700, 880);
@@ -143,7 +143,7 @@ test("the chip opens the section's council as a band at its top; a line from the
   await chip(ada).dispatchEvent("click");
   const council = ada.locator(".council-place.is-section .council");
   await expect(council).toBeVisible();
-  await expect(council.locator(".council-title")).toContainText(section.name);
+  await expect(council).toHaveAttribute("aria-label", `Council of ${section.name}`);
   await expect(council).toHaveAttribute("data-council", "0");
   // it stands inside the window, over the section, under the top bar
   await settle(ada, 700);
@@ -151,18 +151,19 @@ test("the chip opens the section's council as a band at its top; a line from the
   const sec = (await card.boundingBox())!;
   const band = (await card.locator(".council-place.is-section").boundingBox())!;
   const head = (await card.locator(".section-header").boundingBox())!;
-  // a band at the section's top, inside it; the header is pushed down under it
+  // on the section's top edge, over what's above it; the header stays where it was
   expect(Math.abs(band.x - sec.x)).toBeLessThan(3);
-  expect(Math.abs(band.y - sec.y)).toBeLessThan(3);
-  expect(head.y).toBeGreaterThanOrEqual(band.y + band.height - 2);
+  expect(Math.abs(band.y + band.height - sec.y)).toBeLessThan(3);
+  expect(head.y - sec.y).toBeLessThan(6);
   await ada.screenshot({ path: `${SHOTS}/03_council-nobody-here.png` });
 
-  await council.locator(".council-ask-text").fill("make a table of the parts, and get help");
-  await council.locator(".council-ask-text").press("Enter");
+await council.locator("[data-council-all]").click();
+  await council.locator(".council-tools-say .council-say-text").fill("make a table of the parts, and get help");
+  await council.locator(".council-tools-say .council-say-text").press("Enter");
   await expect(chip(ada)).toHaveClass(/is-working/, { timeout: 20_000 });
   await expect(chip(ada)).toContainText("at work");
   await expect(chip(kai)).toHaveClass(/is-working/, { timeout: 20_000 });
-  await expect(council.locator(".council-seat:not(.council-add)").first()).toBeVisible();
+  await expect(council.locator(".council-seat:not(.council-ghost)").first()).toBeVisible();
   await ada.screenshot({ path: `${SHOTS}/04_council-agent-at-work.png` });
 
   // when the work is done the chip rests; what the agent made is on the section, in its name

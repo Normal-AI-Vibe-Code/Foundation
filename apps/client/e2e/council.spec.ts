@@ -147,31 +147,45 @@ test("a press with an agent's bearer is refused: spending credits needs a person
   expect(sentAfter).toBe(sentBefore);
 });
 
-test("the grid's council drops from the top bar; with nobody assigned it says so; an agent added sits at rest, live, with its mark, for everyone who opens it", async () => {
+test("the grid's council stands on the window's bottom edge, no panel; with nobody assigned it is silhouettes to fill; an agent added stands at rest, live, with its marks", async () => {
   await ada.locator("[data-council-open]").click();
   const council = ada.locator(".council");
   await expect(council).toHaveAttribute("data-council", "0");
-  await expect(council.locator(".council-count")).toHaveText("nobody yet");
-  // a band under the top bar, as wide as the open paper; the grid starts below it
+  // nobody yet: places to fill, drawn as silhouettes; and nothing to type into
+  await expect(council.locator(".council-ghost")).toHaveCount(4);
+  await expect(council.locator("input")).toHaveCount(0);
+  // it stands on the window's bottom edge, as wide as the open paper; the grid isn't pushed anywhere
   await settle(ada, 700);
   const bar = (await ada.locator(".council-place.is-board").boundingBox())!;
   const paper = await ada.evaluate(() => {
     const pane = document.querySelector<HTMLElement>(".side-pane");
     return { left: pane ? pane.getBoundingClientRect().right : 0, right: window.innerWidth };
   });
-  expect(bar.y).toBe(44);
+  expect(Math.abs(bar.y + bar.height - (await ada.evaluate(() => window.innerHeight)))).toBeLessThan(2);
+  expect(await ada.evaluate(() => getComputedStyle(document.querySelector(".council-place")!).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
   expect(Math.abs(bar.x - paper.left)).toBeLessThan(2);
   expect(Math.abs(bar.x + bar.width - paper.right)).toBeLessThan(2);
   const insetTop = await ada.evaluate(() => Number(getComputedStyle(document.querySelector(".world-mask")!).getPropertyValue("--floor-t").replace("px", "")));
-  expect(insetTop).toBe(44 + bar.height);
+  expect(insetTop).toBe(44);
 
-  // ＋ opens the agents panel on Add an agent: who (already listed: nothing to look for), connect, avatar, add
-  await council.locator("[data-council-add]").click();
+  // a silhouette opens the agents panel on Add an agent: who (already listed: nothing to look for), connect, avatar, add
+  await council.locator("[data-council-add]").first().click();
   const add = ada.locator("[data-add-agent]");
   await expect(add.locator('[data-add-kind="claude"]')).toContainText("ready");
   await expect(add.locator('[data-add-step="2"]')).toHaveAttribute("data-add-state", "wait");
   await add.locator('[data-add-kind="claude"]').click();
+  // Claude has three ways to be connected; the one that already is, is the one open
+  await expect(add.locator("[data-add-way]")).toHaveCount(3);
+  await expect(add.locator('[data-add-way="own"]')).toHaveAttribute("data-add-way-ready", "yes");
+  await expect(add.locator('[data-add-way="own"]')).toHaveClass(/is-on/);
   await expect(add.locator('[data-add-connect="ready"]')).toContainText("in the cloud");
+  // another way lays out its steps: the key's page, this computer's agents, the key
+  await add.locator('[data-add-way="key"] .add-way-head').click();
+  await expect(add.locator('[data-add-way="key"] [data-way-step]')).toHaveCount(3);
+  await expect(add.locator("[data-add-key-page]")).toContainText("console.anthropic.com");
+  await settle(ada, 300);
+  await ada.screenshot({ path: `${SHOTS}/12c_ways-to-connect.png` });
+  await add.locator('[data-add-way="own"] .add-way-head').click();
   // an avatar is chosen already (the approved character), so skipping the step still gives it a face
   await expect(add.locator(".add-avatar.is-on")).toHaveAttribute("data-add-avatar", "Mochi");
   await settle(ada, 300);
@@ -182,6 +196,15 @@ test("the grid's council drops from the top bar; with nobody assigned it says so
   await expect(seat).toBeVisible();
   await expect(seat).toHaveClass(/is-idle/);
   await expect(council).toHaveAttribute("data-council", "1");
+  // every place taken or not, there is a silhouette to add another
+  await expect(council.locator(".council-ghost")).toHaveCount(3);
+  // above its head: whose model, that it runs in the cloud, and that it's connected
+  await expect(seat.locator('[data-council-where="cloud"]')).toBeVisible();
+  await expect(seat.locator("[data-council-offline]")).toHaveCount(0);
+  // rolled over, a line to write or talk to it opens under... over it (the grid's stands on the bottom edge)
+  await seat.locator(".council-figure").hover();
+  await expect(seat.locator("[data-council-say] input")).toBeVisible();
+  await expect(seat.locator("[data-council-mic]")).toBeVisible();
   // it wears a character, live, and a bead says whose model it is
   await expect(seat.locator(".council-name")).toContainText("as Mochi");
   await expect(seat.locator(".avatar-3d")).toHaveClass(/is-live/, { timeout: 15_000 });
@@ -199,8 +222,8 @@ test("the grid's council drops from the top bar; with nobody assigned it says so
   expect(posted["*"].map((a) => a.key)).toEqual(["claude"]);
   expect(posted["*"][0].byName).toBe("Ada Test");
 
-  // ⓘ: the agent on the right, and the council moves over to stay in the middle of what's left
-  await council.locator("[data-council-details]").click();
+  // pressed: the agent on the right, and the council keeps to the paper that's left
+  await seat.locator(".council-figure").click();
   const info = ada.locator(".agent-info");
   await expect(info).toBeVisible();
   await expect(info.locator('[data-agent-where="cloud"]')).toContainText("In the cloud");
@@ -221,7 +244,7 @@ test("the grid's council drops from the top bar; with nobody assigned it says so
   await expect(info).toHaveCount(0);
 });
 
-test("an agent at work sits in the council on its cursor's colour, wearing a character; selected, the line goes to it alone and its pane shows it head to toe", async () => {
+test("an agent at work stands in the council on its cursor's colour, wearing a character; pressed, its pane shows it head to toe", async () => {
   const made = await ctx.request.post(`${CLIENT}/api/boards`, { data: { name: `Council ${Date.now().toString(36)}` } });
   work = ((await made.json()) as { id: string }).id;
   await ada.goto(`/?board=${work}`);
@@ -229,12 +252,12 @@ test("an agent at work sits in the council on its cursor's colour, wearing a cha
   await ada.locator("[data-council-open]").click();
   const council = ada.locator(".council");
   await expect(council).toHaveAttribute("data-council", "0");
-  await expect(council.locator("[data-council-to]")).toContainText("Claude");
-  // a line from the council itself: with nobody assigned it goes to Claude
-  await council.locator(".council-ask-text").fill("make a section called “Supply” with the parts");
-  await council.locator(".council-ask button[type=submit]").click();
+  // a line to everyone, from the council's own buttons: with nobody assigned it goes to Claude
+  await council.locator("[data-council-all]").click();
+  await council.locator(".council-tools-say .council-say-text").fill("make a section called “Supply” with the parts");
+  await council.locator(".council-tools-say .council-say-text").press("Enter");
 
-  const seat = council.locator(".council-seat:not(.council-add)").first();
+  const seat = council.locator(".council-seat:not(.council-ghost)").first();
   await expect(seat).toBeVisible({ timeout: 10_000 });
   const name = (await seat.getAttribute("data-council-seat"))!;
   // it arrives with a wave, then gets on with it
@@ -259,11 +282,8 @@ test("an agent at work sits in the council on its cursor's colour, wearing a cha
   await settle(ada, 300);
   await ada.screenshot({ path: `${SHOTS}/13_council-agent-at-work.png` });
 
-  // pressed, it's the one spoken to; its pane shows it head to toe, with what it was asked and who for
+  // pressed: its pane shows it head to toe, with what it was asked and who for
   await seat.locator(".council-figure").click();
-  await expect(seat).toHaveClass(/is-selected/);
-  await expect(council.locator("[data-council-to]")).toContainText(name);
-  await council.locator("[data-council-details]").click();
   const info = ada.locator(".agent-info");
   await expect(info).toHaveAttribute("data-agent-info", name);
   await expect(info.locator(".avatar-3d")).toHaveAttribute("data-framing", "full");
@@ -274,7 +294,7 @@ test("an agent at work sits in the council on its cursor's colour, wearing a cha
   await ada.screenshot({ path: `${SHOTS}/14_council-seat-selected.png` });
 
   // done: it cheers, then leaves; the council is empty again
-  await expect.poll(async () => (await council.locator(".council-seat:not(.council-add)").count()) === 0 || (await seat.getAttribute("data-mood")) === "happy", { timeout: 40_000 }).toBe(true);
+  await expect.poll(async () => (await council.locator(".council-seat:not(.council-ghost)").count()) === 0 || (await seat.getAttribute("data-mood")) === "happy", { timeout: 40_000 }).toBe(true);
   await expect(council).toHaveAttribute("data-council", "0", { timeout: 20_000 });
 });
 
@@ -287,24 +307,25 @@ test("a section's council stands on top of its section and holds only that secti
     // the bar keeps what was last typed: write over it
     await ada.locator(".cmd-field input").fill("Council: the agents in");
     await ada.locator(".cmd-row", { hasText: `Council: the agents in ${name}` }).first().click();
-    await expect(ada.locator(".council-title")).toContainText(name);
+    await expect(ada.locator(".council")).toHaveAttribute("aria-label", `Council of ${name}`);
   };
   const supply = (await sectionNamed("Supply"))!;
   expect(supply).not.toBeNull();
   // a second ask: an agent builds another section, and is at work there for a while
   await ada.locator("[data-council-open]").click();
   const council = ada.locator(".council");
-  await council.locator(".council-ask-text").fill("make a section called “Depot” with the parts, hook up FactoryForm, and get help");
-  await council.locator(".council-ask button[type=submit]").click();
+await council.locator("[data-council-all]").click();
+  await council.locator(".council-tools-say .council-say-text").fill("make a section called “Depot” with the parts, hook up FactoryForm, and get help");
+  await council.locator(".council-tools-say .council-say-text").press("Enter");
   await expect.poll(() => sectionNamed("Depot"), { timeout: 20_000 }).not.toBeNull();
   const depot = (await sectionNamed("Depot"))!;
-  await expect(council.locator(".council-seat:not(.council-add)").first()).toBeVisible({ timeout: 10_000 });
+  await expect(council.locator(".council-seat:not(.council-ghost)").first()).toBeVisible({ timeout: 10_000 });
 
   // Supply's council: nobody belongs there and nobody is at work there
   await councilOf(supply, "Supply");
   await expect(ada.locator(".council-place.is-section")).toHaveCount(1);
   await expect(council).toHaveAttribute("data-council", "0");
-  // it is part of its section: a band at the section's top, as wide as it, with the header pushed down under it
+  // it stands on its section's top edge, as wide as the section, over what's above; the section itself doesn't move
   const over = async (id: string) => {
     await settle(ada, 700);
     const card = ada.locator(`.section-card[data-section-id="${id}"]`);
@@ -314,13 +335,13 @@ test("a section's council stands on top of its section and holds only that secti
     const head = (await card.locator(".section-header").boundingBox())!;
     expect(Math.abs(band.x - sec.x)).toBeLessThan(3);
     expect(Math.abs(band.width - sec.width)).toBeLessThan(4);
-    expect(Math.abs(band.y - sec.y)).toBeLessThan(3);
-    expect(head.y).toBeGreaterThanOrEqual(band.y + band.height - 2);
+    expect(Math.abs(band.y + band.height - sec.y)).toBeLessThan(3);
+    expect(head.y - sec.y).toBeLessThan(6);
   };
   await over(supply);
   // Depot's council: the agent building it
   await councilOf(depot, "Depot");
-  await expect(council.locator(".council-seat:not(.council-add)").first()).toBeVisible({ timeout: 10_000 });
+  await expect(council.locator(".council-seat:not(.council-ghost)").first()).toBeVisible({ timeout: 10_000 });
   await over(depot);
   await ada.screenshot({ path: `${SHOTS}/16_council-of-a-section.png` });
   await ada.keyboard.press("Escape");
@@ -335,10 +356,12 @@ test("#/design shows the council and the agent's pane, day and night", async ({ 
     await p.goto("/#/design");
     const demo = p.locator("[data-design-council]");
     await demo.scrollIntoViewIfNeeded();
-    await expect(demo.locator(".council-seat:not(.council-add)")).toHaveCount(4);
-    await expect(demo.locator(".council-seat.is-selected")).toHaveCount(1);
+    await expect(demo.locator(".council-seat:not(.council-ghost)")).toHaveCount(4);
+    await expect(demo.locator(".council-seat.is-hot")).toHaveCount(1);
+    await expect(demo.locator("[data-council-offline]")).toHaveCount(1);
     await expect(demo.locator(".provider-mark")).not.toHaveCount(0);
-    await expect(demo.locator("[data-council-add-menu] .council-add-item")).toHaveCount(3);
+    await expect(demo.locator(".council-ghost")).toHaveCount(2);
+    await expect(demo.locator("[data-council-talk]")).toContainText("To all 4");
     await expect(demo.locator(".design-agent-info")).toContainText("ChatGPT");
     await settle(p, 900);
     await demo.screenshot({ path: `${SHOTS}/15_design-${scheme === "light" ? "day" : "night"}.png` });
