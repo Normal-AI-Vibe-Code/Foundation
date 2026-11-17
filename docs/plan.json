@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-17T07:10:39.400Z",
+  "syncedAt": "2026-11-17T08:08:12.388Z",
   "columns": [
     {
       "id": "needs-you",
@@ -89,7 +89,8 @@
       "milestone": "crew",
       "area": "crew",
       "status": "review",
-      "body": "Josh, 2026-11-17: every section has a different council; a council agent gets a name over its head; adding Claude again over-rode the first and its avatar; the monkey sat low with a circle; the bar should fold for the right pane; ins and outs as a top-level option, and a VM's output piped into a card on the right; full screen beside Desktop. Built: per-place councils (an agent asked from a council stays on it while it works), seats with ids and crew names (old ones named once, keeping their characters), mesh avatars fitted like silhouettes, no plinth, a white line with mic and ✕, the bar's room folding it, Ins & outs as the machine head's third tab with a test line and Out to a new note on the right. Checked: `test/grids.test.ts`, `e2e/council` (8), `e2e/bottom-bar` (8), `e2e/machine-io` on the real engine. Not checked: the desktop window; the live machine's pipes left alone (its Out writes over the note \"How it works\")."
+      "body": "Josh, 2026-11-17: every section has a different council; a council agent gets a name over its head; adding Claude again over-rode the first and its avatar; the monkey sat low with a circle; the bar should fold for the right pane; ins and outs as a top-level option, and a VM's output piped into a card on the right; full screen beside Desktop. Built: per-place councils (an agent asked from a council stays on it while it works), seats with ids and crew names (old ones named once, keeping their characters), mesh avatars fitted like silhouettes, no plinth, a white line with mic and ✕, the bar's room folding it, Ins & outs as the machine head's third tab with a test line and Out to a new note on the right. Checked: `test/grids.test.ts`, `e2e/council` (8), `e2e/bottom-bar` (8), `e2e/machine-io` on the real engine. Not checked: the desktop window; the live machine's pipes left alone (its Out writes over the note \"How it works\").",
+      "issue": 194
     },
     {
       "id": "bottom-bar-and-tools",
