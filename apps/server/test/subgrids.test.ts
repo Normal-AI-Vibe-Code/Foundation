@@ -35,6 +35,7 @@ const { storeFile } = await import("../src/files.ts");
 const { createCharacter, roster } = await import("../src/characters.ts");
 const { gridOutline, extractSection } = await import("../src/subgrids.ts");
 const { _resetCrew } = await import("../src/crew.ts");
+const { createAsk, resolveAsk } = await import("../src/hermes.ts");
 const { GRID_PLACE, appendSection, boardMaps, noteTextOf, postedAgentsOf, putNote, tableCellMap, tableCellsOf, setTableCells } = await import("@foundation/protocol");
 import type { ExtractResult } from "../src/subgrids.ts";
 import type { ObjectDoc, PanelDoc, SectionDoc } from "@foundation/protocol";
@@ -161,8 +162,13 @@ test("a section becomes a grid inside this one: its cards move with their text, 
 
 test("a section with nothing that must stay: the grid's card fills it, and asking again answers with the same grid", async () => {
   const p = await programme("Fans");
+  // an ask in the section: its answer has to find the card on the new grid
+  const ask = createAsk({ boardId: p.id, actor: "Ada", userId: ada.id }, { assignee: "ben@formindustries.com", prompt: "Upload the latest CAD", kind: "upload", section: "Notes" });
   const out = extractSection(p.id, "Notes", { userId: ada.id, name: "Ada", role: "human" });
-  assert.equal(out.moved, 1);
+  assert.equal(out.moved, 2);
+  assert.equal(one<{ board_id: string }>("select board_id from asks where id = ?", ask.id)!.board_id, out.board);
+  await resolveAsk(ask.id, "Ben");
+  assert.equal((maps(out.board).objects.get(ask.panelId) as PanelDoc).status, "done", "answered where the card is now");
   const m = maps(p.id);
   assert.equal(m.sections.get(p.notes.id)!.host, out.card);
   assert.equal(m.sections.get(p.notes.id)!.name, "Notes");

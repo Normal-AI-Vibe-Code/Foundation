@@ -194,6 +194,8 @@ export function extractSection(boardId: string, sectionRef: string, by: ExtractB
     logActivity(doc, { ...who, text: `made this grid from the section “${sec.name}” of ${parentName}: ${plural(moving.length, "card")} came with it` });
   });
   adoptChildGrid(child, boardId);
+  // an ask's card went with it: the answer has to find the card where it is now (one tied to a pipeline stage stays with its stage)
+  for (const id of movingIds) run("update asks set board_id = ? where board_id = ? and panel_id = ? and stage_panel_id is null", child, boardId, id);
   // grids whose cards moved with the section are inside the new grid now (or, for a card left behind by a grid that moved out, remembered there)
   for (const { card } of landed) {
     if (card.kind !== "panel" || card.panel !== "grid" || !card.board) continue;

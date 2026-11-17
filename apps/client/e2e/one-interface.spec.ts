@@ -145,13 +145,15 @@ test("a grid dragged onto another becomes its child: in All Grids, and as a sect
   await expect.poll(() => boardId(ada)).toBe(rim);
   await expect(ada.locator(`.side-pane [data-grid-row="${rim}"]`)).toHaveClass(/is-current/);
 
-  // back to the top: the parent loses the section that stood for it
+  // back to the top: the grid it was in keeps its card, as a preview and a link to where it went (2026-11-17; e2e/sub-grid.spec.ts)
   await row(rim).dragTo(ada.locator(".side-pane .pane-seg-btn", { hasText: "All Grids" }));
   await expect.poll(async () => ((await (await ctx.request.get(`${CLIENT}/api/boards`)).json()) as { boards: Array<{ id: string; parent: string | null }> }).boards.find((b) => b.id === rim)!.parent).toBeNull();
   await row(fans).locator(".space-open").click();
   await expect.poll(() => boardId(ada)).toBe(fans);
   await waitLive(ada);
-  await expect(ada.locator(`[data-grid-link="${rim}"]`)).toHaveCount(0);
+  const left = ada.locator(`[data-grid-link="${rim}"]`);
+  await expect(left).toHaveAttribute("data-grid-moved", "top", { timeout: 15_000 });
+  await expect(left.locator("[data-grid-where]")).toContainText("now at the top of All Grids");
 });
 
 test("a port under the pointer says what's on it and where it goes, and lights its wire; there is no layer to switch on", async () => {

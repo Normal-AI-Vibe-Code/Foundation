@@ -60,6 +60,8 @@ import { setUi } from "../state/ui";
 import { openContextMenu } from "./ContextMenu";
 import { sectionMenuItems } from "./sectionMenu";
 import { countRender } from "../state/renders";
+import { askGrid, gridOfSection, makeSectionAGrid, openAsGrid, staysBehind, useGridAsk } from "../lib/subgrid";
+import { openGrid } from "../lib/grids";
 
 interface Props {
   section: Section;
@@ -303,6 +305,11 @@ export const SectionView = memo(function SectionView({
     [section.id, canRemove, host, hostable, worldPoint, section, isOpen, isGrid],
   );
 
+  // ⤢ on a section makes it a grid of its own (lib/subgrid.ts): asked once, in place. One that stands for a grid opens it
+  const gridAsk = useGridAsk(section.id);
+  const childGrid = gridOfSection(host);
+  const stayers = useMemo(() => (gridAsk === "ask" ? staysBehind(section.id) : []), [gridAsk, section.id]);
+
   // confirmation can be requested locally (✕ button) or via the context menu
   const confirmingActive = confirming || view.pendingRemoval;
   const cancelConfirm = () => {
@@ -331,7 +338,7 @@ export const SectionView = memo(function SectionView({
         (isGrid ? " is-grid" : "") +
         (isOpen ? " is-open" : "") +
         (mini ? " is-mini" : "") +
-        (confirmingActive ? " confirming" : "")
+        (confirmingActive || gridAsk ? " confirming" : "")
       }
       data-section-id={mini ? undefined : section.id}
       data-mini-section-id={mini ? section.id : undefined}
@@ -425,13 +432,13 @@ export const SectionView = memo(function SectionView({
         {!mini && (
           <span className="section-rest">
             <SectionCouncilChip sectionId={section.id} sectionName={section.name} />
-            {!host && (
+            {(!host || childGrid) && (
               <button
                 type="button"
-                className="sec-rest-open"
-                data-tip={isOpen ? "Back up a level" : isGrid ? "Open its grid" : "Open as its own grid: every section is one"}
-                aria-label={isOpen ? "Back up a level" : isGrid ? "Open its grid" : "Open as its own grid"}
-                onClick={() => (isOpen ? levelUp() : openLevel(section.id))}
+                className={"sec-rest-open" + (isOpen || isGrid || childGrid ? "" : " is-make")}
+                data-tip={isOpen ? "Back up a level" : childGrid ? "Open the grid" : isGrid ? "Open its grid" : "Open as its own grid: it becomes a grid inside this one"}
+                aria-label={isOpen ? "Back up a level" : childGrid ? "Open the grid" : isGrid ? "Open its grid" : "Open as its own grid"}
+                onClick={() => (isOpen ? levelUp() : isGrid ? openLevel(section.id) : openAsGrid(section.id, host))}
               >
                 {isOpen ? "⤡" : "⤢"}
               </button>
@@ -465,11 +472,15 @@ export const SectionView = memo(function SectionView({
           <div className="sec-group">
             {tool("Split into two columns", "◫", () => splitSection(section.id, "h"))}
             {tool("Split into two rows", "⬓", () => splitSection(section.id, "v"))}
-            {host && !isOpen
-              ? tool("Fill the screen with this section", "⤢", () => requestSnap({ kind: "section", id: section.id }))
-              : isOpen
-                ? tool("Back up a level", "⤡", () => levelUp(), "", "Esc")
-                : tool(isGrid ? "Open its grid" : "Open as its own grid", "⤢", () => openLevel(section.id))}
+            {childGrid && !isOpen
+              ? tool("Open the grid", "⤢", () => openGrid(childGrid))
+              : host && !isOpen
+                ? tool("Fill the screen with this section", "⤢", () => requestSnap({ kind: "section", id: section.id }))
+                : isOpen
+                  ? tool("Back up a level", "⤡", () => levelUp(), "", "Esc")
+                  : isGrid
+                    ? tool("Open its grid", "⤢", () => openLevel(section.id))
+                    : tool("Open as its own grid", "⤢", () => openAsGrid(section.id, host))}
           </div>
           <div className="sec-group">
             {tool("Council: this section's agents. Talk to them, add more", <CouncilGlyph size={14} />, () => toggleCouncil({ kind: "section", id: section.id }), "sec-agent sec-council")}
@@ -509,6 +520,34 @@ export const SectionView = memo(function SectionView({
             >
               Cancel
             </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* make it a grid of its own: it moves everyone's cards, so it asks first */}
+      <AnimatePresence>
+        {gridAsk && !mini && (
+          <motion.div
+            className="confirm-pop grid-ask"
+            role="alertdialog"
+            aria-label={`Make ${section.name} its own grid?`}
+            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 400, damping: 26 }}
+          >
+            <span className="grid-ask-words">
+              Make <b>{section.name}</b> its own grid? Its cards move into a new grid inside this one; this section keeps a preview of it.
+              {stayers.length > 0 && ` T${stayers.join(", ").slice(1)} ${stayers.length === 1 ? "stays" : "stay"} here.`}
+            </span>
+            <motion.button className="confirm-btn primary" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} disabled={gridAsk === "making"} onClick={() => void makeSectionAGrid(section.id)}>
+              {gridAsk === "making" ? "Making it…" : "Make it a grid"}
+            </motion.button>
+            {gridAsk === "ask" && (
+              <motion.button className="confirm-btn" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} onClick={() => askGrid(null)}>
+                Cancel
+              </motion.button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

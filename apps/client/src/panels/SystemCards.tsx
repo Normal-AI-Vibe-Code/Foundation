@@ -2,55 +2,80 @@
  * Three cards Foundation makes for itself (2026-11-15):
  *
  *  - **A grid inside this one** (`panel: "grid"`): the section that holds it stands for a child grid.
- *    The server puts it there when a grid is dragged into another in the side menu (boards.ts), so the
- *    link is on the parent grid itself, not only in the menu. It says what the child holds; a press
- *    opens it.
+ *    The server puts it there when a grid is dragged into another in the side menu, or when a section
+ *    is made a grid of its own (boards.ts, subgrids.ts), so the link is on the parent grid itself, not
+ *    only in the menu. It says what the child holds and draws it in miniature; a press opens it. A grid
+ *    that has since moved away keeps its card here: the same preview, and where it is now
+ *    (GridLinkCard.tsx).
  *  - **Kanban** (`panel: "kanban"`): columns of cards moved between them. `source: "plan"` is
  *    Foundation's own plan (docs/plan.json), the board Settings → Plan shows.
  *  - **Design chapter** (`panel: "design"`): one chapter of the design language, live on its tokens.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { DESIGN_CHAPTERS, type DesignChapter } from "@foundation/protocol";
 import { api } from "../lib/api";
-import { KIND_GLYPH, childrenOf, openGrid, useGrids } from "../lib/grids";
-import type { PanelMeta } from "../state/store";
+import { childrenOf, openGrid, useGrids } from "../lib/grids";
+import { openParentGrid } from "../lib/subgrid";
+import { removePanel, type PanelMeta } from "../state/store";
+import { useUi } from "../state/ui";
+import { activeBoard, onBoardChange } from "../sync/board";
 import { PlanTab } from "../settings/SettingsPage";
 import { DesignPage } from "../design/DesignPage";
+import { GridLinkCard, type Outline } from "./GridLinkCard";
 import "./system-cards.css";
 
-interface Outline {
-  sections: Array<{ id: string; name: string; cards: number; grids: number }>;
-  cards: number;
-  updatedAt: number | null;
-}
+/** how often a card on screen asks what its grid holds now */
+const OUTLINE_EVERY_MS = 4000;
 
-/** what a grid holds, asked once and again when the list of grids changes */
-function useOutline(board: string | undefined) {
+/**
+ * What a grid holds: asked when the card arrives, when the list of grids changes, and every few
+ * seconds while the card is on screen in a window that's showing (the grid it stands for is someone
+ * else's work in progress). An answer that says nothing new changes nothing here.
+ */
+function useOutline(board: string | undefined, el: React.RefObject<HTMLElement | null>) {
   const [o, setO] = useState<Outline | null>(null);
   const [gone, setGone] = useState(false);
   useEffect(() => {
     if (!board) return;
     let live = true;
+    let last = "";
+    let onScreen = true;
     const read = () =>
       void api<Outline>(`/api/boards/${encodeURIComponent(board)}/outline`).then(
-        (r) => live && (setO(r), setGone(false)),
+        (r) => {
+          if (!live) return;
+          const text = JSON.stringify(r);
+          if (text !== last) setO(r);
+          last = text;
+          setGone(false);
+        },
         () => live && setGone(true),
       );
     read();
+    const io = typeof IntersectionObserver === "function" && el.current ? new IntersectionObserver((es) => (onScreen = es.some((e) => e.isIntersecting))) : null;
+    if (io && el.current) io.observe(el.current);
+    const tick = window.setInterval(() => {
+      if (onScreen && document.visibilityState === "visible") read();
+    }, OUTLINE_EVERY_MS);
     window.addEventListener("foundation:boards", read);
     return () => {
       live = false;
+      io?.disconnect();
+      window.clearInterval(tick);
       window.removeEventListener("foundation:boards", read);
     };
-  }, [board]);
+  }, [board, el]);
   return { outline: o, gone };
 }
 
 export function GridLinkBody({ panel }: { panel: PanelMeta }) {
   const grids = useGrids();
+  const ui = useUi();
+  const here = useSyncExternalStore(onBoardChange, () => activeBoard()?.boardId ?? null);
+  const wrap = useRef<HTMLDivElement>(null);
   const child = grids.find((b) => b.id === panel.board);
-  const { outline, gone } = useOutline(panel.board);
+  const { outline, gone } = useOutline(panel.board, wrap);
   const inside = panel.board ? childrenOf(panel.board, grids) : [];
   if (!panel.board || (gone && !child))
     return (
@@ -58,46 +83,21 @@ export function GridLinkBody({ panel }: { panel: PanelMeta }) {
         <p>This grid isn't here any more, or you can't open it.</p>
       </div>
     );
+  const board = panel.board;
   return (
-    <div className="grid-link" data-grid-link={panel.board}>
-      <button className="grid-link-open" onClick={() => openGrid(panel.board!)} aria-label={`Open ${child?.name ?? panel.name}`}>
-        <span className="grid-link-eyebrow f-eyebrow">A grid inside this one</span>
-        <span className="grid-link-name">
-          <span className="grid-link-glyph">{KIND_GLYPH[child?.kind ?? "grid"]}</span>
-          {child?.name ?? panel.name}
-        </span>
-        <span className="grid-link-facts">
-          {outline ? (
-            <>
-              {outline.sections.length} {outline.sections.length === 1 ? "section" : "sections"} · {outline.cards} {outline.cards === 1 ? "card" : "cards"}
-              {inside.length > 0 && ` · ${inside.length} ${inside.length === 1 ? "grid" : "grids"} inside`}
-            </>
-          ) : (
-            "Reading it…"
-          )}
-        </span>
-        <span className="grid-link-go f-pill is-accent">Open the grid →</span>
-      </button>
-      {outline && outline.sections.length > 0 && (
-        <ul className="grid-link-sections" aria-label="Its sections">
-          {outline.sections.slice(0, 12).map((s) => (
-            <li key={s.id}>
-              <span className="grid-link-sec">{s.name}</span>
-              <span className="grid-link-count">{s.grids ? `▦ ${s.grids}` : s.cards}</span>
-            </li>
-          ))}
-          {outline.sections.length > 12 && <li className="grid-link-more">and {outline.sections.length - 12} more</li>}
-        </ul>
-      )}
-      {inside.length > 0 && (
-        <div className="grid-link-kids">
-          {inside.map((k) => (
-            <button key={k.id} className="f-pill" onClick={() => openGrid(k.id)}>
-              {KIND_GLYPH[k.kind ?? "grid"]} {k.name}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="grid-link-wrap" ref={wrap}>
+      <GridLinkCard
+        board={board}
+        name={outline?.name ?? child?.name ?? panel.name}
+        kind={child?.kind}
+        outline={outline}
+        here={here}
+        inside={inside}
+        onOpen={() => openGrid(board)}
+        onOpenGrid={openGrid}
+        onOpenWhere={(parent) => openParentGrid(parent, board)}
+        onRemove={ui.role === "viewer" ? undefined : () => removePanel(panel.id)}
+      />
     </div>
   );
 }

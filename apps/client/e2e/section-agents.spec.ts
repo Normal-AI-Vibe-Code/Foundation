@@ -199,17 +199,18 @@ test("the menu's Agents card puts the section's agents on the grid as a card, fo
   await settle(kai, 1500);
   await kai.screenshot({ path: `${SHOTS}/06_kai-agents-card.png` });
 
-  // every section is a grid: the mark at rest opens it, and it shows the way back
+  // the mark at rest makes the section a grid of its own (2026-11-17): it asks first, in place, and Cancel
+  // changes nothing (the making itself is e2e/sub-grid.spec.ts)
   const open = ada.locator(`.section-card[data-section-id="${section.id}"] .sec-rest-open`);
   await expect(open).toHaveAttribute("aria-label", "Open as its own grid");
   await open.dispatchEvent("click");
-  await expect(ada.locator(".section-card.is-open")).toHaveCount(1);
-  await expect(ada.locator(".section-card.is-open .sec-rest-open")).toHaveAttribute("aria-label", "Back up a level");
-  await expect(ada.locator(".section-card.is-open .sec-agents-chip")).toHaveCount(1);
+  const ask = ada.locator(`.section-card[data-section-id="${section.id}"] .confirm-pop.grid-ask`);
+  await expect(ask).toContainText(`Make ${section.name} its own grid?`);
+  await expect(ada.locator(".section-card.is-open")).toHaveCount(0);
   await settle(ada, 1200);
   await ada.screenshot({ path: `${SHOTS}/07_open-as-its-own-grid.png` });
-  await ada.locator(".section-card.is-open .sec-rest-open").dispatchEvent("click");
-  await expect(ada.locator(".section-card.is-open")).toHaveCount(0);
+  await ask.getByRole("button", { name: "Cancel" }).dispatchEvent("click");
+  await expect(ask).toHaveCount(0);
 });
 
 test("agents in the section and the text box on #/design, day and night", async ({ browser }) => {

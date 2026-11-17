@@ -33,6 +33,7 @@ import {
   type Section,
 } from "../state/store";
 import { openAgentsPane } from "./SectionCrew";
+import { openAsGrid } from "../lib/subgrid";
 import { keepAgentsCard } from "./SectionAgents";
 import { setUi } from "../state/ui";
 import type { MenuItem } from "./ContextMenu";
@@ -113,7 +114,7 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
       ? [{ icon: "⤢", label: "Fill the screen with it", action: () => requestSnap({ kind: "section" as const, id: section.id }) }]
       : isOpen
         ? [{ icon: "⤡", label: "Back up a level", action: () => levelUp() }]
-        : [{ icon: "⤢", label: isGrid ? "Open its grid" : "Open as its own grid", action: () => openLevel(section.id) }]),
+        : [{ icon: "⤢", label: isGrid ? "Open its grid" : "Open as its own grid", action: () => (isGrid ? openLevel(section.id) : openAsGrid(section.id, host)) }]),
     { icon: "←", label: "Insert section left", action: () => addSectionAdjacent(section.id, "left") },
     { icon: "→", label: "Insert section right", action: () => addSectionAdjacent(section.id, "right") },
     { icon: "↑", label: "Insert section above", action: () => addSectionAdjacent(section.id, "above") },
