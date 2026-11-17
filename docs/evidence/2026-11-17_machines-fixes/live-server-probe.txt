@@ -1,0 +1,18 @@
+# http://localhost:4410, 2026-11-17T03:08Z
+POST /api/boards/company/machines/x/stop           -> {"error":"sign in first"} (401)
+POST /api/boards/company/machines/x/desktop        -> {"error":"not found"} (404)
+POST /api/boards/company/machines/x/agents         -> {"error":"not found"} (404)
+GET /api/prefs                                     -> {"error":"not found"} (404)
+POST /api/boards/company/machines/x/no-such-route  -> {"error":"not found"} (404)
+WS   /machines/company/x/tty (upgrade)             -> 401
+WS   /machines/company/x/vnc (upgrade)             -> 404
+
+# the installed app's own page, http://localhost:31440
+GET  /desktop.html -> 200 text/html 966 bytes
+GET  /assets/desktop-DNSJo_Jj.js -> 200 text/javascript 170356 bytes
+
+# the processes (Win32_Process, read 2026-11-16 local)
+node.exe      pid 28840  started 2026-11-15 19:42:16  "node" --import tsx apps/server/src/index.ts   (listens on 127.0.0.1:4410)
+tauri-app.exe pid 42404  started 2026-11-16 16:25:55  the installed Foundation app (AppData/Local/Foundation/tauri-app.exe; listens on [::1]:31440)
+# the desktop work: commit 0be864a 2026-11-15 21:53:51 -1000, merged 34b7328 21:57:21
+# Kiri: /machine-box-a70f  ubuntu:24.04  running, created 2026-11-16T05:47:27Z (19:47 local on the 15th)

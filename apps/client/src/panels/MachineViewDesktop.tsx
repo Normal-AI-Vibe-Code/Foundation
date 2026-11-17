@@ -19,14 +19,15 @@
  * actions under it; when one asks without leave, the line offers the button.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { MACHINE_AGENT_ACTIVE_MS, type MachineAgentAct, type MachineState } from "@foundation/protocol";
 import { onNight } from "@foundation/ui";
 import type { PanelMeta } from "../state/store";
-import { api } from "../lib/api";
+import { SERVER_NAME, api } from "../lib/api";
+import { desktopRefusal as refusalWords } from "./machineWords";
 import { putInUse } from "../lib/cardUse";
 import { getUi, setUi, toast, useUi } from "../state/ui";
-import { KeysLine, ago, boardId, useNow } from "./MachineViewBits";
+import { KeysLine, ago, boardId, useNow, useRingWidth } from "./MachineViewBits";
 
 export type MachineViewName = "terminal" | "desktop";
 
@@ -68,18 +69,35 @@ export function ViewSwitch({ view, onView }: { view: MachineViewName; onView?: (
 
 const post = (panelId: string, path: "desktop" | "agents", json: object = {}) => api<{ machine: MachineState }>(`/api/boards/${encodeURIComponent(boardId())}/machines/${panelId}/${path}`, { method: "POST", json });
 
+/** why a press didn't work, for the card (machineWords.ts: a server older than the app says so) */
+const desktopRefusal = (e: unknown, doing?: string) => refusalWords(e, SERVER_NAME, doing);
+
 // ---------- the Desktop view ----------
 
 export function Desktop({ panel, m, viewer }: { panel: PanelMeta; m: MachineState; viewer: boolean }) {
   const d = m.desktop;
   const [busy, setBusy] = useState(false);
   const [hasKeys, setHasKeys] = useState(false);
+  // a press the server refused (or never got): the card says why, where the button is, until the next press
+  const [refused, setRefused] = useState<string | null>(null);
   const add = async () => {
     setBusy(true);
+    setRefused(null);
     try {
       await post(panel.id, "desktop");
     } catch (e) {
-      toast((e as Error).message, "bad");
+      setRefused(desktopRefusal(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  // the way out of an install: it is ended in the machine and the card goes back to "no desktop yet"
+  const stop = async () => {
+    setBusy(true);
+    try {
+      await post(panel.id, "desktop", { stop: true });
+    } catch (e) {
+      toast(desktopRefusal(e, "stop an install"), "bad");
     } finally {
       setBusy(false);
     }
@@ -96,16 +114,25 @@ export function Desktop({ panel, m, viewer }: { panel: PanelMeta; m: MachineStat
       </>
     );
   }
-  return <DesktopWell state={d?.state ?? "none"} detail={d?.detail} name={m.name} viewer={viewer} busy={busy} onAdd={() => void add()} />;
+  if (refused && d?.state !== "installing") return <DesktopWell state="error" detail={refused} name={m.name} viewer={viewer} busy={busy} onAdd={() => void add()} />;
+  return <DesktopWell state={d?.state ?? "none"} detail={d?.detail} name={m.name} viewer={viewer} busy={busy} onAdd={() => void add()} onStop={() => void stop()} />;
 }
 
 /** no desktop yet, one being installed, or an install that failed. Also drawn on #/design. */
-export function DesktopWell({ state, detail, name, viewer, busy, onAdd }: { state: "none" | "installing" | "error"; detail?: string; name: string; viewer: boolean; busy?: boolean; onAdd?: () => void }) {
+export function DesktopWell({ state, detail, name, viewer, busy, onAdd, onStop }: { state: "none" | "installing" | "error"; detail?: string; name: string; viewer: boolean; busy?: boolean; onAdd?: () => void; onStop?: () => void }) {
   if (state === "installing") {
     return (
       <div className="machine-progress machine-desk-progress">
-        <span className="f-dot is-warn is-live" />
-        <span>Adding a desktop: {detail ?? "starting…"}</span>
+        <span className="machine-desk-said">
+          <span className="f-dot is-warn is-live" />
+          Adding a desktop: {detail ?? "starting…"}
+        </span>
+        {/* a person can always leave this state: an install that has gone quiet says so in its line, and Stop ends it */}
+        {!viewer && (
+          <button className="f-pill machine-desk-stop" disabled={busy} onClick={onStop} data-tip="Ends the install in the machine. What it has unpacked stays on the machine's disk; Add a desktop picks up from there.">
+            Stop
+          </button>
+        )}
       </div>
     );
   }
@@ -140,6 +167,12 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
   };
   useEffect(() => () => onKeys(false), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [note, setNote] = useState<string | null>("Opening the desktop…");
+  // the last word on a connection that won't be tried again by itself: the card offers the way back
+  const [final, setFinal] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  // the machine's screen as it came (1280×800): the ring goes round the picture, not the letterbox
+  const [shape, setShape] = useState<{ w: number; h: number } | null>(null);
+  useRingWidth(wrap, hasKeys && !viewer);
   const src = `${import.meta.env.BASE_URL}desktop.html#board=${encodeURIComponent(boardId())}&panel=${encodeURIComponent(panelId)}${viewer ? "&view=1" : ""}`;
   const tell = (cmd: string, more: object = {}) => frame.current?.contentWindow?.postMessage({ type: "foundation:desktop", cmd, ...more }, window.location.origin);
   // the frame's ground is the card's, in day and night (a frame can't read our tokens)
@@ -148,13 +181,17 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow || e.origin !== window.location.origin) return;
-      const d = e.data as { type?: string; event?: string; on?: boolean; reason?: string; final?: boolean };
+      const d = e.data as { type?: string; event?: string; on?: boolean; reason?: string; final?: boolean; w?: number; h?: number };
       if (d?.type !== "foundation:desktop") return;
       if (d.event === "connected") {
         setNote(null);
+        setFinal(false);
+        setShape(d.w && d.h ? { w: d.w, h: d.h } : null);
         paint();
-      } else if (d.event === "closed") setNote(d.reason ?? "The desktop closed.");
-      else if (d.event === "keys") {
+      } else if (d.event === "closed") {
+        setNote(d.reason ?? "The desktop closed.");
+        setFinal(Boolean(d.final));
+      } else if (d.event === "keys") {
         setHasKeys(Boolean(d.on));
         if (d.on) putInUse(panelId);
       } else if (d.event === "leave") {
@@ -188,7 +225,8 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
   };
   return (
     <div ref={wrap} className={`machine-desk${inUse ? " is-in-use" : ""}${hasKeys && !viewer ? " has-keys" : ""}`}>
-      <iframe ref={frame} src={src} title={`${name}'s desktop`} onLoad={paint} allow="clipboard-read; clipboard-write" />
+      <iframe key={attempt} ref={frame} src={src} title={`${name}'s desktop`} onLoad={paint} allow="clipboard-read; clipboard-write" />
+      {hasKeys && !viewer && <span className={`machine-desk-ring${shape ? " is-screen" : ""}`} style={shape ? ({ "--screen-ar": String(shape.w / shape.h) } as CSSProperties) : undefined} />}
       {!inUse && (
         // a plain click uses the desktop, as it puts the caret in the terminal; until then the wheel and the pointer are the grid's
         <div className="machine-desk-shield" onPointerDown={(e) => e.stopPropagation()} onClick={use}>
@@ -196,7 +234,24 @@ function DesktopScreen({ panelId, name, viewer, onKeys }: { panelId: string; nam
         </div>
       )}
       {viewer && <div className="machine-watching">View only: you're watching</div>}
-      {note && <div className="machine-closed">{note}</div>}
+      {note && (
+        <div className={`machine-closed${final ? " is-final" : ""}`}>
+          <span>{note}</span>
+          {final && (
+            <button
+              className="f-pill"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => {
+                setNote("Opening the desktop…");
+                setFinal(false);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Try again
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -210,7 +265,7 @@ function AgentsMay({ panelId, m, viewer }: { panelId: string; m: MachineState; v
     try {
       await post(panelId, "agents", { allow });
     } catch (e) {
-      toast((e as Error).message, "bad");
+      toast(desktopRefusal(e, "let agents use a desktop"), "bad");
     } finally {
       setBusy(false);
     }
@@ -266,7 +321,7 @@ export function AgentUse({ panelId, m, viewer, view, onWatch }: { panelId: strin
     try {
       await post(panelId, "agents", { allow: true });
     } catch (e) {
-      toast((e as Error).message, "bad");
+      toast(desktopRefusal(e, "let agents use a desktop"), "bad");
     } finally {
       setBusy(false);
     }

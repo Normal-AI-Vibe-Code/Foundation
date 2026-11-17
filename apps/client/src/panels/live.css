@@ -939,10 +939,82 @@
   font: 400 var(--text-12) / 1.4 var(--font-sans);
 }
 /* the caret is in the machine (its shell or its desktop): the "in use" ring, and a line that says where keys go and the way out */
-.machine-term-wrap.has-keys,
-.machine-desk.has-keys {
-  box-shadow: inset 0 0 0 2px var(--color-pulse);
+/* The ring is the well's own, never the card's or the section's (2026-11-17, Josh: "it should be within the section
+   when it's actively being typed into"): an ::after inside the well, over what it holds (a desktop's frame fills its
+   well and covered an inset shadow), 2 px on the screen at any zoom (--machine-ring is 2 px over the drawn scale, set
+   by useRingWidth while the keys are here). Nothing is transitioned. */
+.machine-term-wrap.has-keys {
   border-color: transparent;
+}
+.machine-term-wrap.has-keys::after,
+.machine-desk-ring {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* an inset shadow, not a border: a browser snaps a border to whole pixels of the card's own, which is 1.2 px on the
+     screen at 122 % and 1.9 at 63 %; a shadow keeps the fraction. It is never transitioned (DESIGN §9). */
+  box-shadow: inset 0 0 0 var(--machine-ring, 2px) var(--color-pulse);
+  border-radius: calc(var(--radius-paper) - 1px);
+  pointer-events: none;
+  z-index: 3;
+}
+/* one ring: while a machine has the keys, the section's own ring and the card's selection ring stand down */
+.section-card.ctx-active:has(.machine-term-wrap.has-keys, .machine-desk-ring)::after {
+  opacity: 0;
+}
+.frame-card.ctx-active:has(.machine-term-wrap.has-keys, .machine-desk-ring) {
+  box-shadow: var(--shadow-card);
+}
+/* a desktop's ring goes round the machine's screen itself, which sits letterboxed in its well (centred, as noVNC draws it) */
+.machine-desk {
+  container-type: size;
+}
+.machine-desk-ring.is-screen {
+  inset: auto;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(100cqw, calc(100cqh * var(--screen-ar)));
+  aspect-ratio: var(--screen-ar);
+  border-radius: 0;
+}
+/* full screen is the machine's alone: no ring (as an app's), the line still says where the keys go */
+.fs-able:fullscreen .machine-term-wrap.has-keys::after,
+.fs-able:fullscreen .machine-desk-ring {
+  display: none;
+}
+/* an install's line, with the way out of it */
+.machine-desk-progress {
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  text-align: center;
+}
+.machine-desk-said .f-dot {
+  display: inline-block;
+  margin-right: var(--space-2);
+  vertical-align: 1px;
+}
+.machine-desk-stop {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+}
+/* a desktop's connection that won't come back by itself: why, and Try again */
+.machine-closed.is-final {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.machine-closed.is-final > span {
+  flex: 1;
+  min-width: 0;
+}
+.machine-closed.is-final .f-pill {
+  flex-shrink: 0;
+}
+/* a machine that runs is not an agent at work: its card keeps a card's own border (shell.css tints .status-running violet) */
+.panel-card.kind-machine.status-running {
+  border-color: var(--color-line-strong);
 }
 .machine-keys {
   position: absolute;

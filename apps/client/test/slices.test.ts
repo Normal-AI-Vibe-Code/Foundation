@@ -63,6 +63,9 @@ test("what the wires draw does change them", () => {
   assert.equal(portWiresSlice(getState()).wires, p1.wires, "a new value on a live wire draws nothing new");
   updatePanel("p2", { status: "running", createdBy: "Finch" });
   assert.deepEqual(parsePairs(portWiresSlice(getState()).running), [["p2", "Finch"]]);
+  // a running machine is a machine running, not an agent at work: no agent's ring around it
+  updatePanel("p1", { panel: "machine", status: "running", createdBy: "Finch" });
+  assert.deepEqual(parsePairs(portWiresSlice(getState()).running), [["p2", "Finch"]]);
   expandSection("A");
   assert.equal(sheetWiresSlice(getState()).open, "A");
   expandSection(null);

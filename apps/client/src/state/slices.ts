@@ -84,7 +84,9 @@ export function portWiresSlice(st: AppState) {
     wires += `${l.id}:${a?.outputs?.[l.from.port] !== undefined ? 1 : 0}:${type}:${a?.sectionId ?? ""}:${b?.sectionId ?? ""},`;
   }
   let running = "";
-  for (const p of Object.values(st.panels)) if (p.status === "running") running += `${p.id}\u0000${p.createdBy ?? "agent"}\u0001`;
+  // a machine's "running" is the machine, not an agent at work on the card: it wears no agent's ring
+  // (2026-11-17: every running machine had a breathing violet ring 8 px outside its card, so outside its section when it hosts one)
+  for (const p of Object.values(st.panels)) if (p.status === "running" && p.panel !== "machine") running += `${p.id}\u0000${p.createdBy ?? "agent"}\u0001`;
   return { grid: st.grid, links: st.links, wires, running, open: openSection(st) };
 }
 

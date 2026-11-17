@@ -1,0 +1,25 @@
+
+> @foundation/server@0.3.0 machines:desktop-smoke
+> tsx scripts/machines-desktop-smoke.ts ubuntu kiri
+
+(node:56500) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+· Kiri 0.1.18 at \\.\pipe\kiri
+· started machine-desk-smoke-mwk47u17 (ubuntu:24.04)
+· Ctrl+C interrupted sleep (exit 130)
+· piped: note “Input” → /foundation/in → tr a-z A-Z → /foundation/out → note “Result” = "HELLO FROM A NOTE"
+· JSON written to /foundation/out arrives on the out port as JSON
+    installing: Starting…
+    installing: Reading the package lists
+    installing: Starting the desktop…
+    ready
+· added a desktop in 62 s: 1280×800
+· VNC through Foundation's relay, a person who can edit: a 1280×800 screen; a pointer move to (500, 300) moved the machine's pointer (x:500 y:300)
+· VNC through Foundation's relay, a viewer: a 1280×800 screen; a pointer move to (900, 600) was dropped (still x:500 y:300)
+· an agent without leave is refused, and the card says it asked
+· with leave, the agent sees the screen: 1280x800, a 22 KB PNG
+· the agent double-clicked Home, pressed ctrl+l and typed /foundation: window titles now "foundation - Thunar"
+· the leave taken back: refused again
+✓ desktop, agent and pipes work on this engine
+· removed the machine and its disk
+exit 0

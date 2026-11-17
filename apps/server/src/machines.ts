@@ -943,7 +943,7 @@ export async function execRaw(
   boardId: string,
   panelId: string,
   argv: string[],
-  opts: { env?: string[]; timeoutS?: number; maxBytes?: number; onStdout?: (b: Buffer) => void } = {},
+  opts: { env?: string[]; timeoutS?: number; maxBytes?: number; onStdout?: (b: Buffer) => void; /** run as this user (a name or uid) instead of the image's own */ user?: string } = {},
 ): Promise<RawResult> {
   const panel = machinePanel(boardId, panelId);
   const found = await findContainer(boardId, panelId, panel.machine?.engine);
@@ -958,6 +958,7 @@ export async function execRaw(
     Tty: false,
     Env: ["TERM=dumb", "DEBIAN_FRONTEND=noninteractive", ...(opts.env ?? [])],
     Cmd: ["/bin/sh", "-c", 'if command -v timeout >/dev/null 2>&1; then exec timeout -s KILL "$0" "$@"; else exec "$@"; fi', String(secs), ...argv],
+    ...(opts.user ? { User: opts.user } : {}),
   });
   const t0 = Date.now();
   const { sock, head, type } = await hijack(engine, `/exec/${exec.Id}/start`, { Detach: false, Tty: false });

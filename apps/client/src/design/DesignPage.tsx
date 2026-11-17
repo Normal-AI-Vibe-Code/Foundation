@@ -1210,7 +1210,10 @@ function MachineUseDemo() {
           <div className="machine-body is-running">
             {head("desktop")}
             <AgentUseLine acts={acts} viewer={false} now={now} watching />
-            <div className="machine-desk has-keys" />
+            {/* the ring goes round the machine's screen (1280×800), letterboxed in its well: never the card, never the section */}
+            <div className="machine-desk has-keys">
+              <span className="machine-desk-ring is-screen" style={{ ["--screen-ar" as string]: "1.6" }} />
+            </div>
             <div className="machine-desk-foot">
               <AgentsMayLine may={{ by: "Ada", at: now - 3 * 60_000 }} viewer={false} now={now} />
               <KeysLine what="this desktop" inline />
@@ -1246,13 +1249,34 @@ function MachineUseDemo() {
         <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
           <div className="machine-body is-running">
             {head("desktop")}
-            <DesktopWell state="error" detail="This image has neither apt nor apk: Foundation's desktop is for Ubuntu, Debian and Alpine machines." name="build-box" viewer={false} />
+            <DesktopWell state="error" detail="No recipe: Fedora Linux 42 (Container Image) has neither apt nor apk, and Foundation's desktop installs only on Ubuntu, Debian and Alpine machines. Nothing was changed." name="build-box" viewer={false} />
           </div>
         </div>
         <div className="frame-card live-specimen" style={{ width: 260, height: 240 }}>
           <div className="machine-body is-running">
             {head("desktop")}
             <DesktopWell state="none" name="build-box" viewer />
+          </div>
+        </div>
+      </div>
+      {/* when it can't work, the card says exactly why (2026-11-17): an install gone quiet (with Stop), no network, a server older than the app */}
+      <div className="adapt-row">
+        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <DesktopWell state="installing" detail="Downloading xfce4-session (247 packages) · no word from the package manager for 3 min" name="build-box" viewer={false} />
+          </div>
+        </div>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <DesktopWell state="error" detail="The machine couldn't reach its package servers, so the desktop wasn't installed (Temporary failure resolving 'archive.ubuntu.com'). Check the machine's network from its terminal (apt-get update), then try again." name="build-box" viewer={false} />
+          </div>
+        </div>
+        <div className="frame-card live-specimen" style={{ width: 400, height: 240 }}>
+          <div className="machine-body is-running">
+            {head("desktop")}
+            <DesktopWell state="error" detail="The Foundation server at localhost:4410 is older than this app and can't add a desktop yet. Restart it (the server switch at the bottom right: Stop, then Start; or stop and start it where it runs), then try again. Nothing was changed in the machine." name="build-box" viewer={false} />
           </div>
         </div>
       </div>
