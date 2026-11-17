@@ -149,7 +149,7 @@ test("agents that come into a section join its group; hover shows it, a pin keep
   await ada.screenshot({ path: `${SHOTS}/03_ada-agents-pane.png` });
 
   // search takes the pane's place, and gives it back
-  await kai.locator(".top-btn", { hasText: "⌕" }).click();
+  await kai.locator(".top-btn[aria-label='Search']").click();
   await expect(kai.locator(".search-pane")).toBeVisible();
   await expect(pane).toHaveCount(0);
   await kai.locator(".top-btn[aria-label='Agents']").click();

@@ -1489,7 +1489,7 @@
       "milestone": "crew",
       "area": "crew",
       "status": "next",
-      "body": "A line to the council starts an ask per agent; replies show only as work on the grid and as activity lines in the agent's pane. Keep a thread per place (who was told what, what each answered, in order), show it in the council and the agent's pane, and let a reply go to the agent that's mid-run instead of starting a new one. Needs a real model turn and a real T3 thread to be seen in it first (*council-real-turn*).",
+      "body": "A line to the council starts an ask per agent; replies show only as work on the grid and as activity lines in the agent's pane. Keep a thread per place (who was told what, what each answered, in order), show it in the council and the agent's pane, and let a reply go to the agent that's mid-run instead of starting a new one. Needs a real model turn and a real T3 thread to be seen in it first (*council-real-turn*). 2026-11-17: the agents panel has a Council tab that lists what you said and each agent's live line; the replies are `council-replies-in-panel`.",
       "issue": 144
     },
     {
@@ -1559,7 +1559,7 @@
       "milestone": "apps",
       "area": "machines",
       "status": "needs-you",
-      "body": "Found 2026-11-15 on Kiri 0.1.18 (reproductions in `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). Foundation works around both (perl or python3 clears the mask, so Ctrl+C is dead on Alpine until `apk add perl`; the server polls whether an exec still runs). Both are Kiri's to fix: file them at github.com/libracoder/kiri.",
+      "body": "Found 2026-11-15 on Kiri 0.1.18 (reproductions in `docs/evidence/2026-11-15_machines-desktop/NOTES.md`). Foundation works around both (perl or python3 clears the mask, so Ctrl+C is dead on Alpine until `apk add perl`; the server polls whether an exec still runs). Both are Kiri's to fix: file them at github.com/libracoder/kiri. Added 2026-11-17 (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`): processes killed inside a machine are never reaped; stopping a desktop's install leaves apt and dpkg as zombies until the machine restarts (they hold no lock and no file).",
       "issue": 151
     },
     {
@@ -1579,7 +1579,7 @@
       "milestone": "apps",
       "area": "machines",
       "status": "backlog",
-      "body": "Not tried: the desktop in the packaged app (and Ctrl+W / Ctrl+T in its terminal), a real Docker engine, macOS or Linux hosts. Not built: a browser in the desktop (Ubuntu's Firefox is a snap), a clipboard between it and the grid, sound, a size other than 1280 × 800, a `screen` output port.",
+      "body": "Not tried: the desktop in the packaged app (and Ctrl+W / Ctrl+T in its terminal), a real Docker engine, macOS or Linux hosts. Not built: a browser in the desktop (Ubuntu's Firefox is a snap), a clipboard between it and the grid, sound, a size other than 1280 × 800, a `screen` output port. 2026-11-17: the packaged app's transport was checked (the production build on another origin, a bearer, socket tickets); pressing it inside the Tauri window is now its own card, `desktop-in-tauri-window`.",
       "issue": 153
     },
     {
@@ -1649,7 +1649,7 @@
       "milestone": "polish",
       "area": "panels",
       "status": "review",
-      "body": "Built 2026-11-16 (`docs/evidence/2026-11-16_card-chrome/NOTES.md`). A character card's ✕ asks first and the character leaves every council with its card; the hover bar gives the card's content 38 px of room instead of covering it; Ctrl/⌘-wheel scrolls through a card with more in it than fits; scroll bars are a 2 px light line; the resize corner is a gleam shown on hover. A ✕ that does nothing on a character was not reproduced: if it happens again, note where it was pressed.",
+      "body": "Built 2026-11-16 (`docs/evidence/2026-11-16_card-chrome/NOTES.md`). A character card's ✕ asks first and the character leaves every council with its card; the hover bar gives the card's content 38 px of room instead of covering it; Ctrl/⌘-wheel scrolls through a card with more in it than fits; scroll bars are a 2 px light line; the resize corner is a gleam shown on hover. A ✕ that does nothing on a character was not reproduced: if it happens again, note where it was pressed. Ctrl-wheel through a card became Alt-wheel on 2026-11-17, `pointer`.",
       "issue": 160
     },
     {
@@ -1671,6 +1671,249 @@
       "status": "backlog",
       "body": "Removing a character's card keeps its record and files, but nothing in the app puts it back on the grid. Offer removed characters in the pipeline card (or the Character studio's menu) with Restore.",
       "issue": 162
+    },
+    {
+      "id": "council-setup-chrome",
+      "title": "The council on its section's edge, a guided agent setup, the side menu, tabs and search redrawn, Today's room behind every panel",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Built 2026-11-17 (SPEC §0.7, §3, §7; `docs/evidence/2026-11-17_council-setup-chrome/`, 14 shots). The council is no band: agents rise from behind their section's top edge and stand on it beside silhouettes of other approved characters that are places to fill (at least four, always one more than the agents; the last wears a ＋); no text box; rolling over an agent opens a line with a microphone that goes to it alone; speak to all, the Council tab and close at the section's top right; the grid's council stands on the window's bottom edge. Marks above each head: the provider, cloud or this computer, a state dot or a pulled plug, and an unreachable agent drawn grey and sad. The agents panel opens on a new Council tab (what you said, each agent's live line, a composer with a microphone). Connect is guided ways with numbered steps: three for Claude (an API key through a new T3 preset `claude`, signing in with a Claude account through T3, Claude Code on this computer), T3 sign-in for ChatGPT and Gemini, a key or a local model for Kimi and DeepSeek. Side menu, top bar tabs (lines, not cards) and the search pane redrawn; the council's mark is three filled figures (the outlined one was the frowny face); Today's room is the whole window; a card's ✕ keeps a 26 px press at any size. Checked: typecheck; `e2e/council.spec.ts` (8), `section-agents` (5), `today`, `one-interface` on ports above 15000; day and night looked at. Not built or not verified: no terminal on this computer inside Foundation (`agent-host-terminal`); key pages open in the system browser (`in-app-browser`); the Claude API-key way was never run with a real key; Vision's T3 sign-in was not read; the Council tab doesn't show replies (`council-replies-in-panel`); voice in the council's line not exercised in a browser test; offline is judged from the agents list only; the ✕'s 26 px has no e2e test. The server on :4410 has to restart to serve it (`server-restart-4410`)."
+    },
+    {
+      "id": "agent-host-terminal",
+      "title": "A terminal on this computer, so an agent can be mounted from inside Foundation",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "next",
+      "body": "Josh, 2026-11-17: mount Claude through the inbuilt terminal. Foundation has no terminal on the computer it runs on: a machine card's terminal is a separate computer and can't sign the host in, so the third way of adding Claude (*Claude Code on this computer*) tells the person to use the computer's own terminal. Give the server a terminal on its own host (a person's, never an agent's; it runs commands on the computer, so it needs the same care as Places) and run the install and `claude` steps in it from the Connect step."
+    },
+    {
+      "id": "in-app-browser",
+      "title": "Open key pages and sign-ins in a browser inside Foundation",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "agent",
+      "status": "backlog",
+      "body": "The Connect step's links (console.anthropic.com/settings/keys, Kimi's and DeepSeek's key pages) open in the system browser. Show them in Foundation's own browser (a web page space or card) so the steps and the page are side by side. Sign-in pages often refuse to be framed; find out which do first."
+    },
+    {
+      "id": "council-replies-in-panel",
+      "title": "The Council tab shows what the agents answered, and keeps what was said",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "next",
+      "body": "The agents panel's Council tab (2026-11-17) lists what you said and each agent's live line (doing, at rest, not connected). The agents' full replies are only in their sessions, and what you said is kept for that window only (`lib/councilOpen.ts` `logSaid`): gone on a reload, not shared. Keep the conversation on the server per place and draw each agent's replies in the tab. With `council-conversation`."
+    },
+    {
+      "id": "server-restart-4410",
+      "title": "Restart the server the desktop app runs (it is from before desktops, sub-grids and the council's new routes)",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "The Foundation server on localhost:4410 was started on 2026-11-15 at 19:42 and never restarted, so it runs that hour's code: Add a desktop answered 404 `not found` (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`, `live-server-probe.txt`). After this branch is merged into the checkout it starts from: the server switch, Stop, then Start. Then Desktop → Add a desktop on `box-a70f`, and open the Character studio once (the studio's upgrade to nodes runs then). Nobody restarted it or touched that machine in the 2026-11-17 work."
+    },
+    {
+      "id": "pointer",
+      "title": "The pointer: a left press grabs only a handle, Alt-wheel scrolls a card (with a hint), the section menu in three bands",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_pointer/NOTES.md`). A left drag moves only from the paper, a section's header or a card's bar; images and videos move by a grip in their corner. Ctrl/⌘-wheel always zooms; Alt-wheel scrolls the card under the pointer, and a small mark on such a card says so until dismissed or learnt. A section's right-click menu: the council, Add and Live side by side, the grid's actions as a row of icons with roll-over names; arrow keys. No swallowed press on a character's ✕ was found."
+    },
+    {
+      "id": "card-x-when-small",
+      "title": "A card's ✕ is 8 px when the card is drawn at 30 %",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "review",
+      "body": "Fixed 2026-11-17 (with `council-setup-chrome`; commits de4bf4a, c9dc04f): the ✕ keeps a 26 px press area on the screen however small its card is drawn (the area follows zoom times the section's fit). Measured in a browser: a 10.5 px button with a 26.0 px press at the Character studio's fit. No e2e test holds it yet; not tried under Rune or in the desktop window. As found by `pointer`: the bar's buttons scale with the card, and the bar round them is the drag handle, so a near miss grabs. Likelier than a swallowed press as why a character 'couldn't be removed'. The bar's other buttons still scale with the card."
+    },
+    {
+      "id": "pointer-rune",
+      "title": "Rune: cards grab only by their bar or grip; run its e2e on the new menu",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "rune",
+      "status": "backlog",
+      "body": "`apps/rune/src/view.rs` drags a note or an image from anywhere on it. Bring it to the 2026-11-17 rule, and run `e2e -- rune` (its two menu assertions were rewritten for the icon row, unrun)."
+    },
+    {
+      "id": "pointer-elsewhere",
+      "title": "The pointer rules on a Mac, a trackpad, touch and in the desktop window",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "panels",
+      "status": "backlog",
+      "body": "Alt/⌥-wheel, ⇧ sideways in a browser, the grip with no hover, the menu's keys, and the `#/design` Using-a-card paragraph and its old image specimen (DesignPage.tsx)."
+    },
+    {
+      "id": "sub-grids",
+      "title": "Open as its own grid makes a real sub-grid; the old grid keeps a preview and a link",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_sub-grids/NOTES.md`). Josh: \"Open as its own grid doesn't work, it should create a sub-grid that can be pulled out of the grid collection and moved to other grids, but still maintain a preview in the Grid it used to be in, and maintain a link to the new location.\" ⤢ on a section asks once, then the server (`extract_section`, `POST /api/boards/:id/sections/:section/extract`) makes a grid inside this one from it: cards with their text, cells, files and inner wires; characters, councils and asks follow; machines, huddles and stages stay and are named; a Slack section is refused; membership copied; idempotent. The section hosts the grid's card with the grid in miniature; moved away, the old parent keeps the card and says where it went. Checked: `apps/server/test/subgrids.test.ts` (8), `e2e/sub-grid.spec.ts` (5, two people). Not done: hosted-app sections have no ⤢ for it, no undo, Rune doesn't draw the question; not run in the packaged desktop app."
+    },
+    {
+      "id": "sub-grid-dissolve",
+      "title": "Dissolve a sub-grid back into its parent section (the undo of Open as its own grid)",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "next",
+      "body": "There is no undo: putting a sub-grid's cards back into the section is by hand (`send_to_board`, card by card). One server move, the reverse of `extract_section`, from the grid's card."
+    },
+    {
+      "id": "sub-grid-hosted-app",
+      "title": "Hosted-app sections: offer Open as its own grid",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "next",
+      "body": "On a section that hosts an app ⤢ is *Fill the screen*, so there is no press that makes it a grid (the tool and the route take such a section). Offer it in the menu."
+    },
+    {
+      "id": "sub-grid-preview-signal",
+      "title": "Sub-grid previews: one change signal instead of a 4 s poll per card",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "backlog",
+      "body": "Every grid card on screen asks its grid's outline every 4 s. Fine for a handful; a grid of many child cards wants one request or a change signal."
+    },
+    {
+      "id": "sub-grid-rune",
+      "title": "Rune: draw the make-it-a-grid question; ⤢ makes a sub-grid",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "rune",
+      "status": "backlog",
+      "body": "Under Rune ⤢ still opens the in-window level, and the right-click menu's *Open as its own grid* sets a question only the web section draws."
+    },
+    {
+      "id": "sub-grid-offline-guard",
+      "title": "Guard a moved card against an offline device bringing it back",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "sections",
+      "status": "backlog",
+      "body": "Extract deletes the moved cards from the parent's document. A device that was offline and changed one of them can bring it back onto the parent when it reconnects, so it would exist on both grids; text typed into a moved note in the instant of the move can be lost. Not seen in tests; not guarded."
+    },
+    {
+      "id": "machines-fixes",
+      "title": "Machines: Add a desktop says why when it can't, an install can be stopped, and the in-use ring is the well's",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machines-fixes/NOTES.md`). Josh: \"Add a desktop doesn't work in Kiri … the selection around the window is still weird\". The cause was a server started before the desktop routes were merged (404 as a toast reading *not found*). Now a refused press is said in the well with Try again (an older server by name, no network, no recipe by the distro's name, not root, an interrupted install); a quiet install says for how long and has Stop; a second install can't trip over the first; packages go in as root. A running machine wears no agent's ring; the in-use ring is the terminal well's or round the desktop's screen, 2 px on the screen at any zoom, the only ring while it shows. Checked on Kiri 0.1.18 (Ubuntu, Debian, Alpine smoke; the four distros without a recipe refused in words; a stalled and an unreachable mirror in a real machine), `test/machines-desktop.test.ts` (15), `e2e/machines-fixes.spec.ts` (4), and the packaged app's transport. Not done: the owner's server was not restarted and his machine not touched; the Tauri window itself was not driven."
+    },
+    {
+      "id": "server-older-than-app",
+      "title": "Say when the server is older than the app",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "desktop",
+      "status": "next",
+      "body": "The app updates itself; a server started from a checkout runs what it was started with. Both report 0.3.0, so only a missing route gives it away, one feature at a time. Have the server report its commit and when it started; the app compares and offers the restart."
+    },
+    {
+      "id": "desktop-more-distros",
+      "title": "A desktop on Fedora, Rocky, Arch and openSUSE",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "backlog",
+      "body": "Four of the Start picker's seven distros are refused by name (no recipe). Add dnf (with EPEL on Rocky), pacman and zypper recipes, or take them out of what Add a desktop offers."
+    },
+    {
+      "id": "desktop-in-tauri-window",
+      "title": "Press Add a desktop inside the Tauri window",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "next",
+      "body": "The packaged app's transport is checked (the production build on another origin, a bearer, socket tickets; 2026-11-17) and the installed app serves `desktop.html` and its script. Nobody has pressed it inside the Tauri window (WebView2). Takes over from the packaged-app part of `machines-desktop-more`."
+    },
+    {
+      "id": "pipes-older-server",
+      "title": "Pipes on an older server say so",
+      "kind": "bug",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "backlog",
+      "body": "On a server from before the pipes, a machine's strip shows and nothing flows: the same silent failure Add a desktop had. Not looked at."
+    },
+    {
+      "id": "character-sheet",
+      "title": "Character card as a sheet: typographic structure, lines, identity as formatted text",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_character-studio/NOTES.md`). The card reads as a sheet: stage, the name as a title you can write in, quiet tags, then *Who it is*, *Stages*, *Pictures*, *Drawn from* under eyebrows with a hairline between, the approval row, the foot. *Who it is* is formatted text on the card (the Text box's surface and toolbar), saved on leaving it and on ⌘/Ctrl+Enter with a tick; markdown kept, plain words to the prompts. Checked in a browser, day and night, at 260 / 400 / 460 / 560 on `#/design`."
+    },
+    {
+      "id": "character-expressions-stage",
+      "title": "Expressions stage in the character pipeline (stand-in verified)",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17. After the sheet, for both forms: one 4:3 picture of eight labelled panels (9 credits), in the lineage, a reference for the views; optional on older characters (*Add expressions*), and it clears nothing after it. Checked against the stand-in Meshy only (`test/characters.test.ts` 15, `e2e/character-studio.spec.ts`). Not verified on the real Meshy: the prompt's results and `aspect_ratio: \"4:3\"` on `image-to-image` are unseen. No existing character has a sheet (`character-expressions-press`)."
+    },
+    {
+      "id": "studio-pipeline-nodes",
+      "title": "Character studio: the pipeline as nodes with Generate and auto-placement",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "review",
+      "body": "Built 2026-11-17. A set's pipeline is nine node cards joined by the grid's wires (Inspiration → Sheet → Expressions → Views → Mesh avatar → Output, the 3D lane under Mesh avatar); each shows the characters at it as tiles with Generate and its price; ＋ New on the Sheet node; a finished card is placed into `Characters · <Set>` by the server; `upgradeStudio` brings a studio with the one flow card to the nodes. Checked against the stand-in: `test/studio-pipeline.test.ts` (4), `e2e/character-studio.spec.ts` (9). Not verified: the upgrade on the live studio, a viewer on the nodes in a browser, the studio's frame rate with 27 more cards and 27 wires."
+    },
+    {
+      "id": "character-expressions-press",
+      "title": "Press the expressions sheet for one animal (Mochi, 9 credits), look at it, then the other five (45)",
+      "kind": "hookup",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "needs-you",
+      "body": "It spends Meshy credits, so it is a person's press; nothing was spent on 2026-11-17 and no character has an expressions sheet. On a server running this code (`server-restart-4410`): press Mochi's (9 credits) and look at it before the rest, because the prompt has never met the real image model (the eight-panel grid, the labels, 4:3 on `image-to-image`). Then the other five animal mesh avatars (45; 54 in all). `node scripts/characters-expressions.mjs --set animals` lists them and the cost; `--press` with `FOUNDATION_SESSION` spends them."
+    },
+    {
+      "id": "mavatar-drawn-variants",
+      "title": "mesh-avatar-studio: drawn closed-eye and open-mouth variants from the expressions sheet's BLINK and TALKING panels",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "next",
+      "body": "Not built. The expressions sheet is drawn to be their source, but nothing cuts or registers the panels, and mesh-avatar-studio's rig format hasn't been checked for taking them. Try it on one character and write down what happened (`docs/characters.md` says what has to be found out first)."
+    },
+    {
+      "id": "studio-live-upgrade-look",
+      "title": "Open the live studio on the new code: look at the upgraded layout with all twenty-two characters, and measure its frames",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "next",
+      "body": "`upgradeStudio` is tested on the server and was never watched in a browser on an upgraded studio, nor run on the live one. It runs the first time the Character studio is opened on a server running this code (`server-restart-4410`): the flow card becomes the Inspiration node, eight nodes and nine wires per set are added, columns grow to 2,060 px and the pipeline row to 1,490 px. Then `e2e -- frames` and the perf trace on it (27 more cards, 27 wires)."
+    },
+    {
+      "id": "pipeline-nodes-viewer-e2e",
+      "title": "Viewer check for the pipeline nodes in e2e",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "pipeline",
+      "status": "next",
+      "body": "A viewer should see the nodes with no Generate and no ＋ New. Written, and only the card's viewer state is on `#/design`; not checked in a browser."
     }
   ]
 }

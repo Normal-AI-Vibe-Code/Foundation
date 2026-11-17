@@ -571,11 +571,11 @@ export async function t3OpenLink(threadId?: string): Promise<string> {
  *        model that's been pulled there. No key, nothing leaves the computer.
  */
 export const T3_PRESETS: Record<string, { name: string; cloud: { baseUrl: string; model: string }; local: { baseUrl: string; model: string } }> = {
+  kimi: { name: "Kimi", cloud: { baseUrl: "https://api.moonshot.ai/anthropic", model: "kimi-k3" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
+  deepseek: { name: "DeepSeek", cloud: { baseUrl: "https://api.deepseek.com/anthropic", model: "deepseek-v4-pro" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
   // Claude on a person's own API key (2026-11-17): Anthropic's endpoint, cloud only. Beside it, T3's own
   // Claude agent is the one signed in with an account.
   claude: { name: "Claude (API key)", cloud: { baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
-  kimi: { name: "Kimi", cloud: { baseUrl: "https://api.moonshot.ai/anthropic", model: "kimi-k3" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
-  deepseek: { name: "DeepSeek", cloud: { baseUrl: "https://api.deepseek.com/anthropic", model: "deepseek-v4-pro" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
 };
 
 export { isClaudeDriven };
