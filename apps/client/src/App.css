@@ -2897,3 +2897,16 @@ body.is-viewer .frame-grip {
   .note-caret-name { animation: none; }
   .note-writer::before { animation: none; }
 }
+
+/* 2026-11-17: a card's ✕ keeps a 26 px press on the screen however small the card is drawn (it was 8 px at
+   30 %, with the drag handle all round it, so a near miss picked the card up). --view-scale: lib/viewScale.ts */
+.frame-header .icon-btn.is-remove,
+.frame-icons .frame-icon.is-remove {
+  position: relative;
+}
+.frame-header .icon-btn.is-remove::before,
+.frame-icons .frame-icon.is-remove::before {
+  content: "";
+  position: absolute;
+  inset: min(0px, calc((100% - 26px / var(--view-scale, 1)) / 2));
+}
