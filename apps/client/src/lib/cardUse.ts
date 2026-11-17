@@ -5,8 +5,8 @@
  *
  * A card on the grid is something you look at and move. The wheel always pans
  * the grid, wherever the pointer is: over a live app, a map, a terminal or a
- * list. ⌘/Ctrl-wheel zooms the grid, except over a card with more in it than
- * fits, where it scrolls through that card (lib/cardScroll.ts, 2026-11-16).
+ * list. ⌘/Ctrl-wheel always zooms the grid; Alt-wheel scrolls through a card
+ * with more in it than fits (lib/cardScroll.ts, 2026-11-17).
  * To use what's inside a card:
  *
  *   - ⌘-click (Ctrl-click elsewhere) puts it **in use** in place: the app,
@@ -77,9 +77,8 @@ let pointer: { x: number; y: number } | null = null;
 let keyDown = false;
 
 /**
- * Whether a person is really holding ⌘/Ctrl. A trackpad pinch reaches the page as a Ctrl-wheel with no key
- * down, and that is always the grid's zoom; the key itself (seen on keydown, and on any pointer move, which
- * carries the real keys) is what lets the wheel scroll through a card.
+ * Whether a person is really holding ⌘/Ctrl (seen on keydown, and on any pointer move, which carries the real
+ * keys). A trackpad pinch reaches the page as a Ctrl-wheel with no key down.
  */
 export const modKeyDown = () => keyDown;
 

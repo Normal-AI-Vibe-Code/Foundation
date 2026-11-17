@@ -15,7 +15,7 @@
  *     card's box, its neighbours, its section, its ports and its resize corner
  *     stay put; a note's last line stays in the card; a live app's document is
  *     neither reloaded nor resized; the editor isn't pushed twice.
- *  3. Ctrl-wheel scrolls through a card with more in it than fits (a note, a
+ *  3. Alt-wheel (since 2026-11-17; it was Ctrl-wheel for a day) scrolls through a card with more in it than fits (a note, a
  *     character, a design chapter) and leaves the grid alone; at the end it
  *     holds, then zooms after a beat; over a short card or the paper it zooms;
  *     the plain wheel still pans; a pinch (Ctrl-wheel with no key down) zooms.
@@ -272,7 +272,7 @@ test("2 · the hover bar makes room: the content moves down, and nothing else mo
   await leave(ada);
 });
 
-test("3 · Ctrl-wheel scrolls through a card with more in it than fits, then zooms after a beat; elsewhere it zooms; the wheel alone still pans", async () => {
+test("3 · Alt-wheel scrolls through a card with more in it than fits and holds at its end; Ctrl-wheel always zooms; the wheel alone still pans", async () => {
   await frame(ada, ids.Long);
   const pane = slot(ada, ids.Long).locator(".note-rendered");
   const top = () => pane.evaluate((el) => el.scrollTop);
@@ -289,32 +289,41 @@ test("3 · Ctrl-wheel scrolls through a card with more in it than fits, then zoo
   await ada.mouse.wheel(0, -120);
   await settle(ada, 300);
 
-  // Ctrl held: the note scrolls and the grid stays exactly where it is
+  // Alt held: the note scrolls and the grid stays exactly where it is
   await hover(ada, ids.Long);
+  await settle(ada, 900);
   before = await world(ada);
-  await ada.keyboard.down("Control");
+  await ada.keyboard.down("Alt");
   await ada.mouse.wheel(0, 120);
   await expect.poll(top).toBeGreaterThan(100);
   await ada.mouse.wheel(0, 120);
   await expect.poll(top).toBeGreaterThan(220);
   expect(await world(ada)).toBe(before);
   await settle(ada, 200);
-  await ada.screenshot({ path: `${SHOTS}/05_ctrl-wheel-scrolls-the-note-night.png` });
+  await ada.screenshot({ path: "../../docs/evidence/2026-11-17_pointer/30_alt-wheel-scrolls-the-note-night.png" });
   // back up works the same
   await ada.mouse.wheel(0, -60);
   await expect.poll(top).toBeLessThan(200);
 
-  // on to the end: it stops there, and turning on doesn't lurch into a zoom
+  // on to the end: it stops there, and turning on doesn't lurch into a pan or a zoom
   for (let i = 0; i < Math.ceil(max / 300) + 2; i++) await ada.mouse.wheel(0, 300);
   await expect.poll(top).toBeGreaterThan(max - 2);
   for (let i = 0; i < 4; i++) await ada.mouse.wheel(0, 120);
   await settle(ada, 150);
   expect(await world(ada)).toBe(before);
-  // after a beat of quiet at the end, the same turn zooms the grid
+  // and it stays held however long the pause: Alt means the card
   await settle(ada, 600);
   await ada.mouse.wheel(0, 120);
   await settle(ada, 500);
+  expect(await world(ada)).toBe(before);
+  await ada.keyboard.up("Alt");
+  // Ctrl-wheel over the same card zooms the grid, and the card stays where it was in its text
+  const held = await top();
+  await ada.keyboard.down("Control");
+  await ada.mouse.wheel(0, 120);
+  await settle(ada, 500);
   expect(zoomOf(await world(ada))).toBeLessThan(zoomOf(before));
+  expect(await top()).toBe(held);
   await ada.keyboard.up("Control");
 
   // a card with nothing to scroll: Ctrl-wheel zooms
@@ -350,16 +359,17 @@ test("3 · Ctrl-wheel scrolls through a card with more in it than fits, then zoo
   await frame(ada, ids["Design · cards"]);
   const chapter = slot(ada, ids["Design · cards"]).locator(".design-card");
   await hover(ada, ids["Design · cards"]);
+  await settle(ada, 900);
   before = await world(ada);
-  await ada.keyboard.down("Control");
+  await ada.keyboard.down("Alt");
   await ada.mouse.wheel(0, 200);
   await expect.poll(() => chapter.evaluate((el) => el.scrollTop)).toBeGreaterThan(150);
   expect(await world(ada)).toBe(before);
-  await ada.keyboard.up("Control");
+  await ada.keyboard.up("Alt");
   await leave(ada);
 });
 
-test("3b · Ctrl-wheel scrolls a character's card", async () => {
+test("3b · Alt-wheel scrolls a character's card", async () => {
   const made = await ctx.request.post(`${CLIENT}/api/boards/${board}/characters`, { data: { name: "Kumo", set: "animals", form: "mesh", identity: "A dreamy cream shiba puppy.", refs: [], height: 0.5 } });
   expect(made.ok(), await made.text()).toBe(true);
   await expect.poll(() => find(ada, "Kumo")).not.toBeNull();
@@ -376,13 +386,13 @@ test("3b · Ctrl-wheel scrolls a character's card", async () => {
   expect(await body.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(60);
   await hover(ada, id);
   const before = await world(ada);
-  await ada.keyboard.down("Control");
+  await ada.keyboard.down("Alt");
   await ada.mouse.wheel(0, 120);
   await expect.poll(() => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(50);
   expect(await world(ada)).toBe(before);
-  await ada.keyboard.up("Control");
+  await ada.keyboard.up("Alt");
   await settle(ada, 300);
-  await ada.screenshot({ path: `${SHOTS}/06_ctrl-wheel-scrolls-a-character-night.png` });
+  await ada.screenshot({ path: "../../docs/evidence/2026-11-17_pointer/31_alt-wheel-scrolls-a-character-night.png" });
   await leave(ada);
 });
 
@@ -408,9 +418,9 @@ test("4 · scroll bars are a 2 px light line, 1 px in from the edge: clear at re
   const on = await thumb();
   expect(alpha(on.color), `under the pointer: ${on.color}`).toBeGreaterThan(0.2);
   expect(alpha(on.color)).toBeLessThan(0.35);
-  await ada.keyboard.down("Control");
+  await ada.keyboard.down("Alt");
   await ada.mouse.wheel(0, 240);
-  await ada.keyboard.up("Control");
+  await ada.keyboard.up("Alt");
   await settle(ada, 400);
   const b = (await pane.boundingBox())!;
   await ada.screenshot({ path: `${SHOTS}/07_scroll-line-night.png`, clip: { x: b.x + b.width - 140, y: b.y, width: 160, height: Math.min(b.height, 320) } });
@@ -482,9 +492,9 @@ test("day and night: the board's cards and #/design", async ({ browser }) => {
     await waitLive(p);
     await frame(p, ids.Long);
     await hover(p, ids.Long);
-    await p.keyboard.down("Control");
+    await p.keyboard.down("Alt");
     await p.mouse.wheel(0, 200);
-    await p.keyboard.up("Control");
+    await p.keyboard.up("Alt");
     await settle(p, 500);
     await p.screenshot({ path: `${SHOTS}/10_note-hovered-${tone}.png` });
     const card = (await slot(p, ids.Long).locator(".frame-card").first().boundingBox())!;

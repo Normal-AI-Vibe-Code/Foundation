@@ -120,6 +120,7 @@ import type { UploadItem } from "../lib/uploads";
 import { snippetHtml } from "../lib/snippet";
 import { RuneDesign } from "../rune/RendererTab";
 import { CardChromeDemo } from "./CardChromeDemo";
+import { PointerDemo } from "./PointerDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -708,6 +709,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           </div>
         </div>
         <CardChromeDemo />
+        <PointerDemo />
       </Section>
 
       <Section title="Adding files" note={`Drop files or whole folders on a section, paste onto the board (${keys("mod+V")}: they land where the pointer is), or pick them (${keys("mod+U")}). A folder comes in as a group, in path order, under a note that names it. Every upload goes through one glass tray at the bottom right: how many and how much in its head, a 3 px meter (blue while sending, green when everything landed, red when something didn't), then a row per file (its folder in dim, a percentage while it goes, ✓ when it's there). Three go at a time. It folds to its head, and goes by itself a beat after the last one lands. A failure keeps it open with Retry; its card waits until Retry or Close. Documents (PDF, Word, PowerPoint, Excel, OpenDocument) are searchable by what's inside them a moment after they land, and a result shows the words that matched.`}>

@@ -1,22 +1,23 @@
 /**
- * ⌘/Ctrl-wheel scrolls through a card (2026-11-16, Josh: "there needs to be a
- * ctrl+scroll feature to scroll through a card").
+ * Alt-wheel scrolls through a card (2026-11-17, Josh: "Ctrl Zoom should always
+ * zoom and alt+scroll should scroll a card"; before that, for a day, it was
+ * ⌘/Ctrl-wheel, which made the zoom key do two things).
  *
- * The plain wheel is still the grid's, everywhere (lib/cardUse.ts). With the
- * modifier held:
+ * The plain wheel is the grid's, everywhere, and ⌘/Ctrl-wheel always zooms it
+ * (lib/cardUse.ts). With Alt (⌥) held:
  *
  *   - over a card whose content is longer than the card, the wheel scrolls
  *     that content: the nearest scrolling pane under the pointer that has
- *     room that way, then the ones around it, inside the card;
- *   - at the end of it the wheel is held (nothing moves) for as long as the
- *     turning goes on, so reaching the end of a list never lurches into a
- *     zoom; after a beat of quiet it zooms the grid again;
- *   - over the paper, or a card with nothing to scroll, it zooms the grid as
- *     it always has.
+ *     room that way, then the ones around it, inside the card; ⇧ turns it
+ *     sideways;
+ *   - at the end of it the wheel is held (nothing moves): Alt means the card,
+ *     so reaching the end of a list never lurches into a pan of the grid;
+ *   - over the paper, or a card with nothing to scroll, Alt changes nothing:
+ *     the wheel pans the grid as it does without it.
  *
- * A trackpad pinch arrives as a Ctrl-wheel nobody is holding a key for: that
- * is always the grid's zoom (`keyHeld`). Live pages are a separate case: the
- * wheel can't be handed into a frame from here, so they need "in use".
+ * Live pages are a separate case: the wheel can't be handed into a frame from
+ * here, so they need "in use". The mark that says all this on a card with
+ * more than fits is lib/scrollHint.ts.
  */
 
 /** what the rule needs to know about a scrolling pane */
@@ -28,9 +29,6 @@ export interface Pane {
   scrollWidth: number;
   clientWidth: number;
 }
-
-/** how long after the last scroll (or held turn) the wheel at a card's end goes back to zooming the grid */
-export const BEAT = 350;
 
 /** content longer (or wider) than its pane by more than a rounding pixel */
 export const overflows = (p: Pane) => p.scrollHeight - p.clientHeight > 1 || p.scrollWidth - p.clientWidth > 1;
@@ -44,18 +42,17 @@ export function hasRoom(p: Pane, dx: number, dy: number): boolean {
   return false;
 }
 
-export type Verdict = { do: "scroll"; pane: number } | { do: "hold" } | { do: "zoom" };
+export type Verdict = { do: "scroll"; pane: number } | { do: "hold" } | { do: "pass" };
 
 /**
- * What a modifier-wheel over a card does. `panes` are the card's scrolling
- * panes under the pointer, nearest first (only ones whose content overflows);
- * `quietFor` is how long since this card last scrolled or held a turn.
+ * What an Alt-wheel over a card does. `panes` are the card's scrolling panes
+ * under the pointer, nearest first (only ones whose content overflows).
+ * `pass`: there's nothing here to scroll, so the wheel is the grid's.
  */
-export function wheelVerdict(panes: readonly Pane[], dx: number, dy: number, quietFor: number): Verdict {
-  if (!panes.length) return { do: "zoom" };
+export function wheelVerdict(panes: readonly Pane[], dx: number, dy: number): Verdict {
+  if (!panes.length) return { do: "pass" };
   const pane = panes.findIndex((p) => hasRoom(p, dx, dy));
-  if (pane >= 0) return { do: "scroll", pane };
-  return quietFor < BEAT ? { do: "hold" } : { do: "zoom" };
+  return pane >= 0 ? { do: "scroll", pane } : { do: "hold" };
 }
 
 /** wheel deltas in pixels (a line is 16 px, a page is the pane), with ⇧ turning the wheel sideways */
@@ -135,25 +132,29 @@ function heading(el: HTMLElement): Pane {
   return { scrollTop: g?.y ?? el.scrollTop, scrollLeft: g?.x ?? el.scrollLeft, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
 }
 
-const lastAt = new WeakMap<Element, number>();
+/** what of a card scrolls: the root the panes are looked for in */
+export const CARD_ROOT = ".frame-body, .panel-body, .map-body-wrap, .table-card, .hosted-app";
+
+/** the card's scrolling root an element is in, if it's in one */
+export const cardRootOf = (el: Element | null) => el?.closest<HTMLElement>(CARD_ROOT) ?? null;
 
 /**
- * A modifier-wheel over the grid: true when the card under the pointer took
- * it (scrolled, or held at its end), false when it's the grid's to zoom with.
- * `keyHeld` is whether a person is really holding ⌘/Ctrl (a pinch isn't).
+ * An Alt-wheel over the grid: true when the card under the pointer took it
+ * (scrolled, or held at its end), false when there is nothing there to scroll
+ * and the wheel is the grid's. `onScroll` hears each wheel that scrolled.
  */
-export function cardWheel(e: WheelEvent, keyHeld: boolean): boolean {
-  if (!keyHeld) return false;
+export function cardWheel(e: WheelEvent, onScroll?: () => void): boolean {
   const target = e.target instanceof Element ? e.target : null;
-  const card = target?.closest<HTMLElement>(".frame-body, .panel-body, .map-body-wrap, .table-card, .hosted-app");
+  const card = cardRootOf(target);
   if (!target || !card) return false;
   const panes = panesUnder(target, card);
   const { dx, dy } = wheelPixels(e, card.clientHeight);
   if (!dx && !dy) return panes.length > 0;
-  const now = performance.now();
-  const verdict = wheelVerdict(panes.map(heading), dx, dy, now - (lastAt.get(card) ?? -Infinity));
-  if (verdict.do === "zoom") return false;
-  lastAt.set(card, now);
-  if (verdict.do === "scroll") scrollPane(panes[verdict.pane], dx, dy, e.deltaMode === 0 && Math.abs(dx) + Math.abs(dy) < 40);
+  const verdict = wheelVerdict(panes.map(heading), dx, dy);
+  if (verdict.do === "pass") return false;
+  if (verdict.do === "scroll") {
+    scrollPane(panes[verdict.pane], dx, dy, e.deltaMode === 0 && Math.abs(dx) + Math.abs(dy) < 40);
+    onScroll?.();
+  }
   return true;
 }

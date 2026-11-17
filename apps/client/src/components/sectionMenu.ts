@@ -35,7 +35,7 @@ import {
 import { openAgentsPane } from "./SectionCrew";
 import { keepAgentsCard } from "./SectionAgents";
 import { setUi } from "../state/ui";
-import type { MenuItem } from "./ContextMenu";
+import type { MenuGroup, MenuItem } from "./menuLayout";
 
 export interface SectionMenuContext {
   /** the app the section hosts, or the one card that could fill it */
@@ -74,10 +74,13 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
         .then(() => toast(`Sent ${c.name} a link to ${section.name}`, "ok"))
         .catch((err) => toast((err as Error).message, "bad")),
   }));
+  // where each sits (menuLayout.ts): Add and Live are two columns side by side; the grid's own actions are a
+  // row of icon buttons along the bottom, each named on roll-over
+  const tag = (group: MenuGroup, items: MenuItem[]): MenuItem[] => items.map((it) => ({ ...it, group }));
   return [
     // an agent first: the section is somewhere agents build with you
     { icon: "⚇", label: "Council: ask this section's agents…", agent: true, action: () => openCouncil({ kind: "section", id: section.id }) },
-    { divider: true },
+    ...tag("add", [
     { heading: "Add" },
     { icon: "¶", label: "Text box", action: () => addTextBox(section.id, at(480, 320)) },
     { icon: "▤", label: "Markdown note", action: () => addNote(section.id) },
@@ -92,7 +95,8 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
         setUi({ command: true });
       },
     },
-    { divider: true },
+    ]),
+    ...tag("live", [
     { heading: "Live" },
     { icon: "✦", label: "Agents card", agent: true, action: () => keepAgentsCard(section.id, at(380, 440)) },
     { icon: "◐", label: "Huddle", action: () => addPanel(section.id, { panel: "huddle", name: "Huddle", ...at(560, 420) }) },
@@ -102,13 +106,8 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     { icon: "☺", label: "Character: 3D", action: () => void newCharacter(section.id, "model") },
     { icon: "☺", label: "Character: mesh avatar", action: () => void newCharacter(section.id, "mesh") },
     { icon: "◨", label: "All agents on this grid", action: () => openAgentsPane(section.id) },
-    ...(host
-      ? [{ icon: "◱", label: `Show ${host.name} as a card`, action: () => setSectionHost(section.id, null) }]
-      : hostable
-        ? [{ icon: "◳", label: `Let ${hostable.name} fill the section`, action: () => setSectionHost(section.id, hostable.id) }]
-        : []),
-    { divider: true },
-    { heading: "Sections" },
+    ]),
+    ...tag("grid", [
     ...(host
       ? [{ icon: "⤢", label: "Fill the screen with it", action: () => requestSnap({ kind: "section" as const, id: section.id }) }]
       : isOpen
@@ -118,10 +117,13 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     { icon: "→", label: "Insert section right", action: () => addSectionAdjacent(section.id, "right") },
     { icon: "↑", label: "Insert section above", action: () => addSectionAdjacent(section.id, "above") },
     { icon: "↓", label: "Insert section below", action: () => addSectionAdjacent(section.id, "below") },
-    { divider: true },
     { icon: "◫", label: "Split column", action: () => splitSection(section.id, "h") },
     { icon: "⬓", label: "Split row", action: () => splitSection(section.id, "v") },
-    { divider: true },
+    ...(host
+      ? [{ icon: "◱", label: `Show ${host.name} as a card`, action: () => setSectionHost(section.id, null) }]
+      : hostable
+        ? [{ icon: "◳", label: `Let ${hostable.name} fill the section`, action: () => setSectionHost(section.id, hostable.id) }]
+        : []),
     {
       icon: "🗑",
       label: "Remove section…",
@@ -129,5 +131,6 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
       disabled: !canRemove,
       action: () => requestRemoveSection(section.id),
     },
+    ]),
   ];
 }
