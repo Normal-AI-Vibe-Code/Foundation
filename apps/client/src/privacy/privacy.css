@@ -5,8 +5,6 @@
   padding: var(--space-7) clamp(16px, 4vw, 56px) var(--space-6);
   background: var(--color-void);
   user-select: text;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-line-strong) transparent;
 }
 .privacy-head {
   flex-wrap: wrap;

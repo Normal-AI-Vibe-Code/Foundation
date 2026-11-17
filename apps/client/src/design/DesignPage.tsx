@@ -117,6 +117,7 @@ import { fan } from "../lib/pickupMath";
 import type { UploadItem } from "../lib/uploads";
 import { snippetHtml } from "../lib/snippet";
 import { RuneDesign } from "../rune/RendererTab";
+import { CardChromeDemo } from "./CardChromeDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -661,7 +662,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
 
       <Section
         title="Using a card"
-        note={`No card takes the wheel: over a live app, a map, a terminal or a list, the wheel pans the grid and ${IS_MAC ? "⌘" : "Ctrl"}-wheel zooms it. ${keys("mod+click")} puts a card in use (a 2 px blue ring; it alone takes the pointer and the wheel until Esc, a click elsewhere, or a pan). Holding ${IS_MAC ? "⌘" : "Ctrl"} rings the card a click would use. ${keys("mod+enter")} or ⤢ opens it full screen: the card itself, not a copy (an app doesn't reload), under a 44 px bar with its name and the way back.`}
+        note={`No card takes the wheel: over a live app, a map, a terminal or a list, the wheel pans the grid and ${IS_MAC ? "⌘" : "Ctrl"}-wheel zooms it; over a card with more in it than fits, ${IS_MAC ? "⌘" : "Ctrl"}-wheel scrolls through that card instead, and zooms again a beat after it reaches the end. ${keys("mod+click")} puts a card in use (a 2 px blue ring; it alone takes the pointer and the wheel until Esc, a click elsewhere, or a pan). Holding ${IS_MAC ? "⌘" : "Ctrl"} rings the card a click would use. ${keys("mod+enter")} or ⤢ opens it full screen: the card itself, not a copy (an app doesn't reload), under a 44 px bar with its name and the way back. A card's bar (30 px, on hover) is given room: what's in the card moves down 38 px for it and nothing else moves. Scroll bars are a 2 px light line, 1 px in from the edge, there while the pointer is on the pane or it scrolls. The resize corner is a 1 px gleam on the card's corner, there only while the pointer is on the card. A card that would lose something (a character) asks before it's removed.`}
       >
         <div className="adapt-row">
           <div className="oncall-cell">
@@ -704,6 +705,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
             <div className="effect-label">Full screen: the card fills the window under its bar</div>
           </div>
         </div>
+        <CardChromeDemo />
       </Section>
 
       <Section title="Adding files" note={`Drop files or whole folders on a section, paste onto the board (${keys("mod+V")}: they land where the pointer is), or pick them (${keys("mod+U")}). A folder comes in as a group, in path order, under a note that names it. Every upload goes through one glass tray at the bottom right: how many and how much in its head, a 3 px meter (blue while sending, green when everything landed, red when something didn't), then a row per file (its folder in dim, a percentage while it goes, ✓ when it's there). Three go at a time. It folds to its head, and goes by itself a beat after the last one lands. A failure keeps it open with Retry; its card waits until Retry or Close. Documents (PDF, Word, PowerPoint, Excel, OpenDocument) are searchable by what's inside them a moment after they land, and a result shows the words that matched.`}>

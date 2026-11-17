@@ -1439,7 +1439,8 @@ body.rewiring {
   cursor: grabbing !important;
 }
 
-/* The card rests clean; its bar is glass that drops in over the top edge on hover. */
+/* The card rests clean; its bar is glass that drops in at the top edge on hover,
+   and the card's content moves down to make room for it (below). */
 .frame-header {
   position: absolute;
   z-index: 4;
@@ -1473,10 +1474,91 @@ body.rewiring {
   pointer-events: auto;
   transition-delay: 0s;
 }
+.frame-anchor.is-confirming .frame-header {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
 /* while a wire is being dragged, bars stay out of the way of the ports */
 body.is-connecting .frame-header {
   opacity: 0;
   pointer-events: none;
+}
+
+/* The bar makes room (2026-11-16): while it shows, what's in the card sits 38 px lower (the bar's 5 px inset,
+   its 30, and 3 of air), on the bar's own curve and its own 140 ms linger. The card's box never changes, so
+   nothing else in the section moves: the body clips, and its one child either gets shorter from the top
+   (.bar-reflow: its last line and its bottom controls stay in the card) or slides (.bar-slide: a page, a
+   terminal, a model, which must not be resized for a hover). Ports and the resize corner sit outside the
+   body and stay where they are. */
+.frame-card {
+  --bar-push: 0px;
+}
+.frame-anchor.chrome-bar:is(:hover, .is-hover, .dragging, .is-confirming, :focus-within) .frame-card {
+  --bar-push: 38px;
+}
+body.is-connecting .frame-card,
+.frame-card:fullscreen {
+  --bar-push: 0px !important;
+}
+.chrome-bar .frame-body > .bar-reflow {
+  height: calc(var(--h) - var(--bar-push));
+  margin-top: var(--bar-push);
+  transition:
+    height var(--dur-pane) var(--ease-out-soft) 140ms,
+    margin-top var(--dur-pane) var(--ease-out-soft) 140ms;
+}
+.chrome-bar .frame-body > .bar-slide {
+  translate: 0 var(--bar-push);
+  transition: translate var(--dur-pane) var(--ease-out-soft) 140ms;
+}
+.frame-anchor.chrome-bar:is(:hover, .is-hover, .dragging, .is-confirming, :focus-within) .frame-body > :is(.bar-reflow, .bar-slide) {
+  transition-delay: 0s;
+}
+/* the room the bar is given shows the card's own ground (what its content stands on), not the paper behind it */
+.panel-card .frame-body {
+  background: var(--color-abyss);
+}
+.panel-card.kind-connector .frame-body,
+.panel-card.kind-ask .frame-body,
+.panel-card.kind-agent .frame-body {
+  background: var(--color-raise);
+}
+.note-body:has(.note-cm, .note-cm-waiting) {
+  background: var(--color-abyss);
+}
+
+/* #/design, "Using a card": the specimens (design/CardChromeDemo.tsx) */
+[data-card-chrome] {
+  margin-top: var(--space-5);
+}
+[data-card-chrome] .oncall-cell {
+  width: 348px;
+  padding-bottom: 76px;
+}
+[data-card-chrome] .effect-label {
+  right: var(--space-4);
+  border-radius: var(--radius-pane);
+}
+
+/* Removing a card that would lose something asks first, on the card, under its bar. */
+.confirm-pop.frame-confirm {
+  top: 40px;
+  right: 6px;
+  left: auto;
+  max-width: calc(100% - 12px);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  white-space: normal;
+  line-height: 1.4;
+}
+.frame-confirm > span:first-child {
+  flex: 1 1 180px;
+}
+.frame-confirm-acts {
+  display: inline-flex;
+  gap: 8px;
 }
 
 /* Images and video: no bar. Round icons wait behind the card's right edge
@@ -1707,9 +1789,9 @@ body.is-connecting .frame-header {
   font-variant-ligatures: none; /* markdown source: |---| stays dashes, -> stays two characters */
   scrollbar-gutter: stable;
 }
-/* while writing, the card's bar sits over the top edge: start the text below it */
+/* while writing, the card's bar is showing and has moved the editor down (.bar-reflow): no room of its own */
 .note-cm .cm-editor .cm-content {
-  padding: 42px 0 14px;
+  padding: 14px 0 14px;
   caret-color: var(--ink);
 }
 .note-cm .cm-editor .cm-line { padding: 0 18px; }
@@ -1720,7 +1802,7 @@ body.is-connecting .frame-header {
 .note-cm-waiting {
   height: 100%;
   overflow: hidden;
-  padding: 42px 18px 14px;
+  padding: 14px 18px 14px;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   color: var(--ink);
@@ -1787,16 +1869,6 @@ body.is-connecting .frame-header {
 }
 .frame-anchor.dragging .frame-card.media-card:not(.is-clear) {
   box-shadow: var(--shadow-card-lift);
-}
-/* its resize corner waits for the pointer too */
-.frame-card.media-card > .map-resize {
-  opacity: 0;
-  transition: opacity var(--dur-quick) var(--ease-out-soft) 120ms;
-}
-.frame-anchor:hover .frame-card.media-card > .map-resize,
-.frame-anchor.is-hover .frame-card.media-card > .map-resize {
-  opacity: 1;
-  transition-delay: 0s;
 }
 .frame-card.media-card.ctx-active {
   box-shadow: 0 0 0 2.5px var(--select);
@@ -2331,6 +2403,10 @@ body.is-connecting .frame-header {
   transform: translateY(0);
 }
 
+/* The resize corner (2026-11-16, Josh: "really just a gleam on the card corner, and don't show it until
+   hovering over"). Nothing at rest. While the pointer is on the card, a 1 px arc lies on the card's own
+   bottom-right corner, 10 px each way and fading out at both ends; under the pointer it turns blue. The grab
+   area is the same 22 px square it always was, reaching 2 px past the card's edge. */
 .map-resize {
   position: absolute;
   right: -2px;
@@ -2339,24 +2415,42 @@ body.is-connecting .frame-header {
   height: 22px;
   cursor: nwse-resize;
   z-index: 6;
-  border-radius: 0 0 12px 0;
+  opacity: 0;
+  /* fades on opacity (never a transitioned colour), and waits a beat on the way out like the rest of a card's chrome */
+  transition: opacity var(--dur-quick) var(--ease-out-soft) 120ms;
 }
-
 .map-resize::after {
   content: "";
   position: absolute;
-  right: 5px;
-  bottom: 5px;
+  /* the square's corner is 1 px outside the card's border edge: this lands the arc on the border itself */
+  right: 1px;
+  bottom: 1px;
   width: 10px;
   height: 10px;
-  border-right: 2.5px solid var(--ink-faint);
-  border-bottom: 2.5px solid var(--ink-faint);
-  border-radius: 0 0 3px 0;
-  transition: border-color 0.2s ease;
+  /* the card's edge is already --color-line-strong: the same tone on top of it can't be seen, so the gleam
+     is the edge lifted toward ink */
+  border: solid color-mix(in srgb, var(--color-frost) 60%, var(--color-line-strong));
+  border-width: 0 1px 1px 0;
+  border-bottom-right-radius: var(--radius-card);
+  /* a mask reads only alpha: clear at the two ends, solid round the corner */
+  mask-image: linear-gradient(to bottom right, transparent 50%, black 78%);
 }
-
-.map-resize:hover::after {
-  border-color: var(--ink);
+.frame-anchor:hover .map-resize,
+.frame-anchor.is-hover .map-resize,
+.map-anchor:hover .map-resize,
+.map-resize:active {
+  opacity: 1;
+  transition-delay: 0s;
+}
+.map-resize:hover::after,
+.map-resize:active::after {
+  border-color: var(--color-pulse);
+}
+/* no pointer to hover with: the corner shows */
+@media (hover: none) {
+  .map-resize {
+    opacity: 1;
+  }
 }
 
 /* map pins — pulsing beacons for people/places */

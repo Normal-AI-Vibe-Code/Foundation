@@ -354,8 +354,11 @@
     0 0 0 1px var(--color-line);
 }
 
-/* ---------- scroll bars: a thin half-ink rectangle, there only while the pane is in use ---------- */
+/* ---------- scroll bars: a 2 px light line by the pane's edge, there only while the pane is in use ----------
+   (2026-11-16, Josh: "make the scroll bar much thinner and basically 2px line next to the edge of the card
+   and light colored") */
 
+/* the strip the bar can be grabbed in stays 8 px wide; only 2 px of it are drawn */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -365,9 +368,12 @@
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
-/* a 4 px bar: the thumb's clear border insets it from the pane's edge. No radius: a rectangle */
+/* a 2 px line, 1 px in from the pane's edge: the thumb's clear borders leave only that much of it (5 + 2 + 1
+   across the strip, for an upright bar and a level one alike; along its length it just ends a little short).
+   No radius */
 ::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
+  border: solid transparent;
+  border-width: 5px 1px 1px 5px;
   border-radius: 0;
   background-color: transparent;
   background-clip: content-box;
@@ -375,7 +381,7 @@
 /* shown under the pointer and while it scrolls (lib/scrollbars.ts marks .is-scrolling) */
 :hover::-webkit-scrollbar-thumb,
 .is-scrolling::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--color-frost) 50%, transparent);
+  background-color: color-mix(in srgb, var(--color-frost) 28%, transparent);
 }
 /* engines without those parts (Firefox): the nearest it has */
 @supports not selector(::-webkit-scrollbar) {
@@ -385,7 +391,7 @@
   }
   *:hover,
   .is-scrolling {
-    scrollbar-color: color-mix(in srgb, var(--color-frost) 50%, transparent) transparent;
+    scrollbar-color: color-mix(in srgb, var(--color-frost) 28%, transparent) transparent;
   }
 }
 

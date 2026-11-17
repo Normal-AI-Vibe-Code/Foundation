@@ -68,6 +68,10 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   design: "◐",
 };
 
+/** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
+ *  nothing that should resize a document for a hover); every other kind gets shorter from the top instead */
+const SLIDES = new Set<PanelMeta["panel"]>(["app", "link", "machine", "file"]);
+
 export const PanelView = memo(function PanelView({ panel, pos, isActive, getScale, hosted }: Props) {
   countRender("PanelView");
   const layout = usePortLayout(panel);
@@ -200,6 +204,9 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       onMove={(x, y) => movePanel(panel.id, x, y)}
       onResize={(dw, dh) => resizePanel(panel.id, panel.w + dw, panel.h + dh)}
       onRemove={() => removePanel(panel.id)}
+      // a character is something a person paid to make: its card asks before it goes (the server takes the
+      // character off every council with it; what was drawn stays in the archive)
+      confirmRemove={panel.panel === "character" ? { name: panel.name, note: "Its pictures and files stay in the archive." } : undefined}
       headerExtras={extras}
       bodyClass={`panel-body panel-${panel.panel}`}
       cardClass={`panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}`}
@@ -207,7 +214,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       openUrl={panel.url}
       overlay={panel.ports.length ? <div className="port-rail">{ports}</div> : null}
     >
-      <div style={{ height: panel.h }} className="panel-inner">
+      {/* the bar makes room: most cards get shorter from the top; one that holds a document, a terminal or a model slides (ObjectFrame) */}
+      <div style={SLIDES.has(panel.panel) ? { height: panel.h } : { ["--h" as string]: `${panel.h}px` }} className={`panel-inner ${SLIDES.has(panel.panel) ? "bar-slide" : "bar-reflow"}`}>
         {body}
       </div>
     </ObjectFrame>
