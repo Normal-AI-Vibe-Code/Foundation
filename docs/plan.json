@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-16T08:04:00.989Z",
+  "syncedAt": "2026-11-17T01:38:27.370Z",
   "columns": [
     {
       "id": "needs-you",
@@ -1589,7 +1589,8 @@
       "milestone": "polish",
       "area": "design",
       "status": "review",
-      "body": "Built 2026-11-16 (SPEC §0.6, §3, §7; `docs/evidence/2026-11-16_today-council-agents/`). Today's pill with the Shiba and a badge, the room in white with a glass composer, answers drawn as markdown, pictures, a plan and folds that open on the right. The council is a band under the top bar (grid) or at the top of its section. ＋ opens Add an agent in the agents panel (who, connect, avatar, add); Background lists sessions. The Character studio has a pipeline row with a flow card, and characters are approved or archived. For a person: restart this computer's server, then add a real agent."
+      "body": "Built 2026-11-16 (SPEC §0.6, §3, §7; `docs/evidence/2026-11-16_today-council-agents/`). Today's pill with the Shiba and a badge, the room in white with a glass composer, answers drawn as markdown, pictures, a plan and folds that open on the right. The council is a band under the top bar (grid) or at the top of its section. ＋ opens Add an agent in the agents panel (who, connect, avatar, add); Background lists sessions. The Character studio has a pipeline row with a flow card, and characters are approved or archived. For a person: restart this computer's server, then add a real agent.",
+      "issue": 154
     },
     {
       "id": "agent-sign-in-vm",
@@ -1598,7 +1599,8 @@
       "milestone": "crew",
       "area": "machines",
       "status": "next",
-      "body": "Josh, 2026-11-16: the agent adding process should go through all the steps to log in with an account, in a built-in unique Kiri VM and browser rendered as a browser tool. Today the Connect step only says how to sign in at a terminal. Needs: a browser inside a machine's desktop (Ubuntu's Firefox is a snap; use a deb or Chromium), the agent's program installed and signed in there or its sign-in page opened there, the desktop shown in the agents panel as a browser pane, and the session's credentials kept in that machine. Depends on *machines-desktop-more* and *agent-machines*."
+      "body": "Josh, 2026-11-16: the agent adding process should go through all the steps to log in with an account, in a built-in unique Kiri VM and browser rendered as a browser tool. Today the Connect step only says how to sign in at a terminal. Needs: a browser inside a machine's desktop (Ubuntu's Firefox is a snap; use a deb or Chromium), the agent's program installed and signed in there or its sign-in page opened there, the desktop shown in the agents panel as a browser pane, and the session's credentials kept in that machine. Depends on *machines-desktop-more* and *agent-machines*.",
+      "issue": 155
     },
     {
       "id": "agent-panel-panes",
@@ -1607,7 +1609,8 @@
       "milestone": "crew",
       "area": "agent",
       "status": "next",
-      "body": "Josh, 2026-11-16: use Claude Code's architecture to show how agents work, with the agent panel as the primary chat interface to Foundation. Today the panel has three faces (at work, add, background) and the agent's own pane has facts and a box to write to it. Build an agent's session as panes: the conversation (with the components Today now draws), what it changed on the grid, its files, its terminal and browser when it has a machine, its plan, and its background tasks; and keep-awake while it works."
+      "body": "Josh, 2026-11-16: use Claude Code's architecture to show how agents work, with the agent panel as the primary chat interface to Foundation. Today the panel has three faces (at work, add, background) and the agent's own pane has facts and a box to write to it. Build an agent's session as panes: the conversation (with the components Today now draws), what it changed on the grid, its files, its terminal and browser when it has a machine, its plan, and its background tasks; and keep-awake while it works.",
+      "issue": 156
     },
     {
       "id": "t3-on-the-grid",
@@ -1616,7 +1619,8 @@
       "milestone": "crew",
       "area": "agent",
       "status": "backlog",
-      "body": "Josh, 2026-11-16: a mini version of T3 on the right panel that expands into a full version, in Foundation's style on the grid, with all of T3's features. Today Background lists T3's sessions with Open and Stop, and Open T3 puts T3 in a browser tab. Next: read a session's messages in the panel, reply to it, then a T3 card on a grid."
+      "body": "Josh, 2026-11-16: a mini version of T3 on the right panel that expands into a full version, in Foundation's style on the grid, with all of T3's features. Today Background lists T3's sessions with Open and Stop, and Open T3 puts T3 in a browser tab. Next: read a session's messages in the panel, reply to it, then a T3 card on a grid.",
+      "issue": 157
     },
     {
       "id": "session-components",
@@ -1625,7 +1629,8 @@
       "milestone": "polish",
       "area": "agent",
       "status": "backlog",
-      "body": "Today draws the Shiba's answers as markdown with pictures, a plan card and folded code, commands and steps that open in the detail pane. The session column (✦ Ask) and what a council's agents answer still draw the old way. Use the same parts there."
+      "body": "Today draws the Shiba's answers as markdown with pictures, a plan card and folded code, commands and steps that open in the detail pane. The session column (✦ Ask) and what a council's agents answer still draw the old way. Use the same parts there.",
+      "issue": 158
     },
     {
       "id": "section-band-wires",
@@ -1634,7 +1639,8 @@
       "milestone": "polish",
       "area": "wires",
       "status": "backlog",
-      "body": "While a section's council band is open, the section's header and cards are 236 px lower (a transform) and the wire layer still routes to where the ports were. Either make the band part of the section's layout (the body's rect starts under it) or offset that section's port points while it's open."
+      "body": "While a section's council band is open, the section's header and cards are 236 px lower (a transform) and the wire layer still routes to where the ports were. Either make the band part of the section's layout (the body's rect starts under it) or offset that section's port points while it's open.",
+      "issue": 159
     },
     {
       "id": "card-chrome",
@@ -1643,7 +1649,8 @@
       "milestone": "polish",
       "area": "panels",
       "status": "review",
-      "body": "Built 2026-11-16 (`docs/evidence/2026-11-16_card-chrome/NOTES.md`). A character card's ✕ asks first and the character leaves every council with its card; the hover bar gives the card's content 38 px of room instead of covering it; Ctrl/⌘-wheel scrolls through a card with more in it than fits; scroll bars are a 2 px light line; the resize corner is a gleam shown on hover. A ✕ that does nothing on a character was not reproduced: if it happens again, note where it was pressed."
+      "body": "Built 2026-11-16 (`docs/evidence/2026-11-16_card-chrome/NOTES.md`). A character card's ✕ asks first and the character leaves every council with its card; the hover bar gives the card's content 38 px of room instead of covering it; Ctrl/⌘-wheel scrolls through a card with more in it than fits; scroll bars are a 2 px light line; the resize corner is a gleam shown on hover. A ✕ that does nothing on a character was not reproduced: if it happens again, note where it was pressed.",
+      "issue": 160
     },
     {
       "id": "card-chrome-elsewhere",
@@ -1652,7 +1659,8 @@
       "milestone": "polish",
       "area": "panels",
       "status": "next",
-      "body": "The bar's room was checked on a note, a live app, a character and a design chapter. Look at Slack, huddle, kanban, machine and file cards (a terminal's bottom line slides under the card's edge while hovered), run the frame-rate check, and try ⌘-wheel, a pinch and a character's ✕ in the desktop window, on a Mac and on a trackpad."
+      "body": "The bar's room was checked on a note, a live app, a character and a design chapter. Look at Slack, huddle, kanban, machine and file cards (a terminal's bottom line slides under the card's edge while hovered), run the frame-rate check, and try ⌘-wheel, a pinch and a character's ✕ in the desktop window, on a Mac and on a trackpad.",
+      "issue": 161
     },
     {
       "id": "character-restore",
@@ -1661,7 +1669,8 @@
       "milestone": "polish",
       "area": "pipeline",
       "status": "backlog",
-      "body": "Removing a character's card keeps its record and files, but nothing in the app puts it back on the grid. Offer removed characters in the pipeline card (or the Character studio's menu) with Restore."
+      "body": "Removing a character's card keeps its record and files, but nothing in the app puts it back on the grid. Offer removed characters in the pipeline card (or the Character studio's menu) with Restore.",
+      "issue": 162
     }
   ]
 }
