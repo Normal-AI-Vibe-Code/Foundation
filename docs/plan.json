@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-17T08:08:12.388Z",
+  "syncedAt": "2026-11-18T00:43:33.747Z",
   "columns": [
     {
       "id": "needs-you",
@@ -989,7 +989,8 @@
       "milestone": "today",
       "area": "today",
       "status": "review",
-      "body": "Company goals: the few things everyone is working towards, first on Today (above Focus today) and in Foundation for Chrome's popup, the same for everyone. Whoever can change the company board sets them (on the page, or by asking the Shiba: `set_company_goal`); a viewer reads them and the server refuses their write (HTTP and tools). A goal handed to someone (`owner`) is in their focus, right after their asks. Changes are logged on the company board. Evidence: `docs/evidence/2026-11-14_company-goals/` (SPEC §3 Today)."
+      "body": "Company goals: the few things everyone is working towards, first on Today (above Focus today) and in Foundation for Chrome's popup, the same for everyone. Whoever can change the company board sets them (on the page, or by asking the Shiba: `set_company_goal`); a viewer reads them and the server refuses their write (HTTP and tools). A goal handed to someone (`owner`) is in their focus, right after their asks. Changes are logged on the company board. Evidence: `docs/evidence/2026-11-14_company-goals/` (SPEC §3 Today).",
+      "issue": 195
     },
     {
       "id": "chrome-real-check",
