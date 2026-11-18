@@ -2001,6 +2001,96 @@
       "status": "backlog",
       "body": "The GPU renderer (apps/rune) draws a collection card blank and has no tile drag-out. Bring it to the web renderer's card (panels/CollectionView.tsx).",
       "issue": 193
+    },
+    {
+      "id": "wt-person-gate",
+      "title": "Working together 1: the person gate",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "review",
+      "body": "Things only a person may start are refused to an agent's token everywhere, with a test for each. Slice 1 of ADR-001 (docs/decisions/ADR-001-working-together.md). Built on branch adr-001/slice-1-person-gate (local, not pushed); waits for Josh to merge."
+    },
+    {
+      "id": "wt-tool-doors",
+      "title": "Working together 2: app tools go through the registry",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "next",
+      "body": "An agent calls an app's tools by its registry entry, with a press on first use; agents get a working folder of their own. Slice 2 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-origin-mark",
+      "title": "Working together 3: where it ran, in the data",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Every agent event and every board object carries its origin and whether it includes outside content; the origin badge and chain row on #/design, day and night. Needs /api/agui. Slice 3 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-deny-ledger",
+      "title": "Working together 4: marked runs and the ledger",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "backlog",
+      "body": "A run that has read outside content is refused the tools that send data out or spend; one ledger line per tool call. Slice 4 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-registry",
+      "title": "Working together 5: enrolment and the map",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "The apps table grows into participants a person enrols by code; manifest v2 served and read; the map drawn from the registry. Builds on app-registry (#48) and foundation-json (#49). Slice 5 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-mandates",
+      "title": "Working together 6: mandates",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "backlog",
+      "body": "Short-lived, chain-bound tokens for calls between enrolled apps, with generated-chain tests for the weakest-link rule. Slice 6 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-first-chain",
+      "title": "Working together 8: the first chain",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "vision",
+      "status": "backlog",
+      "body": "Foundation's agent asks Vision for a part from SolidCraft through Vision's engine door; the Chain view draws it; evidence end to end. Needs Vision's side (slice 7). Slice 8 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-watch",
+      "title": "Working together 9: watching and Waiting for you",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "Chains started elsewhere can be seen and stopped; every pending ask in one list, each saying where it is answered. Slice 9 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-shared-package",
+      "title": "Working together 10: one reducer",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Take the shared AG-UI conventions and reducer from @pacific/agui by hash-locked copy; retire the duplicate. Slice 10 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "wt-handoff",
+      "title": "Working together 12: hand-off between agents",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "A run in another app shown as a subagent in ours; its asks display-only. Needs Vision's tool door. Slice 12 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
     }
   ]
 }
