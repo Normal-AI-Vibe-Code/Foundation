@@ -173,7 +173,7 @@ test("a section's council: three places at the section's right, by its Council b
   await admin.keyboard.press("Escape");
 });
 
-test("the side menu's foot: the server the menu's width above Settings, day and night left of you, all in line with the Settings icon", async () => {
+test("the side menu's foot: the server a small pill right of Settings in its band, day and night left of you, in line with the Settings icon", async () => {
   await admin.locator(".pane-fold").click();
   const pane = admin.locator(".side-pane");
   await expect(pane.locator('[data-server-where="pane"]')).toBeVisible();
@@ -183,11 +183,12 @@ test("the side menu's foot: the server the menu's width above Settings, day and 
   const orb = await box(admin, ".side-pane .pane-foot .night-orb");
   const me = await box(admin, ".side-pane .pane-foot .me-avatar");
   const paneBox = (await pane.boundingBox())!;
-  // above Settings, and nearly the menu's width with the same space either side
-  expect(pill.y + pill.height).toBeLessThanOrEqual(settings.y);
-  expect(Math.abs(pill.x - paneBox.x - (paneBox.x + paneBox.width - (pill.x + pill.width)))).toBeLessThan(3);
-  // the left edges in a line: the server pill, the Settings icon, the orb
-  expect(Math.abs(pill.x - settings.x)).toBeLessThan(2);
+  // in Settings' band: right of it, centred on the same line, small, and inside the menu's right edge
+  expect(pill.x).toBeGreaterThan(settings.x + settings.width);
+  expect(Math.abs(pill.y + pill.height / 2 - (settings.y + settings.height / 2))).toBeLessThan(3);
+  expect(pill.height).toBeLessThanOrEqual(24);
+  expect(pill.x + pill.width).toBeLessThanOrEqual(paneBox.x + paneBox.width);
+  // the orb's left edge in line with the Settings icon
   expect(Math.abs(orb.x - settings.x)).toBeLessThan(3);
   // the orb is left of you
   expect(orb.x + orb.width).toBeLessThanOrEqual(me.x);

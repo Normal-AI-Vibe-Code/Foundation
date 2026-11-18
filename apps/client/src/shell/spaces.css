@@ -657,6 +657,16 @@
   border-top: 1px solid var(--color-line);
   border-bottom: 1px solid var(--color-line);
 }
+/* Settings and the server pill in one band: Settings takes the room, the pill sits at the right */
+.side-pane .pane-low-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.side-pane .pane-low-row .pane-row {
+  flex: 1 0 auto;
+  width: auto;
+}
 .side-pane .pane-pick {
   flex: none;
   display: flex;

@@ -202,15 +202,15 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             </section>
           </div>
 
-          {/* the server this app talks to, the menu's width, above Settings (2026-11-17: out of the top bar) */}
-          <ServerSwitch where="pane" />
-          <section className="pane-band pane-low">
+          {/* Settings, and the server this app talks to as a small pill to its right in the same band (2026-11-17) */}
+          <section className="pane-band pane-low pane-low-row">
             <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
               <span className="pane-glyph">
                 <GearGlyph />
               </span>
               <span className="pane-label">Settings</span>
             </button>
+            <ServerSwitch where="pane" />
           </section>
           <footer className="pane-foot">
             {/* day and night, left of you (2026-11-17: out of the top bar) */}

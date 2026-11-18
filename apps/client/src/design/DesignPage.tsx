@@ -495,23 +495,23 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
                 </div>
               </section>
             </div>
-            {/* the foot (2026-11-17): the server the menu's width above Settings; day and night left of you; edges on the Settings icon's */}
-            <div className="server-switch-place is-bar is-pane">
-              <div className="server-switch">
-                <span className="server-switch-pill">
-                  <i className="server-switch-dot" data-tone="ok" />
-                  <span className="server-switch-addr">localhost:4410</span>
-                  <span className="server-switch-caret">▴</span>
-                </span>
-              </div>
-            </div>
-            <section className="pane-band pane-low">
+            {/* the foot (2026-11-17): Settings with the server as a small pill to its right; day and night left of you */}
+            <section className="pane-band pane-low pane-low-row">
               <span className="pane-row pane-place">
                 <span className="pane-glyph">
                   <GearGlyph />
                 </span>
                 <span className="pane-label">Settings</span>
               </span>
+              <div className="server-switch-place is-bar is-pane">
+                <div className="server-switch">
+                  <span className="server-switch-pill">
+                    <i className="server-switch-dot" data-tone="ok" />
+                    <span className="server-switch-addr">localhost:4410</span>
+                    <span className="server-switch-caret">▴</span>
+                  </span>
+                </div>
+              </div>
             </section>
             <footer className="pane-foot">
               <NightOrb onToggle={() => setNight(!isNight())} />

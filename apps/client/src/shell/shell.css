@@ -5166,7 +5166,6 @@ body.is-viewer .port {
   border: 1px solid var(--color-line);
   border-radius: var(--radius-pane);
 }
-.floor-demo .side-pane .pane-foot,
-.floor-demo .side-pane .server-switch-place {
+.floor-demo .side-pane .pane-foot {
   flex: none;
 }
