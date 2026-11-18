@@ -18,7 +18,7 @@ Rules:
 - Flowform admins become Foundation admins.
 - Flowform viewers are refused unless `FLOWFORM_ADMIT_VIEWERS=1`.
 - A person is matched by **Flowform user id** first, then by email. Someone the importer already linked keeps their board memberships even if their email address changed.
-- Dev login stays available for local work. Turn it off in shared deployments with `FOUNDATION_DEV_LOGIN=0`.
+- Dev login is for local work only: off unless `FOUNDATION_DEV_LOGIN=1`, and then only from the server's own computer.
 
 **Status (2026-11-02):** works against production Flowform when Foundation runs on the person's machine. The redirect chain up to Google's account chooser was checked live (`signin.txt`). Only the person can complete Google's own page. **Josh has nothing to set up for local use.** A *hosted* Foundation, one not on loopback, needs Flowform to accept its origin as a sign-in callback. That is a Flowform-side change, written up with Flowform (private).
 

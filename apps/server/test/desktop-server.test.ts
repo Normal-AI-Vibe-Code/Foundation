@@ -52,7 +52,8 @@ const within = <T>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<"t
 
 test("the app's server keeps to its own folder, says who it is, and leaves when the app does", async () => {
   const home = mkdtempSync(join(tmpdir(), "foundation-desktop-"));
-  writeFileSync(join(home, ".env"), "FOUNDATION_DEV_LOGIN=0\n");
+  // dev login is off by default, so the folder's .env turning it on is what shows the file was read
+  writeFileSync(join(home, ".env"), "FOUNDATION_DEV_LOGIN=1\n");
   const port = await freePort();
   const a = start(home, port);
   try {
@@ -62,7 +63,7 @@ test("the app's server keeps to its own folder, says who it is, and leaves when 
     assert.equal(health.name, "foundation", "the app tells a Foundation server from another program on the port by this");
     assert.ok(existsSync(join(home, "data", "foundation.db")), "its database is under FOUNDATION_ROOT, not the repo's data/");
     const cfg = (await (await fetch(`http://127.0.0.1:${port}/auth/config`)).json()) as { devLogin: boolean };
-    assert.equal(cfg.devLogin, false, "it read .env from FOUNDATION_ROOT");
+    assert.equal(cfg.devLogin, true, "it read .env from FOUNDATION_ROOT");
 
     // a second server on the same port says why in one line and exits, rather than hanging on
     const b = start(mkdtempSync(join(tmpdir(), "foundation-desktop-")), port);

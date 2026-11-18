@@ -488,6 +488,11 @@ export function Login({
                 </motion.button>
               </motion.form>
             )}
+            {cfg && !cfg.devLogin && !google && !waiting && (
+              <div className="login-error" role="status" data-shape="text">
+                No sign-in is turned on for this server. To sign in by email on your own computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart the server.
+              </div>
+            )}
             {error && (
               <motion.div className="login-error" role="alert" data-shape="text" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={press}>
                 {error}

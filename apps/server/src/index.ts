@@ -13,7 +13,7 @@ import { WebSocketServer } from "ws";
 import { config } from "./config.ts";
 import { one } from "./db.ts";
 import { HttpError, json, readJson, Router, sse, type Req } from "./http.ts";
-import { clearSession, createSession, googleAuthUrl, googleCallback, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
+import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, googleAuthUrl, googleCallback, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
 import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
@@ -26,7 +26,7 @@ import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrp
 import { t3Thread, t3Threads } from "./t3.ts";
 import { requestHostTerminal } from "./hostterm.ts";
 import { changelog } from "./changelog.ts";
-import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3OpenLink, type AddAgentInput } from "./t3host.ts";
+import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3HostRunning, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
 import { pollHandoffs } from "./vision.ts";
 import { boardPeople, boardRole, canWrite, requireWriter, setBoardRole } from "./roles.ts";
@@ -83,7 +83,9 @@ r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 r.get("/auth/config", () => ({ google: Boolean(config.google.clientId), devLogin: config.devLogin, flowform: { url: flowform.flowformUrl() }, version: SERVER_VERSION, minClient: minClient() || null }));
 r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
 r.post("/auth/dev", async (req, res) => {
-  if (!config.devLogin) throw new HttpError(403, "dev login is off");
+  // off unless FOUNDATION_DEV_LOGIN=1; then only from this computer, with an allowlist, while T3 isn't running (ADR-001 G0)
+  const refused = devSignInRefusal(req, t3HostRunning());
+  if (refused) throw new HttpError(403, refused);
   const { email, name, bearer } = await readJson<{ email?: string; name?: string; bearer?: boolean }>(req);
   if (!email || !/^[^@\s]+@[^@\s]+$/.test(email)) throw new HttpError(400, "enter an email");
   if (!isAllowed(email)) throw new HttpError(403, `${email} is not on Foundation's allowlist`);
@@ -190,10 +192,10 @@ r.post("/api/ws-ticket", async (req) => {
   requireCurrentClient(client, req.headers.origin);
   return issueTicket(req, path);
 });
-/** a bearer for an external agent (Claude Code, Codex, Vision) acting as you */
+/** a bearer for an external agent (Claude Code, Codex, Vision) acting as you: a person makes it (an agent's token can't mint itself a longer one), and it lasts a week (ADR-001 G9) */
 r.post("/api/agent/token", (req) => {
-  const u = requireUser(req);
-  return { token: createSession(u.id, 30 * 864e5, "agent"), mcp: `${config.publicUrl}/mcp?board=company` };
+  const u = requirePerson(req, "Making an agent token");
+  return { token: createSession(u.id, AGENT_TOKEN_DAYS * 864e5, "agent"), mcp: `${config.publicUrl}/mcp?board=company` };
 });
 
 // ---------- boards ----------
@@ -414,14 +416,16 @@ r.get("/api/apps", (req) => {
   requireUser(req);
   return { apps: listApps() };
 });
+// saving an app and probing an address: a person (the server fetches whatever address is given; ADR-001 G10).
+// Probe isn't in READ_POSTS, so a viewer is refused by the write gate as well
 r.post("/api/apps", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Saving an app");
   const body = await readJson<{ name: string; url?: string; repo?: string; mcp?: string; description?: string }>(req);
   if (!body.name) throw new HttpError(400, "name required");
   return { app: saveApp(body, u.id) };
 });
 r.post("/api/apps/probe", async (req) => {
-  requireUser(req);
+  requirePerson(req, "Probing an app's address");
   const { url } = await readJson<{ url?: string }>(req);
   if (!url || !/^https?:\/\//.test(url)) throw new HttpError(400, "an http(s) URL");
   return probeApp(url);
@@ -645,8 +649,9 @@ r.get("/api/jobs/:id", (req) => {
   requireBoard(u, job.board_id);
   return { job };
 });
+// a job runs third-party code or spends on a model: only a person presses Run (jobs.ts; ADR-001 G1)
 r.post("/api/jobs/:id/run", (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Running a job");
   const job = getJob(req.params.id);
   if (!job) throw new HttpError(404, "no such job");
   requireBoard(u, job.board_id);
@@ -981,8 +986,10 @@ r.get("/api/t3host/presets", (req) => {
   return T3_PRESETS;
 });
 
+// a new run spends on a model: a person asks (ADR-001 G2). Crew helpers and the Slack curator start theirs
+// in-process (agent.ts startRun), not through this route. Still in READ_POSTS: a viewer who is a person may ask
 r.post("/api/agent", async (req, res) => {
-  const user = requireUser(req);
+  const user = requirePerson(req, "Asking the agent");
   const body = await readJson<{ board?: string; prompt?: string; runtime?: string; session?: string; persona?: string; as?: string }>(req);
   if (!body.prompt?.trim()) throw new HttpError(400, "say something");
   requireBoard(user, body.board || "company");
@@ -1028,7 +1035,7 @@ r.post("/api/agent/runs/:id/stop", (req) => {
  * and preferences (their goals, profile and settings are theirs, not a board's). The board is the
  * route's :id, or ?board=, else the person's account role decides.
  */
-const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/apps\/probe$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
+const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
 function gateWrites(req: Req, path: string) {
   if (req.method === "GET" || req.method === "OPTIONS" || !path.startsWith("/api/")) return;
   if (READ_POSTS.some((p) => p.test(path))) return;
@@ -1139,7 +1146,10 @@ server.listen(config.port, config.host, () => {
   const rt = runtimes();
   console.log(`\n  Foundation server  ${config.publicUrl}`);
   console.log(`  data               ${config.dataDir}`);
-  console.log(`  sign-in            ${config.google.clientId ? "Google" : ""}${config.google.clientId && config.devLogin ? " + " : ""}${config.devLogin ? "dev login" : ""}`);
+  const doors = [config.google.clientId ? "Google" : `Google through Flowform (${flowform.flowformUrl()})`, config.devLogin ? "dev login (this computer only)" : ""].filter(Boolean);
+  console.log(`  sign-in            ${doors.join(" + ")}`);
+  // never locked out without being told why: dev login is off unless asked for
+  if (!config.devLogin && !config.google.clientId) console.log("  dev login          off. To sign in by email on this computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart");
   console.log(`  agent              ${rt.subscription ? "Claude Code (subscription)" : rt.subscriptionNote ? `— (${rt.subscriptionNote.split("\n")[0]})` : "—"}${rt.api ? ` · API (${rt.model})` : ""}`);
   console.log(`  MCP                ${config.publicUrl}/mcp?board=company\n`);
 });

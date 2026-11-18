@@ -8,7 +8,7 @@
  */
 
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { person, settle } from "./helpers";
+import { CLIENT, person, settle } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-17_bottom-bar";
 let admin: Page;
@@ -39,6 +39,8 @@ test.beforeAll(async ({ browser }) => {
   ctx = a.context;
 });
 test.afterAll(async () => {
+  // T3 off even if a check stopped half way: dev sign-in is refused while it runs, and the next files sign in
+  await ctx?.request.post(`${CLIENT}/api/t3host/stop`, { failOnStatusCode: false }).catch(() => {});
   await ctx?.close();
 });
 

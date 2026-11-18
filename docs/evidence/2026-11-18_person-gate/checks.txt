@@ -1,0 +1,30 @@
+Person gate (ADR-001 slice 1: G0, G1, G2, G9, G10, G12), checked 2026-11-18 on Windows 11, Node 24.16.0.
+
+npm ci                      exit 0
+
+npm test (exit 1, only from the known client wall-clock test)
+  @foundation/client        tests 172, pass 171, fail 1
+                            the one failure: wires.test.ts "avoiding stays fast with a crowded board" (589 ms against a 400 ms budget; known, not touched)
+  @foundation/extension     tests 9, pass 9, fail 0
+  @foundation/server        tests 302, pass 296, fail 0, skipped 6 (the flowform-import fixture rooms that were never committed, SPEC §7)
+  last workspace            tests 48, pass 48, fail 0
+
+npm run typecheck           client and server: tsc --noEmit, no errors
+
+apps/server/test/person-gate.test.ts (node --test --import tsx), 11 of 11 pass:
+  ok dev sign-in is off by default, /auth/config says so, and the server says how to turn it on
+  ok dev sign-in turned on with an empty allowlist is refused (an empty allowlist would admit anyone)
+  ok on: dev sign-in works from this computer for an allowlisted email, and not for one off the list
+  ok an agent token: a person makes it, it lasts 7 days, and neither an agent's token nor the service token can make one
+  ok running a job: refused to an agent's bearer and to the service token, answered for a person
+  ok asking the agent: refused to an agent's bearer and to the service token, answered for a person
+  ok probing an app's address: refused to an agent's bearer and to the service token, answered for a person
+  ok saving an app: refused to an agent's bearer and to the service token, answered for a person
+  ok a viewer who is a person may still ask the agent, but may not probe an address
+  ok dev sign-in is refused while Foundation's T3 runs here, and works again once it stops
+  ok dev sign-in's rule: only a loopback peer, and not one a proxy forwards
+
+e2e (npm run e2e -w @foundation/client, on its own ports), the two specs that start T3:
+  section-crew.spec.ts      5 passed (a first run under load failed its crew-pane check at line 136, before any changed line; the rerun passed all 5 with no retries used)
+  bottom-bar.spec.ts        "the tools: ... and T3" passed (run with -g). The spec's "day and night reach the grid's paper ... WebGL context" fails on this machine (a pixel 0.018 where 0 is expected), before the T3 test, in both runs; it doesn't touch sign-in. Not checked against main.
+  Other e2e specs were not run.

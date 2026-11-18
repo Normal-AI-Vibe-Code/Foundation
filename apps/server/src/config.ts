@@ -1,7 +1,7 @@
 /**
  * Server configuration from the environment (and an optional `.env` beside
  * the repo root). Every integration is off until its key is present — the
- * server always starts, offline, with dev login.
+ * server always starts, offline. Dev login is off unless FOUNDATION_DEV_LOGIN=1.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -47,8 +47,12 @@ export const config = {
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
-  /** dev login (pick a name, no password) — on unless explicitly disabled */
-  devLogin: env("FOUNDATION_DEV_LOGIN", "1") !== "0",
+  /**
+   * dev login (pick a name, no password): off unless FOUNDATION_DEV_LOGIN=1. Even on, it answers only
+   * a loopback request, for an email on a non-empty allowlist, while Foundation's T3 isn't running
+   * (auth.ts devSignInRefusal; ADR-001 G0)
+   */
+  devLogin: env("FOUNDATION_DEV_LOGIN", "0") === "1",
   /** flowform-server: Foundation signs in with flowform's Google login (same server, same client) */
   flowformUrl: env("FLOWFORM_URL", "https://server.formresearch.ai"),
   /** the Flowform client version Foundation's file downloads declare: Flowform's file routes refuse older clients (426, "1.9.0 or newer", 2026-11-11) */

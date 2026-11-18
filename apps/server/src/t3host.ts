@@ -143,6 +143,11 @@ const tellWork = (id: string, w: T3Work | null) => workSubs.forEach((f) => {
   } catch { /* a listener's own trouble */ }
 });
 
+/** T3's program is up or coming up here (its agents can have a shell on this computer): starting, running, or a child still alive */
+export function t3HostRunning(): boolean {
+  return status.state === "running" || status.state === "starting" || child !== null;
+}
+
 export function t3Host(): T3HostStatus {
   return { ...status, agents: status.agents, work: [...threads.values()].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)) };
 }

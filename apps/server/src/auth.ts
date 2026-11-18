@@ -4,7 +4,8 @@
  *
  * - Google OAuth (authorization-code flow) when GOOGLE_CLIENT_ID/SECRET are set.
  * - Dev login — pick a name and an allowlisted email, no password — for local
- *   testing. Disabled with FOUNDATION_DEV_LOGIN=0.
+ *   testing. Off unless FOUNDATION_DEV_LOGIN=1, and even then only from this
+ *   computer, with an allowlist, while T3 isn't running (devSignInRefusal).
  *
  * Sessions are random 32-byte tokens in an HttpOnly cookie (browser) or a
  * Bearer header (the app on another site's server, agents); only their
@@ -22,6 +23,8 @@ import { one, run } from "./db.ts";
 import { HttpError, parseCookies, type Req } from "./http.ts";
 
 const SESSION_DAYS = 30;
+/** an agent's bearer (/api/agent/token) lasts a week (ADR-001 G9) */
+export const AGENT_TOKEN_DAYS = 7;
 const COOKIE = "foundation_session";
 
 const PALETTE = ["#e8553d", "#2f6fde", "#1e9e6a", "#c2410c", "#7c3aed", "#0e7490", "#b45309", "#be185d"];
@@ -30,6 +33,29 @@ export function isAllowed(email: string): boolean {
   const e = email.toLowerCase();
   if (config.allowlist.length === 0) return true;
   return config.allowlist.some((rule) => (rule.startsWith("@") ? e.endsWith(rule) : e === rule));
+}
+
+/** a request straight from this computer: a loopback peer, and no proxy in between that names another client */
+export function fromLoopback(req: Req): boolean {
+  const addr = req.socket?.remoteAddress ?? "";
+  const loopback = addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1";
+  // a reverse proxy on this computer forwards other people's requests from loopback: those say so in these headers
+  return loopback && !req.headers["x-forwarded-for"] && !req.headers.forwarded && !req.headers["x-real-ip"];
+}
+
+/**
+ * Why dev sign-in (no password) is refused for this request, or null when it may go ahead. Anything that
+ * can reach the port and passes here becomes "a person", so it asks (ADR-001 G0): turned on
+ * (FOUNDATION_DEV_LOGIN=1); an allowlist to keep to (an empty one admits everyone); a request from this
+ * computer; and no agent with a shell running here (Foundation's T3 gives agents one, and one of them could
+ * sign itself in as a person).
+ */
+export function devSignInRefusal(req: Req, t3Running: boolean): string | null {
+  if (!config.devLogin) return "Sign-in by email alone is off on this server. To use it on your own computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart the server.";
+  if (config.allowlist.length === 0) return "Sign-in by email alone needs an allowlist (FOUNDATION_ALLOWLIST), and this server has none, so it is refused.";
+  if (!fromLoopback(req)) return "Sign-in by email alone works only from the computer the server runs on.";
+  if (t3Running) return "Sign-in by email alone is refused while T3 is running here, because its agents have a shell on this computer. Stop T3, or sign in with Google.";
+  return null;
 }
 
 export function upsertUser(email: string, name: string): UserInfo {
