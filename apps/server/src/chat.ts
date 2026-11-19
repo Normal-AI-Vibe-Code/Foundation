@@ -547,7 +547,7 @@ export function addMember(channelId: string, party: ChatParty, opts: { silent?: 
   if (!ch) throw new HttpError(404, "no such channel");
   if (party.kind === "system") return;
   if (memberRow(channelId, party)) return;
-  if (!opts.silent) postMessage(channelId, SYSTEM_PARTY, { type: "system", text: `${party.name} joined.` });
+  if (!opts.silent && party.kind !== "agent") postMessage(channelId, SYSTEM_PARTY, { type: "system", text: `${party.name} joined.` });
   const seq = channelRow(channelId)!.last_seq;
   run(
     "insert or ignore into chat_members (channel_id, party_kind, party_id, name, party_json, read_seq, joined_at) values (?, ?, ?, ?, ?, ?, ?)",
@@ -778,6 +778,15 @@ export interface PostInput {
   editedAt?: number;
 }
 
+/** what a "before post" hook is told: the channel, its kind and service, who is posting, and whether it is brought-in history */
+export type ChatPostContext = { channel: string; kind: ChatChannelKind; service: string | null; author: ChatParty; silent: boolean };
+const postTransforms = new Set<(ctx: ChatPostContext, m: PostInput) => PostInput | void>();
+/** change a message before it is stored, atomically with its post (bridges: an agent's portal message is stored as a draft) */
+export function beforeChatPost(fn: (ctx: ChatPostContext, m: PostInput) => PostInput | void): () => void {
+  postTransforms.add(fn);
+  return () => postTransforms.delete(fn);
+}
+
 /**
  * Post a message. A retry with the same request id (per channel and author) or the same origin returns the
  * first message. `silent` is for brought-in history: no events, no listeners, no mention counts, and
@@ -795,6 +804,7 @@ export function postMessage(channelId: string, author: ChatParty, m: PostInput, 
     const had = one<MessageRow>("select * from chat_messages where channel_id = ? and origin_service = ? and origin_id = ?", channelId, m.origin.service, m.origin.externalId);
     if (had) return toMessage(had);
   }
+  for (const fn of postTransforms) m = fn({ channel: channelId, kind: ch.kind, service: ch.origin_service, author, silent: Boolean(opts.silent) }, m) ?? m;
   const type: ChatMessageType = m.type ?? (m.place ? "link" : "text");
   const text = (m.text ?? "").slice(0, CHAT_TEXT_MAX);
   const files = fileRefs(m.files ?? []);

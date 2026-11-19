@@ -28,7 +28,7 @@ function stepMs() {
 
 const quoted = (s: string) => /[“"]([^”"]{1,60})[”"]/.exec(s)?.[1]?.trim();
 
-export async function runScript(opts: { prompt: string; signal: AbortSignal; persona?: "shiba" }, emit: (e: AgentEvent) => void, ctx: ToolCtx) {
+export async function runScript(opts: { prompt: string; signal: AbortSignal; persona?: "shiba"; chat?: { agent: string } }, emit: (e: AgentEvent) => void, ctx: ToolCtx) {
   const wait = () => new Promise((r) => setTimeout(r, stepMs()));
   const step = async (name: string, input: Record<string, unknown>) => {
     if (opts.signal.aborted) throw new Error("stopped");
@@ -46,6 +46,25 @@ export async function runScript(opts: { prompt: string; signal: AbortSignal; per
     }
   };
   emit({ type: "status", status: "thinking" });
+
+  // a ChatForm turn (chatagents.ts): look at the person's channels, then answer in a few streamed pieces.
+  // "slowly" in the ask: many pieces (so a Stop lands mid-answer); "fail" in the ask: an error after the first piece
+  if (opts.chat) {
+    const seen = String(await step("chat_channels", { limit: 5 }));
+    const n = seen === "no channels" ? 0 : seen.split("\n").length;
+    const ask = opts.prompt.replace(/\s+/g, " ").trim().slice(0, 80);
+    const slow = /\bslowly\b/i.test(opts.prompt);
+    const words = `**${opts.chat.agent}** here. You asked: “${ask}”. I can see ${n} channel${n === 1 ? "" : "s"} for you.${slow ? " Taking my time over this one, word by word, so you can watch it arrive and stop it whenever you like." : ""}`.split(" ");
+    const per = slow ? 1 : Math.ceil(words.length / 4);
+    for (let i = 0; i < words.length; i += per) {
+      if (opts.signal.aborted) throw new Error("stopped");
+      emit({ type: "text", text: (i ? " " : "") + words.slice(i, i + per).join(" ") });
+      if (i === 0 && /\bfail\b/i.test(opts.prompt)) throw new Error("the scripted runtime was asked to fail");
+      await new Promise((r) => setTimeout(r, slow ? Math.max(stepMs(), 150) : stepMs()));
+    }
+    emit({ type: "done", runtime: "script" });
+    return;
+  }
 
   // the Shiba on Today: read the person's day, point at what's first, and say it
   if (opts.persona === "shiba") {

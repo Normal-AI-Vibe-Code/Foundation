@@ -13,12 +13,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { HuddleLine } from "@foundation/protocol";
 import type { PanelMeta } from "../state/store";
-import { HuddleRoom, joinHuddle, leaveHuddle, useJoinedRoom, useRoom, type RoomView } from "../lib/huddle";
-import { api } from "../lib/api";
+import { HuddleRoom, joinHuddle, leaveHuddle, roomOfCard, useJoinedRoom, useRoom, type RoomView } from "../lib/huddle";
+import { api, ApiError } from "../lib/api";
 import { useFileSrc } from "../lib/fileSrc";
+import { goChat } from "../lib/place";
 import { activeBoard } from "../sync/board";
 import { askAgent, toast } from "../state/ui";
 import { useOnScreen } from "./PanelView";
+import { CallControls, CallStage, MicGlyph, MicOffGlyph } from "./HuddleCall";
 
 type Tab = "room" | "notes" | "archive";
 
@@ -28,18 +30,34 @@ export function HuddleBody({ panel }: { panel: PanelMeta }) {
   const board = activeBoard();
   const boardId = board?.boardId ?? "company";
   const me = board?.user.name ?? "me";
+  // a channel's huddle shown here is the channel's room (board "chat"): the same call, wherever it is shown
+  const where = roomOfCard(panel, boardId);
+  const fromChat = panel.home === "chat";
   const joined = useJoinedRoom();
-  const inThis = joined?.huddleId === panel.id && joined.board === boardId;
+  const inThis = joined?.huddleId === where.huddleId && joined.board === where.board;
   const live = panel.huddle?.people ?? [];
+  const isLive = live.length > 0 || Boolean(fromChat && panel.huddle?.liveSince && !panel.huddle?.lastEndedAt);
   const [tab, setTab] = useState<Tab>("room");
   const [listen, setListen] = useState(false);
+  // a private conversation's huddle: may I? (the server says; a grid viewer who isn't in it sees whose it is, nothing else)
+  const [locked, setLocked] = useState(false);
+  useEffect(() => {
+    if (!fromChat) return;
+    let on = true;
+    api(`/api/huddles/${panel.id}?board=${encodeURIComponent(boardId)}`)
+      .then(() => on && setLocked(false))
+      .catch((e) => on && setLocked(e instanceof ApiError && (e.status === 403 || e.status === 404)));
+    return () => {
+      on = false;
+    };
+  }, [fromChat, panel.id, boardId, isLive]);
 
   // watch while the portal is on screen and someone is in it; nothing streams otherwise
   const [watch, setWatch] = useState<HuddleRoom | null>(null);
-  const shouldWatch = onScreen && !inThis && live.length > 0;
+  const shouldWatch = onScreen && !inThis && isLive && !locked;
   useEffect(() => {
     if (!shouldWatch) return;
-    const r = new HuddleRoom(boardId, panel.id, false, { name: me });
+    const r = new HuddleRoom(where.board, where.huddleId, false, { name: me });
     setWatch(r);
     void r.start();
     return () => {
@@ -47,20 +65,47 @@ export function HuddleBody({ panel }: { panel: PanelMeta }) {
       setWatch(null);
       setListen(false);
     };
-  }, [shouldWatch, boardId, panel.id, me]);
+  }, [shouldWatch, where.board, where.huddleId, me]);
+  useEffect(() => watch?.setVoice(listen), [watch, listen]);
 
   const room = inThis ? joined : watch;
   const view = useRoom(room);
   const recording = view.recording ?? (panel.huddle?.recording ? { by: panel.huddle.recording.by } : null);
+  const people = live.length ? live : [...new Set(view.peers.filter((p) => p.sending).map((p) => p.name))];
 
   const join = async () => {
-    const r = await joinHuddle(boardId, panel.id, { name: me }, { recording: Boolean(panel.huddle?.recording) });
+    const r = await joinHuddle(where.board, where.huddleId, { name: me }, { recording: Boolean(panel.huddle?.recording), meta: { name: panel.name, ...(fromChat && panel.channel ? { channel: panel.channel } : {}) } });
     const v = r.snapshot();
     if (v.status === "error") {
       toast(v.error ?? "Couldn't join", "bad");
       leaveHuddle();
     }
   };
+
+  if (locked) {
+    return (
+      <div ref={host} className="huddle-body">
+        <div className="huddle-head">
+          <span className={`huddle-status${isLive ? " is-live" : ""}`}>
+            <span className={`f-dot${isLive ? " is-ok is-live" : ""}`} />
+            {isLive ? "Live" : "Ended"}
+          </span>
+          {panel.huddle?.recording && (
+            <span className="huddle-rec" data-tip="Recording">
+              <span className="huddle-rec-dot" />
+              REC
+            </span>
+          )}
+        </div>
+        <div className="huddle-locked" data-huddle-locked>
+          <div className="huddle-portal">
+            <div className="huddle-empty-title">{panel.name}</div>
+            <div className="huddle-empty-note">A huddle from a private conversation. Only the people in that conversation can see who's in it, join or listen.</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // the tabs sit with the controls: the card's hover bar covers its top edge
   const said = view.lines.filter((l) => l.source !== "system").length;
@@ -77,10 +122,10 @@ export function HuddleBody({ panel }: { panel: PanelMeta }) {
   return (
     <div ref={host} className="huddle-body">
       <div className="huddle-head">
-        {live.length ? (
+        {isLive ? (
           <span className="huddle-status is-live">
             <span className="f-dot is-ok is-live" />
-            Live · {live.length}
+            Live{people.length ? ` · ${people.length}` : ""}
           </span>
         ) : (
           <span className="huddle-status">
@@ -89,133 +134,61 @@ export function HuddleBody({ panel }: { panel: PanelMeta }) {
           </span>
         )}
         {recording && (
-          <span className="huddle-rec" data-tip={`Recording — started by ${recording.by}. Everyone in the huddle is archived.`}>
+          <span className="huddle-rec" data-tip={`Recording — started by ${recording.by || "someone"}. Everyone in the huddle is archived.`}>
             <span className="huddle-rec-dot" />
             REC
           </span>
         )}
-        {panel.channel && (
-          <span className="huddle-channel" data-tip="Opened for a Slack channel — its notes can be posted back there">
-            Slack
-          </span>
+        {fromChat && panel.channel ? (
+          <button className="huddle-channel" data-tip="This huddle belongs to a ChatForm conversation" onClick={() => goChat("chat", panel.channel!)}>
+            ChatForm
+          </button>
+        ) : (
+          panel.channel && (
+            <span className="huddle-channel" data-tip="Opened for a Slack channel — its notes can be posted back there">
+              Slack
+            </span>
+          )
         )}
       </div>
 
       {tab === "room" ? (
-        <RoomStage view={view} inThis={inThis} me={me} live={live} listen={listen} onScreen={onScreen} />
+        <CallStage view={view} inThis={inThis} me={me} live={people} listen={listen} onScreen={onScreen} />
       ) : tab === "notes" ? (
-        <Notes lines={view.lines} canType={Boolean(room) || Boolean(panel.huddle?.lastEndedAt)} onSay={(t) => (room ? room.say(t) : void api(`/api/huddles/${panel.id}/lines`, { method: "POST", json: { board: boardId, text: t } }).catch((e) => toast((e as Error).message, "bad")))} speech={inThis ? view.speech : null} />
+        <Notes lines={view.lines} canType={Boolean(room) || Boolean(panel.huddle?.lastEndedAt)} onSay={(t) => (room ? room.say(t) : void api(`/api/huddles/${where.huddleId}/lines`, { method: "POST", json: { board: where.board, text: t } }).catch((e) => toast((e as Error).message, "bad")))} speech={inThis ? view.speech : null} />
       ) : (
         <Archive panel={panel} boardId={boardId} />
       )}
 
-      <div className="huddle-controls">
-        {inThis ? (
-          <>
-            <button className={`huddle-ctl${view.muted ? " is-off" : ""}`} data-tip={view.muted ? "Unmute" : "Mute"} aria-label={view.muted ? "Unmute" : "Mute"} onClick={() => joined!.setMuted(!view.muted)}>
-              {view.muted ? <MicOff /> : <Mic />}
-            </button>
-            <button className={`huddle-ctl${view.camOff ? " is-off" : ""}`} data-tip={view.camOff ? "Camera on" : "Camera off"} aria-label={view.camOff ? "Camera on" : "Camera off"} onClick={() => joined!.setCamOff(!view.camOff)}>
-              {view.camOff ? <CamOff /> : <Cam />}
-            </button>
-            <button className={`huddle-ctl${recording ? " is-rec" : ""}`} data-tip={recording ? "Stop recording" : "Record everyone — each person's camera and mic go to the archive"} aria-label="Record" onClick={() => joined!.setRecording(!recording)}>
-              <span className="huddle-rec-glyph" />
-            </button>
-            <span className="huddle-ctl-note">{view.uploads ? "Saving recording…" : view.status === "connecting" ? "Connecting…" : view.peers.filter((p) => p.sending).length ? null : "Waiting for others"}</span>
-            <button className="f-pill huddle-leave" onClick={leaveHuddle}>
-              Leave
-            </button>
-            {tabs}
-          </>
-        ) : (
-          <>
-            <button className="f-pill is-accent" onClick={() => void join()}>
-              {live.length ? "Join" : "Start the huddle"}
-            </button>
-            {watch && view.peers.some((p) => p.sending) && (
-              <button className={`f-pill${listen ? " is-primary" : ""}`} onClick={() => setListen(!listen)}>
-                {listen ? "Listening" : "Listen in"}
-              </button>
-            )}
-            <span className="huddle-ctl-note">{live.length ? `${live.join(", ")}` : joined ? `You're in another huddle` : "Camera and mic stay off until you join"}</span>
-            {tabs}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ---------- room ----------
-
-function RoomStage({ view, inThis, me, live, listen, onScreen }: { view: RoomView; inThis: boolean; me: string; live: string[]; listen: boolean; onScreen: boolean }) {
-  const senders = view.peers.filter((p) => p.sending);
-  const tiles = [
-    ...(inThis && view.local ? [{ id: "self", name: me, stream: view.local, self: true, muted: view.muted, camOff: view.camOff, state: "connected" as const }] : []),
-    ...senders.map((p) => ({ id: p.id, name: p.name, stream: p.stream, self: false, muted: p.muted, camOff: p.camOff, state: p.state })),
-  ];
-  if (!tiles.length) {
-    return (
-      <div className="huddle-stage is-empty">
-        <div className="huddle-portal">
-          {live.length ? (
-            <>
-              <div className="huddle-faces">
-                {live.map((n) => (
-                  <span key={n} className="huddle-face">
-                    {initials(n)}
-                  </span>
-                ))}
-              </div>
-              <div className="huddle-empty-title">{onScreen ? "Connecting to the room…" : `${live.join(", ")} ${live.length === 1 ? "is" : "are"} here`}</div>
-            </>
+      {inThis && joined ? (
+        <CallControls room={joined} view={view} extra={tabs} />
+      ) : (
+        <div className="huddle-controls">
+          {fromChat && !isLive ? (
+            <span className="huddle-ctl-note">This huddle has ended. Its recordings and transcript are in the Archive.</span>
           ) : (
             <>
-              <div className="huddle-empty-title">Nobody's here yet</div>
-              <div className="huddle-empty-note">A huddle is a room on the board. Join and everyone who looks this way sees you; what's said is transcribed into the archive.</div>
+              <button className="f-pill is-accent" onClick={() => void join()}>
+                {isLive ? "Join" : "Start the huddle"}
+              </button>
+              {watch && view.peers.some((p) => p.sending) && (
+                <button className={`f-pill${listen ? " is-primary" : ""}`} onClick={() => setListen(!listen)}>
+                  {listen ? "Listening" : "Listen in"}
+                </button>
+              )}
+              <span className="huddle-ctl-note">{people.length ? `${people.join(", ")}` : joined ? `You're in another huddle` : "Camera and mic stay off until you join"}</span>
             </>
           )}
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className={`huddle-stage n-${Math.min(tiles.length, 6)}`}>
-      {tiles.map((t) => (
-        <div key={t.id} className={`huddle-tile${t.self ? " is-self" : ""}${t.camOff ? " is-cam-off" : ""}`}>
-          {t.stream && !t.camOff ? <Video stream={t.stream} muted={t.self || inThis || !listen} /> : <span className="huddle-face is-big">{initials(t.name)}</span>}
-          <span className="huddle-name">
-            {t.muted && <MicOff />}
-            {t.self ? `${t.name} (you)` : t.name}
-            {!t.self && t.state !== "connected" && t.state !== "new" && <i> · {t.state}</i>}
-          </span>
-        </div>
-      ))}
-      {view.captions.length > 0 && (
-        <div className="huddle-captions" aria-live="polite">
-          {view.captions.slice(-2).map((c) => (
-            <div key={c.id}>
-              <b>{c.name}</b> {c.text}
-            </div>
-          ))}
+          {tabs}
         </div>
       )}
     </div>
   );
 }
 
-function Video({ stream, muted }: { stream: MediaStream; muted: boolean }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const v = ref.current;
-    if (!v) return;
-    if (v.srcObject !== stream) v.srcObject = stream;
-    void v.play().catch(() => {});
-  }, [stream]);
-  useEffect(() => {
-    if (ref.current) ref.current.muted = muted;
-  }, [muted]);
-  return <video ref={ref} autoPlay playsInline muted={muted} />;
+/** the room's stage, for anything that draws a huddle (kept for older imports) */
+export function RoomStage(p: { view: RoomView; inThis: boolean; me: string; live: string[]; listen: boolean; onScreen: boolean }) {
+  return <CallStage {...p} />;
 }
 
 // ---------- notes (the live transcript) ----------
@@ -257,7 +230,7 @@ function Notes({ lines, canType, onSay, speech }: { lines: HuddleLine[]; canType
   );
 }
 
-function Transcript({ lines }: { lines: HuddleLine[] }) {
+export function Transcript({ lines }: { lines: HuddleLine[] }) {
   // consecutive lines from one speaker read as one turn
   const turns = useMemo(() => {
     const out: Array<{ speaker: string; at: number; source: HuddleLine["source"]; texts: string[] }> = [];
@@ -276,9 +249,10 @@ function Transcript({ lines }: { lines: HuddleLine[] }) {
             {t.texts.join(" · ")} <time>{clock(t.at)}</time>
           </div>
         ) : (
-          <div key={i} className="huddle-line">
+          <div key={i} className={`huddle-line${t.source === "agent" ? " is-agent" : ""}`}>
             <div className="huddle-line-head">
               <b>{t.speaker}</b>
+              {t.source === "agent" && <i>agent</i>}
               <time>{clock(t.at)}</time>
               {t.source === "typed" && <i>note</i>}
             </div>
@@ -358,7 +332,7 @@ function Archive({ panel, boardId }: { panel: PanelMeta; boardId: string }) {
                 >
                   ✦ Summarize
                 </button>
-                {panel.channel && (
+                {panel.channel && panel.home !== "chat" && (
                   <button className="f-pill" onClick={() => void post(s)}>
                     Post notes to Slack
                   </button>
@@ -374,59 +348,23 @@ function Archive({ panel, boardId }: { panel: PanelMeta; boardId: string }) {
 
 // ---------- bits ----------
 
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
-}
-function clock(at: number) {
+export function clock(at: number) {
   return new Date(at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
-function day(at: number) {
+export function day(at: number) {
   return new Date(at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
-function duration(ms: number) {
+export function duration(ms: number) {
   if (ms < 60_000) return `${Math.max(1, Math.round(ms / 1000))} s`;
   const m = Math.round(ms / 60000);
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
 }
 
-const svg = { width: 16, height: 16, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
-export function Mic() {
-  return (
-    <svg {...svg}>
-      <rect x="5.5" y="2" width="5" height="8" rx="2.5" />
-      <path d="M3.5 8a4.5 4.5 0 0 0 9 0M8 12.5V14" />
-    </svg>
-  );
-}
-export function MicOff() {
-  return (
-    <svg {...svg}>
-      <path d="M10.5 6.5V4.5a2.5 2.5 0 0 0-5 0V8a2.5 2.5 0 0 0 .4 1.4M3.5 8a4.5 4.5 0 0 0 7.6 3.2M8 12.5V14M2.5 2.5l11 11" />
-    </svg>
-  );
-}
-function Cam() {
-  return (
-    <svg {...svg}>
-      <rect x="1.5" y="4" width="9" height="8" rx="1.5" />
-      <path d="M10.5 7l4-2.2v6.4l-4-2.2" />
-    </svg>
-  );
-}
-function CamOff() {
-  return (
-    <svg {...svg}>
-      <path d="M10.5 9.5V12h-7.5a1.5 1.5 0 0 1-1.5-1.5v-5A1.5 1.5 0 0 1 3 4M6 4h3a1.5 1.5 0 0 1 1.5 1.5V7l4-2.2v6.4M2 2l12 12" />
-    </svg>
-  );
-}
+/** the mic glyphs, where they always were (the chip imports them from here) */
+export const Mic = MicGlyph;
+export const MicOff = MicOffGlyph;
 
 /** a recording on the server, loaded with this device's session wherever the server is */
-function FileVideo({ src }: { src: string }) {
+export function FileVideo({ src }: { src: string }) {
   return <video src={useFileSrc(src)} controls preload="metadata" />;
 }

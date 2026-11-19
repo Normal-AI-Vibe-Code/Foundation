@@ -539,6 +539,32 @@ export async function startT3Thread(opts: { agent: string; model?: string; title
   return { threadId, agent, model };
 }
 
+/**
+ * The next turn on a thread T3 already has: the same `thread.turn.start` its own client sends for a
+ * follow-up message, without the bootstrap that makes a thread. Same agent and model as the thread,
+ * supervised. Like starting one, it runs a model on someone's plan or key: a person's press only.
+ */
+export async function continueT3Thread(threadId: string, text: string): Promise<{ threadId: string; agent: T3Agent; model: string }> {
+  const w = threads.get(threadId);
+  if (!w) throw new Error("This T3 doesn't have that thread (it may be archived, or another T3's): open it in T3 to continue.");
+  const agent = status.agents.find((a) => a.id === w.agent);
+  if (!agent) throw new Error(`T3 has no agent "${w.agent}" for this thread any more.`);
+  if (agent.state !== "ready") throw new Error(`${agent.name} can't take work: ${t3AgentWhy(agent)}.`);
+  const model = w.model || agent.model || agent.modelList[0]?.slug;
+  if (!model) throw new Error(`${agent.name} has no model to run.`);
+  await dispatch({
+    type: "thread.turn.start",
+    commandId: randomUUID(),
+    threadId,
+    message: { messageId: randomUUID(), role: "user", text, attachments: [] },
+    modelSelection: { instanceId: agent.id, model },
+    runtimeMode: "approval-required",
+    interactionMode: "default",
+    createdAt: new Date().toISOString(),
+  });
+  return { threadId, agent, model };
+}
+
 /** stop a thread's turn (its agent stops; the thread is kept) */
 export async function interruptT3Thread(threadId: string) {
   await dispatch({ type: "thread.turn.interrupt", commandId: randomUUID(), threadId, createdAt: new Date().toISOString() });

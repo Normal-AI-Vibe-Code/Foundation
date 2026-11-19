@@ -70,6 +70,7 @@ import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTar
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
+import { CHAT_TOOLS } from "./chattools.ts";
 
 /** the person a tool acts for (Today's tools are theirs, not the board's) */
 function personOf(ctx: ToolCtx): UserInfo {
@@ -1401,6 +1402,8 @@ export const TOOLS: BoardTool[] = [
       return `${h.name} is on it`;
     },
   }),
+  // ChatForm (chattools.ts): channels, read, search, post, react — the person's own access, no board
+  ...CHAT_TOOLS,
 ];
 
 export function toolByName(name: string) {

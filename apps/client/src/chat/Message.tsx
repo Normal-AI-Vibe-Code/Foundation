@@ -22,6 +22,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { emojiName } from "./emoji";
 import { markMentions, type PendingMessage } from "./logic";
 import { HuddleCard } from "./HuddleCard";
+import { DraftBar } from "./tabs/DraftBar";
 import { IconEdit, IconLink, IconMore, IconPin, IconReact, IconThread, IconTrash, IconUnread } from "./Icons";
 
 export interface MessageMe {
@@ -266,14 +267,10 @@ function Body({ m, me, srcOf, liveHuddle, actions }: { m: ChatMessage; me?: Mess
           </span>
         </button>
       )}
-      {m.type === "draft" && m.outbound && (
-        <div className={`chat-outbound is-${m.outbound.state}`}>
-          <span className="chat-outbound-state">{m.outbound.state === "draft" ? "Draft · not sent" : m.outbound.state === "sending" ? "Sending…" : m.outbound.state === "sent" ? `Sent${m.outbound.by ? ` by ${m.outbound.by}` : ""}` : `Not sent: ${m.outbound.error ?? "it failed"}`}</span>
-        </div>
-      )}
       {m.text && <Words text={m.text} mine={me?.handle} edited={!!m.editedAt} />}
       <ChatFiles files={m.files} srcOf={srcOf} />
       <LinkPreviews previews={m.previews} />
+      {m.outbound && <DraftBar message={m} live={!!actions} />}
     </>
   );
 }

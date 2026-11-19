@@ -14,6 +14,7 @@ import { Pop, PeoplePicker } from "./Pop";
 import { timeOf } from "./Message";
 import { IconBell, IconDownload, IconMore, IconPeople, IconPin, IconStar } from "./Icons";
 import { isDirect } from "./logic";
+import { ChannelHuddleButton, ChannelHuddleDock } from "./HuddleCard";
 
 export interface ChannelHeadProps {
   channel: ChatChannelView;
@@ -47,6 +48,7 @@ export function ChannelHead(p: ChannelHeadProps) {
   const members = c.members ?? [];
 
   return (
+    <>
     <header className="chat-head" data-channel-head={c.id}>
       <span className="chat-head-mark">{channelMark(c, p.meId, p.online, 22)}</span>
       <h2 className="chat-head-name">{chatTitle(c, p.meId)}</h2>
@@ -79,6 +81,7 @@ export function ChannelHead(p: ChannelHeadProps) {
           Join
         </button>
       )}
+      <ChannelHuddleButton channel={c} />
       <div className="chat-head-anchor">
         <button className={`chat-head-btn is-count${pop === "members" ? " is-on" : ""}`} data-pop-anchor onClick={() => (toggle("members"), p.onWantMembers?.())} data-tip="Who's in it" data-members-count={c.memberCount}>
           <IconPeople />
@@ -218,5 +221,7 @@ export function ChannelHead(p: ChannelHeadProps) {
         </AnimatePresence>
       </div>
     </header>
+    <ChannelHuddleDock channel={c} />
+    </>
   );
 }

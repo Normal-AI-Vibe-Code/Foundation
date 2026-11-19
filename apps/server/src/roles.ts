@@ -45,6 +45,12 @@ export const READ_TOOLS = new Set([
   "set_goal",
   "set_profile",
   "point_today",
+  // ChatForm: no board; chattools.ts enforces chat's own rule (the person's channels; posting where they're a member)
+  "chat_channels",
+  "chat_read",
+  "chat_search",
+  "chat_post",
+  "chat_react",
 ]);
 
 function accountRole(userId: string): BoardRole {

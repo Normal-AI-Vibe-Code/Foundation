@@ -20,6 +20,7 @@ import { layoutTimeline, type PendingMessage } from "./logic";
 import type { MessageActions } from "./Message";
 import { ChatMark, IconSearch } from "./Icons";
 import "./chat.css";
+import { HuddleDemo } from "../panels/HuddleDesign";
 
 const NOW = Date.now();
 const MIN = 60_000;
@@ -189,6 +190,7 @@ export function ChatFormDemo() {
           </div>
         </div>
       </div>
+      <HuddleDemo />
     </div>
   );
 }

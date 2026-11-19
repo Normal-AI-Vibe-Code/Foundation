@@ -237,6 +237,8 @@ export interface PanelDoc extends ObjectBaseDoc {
    * huddleStateOf. Readers ignore this field.
    */
   huddle?: HuddleState;
+  /** a huddle card that is a view of a ChatForm channel's huddle (its id is the huddle's; it signals on /huddle/chat/:id, and `channel` is the chat channel's id) */
+  home?: "chat";
   /** agent session id for panel === "agent" */
   sessionId?: string;
   /** for asks: who, and whether it's done */
@@ -483,6 +485,8 @@ export interface HuddleState {
   /** someone pressed Record: every participant's own camera and mic are being archived */
   recording?: { by: string; since: number } | null;
   lastEndedAt?: number;
+  /** a channel's huddle shown on a grid whose channel isn't open: the card says whose it is, never who's in it (people stays empty, recording.by "") */
+  locked?: boolean;
 }
 
 /** one line of a huddle's transcript — spoken (each person's browser transcribes their own mic) or typed */
@@ -491,19 +495,32 @@ export interface HuddleLine {
   at: number;
   speaker: string;
   text: string;
-  source: "speech" | "typed" | "system";
+  source: "speech" | "typed" | "system" | "agent";
 }
 
 /** messages on the huddle socket (/huddle/:board/:huddle) — signalling only; media is peer to peer */
 export type HuddleWire =
-  | { t: "welcome"; you: string; peers: Array<{ id: string; name: string; color: string; sending: boolean }>; ice: unknown[] }
+  | { t: "welcome"; you: string; peers: Array<{ id: string; name: string; color: string; sending: boolean; noRec?: boolean }>; ice: unknown[] }
   | { t: "peer-joined"; id: string; name: string; color: string; sending: boolean }
   | { t: "peer-left"; id: string }
-  | { t: "peer-state"; id: string; sending: boolean; muted?: boolean; camOff?: boolean }
+  | { t: "peer-state"; id: string; sending: boolean; muted?: boolean; camOff?: boolean; /** "don't record me": their recorder never starts */ noRec?: boolean }
   | { t: "signal"; from: string; to: string; data: unknown }
   | { t: "line"; line: HuddleLine }
   | { t: "caption"; from: string; name: string; text: string }
-  | { t: "recording"; on: boolean; by: string };
+  | { t: "recording"; on: boolean; by: string }
+  // ---- ChatForm (H1): screen share, agents in the room, a channel huddle's end ----
+  /** client → server: share my screen (a second video track on the stream `stream`) or stop; one share per room */
+  | { t: "share"; on: boolean; stream?: string }
+  /** server → all: who shares now (null: nobody); `stream` is the shared MediaStream's id on that peer's connection */
+  | { t: "sharing"; id: string | null; by: string | null; stream?: string }
+  /** server → all: the agents seated in the room and what each is doing */
+  | { t: "agents"; agents: Array<{ name: string; by: string; state: "listening" | "thinking" | "talking" }> }
+  /** server → all: an agent's answer, for every client to speak aloud (speechSynthesis, locally) */
+  | { t: "agent-says"; name: string; text: string; id: string }
+  /** server → all: a person pressed Stop: stop speaking now */
+  | { t: "agent-hush" }
+  /** server → all: a channel's huddle ended (the last person left); the socket closes after */
+  | { t: "ended"; session: string | null };
 
 // ---------- design pipelines: design → CAD → simulation → release ----------
 

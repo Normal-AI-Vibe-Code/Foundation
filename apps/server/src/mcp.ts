@@ -23,14 +23,15 @@ export function crewFor(crewId: string | undefined, user: UserInfo, boardId: str
   return member && member.userId === user.id && member.boardId === boardId ? member : undefined;
 }
 
-function buildServer(boardId: string, user: UserInfo, crewId?: string) {
+function buildServer(boardId: string, user: UserInfo, crewId?: string, as?: string) {
   const crew = crewFor(crewId, user, boardId);
   const server = new McpServer({ name: "foundation", version: "0.1.0" });
   for (const t of TOOLS) {
     const shape = (t.schema as z.ZodObject<z.ZodRawShape>).shape;
     server.registerTool(t.name, { description: t.description, inputSchema: shape }, async (args: unknown) => {
       try {
-        const actor = crew ? crew.name : user.id === "agent" ? "Agent (MCP)" : `${user.name}'s agent`;
+        // ?as=: the agent's own name (a ChatForm turn's agent), as an agent bearer may name itself in chat (chat.ts requestParty)
+        const actor = crew ? crew.name : as ? as : user.id === "agent" ? "Agent (MCP)" : `${user.name}'s agent`;
         const out = await runTool({ boardId, actor, userId: user.id, crew: crew?.id }, t.name, args);
         // a picture in the result (a machine's screen) goes to the model as a picture, the rest as text
         const { text, image } = toolContent(out);
@@ -45,7 +46,7 @@ function buildServer(boardId: string, user: UserInfo, crewId?: string) {
 
 export async function handleMcp(req: Req, res: ServerResponse, user: UserInfo) {
   const boardId = req.query.get("board") || "company";
-  const server = buildServer(boardId, user, req.query.get("crew") ?? undefined);
+  const server = buildServer(boardId, user, req.query.get("crew") ?? undefined, req.query.get("as")?.replace(/[\u0000-\u001f\u007f<>]/g, "").trim().slice(0, 40) || undefined);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on("close", () => {
     void transport.close();

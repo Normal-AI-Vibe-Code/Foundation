@@ -156,69 +156,69 @@ export default function AgentsTab({ user, rest }: { user: UserInfo; rest: string
   const agentOf = (name?: string) => list?.agents.find((a) => a.name === name);
 
   return (
-    <div className="agents-tab" data-chat-tab="agents">
-      <aside className="agents-list" aria-label="Agents and conversations">
-        <div className="agents-list-scroll">
-          {why && <p className="agents-why">{why}</p>}
+    <div className="cfa-tab" data-chat-tab="agents">
+      <aside className="cfa-list" aria-label="Agents and conversations">
+        <div className="cfa-list-scroll">
+          {why && <p className="cfa-why">{why}</p>}
           <Part title="Talk to" count={list?.agents.length}>
             {(list?.agents ?? []).map((a) => (
-              <button key={a.name} className={`agents-row is-agent${a.state !== "ready" ? " is-off" : ""}`} onClick={() => talk(a)} data-agent-row={a.name} data-tip={a.why ? `${a.service} · ${a.why}` : a.service}>
+              <button key={a.name} className={`cfa-row is-agent${a.state !== "ready" ? " is-off" : ""}`} onClick={() => talk(a)} data-agent-row={a.name} data-tip={a.why ? `${a.service} · ${a.why}` : a.service}>
                 <PartyAvatar party={agentPartyOf(a.name, a.via)} size={32} />
-                <span className="agents-row-words">
-                  <span className="agents-row-name">{a.name}</span>
-                  <span className="agents-row-sub">{a.host === "t3" ? "T3 · " : ""}{a.where === "this computer" ? "on this computer" : "in the cloud"}</span>
+                <span className="cfa-row-words">
+                  <span className="cfa-row-name">{a.name}</span>
+                  <span className="cfa-row-sub">{a.host === "t3" ? "T3 · " : ""}{a.where === "this computer" ? "on this computer" : "in the cloud"}</span>
                 </span>
-                <span className="agents-row-marks">
+                <span className="cfa-row-marks">
                   <ProviderMark provider={a.provider as Provider} where={a.where === "this computer" ? "local" : "cloud"} size={20} />
-                  <span className={`agents-state is-${a.state.replace(/\s+/g, "-")}`} data-tip={a.state === "ready" ? "Ready" : a.why ?? a.state} aria-label={a.state} />
+                  <span className={`cfa-state is-${a.state.replace(/\s+/g, "-")}`} data-tip={a.state === "ready" ? "Ready" : a.why ?? a.state} aria-label={a.state} />
                 </span>
               </button>
             ))}
-            {list && !list.agents.length && <p className="agents-empty">No agents here yet.</p>}
+            {list && !list.agents.length && <p className="cfa-empty">No agents here yet.</p>}
           </Part>
           <Part title="Your conversations" count={conversations.length}>
             {conversations.map((c) => (
-              <a key={c.id} href={`#/chat/agents/c/${c.id}`} className={`agents-row${open?.kind === "c" && open.id === c.id ? " is-current" : ""}${c.unread ? " is-unread" : ""}`} data-conversation={c.id}>
+              <a key={c.id} href={`#/chat/agents/c/${c.id}`} className={`cfa-row${open?.kind === "c" && open.id === c.id ? " is-current" : ""}${c.unread ? " is-unread" : ""}`} data-conversation={c.id}>
                 <PartyAvatar party={agentPartyOf(c.agent?.name ?? chatTitle(c, user.id), c.agent?.via)} size={28} />
-                <span className="agents-row-words">
-                  <span className="agents-row-name">{chatTitle(c, user.id)}</span>
-                  <span className="agents-row-sub">{c.lastText ?? "Nothing said yet"}</span>
+                <span className="cfa-row-words">
+                  <span className="cfa-row-name">{chatTitle(c, user.id)}</span>
+                  <span className="cfa-row-sub">{c.lastText ?? "Nothing said yet"}</span>
                 </span>
-                {c.unread > 0 && <span className="agents-badge">{c.unread}</span>}
+                {c.unread > 0 && <span className="cfa-badge">{c.unread}</span>}
               </a>
             ))}
-            {!conversations.length && <p className="agents-empty">Press an agent above to start talking. In any channel, @ an agent and it answers in the thread.</p>}
+            {!conversations.length && <p className="cfa-empty">Press an agent above to start talking. In any channel, @ an agent and it answers in the thread.</p>}
           </Part>
           <Part title="Foundation sessions" count={list?.sessions.length}>
             {(list?.sessions ?? []).slice(0, 12).map((x) => (
-              <a key={x.id} href={`#/chat/agents/s/${x.id}`} className={`agents-row is-quiet${open?.kind === "s" && open.id === x.id ? " is-current" : ""}`} data-session={x.id}>
-                <span className="agents-row-words">
-                  <span className="agents-row-name">{x.title}</span>
-                  <span className="agents-row-sub">
+              <a key={x.id} href={`#/chat/agents/s/${x.id}`} className={`cfa-row is-quiet${open?.kind === "s" && open.id === x.id ? " is-current" : ""}`} data-session={x.id}>
+                <span className="cfa-row-words">
+                  <span className="cfa-row-name">{x.title}</span>
+                  <span className="cfa-row-sub">
                     {x.board} · {x.runs} turn{x.runs === 1 ? "" : "s"} · {ago(x.updatedAt)}
                   </span>
                 </span>
-                {x.status === "running" && <span className="agents-state is-working" aria-label="working" />}
+                {x.status === "running" && <span className="cfa-state is-working" aria-label="working" />}
               </a>
             ))}
-            {list && !list.sessions.length && <p className="agents-empty">Your agent sessions on the grids show here.</p>}
+            {list && !list.sessions.length && <p className="cfa-empty">Your agent sessions on the grids show here.</p>}
           </Part>
           <Part title="T3 threads" count={list?.threads.length}>
-            {list && list.t3.state !== "running" && <p className="agents-empty">T3 isn't running on this computer{list.t3.detail ? `: ${list.t3.detail}` : ""}. Settings → Agents starts it.</p>}
+            {list && list.t3.state !== "running" && <p className="cfa-empty">T3 isn't running on this computer{list.t3.detail ? `: ${list.t3.detail}` : ""}. Settings → Agents starts it.</p>}
             {GROUP.map((g) => {
               const rows = (list?.threads ?? []).filter((t) => t.status === g.status);
               if (!rows.length) return null;
               return (
-                <div key={g.status} className="agents-group" data-thread-group={g.status}>
-                  <div className="agents-group-head">
-                    <span className={`agents-state is-${g.status}`} aria-hidden />
+                <div key={g.status} className="cfa-group" data-thread-group={g.status}>
+                  <div className="cfa-group-head">
+                    <span className={`cfa-state is-${g.status}`} aria-hidden />
                     {g.label}
                   </div>
                   {rows.slice(0, 20).map((t) => (
-                    <a key={t.id} href={`#/chat/agents/t/${t.id}`} className={`agents-row is-quiet${open?.kind === "t" && open.id === t.id ? " is-current" : ""}`} data-thread={t.id}>
-                      <span className="agents-row-words">
-                        <span className="agents-row-name">{t.title}</span>
-                        <span className="agents-row-sub">
+                    <a key={t.id} href={`#/chat/agents/t/${t.id}`} className={`cfa-row is-quiet${open?.kind === "t" && open.id === t.id ? " is-current" : ""}`} data-thread={t.id}>
+                      <span className="cfa-row-words">
+                        <span className="cfa-row-name">{t.title}</span>
+                        <span className="cfa-row-sub">
                           {t.agent} · {t.project || (t.source === "vision" ? "Vision Code" : "T3")} · {ago(t.updatedAt)}
                         </span>
                       </span>
@@ -230,7 +230,7 @@ export default function AgentsTab({ user, rest }: { user: UserInfo; rest: string
           </Part>
         </div>
       </aside>
-      <section className="agents-open">
+      <section className="cfa-open">
         {!open ? (
           <div className="chat-tab-empty">
             <h2>Talk with an agent</h2>
@@ -250,10 +250,10 @@ export default function AgentsTab({ user, rest }: { user: UserInfo; rest: string
 
 function Part({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   return (
-    <section className="agents-part">
-      <h3 className="agents-part-head">
+    <section className="cfa-part">
+      <h3 className="cfa-part-head">
         {title}
-        {count ? <span className="agents-part-count">{count}</span> : null}
+        {count ? <span className="cfa-part-count">{count}</span> : null}
       </h3>
       {children}
     </section>
@@ -266,19 +266,19 @@ function AgentHead({ name, via, provider, where, line, mood, children }: { name:
   const character = useCharacter(name);
   const { live, take } = useStage(Boolean(character));
   return (
-    <header className="agents-head" data-agent-head={name} data-mood={mood}>
-      <div className={`agents-face is-${mood}`} onPointerEnter={take} aria-hidden>
-        {character ? <Avatar character={character} mood={mood} framing="bust" still={!live} /> : <span className="agents-face-none">✦</span>}
+    <header className="cfa-head" data-agent-head={name} data-mood={mood}>
+      <div className={`cfa-face is-${mood}`} onPointerEnter={take} aria-hidden>
+        {character ? <Avatar character={character} mood={mood} framing="bust" still={!live} /> : <span className="cfa-face-none">✦</span>}
       </div>
-      <div className="agents-head-words">
-        <div className="agents-head-name">
+      <div className="cfa-head-words">
+        <div className="cfa-head-name">
           {name}
           <span className="chat-agent-mark" data-tip={`${name} is an agent${via ? ` (${via})` : ""}`}>
             Agent
           </span>
           {provider && <ProviderMark provider={provider as Provider} where={where === "this computer" ? "local" : "cloud"} size={18} />}
         </div>
-        <div className="agents-head-line" aria-live="polite">
+        <div className="cfa-head-line" aria-live="polite">
           {line}
         </div>
       </div>
@@ -370,11 +370,11 @@ function Conversation({ user, channelId, agent }: { user: UserInfo; channelId: s
         : `Can't answer now: ${agent.why ?? agent.state}`
       : "An agent";
   return (
-    <div className="chat-main agents-conversation" data-agent-conversation={channelId}>
+    <div className="chat-main cfa-conversation" data-agent-conversation={channelId}>
       <AgentHead name={name} via={channel.agent?.via} provider={agent?.provider} where={agent?.where} line={line} mood={moodOf(running)}>
         {running && (
           <button
-            className="agents-stop"
+            className="cfa-stop"
             onClick={() =>
               void api(`/api/chat/agents/turns/${enc(running.id)}/stop`, { method: "POST" })
                 .then(() => toast(`Stopped ${name}`))
@@ -402,7 +402,7 @@ function Conversation({ user, channelId, agent }: { user: UserInfo; channelId: s
           onRetry={retry}
           onDiscard={discard}
           intro={
-            <div className="agents-intro">
+            <div className="cfa-intro">
               <p>
                 This is your conversation with <b>{name}</b>. It answers as itself, marked as an agent working for you, and remembers what was said here.
               </p>
@@ -442,10 +442,10 @@ function SessionView({ id, user }: { id: string; user: UserInfo }) {
   const items = useMemo(() => layoutTimeline(data?.messages ?? [], { meId: user.id }), [data, user.id]);
   if (why) return <Missing why={why} />;
   return (
-    <div className="chat-main agents-conversation is-readonly" data-agent-session={id}>
+    <div className="chat-main cfa-conversation is-readonly" data-agent-session={id}>
       <AgentHead name="Claude" via="claude" provider="claude" line={data ? `${data.session.title} · on “${data.session.board}”` : "Loading…"} mood={data?.session.status === "running" ? "thinking" : "idle"} />
       <Timeline items={items} me={{ id: user.id, name: user.name, handle: chatHandle(user.name) }} />
-      <div className="agents-foot-note">A Foundation session: read here. Continue it from its session tab on “{data?.session.board ?? "its grid"}”.</div>
+      <div className="cfa-foot-note">A Foundation session: read here. Continue it from its session tab on “{data?.session.board ?? "its grid"}”.</div>
     </div>
   );
 }
@@ -479,9 +479,9 @@ function ThreadView({ id, user, onSent }: { id: string; user: UserInfo; onSent()
       .catch(() => (t?.url ? window.open(t.url, "_blank", "noopener") : toast("T3 isn't running on this computer", "bad")));
   const status = t ? ({ working: "Working", waiting: "Waiting for a person in T3", problem: "A problem: open it in T3", idle: "At rest" } as const)[t.status] : "Loading…";
   return (
-    <div className="chat-main agents-conversation is-readonly" data-agent-thread={id}>
+    <div className="chat-main cfa-conversation is-readonly" data-agent-thread={id}>
       <AgentHead name={t?.agent ?? "T3"} via={t?.via} line={t ? `${t.title} · ${status}` : status} mood={t?.status === "working" ? "thinking" : t?.status === "waiting" ? "talking" : "idle"}>
-        <button className="agents-ghost" onClick={openInT3}>
+        <button className="cfa-ghost" onClick={openInT3}>
           Open in T3
         </button>
       </AgentHead>
@@ -513,9 +513,9 @@ function ThreadView({ id, user, onSent }: { id: string; user: UserInfo; onSent()
             }}
           />
         ) : (
-          <div className="agents-foot-note" data-t3-continue>
+          <div className="cfa-foot-note" data-t3-continue>
             {t?.why ?? "Open in T3 to continue"}.{" "}
-            <button className="agents-link" onClick={openInT3}>
+            <button className="cfa-link" onClick={openInT3}>
               Open in T3 to continue
             </button>
           </div>

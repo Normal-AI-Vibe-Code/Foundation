@@ -137,10 +137,12 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
     wss.handleUpgrade(req, socket, head, (ws) => attachChat(ws, who, person));
     return;
   }
-  const user = socketUser(req, url);
   const hm = HUDDLE.exec(url.pathname);
+  // a channel's huddle seats people only: whether the opener is one is read before a ticket is spent (huddles.ts decides)
+  const huddlePerson = hm ? chatSocketIsPerson(req, url) : false;
+  const user = socketUser(req, url);
   if (hm && user && canSeeBoard(user, hm[1])) {
-    wss.handleUpgrade(req, socket, head, (ws) => attachHuddle(hm[1], hm[2], ws, user, req.query.get("send") === "1"));
+    wss.handleUpgrade(req, socket, head, (ws) => attachHuddle(hm[1], hm[2], ws, user, req.query.get("send") === "1", huddlePerson));
     return;
   }
   // a machine card's shared terminal: editors type, viewers watch

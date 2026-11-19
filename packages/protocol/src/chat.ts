@@ -181,7 +181,7 @@ export interface ChatMessage {
   previews?: ChatLinkPreview[];
   origin?: ChatOrigin;
   /** type "huddle" */
-  huddle?: { id: string; session?: string; startedAt: number; endedAt?: number; people: string[]; recorded?: boolean; board?: string };
+  huddle?: { id: string; session?: string; startedAt: number; endedAt?: number; people: string[]; recorded?: boolean; board?: string; /** the section of `board` it was taken to */ section?: string };
   /** type "link" */
   place?: { board: string; boardName?: string; section?: string; object?: string; label: string };
   /** type "draft": where it stands (drafted by an agent · sent by a person · failed with why) */
@@ -199,13 +199,17 @@ export interface ChatPage {
 // ---------- huddles in a channel ----------
 
 export interface ChatHuddleState {
-  /** the huddle's id (the same id on `/huddle/:board/:huddle`) */
+  /** the huddle's id; it always signals on `/huddle/chat/:id`, wherever it is shown */
   id: string;
-  /** the board that carries its signalling: `chat` until it is taken to a grid, then that grid */
+  /** where it is shown: `chat` until it is taken to a grid, then that grid (its card there is a view of the same room) */
   board: string;
+  /** the section of `board` it was taken to */
+  section?: string;
   liveSince: number;
   people: string[];
   recording: boolean;
+  /** agents seated in it */
+  agents?: string[];
 }
 
 // ---------- bridges ----------

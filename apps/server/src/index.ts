@@ -35,7 +35,7 @@ import { SERVER_VERSION, minClient, requireCurrentClient } from "./clientversion
 import { httpToolCtx, runTool, TOOLS } from "./tools.ts";
 import { handleMcp } from "./mcp.ts";
 import { seedCompanyBoard } from "./seed.ts";
-import { addLine, attachRecording, huddleArchive, huddleForInvite, transcriptText, type NewHuddle } from "./huddles.ts";
+import { huddleArchive, huddleForInvite, huddleRoutes, transcriptText, type NewHuddle } from "./huddles.ts";
 import { boardLink, channelHistory, channelInfo, inviteText, listChannels, postMessage, shareText, SlackError, slackStatus } from "./slack.ts";
 import { appendSection, boardMaps, huddleStateOf } from "@foundation/protocol";
 import { migrateAllBoards } from "./migrate.ts";
@@ -374,6 +374,9 @@ function requireFileBoard(user: UserInfo, fileId: string) {
 // ---------- ChatForm (chat.ts) ----------
 
 chatRoutes(r);
+(await import("./chatimport.ts")).chatImportRoutes(r); // history: Slack export zip and API pull in, ChatForm export out
+(await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
+(await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
 
@@ -489,34 +492,8 @@ function huddleOn(boardId: string, id: string) {
   if (!o || o.kind !== "panel" || o.panel !== "huddle") throw new HttpError(404, "no such huddle");
   return o;
 }
-r.get("/api/huddles/:id", (req) => {
-  const u = requireUser(req);
-  const board = req.query.get("board") ?? "company";
-  requireBoard(u, board);
-  const panel = huddleOn(board, req.params.id);
-  return { huddle: { id: panel.id, name: panel.name, channel: panel.channel ?? null, state: huddleStateOf(getBoard(board).doc, panel.id) ?? { people: [] } }, sessions: huddleArchive(board, panel.id) };
-});
-r.post("/api/huddles/:id/lines", async (req) => {
-  const u = requireUser(req);
-  const b = await readJson<{ board?: string; text?: string }>(req);
-  requireBoard(u, b.board ?? "company");
-  try {
-    return { line: addLine(b.board ?? "company", req.params.id, u, b.text ?? "", "typed") };
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message);
-  }
-});
-r.post("/api/huddles/:id/recordings", async (req) => {
-  const u = requireUser(req);
-  const b = await readJson<{ board?: string; fileId?: string; sessionId?: string; startedAt?: number; endedAt?: number }>(req);
-  if (!b.fileId) throw new HttpError(400, "fileId required");
-  requireBoard(u, b.board ?? "company");
-  try {
-    return attachRecording(b.board ?? "company", req.params.id, { fileId: b.fileId, person: u.name, sessionId: b.sessionId, startedAt: b.startedAt ?? Date.now(), endedAt: b.endedAt ?? Date.now() });
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message);
-  }
-});
+// a grid's huddle and a channel's (ChatForm H1): start, lines, recordings, take to a grid, agents, live list, archive
+huddleRoutes(r);
 
 // ---------- Slack channels (bot token; posts go out under the person's name) ----------
 

@@ -17,6 +17,7 @@
     "tauri": "npm run tauri -w @foundation/client --",
     "services": "node scripts/sibling.mjs all",
     "slack": "node scripts/slack.mjs",
+    "chat:import": "node scripts/chat-import.mjs",
     "plan:push": "node scripts/plan.mjs push",
     "plan:pull": "node scripts/plan.mjs pull",
     "plan:sync": "node scripts/plan.mjs sync",
