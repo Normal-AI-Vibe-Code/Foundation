@@ -2017,8 +2017,8 @@
       "kind": "plan",
       "milestone": "apps",
       "area": "security",
-      "status": "next",
-      "body": "An agent calls an app's tools by its registry entry, with a press on first use; agents get a working folder of their own. Slice 2 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+      "status": "review",
+      "body": "An agent calls an app's tools by its registry entry, with a press on first use; agents get a working folder of their own. Slice 2 of ADR-001 (docs/decisions/ADR-001-working-together.md). Built and merged to main locally 2026-11-18; waits in Review for a person to try it on a live board."
     },
     {
       "id": "wt-origin-mark",
@@ -2091,6 +2091,15 @@
       "area": "agent",
       "status": "backlog",
       "body": "A run in another app shown as a subagent in ours; its asks display-only. Needs Vision's tool door. Slice 12 of ADR-001 (docs/decisions/ADR-001-working-together.md)."
+    },
+    {
+      "id": "security-pass-desktop-check",
+      "title": "Check the desktop app before the security pass is pushed",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "security",
+      "status": "needs-you",
+      "body": "A push to main publishes a signed desktop release. Before pushing the 2026-11-18 security pass, a person checks the packaged desktop app: it signs in (the new code-and-confirm step), the agent answers one turn, and T3 starts. See docs/SECURITY.md."
     }
   ]
 }
