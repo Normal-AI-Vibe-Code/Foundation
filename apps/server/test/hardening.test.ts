@@ -217,6 +217,25 @@ test("a socket opened with the cookie from another page is refused; from the cli
   assert.equal(await openSocket("/sync/company", { authorization: `Bearer ${agent}` }), 101);
 });
 
+// ---------- 5. asking this computer's model server: a person, an exact loopback origin ----------
+
+test("the local model lookup: refused to an agent's bearer and the service token; a person may ask only a loopback origin", async () => {
+  const q = (base: string) => `/api/t3host/local?base=${encodeURIComponent(base)}`;
+  for (const bearer of [agent, SERVICE]) {
+    const r = await call("GET", q("http://127.0.0.1:9"), { bearer });
+    assert.equal(r.status, 403, r.text);
+    assert.match(r.json.error, /needs a person/);
+  }
+  const ok = await call("GET", q("http://127.0.0.1:9"), { cookie: ada });
+  assert.equal(ok.status, 200, ok.text);
+  assert.equal(ok.json.up, false);
+  for (const base of [`http://127.0.0.1:${port}/api/agent/token?`, `http://127.0.0.1:${port}/x`, "http://127.0.0.1:9?x", "http://u:p@127.0.0.1:9", "https://example.com"]) {
+    const r = await call("GET", q(base), { cookie: ada });
+    assert.equal(r.status, 400, base);
+    assert.match(r.json.error, /Only a model server on this computer/);
+  }
+});
+
 // ---------- 2. agents' leave to use a desktop: only a person's press ----------
 
 test("letting agents use a desktop: refused to an agent's bearer and the service token, a person gets past the gate", async () => {

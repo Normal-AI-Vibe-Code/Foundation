@@ -694,11 +694,32 @@ export async function removeT3Agent(id: string): Promise<T3Agent[]> {
   return status.agents;
 }
 
+/**
+ * An address that is exactly a loopback origin: http(s), localhost / 127.0.0.1 / [::1], an explicit port,
+ * and nothing else (no user, path, query or fragment). The origin, or null.
+ */
+export function loopbackOrigin(base: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(base.trim());
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(u.hostname)) return null;
+  if (!u.port || u.username || u.password || u.search || u.hash || (u.pathname !== "/" && u.pathname !== "")) return null;
+  // what was written is the origin itself (a trailing slash at most): nothing the parser tidied away
+  const raw = base.trim().replace(/\/$/, "");
+  return raw.toLowerCase() === u.origin.toLowerCase() ? u.origin : null;
+}
+
 /** model servers on this computer that a local agent could use (Ollama's address; asked when the form opens) */
 export async function localModels(base = T3_PRESETS.kimi.local.baseUrl): Promise<{ baseUrl: string; up: boolean; models: string[] }> {
-  if (!isLoopback(base)) throw new Error("Only an address on this computer can be asked.");
+  const origin = loopbackOrigin(base);
+  if (!origin) throw new Error("Only a model server on this computer can be asked: an address like http://127.0.0.1:11434 (http or https, localhost, 127.0.0.1 or [::1], a port, and nothing after it).");
   try {
-    const r = await fetch(`${base.replace(/\/+$/, "")}/api/tags`, { signal: AbortSignal.timeout(1500) });
+    // the list is asked of that origin's /api/tags and nowhere else (a redirect isn't followed)
+    const r = await fetch(`${origin}/api/tags`, { signal: AbortSignal.timeout(1500), redirect: "manual" });
     const j = (await r.json()) as { models?: Array<{ name?: string }> };
     return { baseUrl: base, up: r.ok, models: (j.models ?? []).map((m) => m.name ?? "").filter(Boolean) };
   } catch {

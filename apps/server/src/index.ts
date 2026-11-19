@@ -992,8 +992,9 @@ r.delete("/api/t3host/agents/:id", async (req) => {
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can remove an agent.");
   return { agents: await removeT3Agent(req.params.id).catch((e) => { throw new HttpError(400, (e as Error).message); }) };
 });
+// the server asks an address on this computer for its models: a person's form, not an agent's port scan
 r.get("/api/t3host/local", async (req) => {
-  requireUser(req);
+  requirePerson(req, "Asking this computer's model server");
   return localModels(req.query.get("base") || undefined).catch((e) => { throw new HttpError(400, (e as Error).message); });
 });
 r.get("/api/t3host/presets", (req) => {
