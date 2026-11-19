@@ -14,7 +14,7 @@
 
 import { portHover, sayValue, setPortHover, usePortHover } from "./portHover";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { LinkDoc } from "@foundation/protocol";
+import { CHARACTER_TYPE, SECTION_PORT, type LinkDoc } from "@foundation/protocol";
 import { addLink, applyWireClip, getState, gridSize, objectWorldRect, removeLink, sectionAtWorld, subscribe, uid, updatePanel, usePanel, wireBackstage, wireClipRect, type PanelMeta } from "../state/store";
 import { boardTool } from "../lib/collectionDrag";
 import { toast } from "../state/ui";
@@ -22,7 +22,7 @@ import { useActiveBoard } from "./Presence";
 import { toWorld, camera } from "../state/camera";
 import { polyline, route, routeSides, tunnelGeometry, typesCompatible, type P } from "./wireGeometry";
 import { allCrossings, publishRoutes, routesVersion, unpublishRoutes } from "./routeRegistry";
-import { cardRects, endRect, obstaclesFor, portLayout, portPoint, portSide, toneOf } from "./ports";
+import { cardRects, endPanel, endRect, obstaclesFor, portLayout, portPoint, portSide, sectionEndRect, toneOf } from "./ports";
 import { countRender } from "../state/renders";
 import { parsePairs, portWiresSlice, useStoreSlice } from "../state/slices";
 import type { BoardSync } from "../sync/board";
@@ -40,28 +40,39 @@ type Drag = {
   /** a card under the pointer with no compatible port in reach — dropping uses or creates one */
   overPanel: string | null;
   detached?: LinkDoc;
+  /**
+   * drawn backwards, out of an input (Foundation's avatars: drag from its input to a character card or a
+   * section): it snaps to outputs, and let go over a section the wire leaves that section
+   */
+  reverse?: boolean;
 };
 let drag: Drag | null = null;
 const dragListeners = new Set<() => void>();
 const notifyDrag = () => dragListeners.forEach((f) => f());
 
 function portType(panelId: string, portId: string) {
-  return getState().panels[panelId]?.ports.find((p) => p.id === portId)?.type;
+  return endPanel(panelId)?.ports.find((p) => p.id === portId)?.type;
+}
+
+/** ring the section a backwards wire would wire in */
+function markSection(id: string | null) {
+  document.querySelectorAll<HTMLElement>(".section-card.is-wire-target").forEach((el) => el.dataset.sectionId !== id && el.classList.remove("is-wire-target"));
+  if (id) document.querySelector<HTMLElement>(`.section-card[data-section-id="${CSS.escape(id)}"]`)?.classList.add("is-wire-target");
 }
 
 /** light up every input this wire could land on; mark the one it's snapped to */
 function markTargets(on: boolean) {
   document.body.classList.toggle("is-connecting", on);
-  document.querySelectorAll<HTMLElement>(".port.port-in").forEach((el) => {
-    const compatible = on && drag && el.dataset.panel !== drag.from.panel && typesCompatible(drag.type, el.dataset.type);
+  document.querySelectorAll<HTMLElement>(drag?.reverse ? ".port.port-out" : ".port.port-in").forEach((el) => {
+    const compatible = on && drag && el.dataset.panel !== drag.from.panel && (drag.reverse ? el.dataset.type === drag.type : typesCompatible(drag.type, el.dataset.type));
     el.classList.toggle("is-target", Boolean(compatible));
     el.classList.toggle("is-snap", Boolean(on && drag?.snap && el.dataset.portId === drag.snap.port));
   });
 }
 
-function startDrag(e: React.PointerEvent, from: { panel: string; port: string }, detached?: LinkDoc) {
+function startDrag(e: React.PointerEvent, from: { panel: string; port: string }, detached?: LinkDoc, reverse = false) {
   const w = toWorld(e.clientX - camera.left, e.clientY - camera.top);
-  drag = { from, type: portType(from.panel, from.port), x: w.x, y: w.y, snap: null, overPanel: null, detached };
+  drag = { from, type: portType(from.panel, from.port), x: w.x, y: w.y, snap: null, overPanel: null, detached, reverse };
   markTargets(true);
   notifyDrag();
 
@@ -75,7 +86,7 @@ function startDrag(e: React.PointerEvent, from: { panel: string; port: string },
     for (const panel of Object.values(st.panels)) {
       if (panel.id === drag.from.panel) continue;
       for (const port of panel.ports) {
-        if (port.dir !== "in" || !typesCompatible(drag.type, port.type)) continue;
+        if (drag.reverse ? port.dir !== "out" || port.type !== drag.type : port.dir !== "in" || !typesCompatible(drag.type, port.type)) continue;
         const pt = portPoint(panel, port.id, undefined, links);
         if (!pt) continue;
         const dist = Math.hypot(pt.x - p.x, pt.y - p.y);
@@ -89,6 +100,8 @@ function startDrag(e: React.PointerEvent, from: { panel: string; port: string },
     const over = hit?.dataset.panelId && hit.dataset.panelId !== drag.from.panel ? hit.dataset.panelId : null;
     const changed = best?.port !== drag.snap?.port;
     drag = { ...drag, x: p.x, y: p.y, snap: best, overPanel: best ? null : over };
+    // drawn backwards: the section it would wire in, when it isn't over a card
+    if (drag.reverse) markSection(!best && !over ? (sectionAtWorld(p.x, p.y)?.id ?? null) : null);
     if (changed) markTargets(true);
     notifyDrag();
   };
@@ -98,9 +111,21 @@ function startDrag(e: React.PointerEvent, from: { panel: string; port: string },
     const d = drag;
     drag = null;
     markTargets(false);
+    markSection(null);
     notifyDrag();
     if (!d) return;
     const st = getState();
+    if (d.reverse) {
+      // out of an input: a card's output it snapped to or was let go over, else the section under the pointer
+      const over = d.overPanel ? st.panels[d.overPanel] : undefined;
+      const outPort = over?.ports.find((p) => p.dir === "out" && p.type === d.type);
+      const sec = !d.snap && !outPort ? sectionAtWorld(d.x, d.y) : null;
+      const from = d.snap ? { panel: d.snap.panel, port: d.snap.port } : over && outPort ? { panel: over.id, port: outPort.id } : sec && sec.id !== st.panels[d.from.panel]?.sectionId ? { panel: sec.id, port: SECTION_PORT } : null;
+      if (!from) return;
+      if (Object.values(st.links).some((l) => l.from.panel === from.panel && l.from.port === from.port && l.to.port === d.from.port)) return;
+      addLink({ from, to: d.from, label: sec ? sec.name.replace(/^characters\s*·\s*/i, "") : undefined });
+      return;
+    }
     let to = d.snap ? { panel: d.snap.panel, port: d.snap.port } : null;
     if (!to && d.overPanel) {
       const dst = st.panels[d.overPanel];
@@ -139,6 +164,13 @@ export function beginConnect(e: React.PointerEvent, panel: string, port: string)
   e.stopPropagation();
   e.preventDefault();
   startDrag(e, { panel, port });
+}
+
+/** Draw a wire backwards out of an input: onto a card's output, or let go over a section to wire the whole section in. */
+export function beginGather(e: React.PointerEvent, panel: string, port: string) {
+  e.stopPropagation();
+  e.preventDefault();
+  startDrag(e, { panel, port }, undefined, true);
 }
 
 /** Grab a connected input: lift the wire landing nearest the pointer off it, to re-route or drop. */
@@ -208,6 +240,8 @@ function routesFor(links: LinkDoc[]): Map<string, Frame> {
     outOfCard.get(l.from.panel)!.push(l);
   }
   const yOf = (id: string) => {
+    const sec = sectionEndRect(id);
+    if (sec) return sec.y;
     const p = st.panels[id];
     return (p && objectWorldRect(p)?.y) ?? 0;
   };
@@ -220,8 +254,8 @@ function routesFor(links: LinkDoc[]): Map<string, Frame> {
 
   const rects = cardRects();
   for (const l of links) {
-    const a = st.panels[l.from.panel];
-    const b = st.panels[l.to.panel];
+    const a = endPanel(l.from.panel);
+    const b = endPanel(l.to.panel);
     if (!a || !b) continue;
     const pa = portPoint(a, l.from.port, l.id, links);
     const pb = portPoint(b, l.to.port, l.id, links);
@@ -363,11 +397,13 @@ export const PortWires = memo(function PortWires() {
         }
       }
       if (ghost.current && drag) {
-        const a = getState().panels[drag.from.panel];
+        const a = endPanel(drag.from.panel);
         const pa = a && portPoint(a, drag.from.port);
         if (pa) {
           const end = drag.snap ?? { x: drag.x, y: drag.y };
-          ghost.current.setAttribute("d", polyline(route(pa, end, { leadOut: drag.snap ? 48 : 0, src: objectWorldRect(a) })));
+          // backwards out of an input, the ghost still runs the way the wire will: from the pointer into the input
+          const pts = drag.reverse ? route(end, pa, { leadOut: drag.snap ? 48 : 0 }) : route(pa, end, { leadOut: drag.snap ? 48 : 0, src: sectionEndRect(a.id) ?? objectWorldRect(a) });
+          ghost.current.setAttribute("d", polyline(pts));
           ghost.current.classList.toggle("is-snapped", Boolean(drag.snap));
         }
       }
@@ -415,7 +451,8 @@ export const PortWires = memo(function PortWires() {
         ))}
         {links.map((l) => {
           const type = portType(l.from.panel, l.from.port);
-          const live = state.panels[l.from.panel]?.outputs?.[l.from.port] !== undefined;
+          // a character wire always carries its characters (into Foundation's avatars, a collection): it flows
+          const live = state.panels[l.from.panel]?.outputs?.[l.from.port] !== undefined || type === CHARACTER_TYPE;
           const backstage = wireBackstage(state, state.panels[l.from.panel]?.sectionId, state.panels[l.to.panel]?.sectionId);
           return (
             <g
@@ -492,7 +529,7 @@ export const PortWires = memo(function PortWires() {
 
 /** what flows along a hovered wire: follows its two apps (the value updates while you look) */
 function PipeTip({ link, x, y }: { link: LinkDoc; x: number; y: number }) {
-  const from = usePanel(link.from.panel);
+  const from = usePanel(link.from.panel) ?? endPanel(link.from.panel);
   const to = usePanel(link.to.panel);
   const fromPort = from?.ports.find((p) => p.id === link.from.port);
   const toPort = to?.ports.find((p) => p.id === link.to.port);

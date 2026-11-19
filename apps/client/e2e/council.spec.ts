@@ -66,7 +66,7 @@ test("⌘K opens the Character studio: one board, inspiration, the pipeline and 
   await waitLive(ada);
   studio = await boardId(ada);
   const names = await ada.evaluate(() => Object.values((window as unknown as { __foundation: Store }).__foundation.getState().sections).map((s) => s.name).sort());
-  expect(names).toEqual(["Characters · Abstract", "Characters · Animals", "Characters · Anime", "Inspiration · Abstract", "Inspiration · Animals", "Inspiration · Anime", "Pipeline · Abstract", "Pipeline · Animals", "Pipeline · Anime"]);
+  expect(names).toEqual(["Characters · Abstract", "Characters · Animals", "Characters · Anime", "Foundation avatars", "Inspiration · Abstract", "Inspiration · Animals", "Inspiration · Anime", "Pipeline · Abstract", "Pipeline · Animals", "Pipeline · Anime"]);
   // between a set's inspiration and its characters, the flow: a node card per stage and a way to start one there
   // (e2e/character-studio.spec.ts walks it)
   await expect(ada.locator('[data-pipe-node][data-pipe-set="animals"]')).toHaveCount(9);

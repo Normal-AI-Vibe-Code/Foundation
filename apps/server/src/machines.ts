@@ -411,6 +411,8 @@ export const machineHooks = {
   started: [] as Array<(boardId: string, panelId: string, person: string) => void>,
   /** stopped, restarting or removed: whatever was attached to it lets go */
   ended: [] as Array<(boardId: string, panelId: string, why: "stopped" | "restarted" | "removed") => void>,
+  /** a container is about to be made: a hook may shape what it's made with (machinecluster.ts: a cluster's node) */
+  creating: [] as Array<(m: MachineState, body: Record<string, unknown>, engine: Engine) => Promise<void>>,
 };
 const fire = <A extends unknown[]>(list: Array<(...a: A) => void>, ...a: A) => {
   for (const fn of list) {
@@ -461,6 +463,15 @@ export async function machineSeen(boardId: string, panelId: string) {
   return r;
 }
 
+/**
+ * An image name in an Engine API path: each part escaped, the slashes kept. Kiri answers 404 for
+ * `rancher%2Fk3s:…` and 200 for `rancher/k3s:…` (found 2026-11-17), so an image with a slash in its name was
+ * never found and pulled again on every Start.
+ */
+export function imageRef(image: string) {
+  return image.split("/").map(encodeURIComponent).join("/");
+}
+
 function splitImage(image: string) {
   const at = image.lastIndexOf(":");
   const slash = image.lastIndexOf("/");
@@ -472,7 +483,7 @@ export function validImage(image: string) {
   return /^[a-z0-9][a-z0-9._\-/:@]{0,199}$/i.test(image) && !image.includes("..");
 }
 
-async function pull(e: Engine, image: string, onProgress: (text: string) => void) {
+async function pull(e: Engine, image: string, onProgress: (text: string, bytes?: { done: number; total: number }) => void) {
   const { repo, tag } = splitImage(image);
   const layers = new Map<string, { cur: number; tot: number }>();
   let failed = "";
@@ -493,7 +504,7 @@ async function pull(e: Engine, image: string, onProgress: (text: string) => void
         let cur = 0;
         let tot = 0;
         for (const l of layers.values()) (cur += l.cur), (tot += l.tot);
-        onProgress(tot ? `Pulling ${image}: ${mb(cur)} of ${mb(tot)}` : `Pulling ${image}…`);
+        onProgress(tot ? `Pulling ${image}: ${mb(cur)} of ${mb(tot)}` : `Pulling ${image}…`, tot ? { done: cur, total: tot } : undefined);
       }
     },
   });
@@ -532,6 +543,7 @@ export function startMachine(boardId: string, panelId: string, person: string, i
 async function doStart(boardId: string, panelId: string, person: string, input: StartInput): Promise<MachineState> {
   const panel = machinePanel(boardId, panelId);
   const prev = panel.machine ?? { name: machineName(panel.name), state: "absent" as const };
+  if (prev.pod) throw new HttpError(409, `${prev.name} is a pod: its cluster runs it (Run a pod on the cluster's server card).`);
   const image = (input.image ?? prev.image ?? "").trim();
   if (!image) throw new HttpError(400, "pick an image first");
   if (!validImage(image)) throw new HttpError(400, `“${image}” isn't an image name an engine will take`);
@@ -570,11 +582,11 @@ async function doStart(boardId: string, panelId: string, person: string, input: 
   }
 
   writeMachine(boardId, panelId, { image, engine: engine.id, wantPorts, ...(input.desktop ? { wantDesktop: true } : {}), state: "pulling", detail: `Looking for ${image} on ${engine.name}…`, startedBy: person, proposedBy: undefined, containerId: undefined, ports: undefined });
-  const have = await engineCall(engine, "GET", `/images/${encodeURIComponent(image)}/json`).catch(() => null);
-  if (!have || have.status === 404) await pull(engine, image, (detail) => writeMachine(boardId, panelId, { detail })).catch(fail);
+  const have = await engineCall(engine, "GET", `/images/${imageRef(image)}/json`).catch(() => null);
+  if (!have || have.status === 404) await pull(engine, image, (detail, bytes) => writeMachine(boardId, panelId, { detail, pull: bytes })).catch(fail);
   else if (have.status >= 400) fail(new EngineError(have.status, have.body.toString("utf8")));
 
-  writeMachine(boardId, panelId, { state: "starting", detail: `Starting on ${engine.name}…` });
+  writeMachine(boardId, panelId, { state: "starting", detail: `Starting on ${engine.name}…`, pull: undefined });
   const distro = MACHINE_DISTROS.some((d) => d.image === image) || /^(ubuntu|debian|alpine|fedora|archlinux|rockylinux|opensuse\/[a-z]+|amazonlinux|almalinux|centos)(:|$)/.test(image);
   const body = {
     Image: image,
@@ -590,6 +602,7 @@ async function doStart(boardId: string, panelId: string, person: string, input: 
       PortBindings: Object.fromEntries(wantPorts.map((p) => [`${p}/tcp`, [{ HostIp: "127.0.0.1", HostPort: "" }]])),
     },
   };
+  for (const shape of machineHooks.creating) await shape(prev, body as Record<string, unknown>, engine).catch(fail);
   const name = await freeName(engine, prev.name);
   const created = await engineJson<{ Id: string }>(engine, "POST", `/containers/create?name=${encodeURIComponent(`machine-${name}`)}`, body).catch(fail);
   if (name !== prev.name) writeMachine(boardId, panelId, { name });
@@ -654,7 +667,7 @@ export async function removeMachine(boardId: string, panelId: string, person: st
   fire(machineHooks.ended, boardId, panelId, "removed");
   await engineJson(engine, "DELETE", `/containers/${c.Id}?force=1&v=1`, undefined, 30_000);
   // its disk is gone, and with it the desktop installed there, the leave agents had to use it, and its pipes' files
-  const gone = { desktop: undefined, wantDesktop: undefined, agentsMay: undefined, agentAsked: undefined, agentActs: undefined, io: undefined };
+  const gone = { desktop: undefined, wantDesktop: undefined, agentsMay: undefined, agentAsked: undefined, agentActs: undefined, io: undefined, functions: undefined, fnDone: undefined, fnSetup: undefined, shares: undefined, pull: undefined };
   writeMachine(boardId, panelId, { ...gone, state: "absent", containerId: undefined, ports: undefined, detail: `Removed by ${person}, with its disk. Start makes a fresh one.` }, { who: person, role: "human", text: `removed the machine ${panel.machine?.name ?? panel.name}` });
   return machinePanel(boardId, panelId).machine!;
 }
@@ -1079,15 +1092,17 @@ fi
 unblocked "$(command -v bash || command -v sh)" -l`;
 
 async function openTty(boardId: string, panelId: string): Promise<Tty> {
-  const { engine, c } = await container(boardId, panelId);
-  if (c.State !== "running") throw new HttpError(409, "the machine isn't running");
+  // a pod's card: a shell in the pod, through its cluster's server (kubectl exec)
+  const pod = machinePanel(boardId, panelId).machine?.pod;
+  const { engine, c } = await container(boardId, pod ? pod.server : panelId);
+  if (c.State !== "running") throw new HttpError(409, pod ? "the cluster's server isn't running" : "the machine isn't running");
   const exec = await engineJson<{ Id: string }>(engine, "POST", `/containers/${c.Id}/exec`, {
     AttachStdin: true,
     AttachStdout: true,
     AttachStderr: true,
     Tty: true,
     Env: ["TERM=xterm-256color", "COLORTERM=truecolor"],
-    Cmd: ["/bin/sh", "-c", SHELL_LAUNCH],
+    Cmd: pod ? ["/bin/sh", "-c", 'exec kubectl exec -it -n "$1" "$2" -- sh -c "command -v bash >/dev/null 2>&1 && exec bash || exec sh"', "foundation", pod.ns, pod.name] : ["/bin/sh", "-c", SHELL_LAUNCH],
   });
   const { sock, head } = await hijack(engine, `/exec/${exec.Id}/start`, { Detach: false, Tty: true });
   const t: Tty = { board: boardId, panel: panelId, execId: exec.Id, engine, sock, clients: new Map(), screen: [], screenBytes: 0 };

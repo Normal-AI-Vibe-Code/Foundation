@@ -12,15 +12,18 @@
 
 import { PipelineBody } from "./PipelineView";
 import { CollectionBody } from "./CollectionView";
+import { UploaderBody } from "./UploaderView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
 import { CadPreview } from "../cad/CadPreview";
 import { MODEL_EXT } from "../cad/model";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { drawnScale, isHosted, MINI_HEADER, emitPort, getState, subscribe, inputValue, movePanel, removePanel, requestSnap, resizePanel, sectionBodyRect, updatePanel, usePanel, type PanelMeta } from "../state/store";
+import { drawnScaleOf } from "./scaledMouse";
 import { ObjectFrame } from "../components/ObjectFrame";
-import { beginConnect, beginDetach, usePortLayout } from "../shell/AgentLayer";
+import { beginConnect, beginDetach, beginGather, usePortLayout } from "../shell/AgentLayer";
 import { landingsOf, toneOf } from "../shell/ports";
+import { CHARACTER_TYPE } from "@foundation/protocol";
 import { api, fetchFile, uploadFile } from "../lib/api";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
 import { askAgent, toast, useUi } from "../state/ui";
@@ -70,6 +73,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   design: "◐",
   pipeline: "⇢",
   collection: "❖",
+  uploader: "⇪",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -136,6 +140,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <PipelineBody panel={panel} />
     ) : panel.panel === "collection" ? (
       <CollectionBody panel={panel} />
+    ) : panel.panel === "uploader" ? (
+      <UploaderBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (
@@ -163,7 +169,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
             data-port-id={p.id}
             data-type={p.type ?? "json"}
             style={{ top: l.y, height: l.height, ["--wire-tone" as string]: toneOf(p.type) }}
-            onPointerDown={(e) => (p.dir === "out" ? beginConnect(e, panel.id, p.id) : undefined)}
+            onPointerDown={(e) => (p.dir === "out" ? beginConnect(e, panel.id, p.id) : p.type === CHARACTER_TYPE ? beginGather(e, panel.id, p.id) : undefined)}
             {...portHoverProps(panel.id, p.id)}
           >
             {label}
@@ -274,20 +280,41 @@ export function useOnScreen(ref: React.RefObject<HTMLElement | null>, minScale =
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), { rootMargin: "200px" });
+    const io = new IntersectionObserver(
+      ([e]) => {
+        setVisible(e.isIntersecting);
+        el.dataset.seen = e.isIntersecting ? "1" : "0";
+      },
+      { rootMargin: "200px" },
+    );
     io.observe(el);
     // fitted when it's in a section's flow; a hosted app fills its section at full size
     const section = el.closest(".section-content") ? (el.closest<HTMLElement>("[data-section-id]")?.dataset.sectionId ?? null) : null;
     let zoom = camera.scale;
-    const check = () => setBigEnough(drawnScale(zoom, section) >= minScale);
+    // the section's fit says how big its docked cards are drawn; a card floating in a flow section (a machine laid
+    // after a studio's collection, 2026-11-17) is drawn at its own size, so when the fit says too small the page is
+    // asked how big it really is
+    let big = false;
+    const check = () => {
+      big = drawnScale(zoom, section) >= minScale || drawnScaleOf(el) >= minScale;
+      setBigEnough(big);
+      el.dataset.big = big ? "1" : "0"; // what it read, for a check to see
+    };
     check();
     const off = onCamera((c) => {
       zoom = c.scale;
       check();
     });
     const offFit = section ? subscribe(check) : () => {};
+    // measured mid-animation (a snap, a section's fit still springing) it can read small and nothing moves after:
+    // asked again as it comes into view, and each second while it reads too small
+    const io2 = new IntersectionObserver(() => check(), { rootMargin: "200px" });
+    io2.observe(el);
+    const again = setInterval(() => !big && check(), 1000);
     return () => {
       io.disconnect();
+      io2.disconnect();
+      clearInterval(again);
       off();
       offFit();
     };
