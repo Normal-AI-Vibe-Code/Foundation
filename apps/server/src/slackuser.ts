@@ -11,6 +11,7 @@
  */
 
 import { one } from "./db.ts";
+import { egressBlocked } from "./egressguard.ts";
 
 const RETRY_MS = 5 * 60_000;
 
@@ -61,6 +62,8 @@ export function forgetUserTokenOwner() {
  * person, or the person an agent acts for). Null for anyone else, for the service token, and for no one.
  */
 export async function slackUserTokenFor(userId: string | undefined): Promise<string | null> {
+  // asking Slack whose token this is is itself a call to Slack: an agent's call makes it only where a person allowed Slack (egress.ts)
+  if (egressBlocked("Slack")) return null;
   const token = process.env.SLACK_USER_TOKEN ?? "";
   if (!token || !userId || userId === "agent") return null;
   const owner = await userTokenOwner();

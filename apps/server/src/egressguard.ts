@@ -30,6 +30,21 @@ export class EgressHeld extends HttpError {
   }
 }
 
+/**
+ * For a step that comes before the send itself (finding out whose token to use): true when this call may
+ * not reach the service, and the service is noted as held (and recorded) exactly as guardEgress would.
+ * Nothing is thrown, so the caller can go on without that service.
+ */
+export function egressBlocked(service: string): boolean {
+  try {
+    guardEgress(service);
+    return false;
+  } catch (e) {
+    if (e instanceof EgressHeld) return true;
+    throw e;
+  }
+}
+
 export function guardEgress(service: string) {
   const s = callScope.getStore();
   if (!s || !s.gated || s.allowed.has(service)) return;

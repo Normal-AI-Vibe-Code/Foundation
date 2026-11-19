@@ -38,7 +38,11 @@ globalThis.fetch = (async (input: string | URL | Request) => {
     slackHits.push(url);
     const method = new URL(url).pathname.split("/").pop();
     const body =
-      method === "search.messages"
+      method === "auth.test"
+        ? { ok: true, user_id: "U1" }
+        : method === "users.info"
+          ? { ok: true, user: { id: "U1", profile: { email: "ada@example.test" } } }
+          : method === "search.messages"
         ? { ok: true, messages: { matches: [{ iid: "m1", text: "the rim drive ships Friday", permalink: "https://slack.test/m1", username: "ada", channel: { name: "general" } }] } }
         : method === "users.lookupByEmail"
           ? { ok: true, user: { id: "U1" } }

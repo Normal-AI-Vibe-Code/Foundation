@@ -90,6 +90,13 @@ for (const [id, email] of [
 const BOARD = "slack-tie";
 const ctx = (userId: string) => ({ boardId: BOARD, actor: `${userId}'s agent`, userId });
 
+// these checks are about which channel and whose token, so a person has already allowed agents on this board to
+// read and search Slack (the outgoing gate, egress.ts, has its own tests)
+const { setAllowance } = await import("../src/egress.ts");
+const adaPerson = { id: "u_ada", email: "ada@example.test", name: "ada", color: "#325bb4", role: "member" as const };
+setAllowance(BOARD, adaPerson, "Slack", "read", true);
+setAllowance(BOARD, adaPerson, "Slack", "query", true);
+
 test("slack_read reads a channel on the board, and refuses one that isn't", async () => {
   process.env.SLACK_BOT_TOKEN = BOT;
   const doc = getBoard(BOARD).doc;
