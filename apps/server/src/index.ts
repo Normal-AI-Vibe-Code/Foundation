@@ -679,6 +679,8 @@ r.post("/api/jobs/:id/run", (req) => {
   const job = getJob(req.params.id);
   if (!job) throw new HttpError(404, "no such job");
   requireBoard(u, job.board_id);
+  // seeing the job's board isn't enough: a viewer of it can't start what runs on it
+  requireWriter(u, job.board_id);
   return { job: startJob(job.id, job.board_id ?? "company", u.name) };
 });
 
