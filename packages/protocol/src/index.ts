@@ -13,6 +13,7 @@ import type { CharacterState } from "./characters.ts";
 import type { CollectionState } from "./collections.ts";
 export * from "./characters.ts";
 export * from "./collections.ts";
+export * from "./chat.ts";
 
 // ---------- board document layout ----------
 
@@ -871,7 +872,7 @@ export type AgentEvent =
 export type AgentRuntime = "subscription" | "api" | "script";
 
 export interface SearchHit {
-  source: "board" | "file" | "slack" | "github" | "app" | "activity" | "huddle" | "flowform";
+  source: "board" | "file" | "slack" | "github" | "app" | "activity" | "huddle" | "flowform" | "chat";
   id: string;
   title: string;
   snippet: string;

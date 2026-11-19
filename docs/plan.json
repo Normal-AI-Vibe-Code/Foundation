@@ -79,9 +79,95 @@
       "id": "today",
       "name": "Today",
       "about": "Home before the boards: the Shiba, focus, goals, Foundation for Chrome"
+    },
+    {
+      "id": "chatform",
+      "name": "ChatForm",
+      "about": "The company's conversations in Foundation: channels, DMs, agents, huddles and replay, Slack's history, and bridges to mail, WhatsApp, Instagram and WeChat"
     }
   ],
   "cards": [
+    {
+      "id": "chatform-slack-export",
+      "title": "Export the Slack workspace and bring it in",
+      "kind": "hookup",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "needs-you",
+      "body": "Slack → Settings → Import/Export → Export (private channels and DMs need Business+ and an owner's request). Bring the zip in from ChatForm → Inbox → History soon after: file links in an export expire. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-bridge-keys",
+      "title": "Connect the real services: a Google Cloud project for Gmail, a Meta app for WhatsApp and Instagram, WeCom for WeChat",
+      "kind": "hookup",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "needs-you",
+      "body": "The bridges run against a stand-in until these exist. Each is an account, an app review or an admin consent only a person can do; Inbox says which keys are missing and the steps. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-replay",
+      "title": "Replay and the clock: a recorded huddle replays with the grid as it was; CAD and Vision files in a channel",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "next",
+      "body": "R1. A grid's changes are kept with a recorded session (takes). A clock card on a section scrubs the session: recordings seek together, lines light as said, portraits and avatars speak, the section is drawn as it was. The scenario end to end: a STEP file in a channel, a huddle on it, taken to a grid, recorded, replayed. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-huddles",
+      "title": "Huddles in a channel: a card everyone can join, screen share, agents that speak, and taking it to a grid",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "next",
+      "body": "H1. A huddle belongs to a channel and posts a card; when it ends the card holds the people, transcript, recordings and Replay. Take it to a grid moves the same call onto a section. Agent participants answer aloud through their avatars. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-agents",
+      "title": "Agents in ChatForm: mention one and it answers in the thread as itself; T3 threads and sessions as conversations",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "next",
+      "body": "A1. Agents post as agents (violet, avatar, whom they worked for); @mention starts a turn that answers in the thread; chat tools on the tool surface and MCP; each T3 thread and Foundation session is a conversation in the Agents tab. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-bridges",
+      "title": "Bridges: mail, WhatsApp, Instagram and WeChat as portals, with a person's press to send",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "next",
+      "body": "B1. One adapter per service on the official routes (Gmail API, WhatsApp Business Cloud API, Instagram Messaging API, WeCom / WeChat Official Account), each honest about its state and the keys it lacks; inbound webhooks make portals and ghosts; agents draft, people send; a stand-in adapter in tests. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-history",
+      "title": "Bring Slack's history in (export zip and API) and take ChatForm's out",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "next",
+      "body": "I1. Slack's export zip (channels, groups, dms, mpims, users, day files) and, with a token, Slack's API: authors, times, threads, reactions, pins, mentions and files; brought in twice without doubling; a report of what was skipped. Every channel downloads as JSON and Markdown. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-place",
+      "title": "ChatForm, the place: a button beside Today, four tabs, the sidebar, the timeline, the composer and threads",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "doing",
+      "body": "C1. #/chat with Chat, Agents, Inbox and Huddles tabs; unread badge; quick switcher; uploads of images, video, GIFs and files with inline previews; link previews; mentions, emoji, drafts; shown on #/design day and night; two-browser e2e. Architecture and contract: docs/chatform.md."
+    },
+    {
+      "id": "chatform-core",
+      "title": "ChatForm core: channels, DMs, threads, reactions, files, search and unread on the server",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "doing",
+      "body": "S1. One conversation model in SQLite (chat.ts): open and private channels, DMs, groups, agent conversations and portals; messages with a per-channel seq, threads by root, reactions, pins, edits, removals that need confirm, request_id idempotency; who spoke is the server's to say; a /chat socket; FTS; unread and mentions into Today. Architecture and contract: docs/chatform.md."
+    },
     {
       "id": "council-seats-and-machine-io",
       "title": "Councils of their own, seats with names (the same agent twice), the white line, a machine's Ins & outs",

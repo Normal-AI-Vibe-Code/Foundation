@@ -39,6 +39,7 @@ const SOURCE_LABEL: Record<SearchHit["source"], string> = {
   app: "App",
   activity: "Activity",
   flowform: "Flowform",
+  chat: "ChatForm",
 };
 
 export function looksLikeUrl(q: string) {

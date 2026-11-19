@@ -15,7 +15,7 @@ import { openUrlAsPanel } from "../shell/CommandBar";
 export const IMAGE = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
 export const VIDEO = /\.(mp4|mov|webm|m4v)$/i;
 
-export const GLYPH: Record<SearchHit["source"], string> = { board: "▦", file: "▤", app: "◳", slack: "#", github: "⌥", activity: "•", huddle: "◉", flowform: "▧" };
+export const GLYPH: Record<SearchHit["source"], string> = { board: "▦", file: "▤", app: "◳", slack: "#", github: "⌥", activity: "•", huddle: "◉", flowform: "▧", chat: "✉" };
 /** Flowform's own kinds, drawn as Foundation's marks */
 const FLOWFORM_GLYPH: Record<string, string> = { image: "▣", video: "▶", pdf: "▤", doc: "▤", file: "▤", model: "◇" };
 export const glyphOf = (h: SearchHit) => (h.source === "flowform" ? (FLOWFORM_GLYPH[h.flowform?.kind ?? ""] ?? "▧") : GLYPH[h.source]);
