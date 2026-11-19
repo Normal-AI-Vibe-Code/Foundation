@@ -28,7 +28,10 @@ test("Foundation for Chrome: a new tab is Today, and the popup reads it with the
   mkdirSync(evidence, { recursive: true });
 
   // a day worth showing: Kai asks Ada for things; Ada has goals and says what she works on
-  const kai = await request.newContext();
+  // the setup's own calls sign in by cookie and say they come from Foundation's page, as Kai's browser would there:
+  // the server refuses a cookie's change from any other page (origins.ts)
+  const fromFoundation = { origin: CLIENT };
+  const kai = await request.newContext({ extraHTTPHeaders: fromFoundation });
   expect((await kai.post(`${CLIENT}/auth/dev`, { data: { name: "Kai Moana", email: "kai@normal.dev" } })).ok()).toBeTruthy();
   for (const prompt of ["Upload the latest stator STEP for the PTHP build", "Sign off the bearing loads before Friday's review"]) {
     expect((await kai.post(`${CLIENT}/api/asks`, { data: { board: "company", assignee: "ada@normal.dev", prompt, kind: "cad_upload" } })).ok()).toBeTruthy();
@@ -49,13 +52,14 @@ test("Foundation for Chrome: a new tab is Today, and the popup reads it with the
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
   });
   try {
-    expect((await context.request.post(`${CLIENT}/auth/dev`, { data: { name: "Ada Park", email: "ada@normal.dev" } })).ok()).toBeTruthy();
+    // (per call, not for the whole context: the extension's own pages make their requests as Chrome does)
+    expect((await context.request.post(`${CLIENT}/auth/dev`, { data: { name: "Ada Park", email: "ada@normal.dev" }, headers: fromFoundation })).ok()).toBeTruthy();
     for (const g of [
       { title: "Freeze the rim-drive CAD for the PTHP build", detail: "Stator and bearings signed off", progress: 0.6, dueAt: Date.now() + 8 * 864e5 },
       { title: "Get Today in front of the team", progress: 0.35, dueAt: Date.now() + 2 * 864e5 },
       { title: "Onboard Kai to FactoryForm work orders", progress: 0.8 },
     ]) {
-      expect((await context.request.post(`${CLIENT}/api/today/goals`, { data: g })).ok()).toBeTruthy();
+      expect((await context.request.post(`${CLIENT}/api/today/goals`, { data: g, headers: fromFoundation })).ok()).toBeTruthy();
     }
     await context.addInitScript(() => localStorage.setItem("foundation-floor", JSON.stringify({ pane: false, tabs: [], tab: null, search: false })));
 
