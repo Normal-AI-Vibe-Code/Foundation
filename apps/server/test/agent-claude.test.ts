@@ -90,8 +90,8 @@ test("a subscription turn reaches the stand-in with its prompt as one argument",
   assert.equal(turn[turn.indexOf("--setting-sources") + 1], "", "no user, project or local settings: the empty value arrived as one argument");
 });
 
-test("the argument builder: Foundation's MCP config, strictly; no setting sources; only the board's tools pre-approved", async () => {
-  const { subscriptionArgs } = await import("../src/agent.ts");
+test("the argument builder: Foundation's MCP config, strictly; no setting sources; no built-in tools; only the board's tools pre-approved", async () => {
+  const { subscriptionArgs, CLAUDE_BUILT_IN_TOOLS } = await import("../src/agent.ts");
   const a = subscriptionArgs({ prompt: "hi --strict-mcp-config", mcpFile: "/w/runs/r1/mcp.json", system: "sys" });
   assert.deepEqual(a, [
     "-p",
@@ -108,10 +108,26 @@ test("the argument builder: Foundation's MCP config, strictly; no setting source
     "sys",
     "--allowedTools",
     "mcp__foundation__*",
+    "--tools=",
+    `--disallowedTools=${CLAUDE_BUILT_IN_TOOLS.join(",")}`,
   ]);
   // the prompt is one argument and never read as a flag: the flags stand on their own after it
   assert.equal(a.filter((x) => x === "--strict-mcp-config").length, 1);
   assert.equal(a.indexOf("--mcp-config") + 1, a.indexOf("/w/runs/r1/mcp.json"));
+});
+
+test("a board run has no built-in tools: an empty set (as the Agent SDK passes tools: []), and every built-in denied besides", async () => {
+  const { subscriptionArgs, CLAUDE_BUILT_IN_TOOLS } = await import("../src/agent.ts");
+  const a = subscriptionArgs({ prompt: "p", mcpFile: "/m.json", system: "s" });
+  // one argument each, in the SDK's own form (`--tools=` for tools: [], `--disallowedTools=a,b` for a list)
+  assert.equal(a.filter((x) => x === "--tools=").length, 1);
+  assert.ok(!a.some((x) => /^--tools=./.test(x) || x === "--tools"), "no built-in is named as available");
+  const deny = a.find((x) => x.startsWith("--disallowedTools="))!.slice("--disallowedTools=".length).split(",");
+  for (const t of ["Bash", "PowerShell", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Agent", "Task", "Skill", "NotebookEdit"]) assert.ok(deny.includes(t), `${t} is denied`);
+  assert.ok(!deny.some((t) => t.startsWith("mcp__")), "Foundation's own tools are not denied");
+  assert.deepEqual(deny, [...CLAUDE_BUILT_IN_TOOLS]);
+  // Foundation's tools stay the only ones pre-approved
+  assert.equal(a[a.indexOf("--allowedTools") + 1], "mcp__foundation__*");
 });
 
 test("Claude Code gets no keys, works outside data/, and its pass to the board is in a run folder that goes with the run (ADR-001 G13)", async () => {

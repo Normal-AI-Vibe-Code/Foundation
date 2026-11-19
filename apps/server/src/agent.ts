@@ -89,6 +89,9 @@ You are one of the crew: people see you on the board as a named cursor (your nam
  * `--strict-mcp-config`: only the MCP server in Foundation's config (the board's tools), not the person's
  * user, project or plugin MCP servers (mail, docs, trackers). `--setting-sources ""`: none of their settings
  * files (user, project, local), so their permission allow-rules, hooks and env don't widen a board run.
+ * `--tools=`: no built-in tools at all (`claude --help`: `--tools ""` disables all of them; the Agent SDK
+ * 0.3.323 turns `tools: []` into this same `--tools=`), and `--disallowedTools=` naming every built-in as
+ * a second fence, should a version ever bring one back. `--allowedTools` only pre-approves Foundation's.
  * Flag names as Claude Code 2.1.288's `claude --help` gives them.
  */
 export function subscriptionArgs(o: { prompt: string; mcpFile: string; system: string }): string[] {
@@ -107,8 +110,23 @@ export function subscriptionArgs(o: { prompt: string; mcpFile: string; system: s
     o.system,
     "--allowedTools",
     "mcp__foundation__*",
+    "--tools=",
+    `--disallowedTools=${CLAUDE_BUILT_IN_TOOLS.join(",")}`,
   ];
 }
+
+/**
+ * Claude Code's built-in tools, every one a board run is denied (subscriptionArgs): shells, files, the web,
+ * sub-agents, tasks, worktrees, skills, schedules, messages. The same list Casey's SDK options deny.
+ */
+export const CLAUDE_BUILT_IN_TOOLS = Object.freeze([
+  "Agent", "Task", "Bash", "BashOutput", "KillBash", "KillShell", "PowerShell", "Monitor",
+  "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "NotebookRead", "Glob", "Grep", "LS",
+  "WebFetch", "WebSearch", "TodoWrite", "TaskCreate", "TaskGet", "TaskUpdate", "TaskList", "TaskOutput", "TaskStop",
+  "ExitPlanMode", "EnterPlanMode", "EnterWorktree", "ExitWorktree", "ListMcpResourcesTool", "ReadMcpResourceTool",
+  "Skill", "SlashCommand", "ToolSearch", "AskUserQuestion", "CronCreate", "CronDelete", "CronList", "ScheduleWakeup",
+  "RemoteTrigger", "Workflow", "SendMessage", "Artifact", "PushNotification",
+]);
 
 const histories = new Map<string, Anthropic.MessageParam[]>();
 const claudeSessions = new Map<string, string>();
