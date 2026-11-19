@@ -27,11 +27,35 @@ export function hostOf(escapedUrl: string): string {
 }
 
 /**
- * A picture that loads on sight: one of Foundation's own files (/files/…), or a picture written into the
- * text itself (a data: image). Any other address would tell its server who is reading, and when, the moment
- * the text is on screen (and what an agent put in its address), so it is a placeholder until a person presses.
+ * The exact address of one of Foundation's own files: `/files/<id>`, where an id is `f_` and 16 hex digits
+ * (an upload: apps/server/src/files.ts) or `ff_` and letters, digits, `_` and `-` (brought from Flowform).
+ * Nothing else: no `..`, no `.`, no `%` (so no encoded slash or dot), no backslash, no query, no fragment, no
+ * host. Any of those could make the browser fetch another of the server's addresses, as the reader.
  */
-export const OWN_IMAGE = /^(\/files\/[^\s)"'<>]+|data:image\/(?:png|jpe?g|gif|webp|avif);base64,[A-Za-z0-9+/=]+)$/;
+export const OWN_FILE = /^\/files\/(?:f_[0-9a-f]{16}|ff_[A-Za-z0-9_-]{1,61})$/;
+
+/** an own file's address, also as the browser would read it: normalising it must leave it exactly as written */
+export function isOwnFile(url: string): boolean {
+  if (!OWN_FILE.test(url)) return false;
+  try {
+    const u = new URL(url, "http://foundation.invalid");
+    return u.origin === "http://foundation.invalid" && u.pathname === url && !u.search && !u.hash;
+  } catch {
+    return false;
+  }
+}
+
+/** a picture written into the text itself */
+const DATA_IMAGE = /^data:image\/(?:png|jpe?g|gif|webp|avif);base64,[A-Za-z0-9+/=]+$/;
+
+/**
+ * A picture that loads on sight: one of Foundation's own files, by its exact address (isOwnFile), or a
+ * picture written into the text itself (a data: image). Any other address would tell its server who is
+ * reading, and when, the moment the text is on screen (and what an agent put in its address), and an address
+ * that only starts like a file's could reach another of Foundation's own routes as the reader, so it is a
+ * placeholder until a person presses.
+ */
+export const OWN_IMAGE = { test: (url: string) => isOwnFile(url) || DATA_IMAGE.test(url) };
 
 /** the placeholder for a picture from elsewhere: its host, and a press to load it (installRemoteImages) */
 function remoteImage(alt: string, url: string): string {

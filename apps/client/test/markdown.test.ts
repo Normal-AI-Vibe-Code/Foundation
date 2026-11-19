@@ -57,7 +57,7 @@ test("a picture from elsewhere isn't loaded on sight: a placeholder with its hos
 });
 
 test("Foundation's own files and data: images load as pictures", () => {
-  assert.equal(renderMarkdown("![f](/files/f_1)"), '<p><img class="md-img" src="/files/f_1" alt="f" loading="lazy"></p>');
+  assert.equal(renderMarkdown("![f](/files/f_0123456789abcdef)"), '<p><img class="md-img" src="/files/f_0123456789abcdef" alt="f" loading="lazy"></p>');
   assert.match(renderMarkdown("![d](data:image/png;base64,iVBORw0KGgo=)"), /<img class="md-img" src="data:image\/png;base64,iVBORw0KGgo="/);
   // a data: address that isn't an image is neither a picture nor a link
   const page = renderMarkdown("![d](data:text/html;base64,PHNjcmlwdD4=)");
@@ -92,4 +92,49 @@ test("marks can't reach into an address, and a picture inside a link stays a pla
   const forged = renderMarkdown("[a](https://a.example) \u00000\u0000");
   assert.doesNotMatch(forged, /\u0000/);
   assert.equal((forged.match(/<a /g) ?? []).length, 1);
+});
+
+test("a picture loads on sight only from a file's exact address: anything that climbs, encodes or names a host is a placeholder", async () => {
+  const { isOwnFile } = await import("../src/utils/markdown.ts");
+  const own = ["/files/f_0123456789abcdef", "/files/ff_room-1_file-2", "/files/ff_9f2c1e0d4b7a6f5e3d2c1b0a9f8e7d6c"];
+  for (const url of own) {
+    assert.equal(isOwnFile(url), true, url);
+    assert.match(renderMarkdown(`![p](${url})`), new RegExp(`<img class="md-img" src="${url}"`), url);
+  }
+  const not = [
+    // traversal out of the files route, plain and encoded
+    "/files/../api/t3host/local?base=http://127.0.0.1:6379",
+    "/files/f_0123456789abcdef/../../api/company?fresh=1",
+    "/files/./f_0123456789abcdef",
+    "/files/%2e%2e/api/company",
+    "/files/%2E%2E%2Fapi%2Fcompany",
+    "/files/f_0123456789abcdef%2f..%2f..%2fapi",
+    "/files/..%5capi%5ccompany",
+    // backslashes, which a browser reads as slashes
+    "/files\\..\\api\\company",
+    "/files/f_0123456789abcdef\\..\\..\\api",
+    // a query or fragment that changes what is asked for
+    "/files/f_0123456789abcdef?download=1",
+    "/files/f_0123456789abcdef#x",
+    // another route under /files, or not a file id
+    "/files/flowform/abc/1/thumb",
+    "/files/f_1",
+    "/files/F_0123456789ABCDEF",
+    "/files/",
+    "/files",
+    // protocol-relative and absolute, even this server's own origin
+    "//evil.example/files/f_0123456789abcdef",
+    "///files/f_0123456789abcdef",
+    "http://localhost:1430/files/f_0123456789abcdef",
+    "https://foundation.example.com/files/f_0123456789abcdef",
+    "/api/company?fresh=1",
+    "/auth/flowform/start",
+  ];
+  for (const url of not) {
+    assert.equal(isOwnFile(url), false, url);
+    const html = renderMarkdown(`![p](${url})`);
+    assert.doesNotMatch(html, /<img/, `${url} loaded on sight`);
+  }
+  // an absolute address is still offered behind a press, with its host shown
+  assert.match(renderMarkdown("![p](http://localhost:1430/files/f_0123456789abcdef)"), /Image from <b>localhost:1430<\/b>/);
 });
