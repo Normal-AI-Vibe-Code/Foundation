@@ -16,7 +16,7 @@
  * own terminal for those.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { childOptions, spawnChild, type ChildProcess, type SpawnOptions } from "./child.ts";
 import { randomBytes } from "node:crypto";
 import type { WebSocket } from "ws";
 import type { UserInfo } from "@foundation/protocol";
@@ -65,14 +65,19 @@ export function spendHostTerminalKey(id: string, key: string | null): UserInfo |
 
 const shellName = () => (process.platform === "win32" ? "PowerShell" : process.env.SHELL?.split("/").pop() || "sh");
 
+/**
+ * The shell is a person's own, but not the server's keys: it gets the allowlist (child.ts), no extras, and
+ * TERM=dumb (no colours or cursor codes; there's no pseudo-terminal), so `env` or `Get-ChildItem env:` in it
+ * prints none of `.env`. An admin who needs a key reads `.env` themselves.
+ */
 function startShell(cwd: string): ChildProcess {
   if (process.platform === "win32") {
-    const p = spawn("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"], { cwd, windowsHide: true, env: { ...process.env, TERM: "dumb" } });
+    const p = spawnChild("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"], childOptions<SpawnOptions>({ extras: [], set: { TERM: "dumb" } }, { cwd, windowsHide: true }));
     p.stdin?.write("[Console]::OutputEncoding=[Text.Encoding]::UTF8; $ProgressPreference='SilentlyContinue'\n");
     return p;
   }
   const sh = process.env.SHELL && /(^|\/)(bash|zsh|sh)$/.test(process.env.SHELL) ? process.env.SHELL : "/bin/sh";
-  return spawn(sh, ["-s"], { cwd, env: { ...process.env, TERM: "dumb", PS1: "" } });
+  return spawnChild(sh, ["-s"], childOptions<SpawnOptions>({ extras: [], set: { TERM: "dumb", PS1: "" } }, { cwd }));
 }
 
 /** the line that prints the mark after each command */

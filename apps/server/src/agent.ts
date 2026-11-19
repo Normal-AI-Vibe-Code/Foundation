@@ -16,7 +16,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { spawn, execFileSync } from "node:child_process";
+import { childOptions, execFileSyncChild, spawnChild, type ChildOptions, type ExecFileSyncOptions, type SpawnOptions } from "./child.ts";
 import { randomBytes } from "node:crypto";
 import { writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -57,7 +57,7 @@ import { describeCrewWork, joinCrew, leaveCrew, setDoing, type CrewMember, seatN
 import { setHelperStarter } from "./tools.ts";
 import { runScript } from "./script.ts";
 import { CLAUDE_CODE_ENV, claudeCommand, here, type Runtime } from "./rea.ts";
-import { childEnv, workFolder } from "./childenv.ts";
+import { workFolder } from "./childenv.ts";
 
 const SYSTEM = `You are the Foundation agent — the company brain of Form Industries, living inside Foundation, a shared grid where the team keeps its projects, files, designs, running apps and agents together.
 
@@ -109,7 +109,9 @@ export function resolveClaude(cli: string, rt: Runtime, exec: (cmd: string, args
 let claude: ClaudeStart | null = null;
 /** Claude Code on this computer, checked once */
 export function claudeStart(): ClaudeStart {
-  claude ??= resolveClaude(config.claudeCli, here(), (cmd, args) => execFileSync(cmd, args, { stdio: "ignore", timeout: 5000, windowsHide: true }));
+  // `claude --version` gets what Claude Code needs to start at all (CLAUDE_CODE_ENV: where its config is,
+  // and Git Bash on Windows), never a key
+  claude ??= resolveClaude(config.claudeCli, here(), (cmd, args) => execFileSyncChild(cmd, args, childOptions<ExecFileSyncOptions>({ extras: CLAUDE_CODE_ENV }, { stdio: "ignore", timeout: 5000, windowsHide: true })));
   return claude;
 }
 
@@ -442,8 +444,8 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
  * Its environment is the allowlist plus CLAUDE_CODE_ENV (its login), never ANTHROPIC_API_KEY or any
  * other key: with that key set, `claude -p` would bill it instead of the person's plan.
  */
-export function subscriptionSpawnOptions(): { cwd: string; env: Record<string, string> } {
-  return { cwd: workFolder("agent"), env: childEnv(CLAUDE_CODE_ENV) };
+export function subscriptionSpawnOptions(): ChildOptions<SpawnOptions> {
+  return childOptions<SpawnOptions>({ extras: CLAUDE_CODE_ENV }, { cwd: workFolder("agent"), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 }
 
 async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent) => void, runId: string) {
@@ -493,11 +495,11 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
   emit({ type: "status", status: "thinking" });
   await new Promise<void>((resolve, reject) => {
     // no shell: the prompt is one argument, whatever it holds
-    const child = spawn(c.cmd, [...c.pre, ...argv], { ...subscriptionSpawnOptions(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const child = spawnChild(c.cmd, [...c.pre, ...argv], subscriptionSpawnOptions());
     opts.signal.addEventListener("abort", () => child.kill("SIGTERM"));
     let buf = "";
     let err = "";
-    child.stdout.on("data", (b: Buffer) => {
+    child.stdout!.on("data", (b: Buffer) => {
       buf += b.toString("utf8");
       let i: number;
       while ((i = buf.indexOf("\n")) >= 0) {
@@ -506,7 +508,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
         if (line) handleLine(line);
       }
     });
-    child.stderr.on("data", (b: Buffer) => (err += b.toString("utf8")));
+    child.stderr!.on("data", (b: Buffer) => (err += b.toString("utf8")));
     const handleLine = (line: string) => {
       let ev: {
         type: string;

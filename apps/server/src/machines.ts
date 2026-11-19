@@ -37,7 +37,7 @@
 
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import type { Socket } from "node:net";
-import { spawn } from "node:child_process";
+import { childOptions, spawnChild, type SpawnOptions } from "./child.ts";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, posix } from "node:path";
@@ -266,13 +266,15 @@ export function kiriApp(env = process.env, platform = process.platform): { exe: 
  * Start a program outside this server's process tree, so stopping Foundation
  * (npm run dev stops its children with `taskkill /T`) leaves Kiri running.
  * On Windows `start` launches it and exits, which cuts the parent link.
+ * Kiri's app (and `open` on macOS) needs nothing of the server's: the allowlist only (child.ts), no extras.
+ * Exported for tests (what it would start with); only wakeKiri calls it.
  */
-function launchApart(exe: string, args: string[]) {
-  if (process.platform === "win32") {
+export function launchApart(exe: string, args: string[], platform: NodeJS.Platform = process.platform) {
+  if (platform === "win32") {
     const q = (s: string) => `"${s.replace(/"/g, "")}"`;
-    spawn("cmd.exe", ["/d", "/s", "/c", `start "" /b ${[exe, ...args].map(q).join(" ")}`], { detached: true, stdio: "ignore", windowsHide: true, windowsVerbatimArguments: true }).unref();
+    spawnChild("cmd.exe", ["/d", "/s", "/c", `start "" /b ${[exe, ...args].map(q).join(" ")}`], childOptions<SpawnOptions>({ extras: [] }, { detached: true, stdio: "ignore", windowsHide: true, windowsVerbatimArguments: true })).unref();
   } else {
-    spawn(exe, args, { detached: true, stdio: "ignore" }).unref();
+    spawnChild(exe, args, childOptions<SpawnOptions>({ extras: [] }, { detached: true, stdio: "ignore" })).unref();
   }
 }
 

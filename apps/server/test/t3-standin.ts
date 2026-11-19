@@ -16,11 +16,21 @@
  * The test drives the rest through control.json: {do:"finish"|"approve"|"fail", id}.
  */
 
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+
+/**
+ * A launcher for the stand-in in `dir` that gives it its settings (T3_STANDIN_*) itself: Foundation starts T3
+ * with the allowlisted environment only (child.ts), so the server's own variables never reach it.
+ */
+export function standinLauncher(dir: string, settings: Record<string, string>): string {
+  const cli = join(dir, "t3-standin-run.mjs");
+  writeFileSync(cli, `Object.assign(process.env, ${JSON.stringify(settings)});\nawait import(${JSON.stringify(new URL("./t3-standin.mjs", import.meta.url).href)});\n`);
+  return cli;
+}
 
 /** point the stand-in (t3-standin.mjs) at a folder for its files; returns where they are */
 export function writeStandin(dir: string): { cli: string; control: string; file: (name: string) => string } {
   process.env.T3_STANDIN_DIR = dir;
-  return { cli: fileURLToPath(new URL("./t3-standin.mjs", import.meta.url)), control: join(dir, "control.json"), file: (name) => join(dir, name) };
+  return { cli: standinLauncher(dir, { T3_STANDIN_DIR: dir }), control: join(dir, "control.json"), file: (name) => join(dir, name) };
 }

@@ -10,16 +10,16 @@
  *  - a local directory or .asar → `rea-agents analyze-javascript-application <path> --json`
  *  - anything else (a URL, a binary, a repo) → a Claude Code session on this
  *    machine with REA's MCP server, told the goal and to report findings
- *    with evidence. Run `npx rea-agents setup` once to register REA with
+ *    with evidence. Run `npx rea-agents@6.9.0 setup` once to register REA with
  *    Claude Code.
  * rea-agents is pinned (rea.ts REA_AGENTS) and checked against npm's registry
  * before it starts; each job runs in its own folder under the work folder with
- * an environment from an allowlist (childenv.ts; ADR-001 G13).
+ * an environment from an allowlist (childenv.ts, started through child.ts; ADR-001 G13).
  */
 
 import { startHandoff } from "./vision.ts";
-import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
-import { childEnv, workFolder } from "./childenv.ts";
+import { childOptions, spawnChild, type ChildOptions, type ChildProcess, type SpawnOptions } from "./child.ts";
+import { workFolder } from "./childenv.ts";
 import { randomBytes } from "node:crypto";
 import { boardMaps, logActivity } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
@@ -95,9 +95,9 @@ export function startJob(id: string, boardId: string, by: string) {
  * (setJobDeps) so nothing runs and nothing goes to the network.
  */
 export const jobDeps: {
-  spawn: (cmd: string, argv: string[], opts: SpawnOptions) => ChildProcess;
+  spawn: (cmd: string, argv: string[], opts: ChildOptions<SpawnOptions>) => ChildProcess;
   integrity: () => Promise<string | null>;
-} = { spawn: (cmd, argv, opts) => spawn(cmd, argv, opts), integrity: () => checkReaIntegrity() };
+} = { spawn: (cmd, argv, opts) => spawnChild(cmd, argv, opts), integrity: () => checkReaIntegrity() };
 export function setJobDeps(d: Partial<typeof jobDeps>) {
   Object.assign(jobDeps, d);
 }
@@ -107,15 +107,13 @@ export function setJobDeps(d: Partial<typeof jobDeps>) {
  * environment from the allowlist, never the server's. rea-agents' static JavaScript analysis needs no
  * model and no key, so it gets BASE only (npx finds npm's cache and settings through the home folders
  * in it). The Claude Code route gets what Claude Code needs to find the person's login (CLAUDE_CODE_ENV),
- * and REA's MCP server is the one `npx rea-agents setup` registered with it.
+ * and REA's MCP server is the one `npx rea-agents@6.9.0 setup` registered with it.
  */
-export function jobSpawnOptions(job: { id: string }, plan: { route: "rea-agents" | "claude" }): SpawnOptions {
-  return {
-    cwd: workFolder("jobs", job.id),
-    env: childEnv(plan.route === "claude" ? CLAUDE_CODE_ENV : []),
-    stdio: ["ignore", "pipe", "pipe"],
-    windowsHide: true,
-  };
+export function jobSpawnOptions(job: { id: string }, plan: { route: "rea-agents" | "claude" }): ChildOptions<SpawnOptions> {
+  return childOptions<SpawnOptions>(
+    { extras: plan.route === "claude" ? CLAUDE_CODE_ENV : [] },
+    { cwd: workFolder("jobs", job.id), stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+  );
 }
 
 function launch(job: JobRow, boardId: string, plan: { route: "rea-agents" | "claude"; cmd: string; argv: string[] }) {

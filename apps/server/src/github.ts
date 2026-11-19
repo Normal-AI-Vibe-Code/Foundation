@@ -5,11 +5,18 @@
  * public API (60 req/h).
  */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
+import { childOptions, execFileText, type ExecFileOptions } from "./child.ts";
 import { config } from "./config.ts";
 
-const exec = promisify(execFile);
+/**
+ * What `gh` gets beyond the allowlist (child.ts): its own credential and settings, and nothing else of
+ * the server's. gh reads a token from GH_TOKEN or GITHUB_TOKEN (GH_ENTERPRISE_TOKEN for an Enterprise
+ * host, GH_HOST to pick the host), else its login under GH_CONFIG_DIR (default: the home folder, in BASE).
+ * Only gh's callers name these: github.ts here, and the plan sync (plan.ts, scripts/plan.mjs runs gh).
+ */
+export const GH_ENV = ["GITHUB_TOKEN", "GH_TOKEN", "GH_HOST", "GH_CONFIG_DIR", "GH_ENTERPRISE_TOKEN"] as const;
+
+const exec = (cmd: string, args: string[], opts: Omit<ExecFileOptions, "env">) => execFileText(cmd, args, childOptions<ExecFileOptions>({ extras: GH_ENV }, opts));
 
 let ghCliOk: boolean | null = null;
 

@@ -138,7 +138,7 @@ export function npxCommand(rt: Runtime): Command | Refused {
 /**
  * What Claude Code gets beyond childenv.ts's BASE (its home folders are in BASE: it finds its login
  * under ~/.claude, or the macOS keychain by the user, and ~/.claude.json holds MCP servers set up with
- * `npx rea-agents setup`). Never ANTHROPIC_API_KEY: with it set, `claude -p` bills the API key instead
+ * `npx rea-agents@6.9.0 setup`). Never ANTHROPIC_API_KEY: with it set, `claude -p` bills the API key instead
  * of the person's plan.
  */
 export const CLAUDE_CODE_ENV = [

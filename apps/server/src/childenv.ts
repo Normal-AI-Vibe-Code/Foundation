@@ -13,11 +13,11 @@ import { config } from "./config.ts";
 
 export const BASE_ENV = [
   // finding programs, and Windows' own folders and shell
-  "PATH", "PATHEXT", "SystemRoot", "windir", "COMSPEC",
+  "PATH", "PATHEXT", "SystemRoot", "SystemDrive", "windir", "COMSPEC", "OS", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS", "PSModulePath",
   // temporary files
   "TEMP", "TMP", "TMPDIR",
   // the user's home and app-data folders (where programs keep their settings and logins)
-  "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "CommonProgramFiles",
+  "USERPROFILE", "HOME", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA", "ProgramData", "ALLUSERSPROFILE", "PUBLIC", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "CommonProgramFiles",
   "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
   // who and where
   "USERNAME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "TZ",

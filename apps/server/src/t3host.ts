@@ -26,7 +26,8 @@
  * read defensively: an unknown shape is skipped, never a crash.
  */
 
-import { spawn, execFile, type ChildProcess } from "node:child_process";
+import { childOptions, execFileChild, spawnChild, type ChildProcess, type ExecFileOptions, type SpawnOptions } from "./child.ts";
+import { CLAUDE_CODE_ENV } from "./rea.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -88,6 +89,8 @@ export interface T3HostStatus {
 }
 
 const HOME = () => join(config.dataDir, "t3");
+/** what Foundation's T3 gets beyond the allowlist: where the agents it runs keep their sign-ins (why: at the start, below) */
+export const T3_ENV = [...CLAUDE_CODE_ENV, "CODEX_HOME"] as const;
 const FIRST_PORT = () => {
   const v = Number(process.env.FOUNDATION_T3_PORT ?? "15783");
   return Number.isInteger(v) && v > 0 ? v : 15783;
@@ -374,7 +377,7 @@ async function connect(base: string, gen: number) {
 }
 
 function killTree(c: ChildProcess) {
-  if (c.pid && process.platform === "win32") execFile("taskkill", ["/pid", String(c.pid), "/T", "/F"], { windowsHide: true }, () => {});
+  if (c.pid && process.platform === "win32") execFileChild("taskkill", ["/pid", String(c.pid), "/T", "/F"], childOptions<ExecFileOptions>({ extras: [] }, { windowsHide: true }));
   else c.kill();
 }
 
@@ -402,10 +405,15 @@ async function run(by: string): Promise<T3HostStatus> {
     seedHome(home);
     const port = await pickPort();
     const token = randomBytes(24).toString("hex");
-    const env: NodeJS.ProcessEnv = { ...process.env, T3CODE_HOME: home };
-    for (const k of ["T3CODE_PORT", "T3CODE_MODE", "T3CODE_HOST", "T3CODE_DEV_AUTH_TOKEN"]) delete env[k];
     set({ detail: `Starting T3 on port ${port}`, port });
-    const c = spawn(cmd, [...pre, "--bootstrap-fd", "0"], { cwd: home, env, stdio: ["pipe", "ignore", "pipe"], windowsHide: true });
+    // T3 and every agent it runs get the allowlist (child.ts), never the server's keys: a vendor key reaches
+    // an agent only through T3's own settings, per agent (addT3Agent: a provider instance's `environment`,
+    // marked sensitive, kept by T3). Beyond that: its home (T3CODE_HOME, Foundation's; the port, mode, host
+    // and a dev token come only on the bootstrap line, so none of the server's T3CODE_* ride along), and what
+    // the agents it starts need to find their own sign-ins when a person moved them: Claude Code's
+    // (CLAUDE_CODE_ENV, and Git Bash on Windows) and Codex's (CODEX_HOME). Its home, and its working folder,
+    // are still under data/ (`<data>/t3`: T3's database, the added agents' homes and foundation-agents.json).
+    const c = spawnChild(cmd, [...pre, "--bootstrap-fd", "0"], childOptions<SpawnOptions>({ extras: T3_ENV, set: { T3CODE_HOME: home } }, { cwd: home, stdio: ["pipe", "ignore", "pipe"], windowsHide: true }));
     child = c;
     let err = "";
     c.stderr?.on("data", (b: Buffer) => (err = (err + b).slice(-600)));
@@ -748,7 +756,7 @@ async function ensureBoardTools() {
 process.once("exit", () => {
   if (child?.pid) {
     try {
-      if (process.platform === "win32") spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, detached: true, stdio: "ignore" }).unref();
+      if (process.platform === "win32") spawnChild("taskkill", ["/pid", String(child.pid), "/T", "/F"], childOptions<SpawnOptions>({ extras: [] }, { windowsHide: true, detached: true, stdio: "ignore" })).unref();
       else child.kill();
     } catch { /* already gone */ }
   }

@@ -1,0 +1,69 @@
+One door for every program the server starts (ADR-001 G13), 2026-11-18
+=======================================================================
+
+What changed
+  apps/server/src/child.ts is the only server file that imports node:child_process. A caller asks
+  childOptions({ extras, set }, opts) for its options; spawnChild / execFileChild / execFileText /
+  execFileSyncChild refuse any other options object and always rebuild env from the allowlist
+  (childenv.ts BASE) plus the named extras, plus values Foundation sets (a name that looks like a
+  secret can't be set). An env put on the options afterwards is never used.
+
+Per program (extras beyond BASE; cwd)
+  T3 (t3host.ts)            CLAUDE_CONFIG_DIR, CLAUDE_CODE_GIT_BASH_PATH, CODEX_HOME; set T3CODE_HOME; cwd <data>/t3 (unchanged)
+  taskkill (t3host.ts)      none; cwd unchanged
+  t3 CLI (vision.ts)        none; cwd unchanged (server's)
+  Kiri (machines.ts)        none; detached, cwd unchanged
+  gh (github.ts)            GITHUB_TOKEN, GH_TOKEN, GH_HOST, GH_CONFIG_DIR, GH_ENTERPRISE_TOKEN
+  plan sync (plan.ts)       the same five + FOUNDATION_GH; set FOUNDATION_PLAN_FILE
+  claude --version (agent)  CLAUDE_CODE_ENV
+  claude -p (agent)         CLAUDE_CODE_ENV; cwd work/agent (unchanged)
+  REA jobs (jobs.ts)        none / CLAUDE_CODE_ENV; cwd work/jobs/<job> (unchanged)
+  terminal (hostterm.ts)    none; set TERM=dumb (and PS1="" on macOS/Linux)
+  git (changelog.ts)        none
+  tar (flowform-import.ts)  none
+
+Checks (Windows 11, Node 24.16.0; machine heavily loaded)
+  npm ci                                   ok
+  npm run typecheck                        ok (client and server)
+  npm test -w @foundation/server           tests 322, pass 316, fail 0, skipped 6
+    (the 6 skips are the flowform import fixtures that were never committed, as before)
+
+  test/child-door.test.ts (fake ANTHROPIC_API_KEY, SLACK_BOT_TOKEN, GITHUB_TOKEN, GH_TOKEN,
+  FOUNDATION_SERVICE_TOKEN, MESHY_API_KEY, GOOGLE_CLIENT_SECRET, DATAROOM_READ_TOKEN, FOO_PASSWORD
+  in the server's environment throughout):
+    ok only child.ts imports node:child_process under apps/server/src
+    ok a program's options come only from childOptions, and the door builds its environment itself
+    ok REA jobs (jobs.ts): base only for rea-agents, Claude Code's login folder for the claude route
+    ok Claude Code (agent.ts): `claude --version` and a subscription turn get CLAUDE_CODE_ENV, no key
+    ok Foundation's T3 (t3host.ts): its home, the agents' sign-in folders, no key and none of the server's T3CODE_*
+    ok Vision Code's t3 CLI (vision.ts): the allowlist only, to mint a hand-off session
+    ok Kiri's launcher (machines.ts): the allowlist only
+    ok gh (github.ts): gh's own credential and settings, and no other key
+    ok the plan sync (plan.ts -> scripts/plan.mjs -> gh): gh's credential, the plan file, FOUNDATION_GH, no other key
+    ok the built-in terminal (hostterm.ts): a person's shell, without the server's keys
+    ok git (changelog.ts) and tar (flowform-import.ts): the allowlist only
+
+  Through the real door (programs actually started):
+    test/t3threads.test.ts and test/person-gate.test.ts start the T3 stand-in through child.ts and
+    drive it end to end (sign-in, streams, threads, added agents): all pass.
+    test/plan.test.ts runs scripts/plan.mjs and the fake gh through child.ts: all pass.
+    test/agent-claude.test.ts runs a stand-in Claude Code and reads the environment it got: pass.
+
+  First full run failed (plan.test.ts 2, t3threads.test.ts 9): their stand-ins were configured
+  through the server's environment (FAKE_GH_STATE, T3_STANDIN_*), which no longer reaches a
+  program. Each stand-in now gets its settings from a small launcher script written beside it
+  (test/t3-standin.ts standinLauncher; plan.test.ts fakeGh; e2e/playwright.config.ts uses the
+  same launcher). No assertion changed. Second full run: all pass. No test needed a timeout rerun.
+
+Unpinned code sweep
+  Run by the server: rea-agents (already 6.9.0, MIT, integrity
+  sha512-KqDn1UR5BMqHoQ3MGAnPuWiSKwgdFaz1L/uUNgrKt+1W8kPtgYP8AWEOXIF1lDIOBVyPuYIIst2iamo1Wf3r8g==,
+  re-checked with npm view today). No other npx/@latest/uvx/pip/curl|sh run by the server.
+  Container images a person picks (packages/protocol MACHINE_DISTROS) are pulled by tag, not digest;
+  archlinux:latest and opensuse/tumbleweed:latest are rolling. Left: see SPEC section 7.
+  Instructions to a person: `npx rea-agents setup` -> `npx rea-agents@6.9.0 setup` in SPEC.md and the
+  comments in jobs.ts and rea.ts (docs/plan.json and the ADR left as they are).
+
+Not checked with a real run
+  A real T3 with real agents signing in; gh and the plan sync with a real login; the terminal in a
+  browser; Kiri waking; a real tar.gz import (its fixture is missing).
