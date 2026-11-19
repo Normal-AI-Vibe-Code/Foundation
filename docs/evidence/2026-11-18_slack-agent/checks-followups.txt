@@ -1,0 +1,136 @@
+﻿Follow-ups (thread owner, OAuth state secret, log level, errors in Slack): npm test in apps/slack-agent, 2026-11-18 (node --test)
+
+✔ nothing in the Slack agent bypasses permissions (7.5311ms)
+▶ Casey SDK options
+  ✔ never bypasses permissions (1.7609ms)
+  ✔ has no built-in tools, and refuses them by name too (0.961ms)
+  ✔ canUseTool denies Bash (0.2411ms)
+  ✔ canUseTool denies Read (0.1001ms)
+  ✔ canUseTool denies Write (0.0711ms)
+  ✔ canUseTool denies Edit (0.1137ms)
+  ✔ canUseTool denies WebFetch (0.0859ms)
+  ✔ canUseTool denies PowerShell (0.092ms)
+  ✔ canUseTool denies Skill (0.085ms)
+  ✔ canUseTool denies NotAToolAtAll (0.1927ms)
+  ✔ canUseTool denies mcp__ (0.1299ms)
+  ✔ canUseTool denies mcp__casey-tools__ (0.1975ms)
+  ✔ canUseTool denies an MCP tool from a server that is not configured (0.1866ms)
+  ✔ canUseTool denies a configured name served by a server that is not configured (0.1135ms)
+  ✔ canUseTool allows the configured MCP tools (0.1674ms)
+  ✔ a Slack tool is denied when no Slack server is configured (0.0692ms)
+  ✔ loads no Claude Code settings and no MCP servers but its own (0.0666ms)
+  ✔ gives the SDK no secret but the model credential (0.273ms)
+  ✔ defaults to the process environment, filtered (0.3657ms)
+  ✔ works in an empty, private folder outside the repo (0.2098ms)
+  ✔ resumes a session only when given one (0.0954ms)
+✔ Casey SDK options (7.5675ms)
+▶ OAuth state secret
+  ✔ refuses when unset (0.423ms)
+  ✔ refuses when shorter than 32 characters (0.0947ms)
+  ✔ accepts 32 characters or more (0.0871ms)
+✔ OAuth state secret (1.2136ms)
+▶ Bolt log level
+  ✔ is INFO by default (0.107ms)
+  ✔ can be set from the environment (0.0762ms)
+✔ Bolt log level (0.2785ms)
+✔ only the kind and the channel of an event leave this process (9.4579ms)
+✔ it checks in, forwards what Foundation follows, and lets the app’s own listeners run (412.1058ms)
+✔ the bot token never goes to another host (204.2245ms)
+✔ without a service token it says so and forwards nothing (0.6894ms)
+✔ Foundation being down is said once, and doesn’t stop the app (216.0537ms)
+▶ handleFeedbackButton
+  ✔ acknowledges the action (2.3134ms)
+  ✔ posts positive ephemeral message for good feedback (0.6602ms)
+  ✔ posts negative ephemeral message for bad feedback (0.4519ms)
+  ✔ logs error when postEphemeral fails (0.5443ms)
+✔ handleFeedbackButton (5.3377ms)
+▶ handleIssueButton
+  ✔ acknowledges the action (2.1424ms)
+  ✔ opens a modal with the trigger_id (0.3392ms)
+  ✔ passes the category to the modal (0.2602ms)
+  ✔ logs error when views.open fails (0.3925ms)
+✔ handleIssueButton (4.2894ms)
+▶ handleAppHomeOpened
+  ✔ publishes the home view when event.tab === "home" (3.5071ms)
+  ✔ sets suggested prompts when event.tab === "messages" (0.4733ms)
+  ✔ logs error when views.publish fails (0.4475ms)
+✔ handleAppHomeOpened (5.5633ms)
+▶ who Casey answers
+  ✔ answers a person in its own workspace (0.9681ms)
+  ✔ refuses bots (0.2269ms)
+  ✔ refuses people from another workspace (1.3936ms)
+  ✔ trusts issue metadata only on its own bot messages (0.632ms)
+✔ who Casey answers (4.6559ms)
+▶ a thread belongs to the person who started it
+  ✔ the owner continues their own session with their own token (1.3487ms)
+  ✔ another person's reply runs nothing and is told once (0.7981ms)
+  ✔ a session is never resumed with another person's token (0.3305ms)
+  ✔ a new mention by the other person starts that person's own session (0.3779ms)
+  ✔ a mention in a thread is run once, by the mention handler (0.3189ms)
+  ✔ a reply in a thread Casey is not in is ignored (0.1696ms)
+  ✔ a DM starts a session owned by the sender (0.2334ms)
+✔ a thread belongs to the person who started it (4.2738ms)
+▶ errors stay out of the thread
+  ✔ posts a fixed sentence and logs only the message (0.4034ms)
+✔ errors stay out of the thread (0.4872ms)
+▶ buildAppHomeView
+  ✔ returns a home view (1.3529ms)
+  ✔ has a blocks array (0.1818ms)
+  ✔ contains an actions block with buttons matching CATEGORIES (0.1246ms)
+  ✔ each button has action_id and value (0.0935ms)
+  ✔ shows disconnected status with learn-more link by default (0.108ms)
+  ✔ shows disconnected status when installUrl is provided (0.0917ms)
+  ✔ shows connected status when isConnected is true (0.079ms)
+  ✔ includes bot mention in context when botUserId is provided (0.1453ms)
+  ✔ omits bot mention when botUserId is not provided (0.1076ms)
+✔ buildAppHomeView (3.1147ms)
+▶ CATEGORIES
+  ✔ each category has required fields (0.2642ms)
+✔ CATEGORIES (0.4323ms)
+▶ buildFeedbackBlocks
+  ✔ returns a non-empty array (0.7687ms)
+  ✔ first block has type context_actions (0.1793ms)
+  ✔ contains feedback action_id (0.9343ms)
+  ✔ has positive and negative buttons (0.1153ms)
+✔ buildFeedbackBlocks (3.0617ms)
+▶ buildIssueModal
+  ✔ returns a modal view (2.462ms)
+  ✔ has callback_id of issue_submission (0.1815ms)
+  ✔ has submit and close buttons (0.1955ms)
+  ✔ pre-selects the given category (0.0975ms)
+  ✔ defaults to first category when unknown category is given (0.0879ms)
+  ✔ defaults to first category when no category is given (0.1015ms)
+  ✔ has category and description input blocks (0.0767ms)
+  ✔ category options match CATEGORIES count (0.1005ms)
+✔ buildIssueModal (4.4669ms)
+▶ handleIssueSubmission
+  ✔ acknowledges the submission (1.4932ms)
+  ✔ opens a DM conversation with the user (0.2473ms)
+  ✔ posts message with category, description, and metadata (0.2471ms)
+  ✔ logs error when conversations.open fails (0.2655ms)
+✔ handleIssueSubmission (3.0322ms)
+▶ SessionStore
+  ✔ stores and retrieves a session (1.5417ms)
+  ✔ returns null for missing key (0.1777ms)
+  ✔ keeps different threads independent (0.1292ms)
+  ✔ expires entries after TTL (5.5431ms)
+  ✔ evicts oldest entries when max is exceeded (0.8784ms)
+  ✔ finds a session only for the person who started it (0.4224ms)
+  ✔ decides resume, start, not_owner or not_engaged (1.4429ms)
+  ✔ tells a person once per thread (0.3804ms)
+  ✔ overwrites existing key (0.253ms)
+✔ SessionStore (12.1387ms)
+ℹ tests 90
+ℹ suites 15
+ℹ pass 90
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1005.1649
+
+Also checked:
+- tsc --checkJs on app.js and app-oauth.js: exit 0; on the new tests: exit 0
+- biome on every touched file: clean (untouched files still report CRLF from the Windows checkout only)
+- SLACK_STATE_SECRET=short node app-oauth.js: printed the refusal sentence and exited 1 before any server started
+- no real agent run, no model call, no Slack connection

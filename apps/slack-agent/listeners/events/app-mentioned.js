@@ -1,83 +1,77 @@
 import { runCaseyAgent } from '../../agent/index.js';
 import { sessionStore } from '../../thread-context/index.js';
 import { buildFeedbackBlocks } from '../views/feedback-builder.js';
+import { errorMessage, FAILURE_TEXT } from './replies.js';
 import { refusal } from './sender.js';
 
 /**
- * Handle app_mention events and run the Casey agent.
- * @param {import('@slack/bolt').AllMiddlewareArgs & import('@slack/bolt').SlackEventMiddlewareArgs<'app_mention'>} args
- * @returns {Promise<void>}
+ * @param {{ runAgent?: typeof runCaseyAgent, store?: import('../../thread-context/store.js').SessionStore }} [deps]
+ * @returns {(args: import('@slack/bolt').AllMiddlewareArgs & import('@slack/bolt').SlackEventMiddlewareArgs<'app_mention'>) => Promise<void>}
  */
-export async function handleAppMentioned({ client, context, event, logger, say, sayStream, setStatus }) {
-  const refused = refusal(event, context);
-  if (refused) {
-    logger.info(`Casey: not answering a mention (${refused})`);
-    return;
-  }
-  try {
-    const channelId = event.channel;
-    const text = event.text || '';
-    const threadTs = event.thread_ts || event.ts;
-    const userId = /** @type {string} */ (context.userId);
-
-    // Strip the bot mention from the text
-    const cleanedText = text.replace(/<@[A-Z0-9]+>/g, '').trim();
-
-    if (!cleanedText) {
-      await say({
-        text: "Hey there! How can I help you? Describe your IT issue and I'll do my best to assist.",
-        thread_ts: threadTs,
-      });
+export function makeAppMentionedHandler({ runAgent = runCaseyAgent, store = sessionStore } = {}) {
+  return async function handleAppMentioned({ client, context, event, logger, say, sayStream, setStatus }) {
+    const refused = refusal(event, context);
+    if (refused) {
+      logger.info(`Casey: not answering a mention (${refused})`);
       return;
     }
+    const userId = context.userId ?? event.user;
+    if (!userId) return;
 
-    // Add eyes reaction only to the first message (not threaded replies)
-    if (!event.thread_ts) {
-      await client.reactions.add({
-        channel: channelId,
-        timestamp: event.ts,
-        name: 'eyes',
+    const channelId = event.channel;
+    const threadTs = event.thread_ts || event.ts;
+    try {
+      const cleanedText = (event.text || '').replace(/<@[A-Z0-9]+>/g, '').trim();
+
+      if (!cleanedText) {
+        await say({
+          text: "Hey there! How can I help you? Describe your IT issue and I'll do my best to assist.",
+          thread_ts: threadTs,
+        });
+        return;
+      }
+
+      if (!event.thread_ts) {
+        await client.reactions.add({
+          channel: channelId,
+          timestamp: event.ts,
+          name: 'eyes',
+        });
+      }
+
+      await setStatus({
+        status: 'Thinking…',
+        loading_messages: [
+          'Teaching the hamsters to type faster…',
+          'Untangling the internet cables…',
+          'Consulting the office goldfish…',
+          'Polishing up the response just for you…',
+          'Convincing the AI to stop overthinking…',
+        ],
       });
+
+      const decision = store.decide(channelId, threadTs, userId, { startIfNew: true });
+      const existingSessionId = decision.kind === 'resume' ? decision.sessionId : undefined;
+
+      const deps = { client, userId, channelId, threadTs, messageTs: event.ts, userToken: context.userToken };
+      const { responseText, sessionId: newSessionId } = await runAgent(cleanedText, existingSessionId, deps);
+
+      const streamer = sayStream();
+      await streamer.append({ markdown_text: responseText });
+      await streamer.stop({ blocks: buildFeedbackBlocks() });
+
+      if (newSessionId) {
+        store.setSession(channelId, threadTs, newSessionId, userId);
+      }
+    } catch (e) {
+      logger.error(`Failed to handle app mention: ${errorMessage(e)}`);
+      await say({ text: FAILURE_TEXT, thread_ts: threadTs });
     }
-
-    // Set assistant thread status with loading messages
-    await setStatus({
-      status: 'Thinking…',
-      loading_messages: [
-        'Teaching the hamsters to type faster…',
-        'Untangling the internet cables…',
-        'Consulting the office goldfish…',
-        'Polishing up the response just for you…',
-        'Convincing the AI to stop overthinking…',
-      ],
-    });
-
-    // Get conversation session
-    const existingSessionId = sessionStore.getSession(channelId, threadTs);
-
-    // Run the agent with deps for tool access
-    const deps = { client, userId, channelId, threadTs, messageTs: event.ts, userToken: context.userToken };
-    const { responseText, sessionId: newSessionId } = await runCaseyAgent(
-      cleanedText,
-      existingSessionId ?? undefined,
-      deps,
-    );
-
-    // Stream response in thread with feedback buttons
-    const streamer = sayStream();
-    await streamer.append({ markdown_text: responseText });
-    const feedbackBlocks = buildFeedbackBlocks();
-    await streamer.stop({ blocks: feedbackBlocks });
-
-    // Store conversation session
-    if (newSessionId) {
-      sessionStore.setSession(channelId, threadTs, newSessionId);
-    }
-  } catch (e) {
-    logger.error(`Failed to handle app mention: ${e}`);
-    await say({
-      text: `:warning: Something went wrong! (${e})`,
-      thread_ts: event.thread_ts || event.ts,
-    });
-  }
+  };
 }
+
+/**
+ * Handle app_mention events and run the Casey agent. A mention resumes only
+ * the sender's own session in that thread; anyone else's mention starts theirs.
+ */
+export const handleAppMentioned = makeAppMentionedHandler();
