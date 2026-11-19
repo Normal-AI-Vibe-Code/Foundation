@@ -73,7 +73,8 @@ export function findMachineCard(boardId: string, ref: string): PanelDoc | undefi
   return objects.find((o) => o.id === ref) ?? objects.find((o) => o.machine?.name === needle) ?? objects.find((o) => o.name.trim().toLowerCase() === needle);
 }
 
-function writeAsk(boardId: string, panelId: string, ask: MachineAsk, line?: { who: string; role: "human" | "agent"; text: string; for?: string }) {
+/** put an ask on a card (the board's `machineAsks`, which only the server writes); apptools.ts uses it for an app's card */
+export function writeAsk(boardId: string, panelId: string, ask: MachineAsk, line?: { who: string; role: "human" | "agent"; text: string; for?: string }) {
   editBoard(boardId, "machines", (doc) => {
     const m = boardMaps(doc);
     const list = machineAsksOf(doc, panelId).filter((a) => a.id !== ask.id);
@@ -216,9 +217,11 @@ function sweepStaleAsks(boardId: string) {
   const doc = getBoard(boardId).doc;
   const m = boardMaps(doc);
   const stale: Array<[string, MachineAsk[]]> = [];
+  // an app tool's ask (`tool`) waits on the board, not in this process: it stays until a person answers it (apptools.ts)
+  const isStale = (a: MachineAsk) => !a.tool && (a.state === "waiting" || a.state === "running") && !waiting.has(a.id);
   for (const [panelId, list] of m.machineAsks.entries()) {
-    if (list.some((a) => (a.state === "waiting" || a.state === "running") && !waiting.has(a.id))) {
-      stale.push([panelId, list.map((a) => ((a.state === "waiting" || a.state === "running") && !waiting.has(a.id) ? { ...a, state: "withdrawn" as const, endedAt: Date.now() } : a))]);
+    if (list.some(isStale)) {
+      stale.push([panelId, list.map((a) => (isStale(a) ? { ...a, state: "withdrawn" as const, endedAt: Date.now() } : a))]);
     }
   }
   if (stale.length) editBoard(boardId, "machines", () => stale.forEach(([id, list]) => m.machineAsks.set(id, list)));

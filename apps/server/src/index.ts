@@ -52,6 +52,7 @@ import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
 import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
+import { answerAppToolAsk } from "./apptools.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
 import { buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
@@ -725,6 +726,15 @@ r.post("/api/boards/:id/machines/:panel/asks/:ask/:verdict", async (req) => {
   const u = requirePerson(req, verdict === "run" ? "Running an agent's command" : "Declining an agent's command");
   requireBoard(u, req.params.id);
   return { ask: answerAsk(req.params.id, req.params.panel, req.params.ask, u, verdict) };
+});
+// an agent's ask to use an app's tool, on the app's card: the same gate (a person at their browser who can edit the board).
+// Allow lets agents call that tool of that saved app until its definition changes; it calls nothing itself (apptools.ts)
+r.post("/api/boards/:id/apps/:panel/asks/:ask/:verdict", async (req) => {
+  const verdict = req.params.verdict;
+  if (verdict !== "allow" && verdict !== "decline") throw new HttpError(404, "allow or decline");
+  const u = requirePerson(req, verdict === "allow" ? "Allowing an app's tool" : "Declining an agent's ask");
+  requireBoard(u, req.params.id);
+  return { ask: answerAppToolAsk(req.params.id, req.params.panel, req.params.ask, u, verdict) };
 });
 r.post("/api/boards/:id/machines/load", async (req) => {
   const u = requirePerson(req, "Loading an image into an engine");

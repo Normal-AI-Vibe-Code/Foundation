@@ -27,7 +27,7 @@ export const BOARD = {
   activity: "activity", // Y.Array<ActivityEntry>
   noteText: "noteText", // noteId → Y.Text (schema 3: typing merges character by character)
   huddles: "huddles", // huddle panel id → HuddleState (schema 6: kept by the server alone, off the card)
-  machineAsks: "machineAsks", // machine panel id → MachineAsk[] (commands agents asked to run; kept by the server alone, off the card)
+  machineAsks: "machineAsks", // machine or app panel id → MachineAsk[] (commands agents asked to run, app tools they asked to use; kept by the server alone, off the card)
   slack: "slack", // section id → SlackSectionState (a section kept for a Slack channel; kept by the server alone)
   characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
   agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
@@ -401,6 +401,7 @@ export function machineName(s: string): string {
  */
 export interface MachineAsk {
   id: string;
+  /** the command to run; for an app's tool, the tool's name */
   command: string;
   /** the agent's few words on why */
   why?: string;
@@ -408,7 +409,15 @@ export interface MachineAsk {
   by: string;
   /** the person it works for */
   for?: string;
-  state: "waiting" | "running" | "done" | "declined" | "timed out" | "withdrawn" | "failed";
+  /**
+   * Set when this asks to use a tool of a saved app (on an app's card, ADR-001
+   * G3) rather than to run a command in a machine. Nothing is called on Allow:
+   * Allow lets agents call that tool of that app from then on (until its
+   * definition changes), and the agent calls again. Such an ask doesn't wait
+   * in the server or time out; it stays until a person answers it.
+   */
+  tool?: AppToolAsk;
+  state: "waiting" | "running" | "done" | "declined" | "timed out" | "withdrawn" | "failed" | "allowed";
   at: number;
   /** the person who pressed Run or Decline */
   decidedBy?: string;
@@ -421,7 +430,23 @@ export interface MachineAsk {
   expiresAt?: number;
 }
 
-/** the commands agents asked to run in a machine, newest last */
+/** what an ask to use an app's tool shows a person: which app, where, which tool, and what this call would send */
+export interface AppToolAsk {
+  /** the saved app (the registry's `apps` row) the card resolved to */
+  appId: string;
+  app: string;
+  /** the saved MCP address Foundation would connect to (the registry's, not the card's) */
+  address: string;
+  description: string;
+  /** the arguments this call wants to send, as JSON (shortened) */
+  args: string;
+  /** "first": never allowed; "changed": allowed before, but its definition changed since */
+  change: "first" | "changed";
+  /** sha256 of the tool's name, description and input schema as listed: what Allow allows */
+  defHash: string;
+}
+
+/** the commands agents asked to run in a machine (and, on an app's card, the tools they asked to use), newest last */
 export function machineAsksOf(doc: Y.Doc, panelId: string): MachineAsk[] {
   return boardMaps(doc).machineAsks.get(panelId) ?? [];
 }

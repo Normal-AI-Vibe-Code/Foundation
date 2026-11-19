@@ -31,7 +31,7 @@ import { onConnectorChange } from "../lib/connectorEvents";
 import { HuddleBody } from "./HuddleView";
 import { SlackBody } from "./SlackView";
 import { CrewCardBody } from "../components/SectionAgents";
-import { MachineBody, machineAction } from "./MachineView";
+import { AppToolAsks, MachineBody, machineAction } from "./MachineView";
 import { CharacterBody } from "./CharacterView";
 import { machinePage, type FromMachine, type MachinePage } from "./machinePage";
 import { sandboxFor } from "./frameSandbox";
@@ -424,6 +424,7 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
           </span>
         </div>
       )}
+      {panel.mcp && <AppToolAsks panelId={panel.id} viewer={viewer} />}
     </div>
   );
 }

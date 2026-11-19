@@ -95,6 +95,21 @@ create table if not exists apps (
   created_at integer not null
 );
 
+-- A person's leave for agents to call one tool of one saved app (apptools.ts,
+-- ADR-001 G3). Keyed by the tool's definition as it was listed when they
+-- pressed Allow (sha256 of name, description and input schema): a tool whose
+-- definition changes needs a new press.
+create table if not exists app_tool_allowances (
+  app_id text not null,
+  tool text not null,
+  def_hash text not null,
+  allowed_by text not null,
+  allowed_by_name text not null,
+  board_id text,
+  allowed_at integer not null,
+  primary key (app_id, tool, def_hash)
+);
+
 create table if not exists asks (
   id text primary key,
   board_id text not null,

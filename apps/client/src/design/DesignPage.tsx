@@ -1007,6 +1007,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           </div>
         </div>
         <MachineAsksDemo />
+        <AppToolAsksDemo />
         <MachineUseDemo />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
@@ -1348,6 +1349,41 @@ function MachineUseDemo() {
         </div>
       </div>
     </>
+  );
+}
+
+/**
+ * An agent's ask to use a saved app's tool, over the app's page (ADR-001 G3): first use and a changed
+ * tool waiting, then allowed and declined (560, 400 as a viewer, 260). Allow calls nothing; the agent calls again.
+ */
+function AppToolAsksDemo() {
+  const now = Date.now();
+  const tool = (change: "first" | "changed", args: string) => ({ appId: "app_demo", app: "Vision", address: "http://localhost:5174/mcp", description: "Make a part from a sketch: extrudes the closed profile by the given depth.", args, change, defHash: "demo" });
+  const first: MachineAsk = { id: "ask_app1", command: "make_part", by: "Kestrel", for: "Ada", state: "waiting", at: now - 8_000, tool: tool("first", '{\n "sketch": "rim-profile-v3",\n "depth_mm": 12,\n "material": "6061-T6"\n}') };
+  const changed: MachineAsk = { id: "ask_app2", command: "export_step", by: "Wren", for: "Kai", state: "waiting", at: now - 3_000, tool: tool("changed", '{\n "part": "rim"\n}') };
+  const done: MachineAsk[] = [
+    { id: "ask_app0", command: "list_parts", by: "Kestrel", for: "Ada", state: "allowed", at: now - 90_000, decidedBy: "Ada", endedAt: now - 80_000, tool: tool("first", "{}") },
+    { id: "ask_app3", command: "delete_part", by: "Kestrel", for: "Ada", state: "declined", at: now - 60_000, decidedBy: "Kai", endedAt: now - 50_000, tool: tool("first", '{\n "part": "rim"\n}') },
+  ];
+  const card = (width: number, height: number, asks: MachineAsk[], viewer = false) => (
+    <div className="frame-card live-specimen" style={{ width, height, position: "relative" }}>
+      <div className="live-frame">
+        <div className="frame-poster">
+          <div className="frame-poster-name">Vision</div>
+          <div className="frame-poster-domain">localhost:5174</div>
+        </div>
+        <div className="app-asks">
+          <MachineAskList asks={asks} viewer={viewer} now={now} />
+        </div>
+      </div>
+    </div>
+  );
+  return (
+    <div className="adapt-row">
+      {card(560, 420, [...done, first])}
+      {card(400, 360, [changed], true)}
+      {card(260, 360, [first])}
+    </div>
   );
 }
 
