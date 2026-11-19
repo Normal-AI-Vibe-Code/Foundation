@@ -28,3 +28,32 @@ e2e (npm run e2e -w @foundation/client, on its own ports), the two specs that st
   section-crew.spec.ts      5 passed (a first run under load failed its crew-pane check at line 136, before any changed line; the rerun passed all 5 with no retries used)
   bottom-bar.spec.ts        "the tools: ... and T3" passed (run with -g). The spec's "day and night reach the grid's paper ... WebGL context" fails on this machine (a pixel 0.018 where 0 is expected), before the T3 test, in both runs; it doesn't touch sign-in. Not checked against main.
   Other e2e specs were not run.
+
+
+G13 (third-party programs: no keys, a folder outside data/, a pinned rea-agents), checked 2026-11-18.
+The machine was overloaded throughout (CPU at 99%, about 90 node processes from other sessions); the server took 61 s to boot by hand.
+
+npm test -w @foundation/server (first full run): tests 301, pass 289, fail 6, skipped 6 (the flowform-import fixture rooms, SPEC §7)
+  The 6 failures and their reruns, each file on its own:
+  - person-gate.test.ts (the whole file: its servers didn't come up within 40 s): rerun with a 2-minute boot wait, 11 of 11 pass (the first server took 61 s)
+  - desktop-server.test.ts (the server didn't come up within 30 s): rerun with a 2-minute boot wait, 1 of 1 pass (21 s)
+  - t3host.test.ts "Stop ends the program ..." and "a T3 that dies says so ...": passed on rerun, unchanged
+  - characters.test.ts "a 3D character, stage by stage ..." and "lineage ...": passed on rerun, unchanged
+npm run typecheck: client and server, no errors (exit 0)
+
+New and changed tests (all pass):
+  childenv.test.ts
+    ok no key, token, secret or password gets through, and what a program needs to run does
+    ok a caller's named extra gets through, even one that looks like a secret, and only that one
+    ok on Windows, names match in any case and keep the server's spelling
+    ok the work folder is beside data/, and a program's folder is made under it
+  jobs.test.ts
+    ok the exact REA command on win32 and darwin (now rea-agents@6.9.0, was @latest)
+    ok the pinned rea-agents: a matching integrity passes, a different one or no answer refuses (no network)
+    ok a REA job starts the pinned version in a folder of its own, with no keys (ADR-001 G13)
+    ok a REA job whose pinned version doesn't match the registry fails with a plain sentence and starts nothing
+    ok the Claude Code route of a REA job gets only Claude Code's own extras, in its own folder
+  agent-claude.test.ts (against the stand-in claude)
+    ok Claude Code gets no keys, works outside data/, and its pass to the board is in a run folder that goes with the run (ADR-001 G13)
+
+Not run: a real REA job; a real `claude -p` turn (whether Claude Code still finds its login with the trimmed environment is not verified).

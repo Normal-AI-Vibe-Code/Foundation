@@ -5,7 +5,7 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 // The repo's root when run from source. The desktop app runs a bundled copy from its install folder
 // (scripts/desktop-server.mjs) and names its own folder instead (FOUNDATION_ROOT: the app's data
@@ -38,6 +38,8 @@ export const config = {
     .map((s) => s.trim().replace(/\/$/, ""))
     .filter(Boolean),
   dataDir: resolve(root, env("FOUNDATION_DATA_DIR", "data")),
+  /** where third-party programs Foundation starts get folders of their own (childenv.ts workFolder): beside the data folder, never in it (ADR-001 G13) */
+  workDir: "",
   /** comma-separated emails or @domain entries allowed to sign in */
   allowlist: env("FOUNDATION_ALLOWLIST", "@formindustries.com,@normal.dev,josh.leong@gmail.com")
     .split(",")
@@ -80,5 +82,7 @@ export const config = {
   /** bearer token other services/agents use for /mcp and /api when not signed in */
   serviceToken: env("FOUNDATION_SERVICE_TOKEN"),
 };
+
+config.workDir = resolve(root, env("FOUNDATION_WORK_DIR", join(dirname(config.dataDir), "work")));
 
 export type Config = typeof config;

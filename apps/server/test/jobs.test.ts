@@ -13,14 +13,16 @@
 
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { checkTarget, claudeCommand, here, npxCommand, reaCommand, REA_DEFAULT_GOAL, type Runtime } from "../src/rea.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "foundation-test-"));
-process.env.FOUNDATION_DATA_DIR = dir;
+process.env.FOUNDATION_DATA_DIR = join(dir, "data");
+process.env.FOUNDATION_WORK_DIR = join(dir, "work");
 
 /** a runtime over a made-up file system: `files` (path → text), `dirs` */
 function rt(platform: NodeJS.Platform, o: { files?: Record<string, string>; dirs?: string[]; env?: Record<string, string>; execPath?: string; cwd?: string } = {}): Runtime {
@@ -44,7 +46,7 @@ const NPX_CLI = "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npx-cli.js";
 const NPM_SHIM = (script: string) => `@ECHO off\r\nGOTO start\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\nIF EXIST "%dp0%\\node.exe" (\r\n  SET "_prog=%dp0%\\node.exe"\r\n) ELSE (\r\n  SET "_prog=node"\r\n)\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${script}" %*\r\n`;
 const APP_WIN = "C:\\Apps\\Slack\\resources\\app.asar";
 const APP_MAC = "/Applications/Slack.app/Contents/Resources/app.asar";
-const REA = (target: string) => ["-y", "rea-agents@latest", "analyze-javascript-application", target, "--json"];
+const REA = (target: string) => ["-y", "rea-agents@6.9.0", "analyze-javascript-application", target, "--json"];
 
 test("npx on Windows: npm's npx-cli.js under this Node, never npx.cmd", () => {
   // next to the running Node (an ordinary install)
@@ -98,7 +100,7 @@ test("the exact REA command on win32 and darwin", () => {
   const job = { target: APP_WIN, goal: "How does it sync?" };
   assert.deepEqual(reaCommand(job, "claude", win), { ok: true, route: "rea-agents", target: APP_WIN, cmd: "C:\\Program Files\\nodejs\\node.exe", argv: [NPX_CLI, ...REA(APP_WIN)] });
   assert.deepEqual(reaCommand({ ...job, target: APP_MAC }, "claude", mac), { ok: true, route: "rea-agents", target: APP_MAC, cmd: "npx", argv: REA(APP_MAC) });
-  // a directory is an app too, and a relative path is made absolute (the job runs in the data folder, not here)
+  // a directory is an app too, and a relative path is made absolute (the job runs in its own work folder, not here)
   const macDir = rt("darwin", { dirs: ["/srv/foundation/apps/web"] });
   assert.deepEqual(reaCommand({ target: "apps/web", goal: "" }, "claude", macDir), { ok: true, route: "rea-agents", target: "/srv/foundation/apps/web", cmd: "npx", argv: REA("/srv/foundation/apps/web") });
   // a URL goes to Claude Code with REA's MCP: the target is inside the one prompt argument
@@ -200,4 +202,134 @@ test("on Windows: the resolved npx starts without a shell, and a claude.cmd's ar
   const res = spawnSync(plan.cmd, plan.argv, { encoding: "utf8", windowsHide: true });
   assert.equal(res.status, 0, res.stderr);
   assert.deepEqual(JSON.parse(res.stdout), plan.argv.slice(1));
+});
+
+// ---------- ADR-001 G13: a pinned rea-agents, checked before it starts, with no keys and outside data/ ----------
+
+// the boards these checks open are closed once the file is done (the refused-job check closes its own after itself)
+after(async () => (await import("../src/boards.ts")).closeBoards());
+
+const SECRET = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i;
+const SECRETS = { ANTHROPIC_API_KEY: "sk-ant-not-real", SLACK_BOT_TOKEN: "xoxb-not-real", GITHUB_TOKEN: "ghp-not-real", FOUNDATION_SERVICE_TOKEN: "s".repeat(40), MESHY_API_KEY: "msy-not-real", GOOGLE_CLIENT_SECRET: "g-not-real", FOO_PASSWORD: "hunter2" };
+const isUnder = (child: string, parent: string) => {
+  const r = relative(resolve(parent), resolve(child));
+  return r === "" || (!r.startsWith("..") && !isAbsolute(r));
+};
+
+/** a child process that ran and finished at once (nothing really starts) */
+function fakeChild(code = 0, out = "") {
+  const c = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
+  c.stdout = new EventEmitter();
+  c.stderr = new EventEmitter();
+  setImmediate(() => {
+    if (out) c.stdout.emit("data", Buffer.from(out));
+    c.emit("close", code);
+  });
+  return c as unknown as ChildProcess;
+}
+
+/** a REA job on a local app folder (the rea-agents route) */
+async function queueAppJob() {
+  const { run: runSql } = await import("../src/db.ts");
+  runSql("insert or ignore into users (id, email, name, color, role, created_at) values (?, ?, ?, ?, 'member', ?)", "u", "u@formindustries.com", "Tester", "#325bb4", Date.now());
+  const { runTool } = await import("../src/tools.ts");
+  const { getBoard } = await import("../src/boards.ts");
+  const { appendSection, boardMaps } = await import("@foundation/protocol");
+  const board = getBoard("jobs-board");
+  if (boardMaps(board.doc).sections.size === 0) board.doc.transact(() => appendSection(board.doc, "Research"));
+  const app = join(dir, "an-app");
+  mkdirSync(app, { recursive: true });
+  return (await runTool({ boardId: "jobs-board", actor: "test", userId: "u" }, "reverse_engineer", { target: app, goal: "map it" })) as { job: string; card: string };
+}
+
+async function until(what: string, ok: () => boolean) {
+  for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
+  assert.ok(ok(), what);
+}
+
+test("the pinned rea-agents: a matching integrity passes, a different one or no answer refuses (no network)", async () => {
+  const { checkReaIntegrity, REA_AGENTS } = await import("../src/rea.ts");
+  assert.equal(REA_AGENTS.version, "6.9.0");
+  let asked: string[] = [];
+  assert.equal(
+    await checkReaIntegrity(async (n, v) => {
+      asked = [n, v];
+      return REA_AGENTS.integrity;
+    }),
+    null,
+  );
+  assert.deepEqual(asked, ["rea-agents", "6.9.0"], "it asks for the exact pinned version");
+  assert.match((await checkReaIntegrity(async () => "sha512-somethingElse==")) ?? "", /npm's registry says rea-agents@6\.9\.0 is sha512-somethingElse==, not .* Foundation pinned, so it didn't start/);
+  assert.match((await checkReaIntegrity(async () => undefined)) ?? "", /is missing/);
+  assert.match(
+    (await checkReaIntegrity(async () => {
+      throw new Error("offline");
+    })) ?? "",
+    /Couldn't check rea-agents@6\.9\.0.*offline.*didn't start/,
+  );
+});
+
+test("a REA job starts the pinned version in a folder of its own, with no keys (ADR-001 G13)", async () => {
+  const { startJob, getJob, setJobDeps } = await import("../src/jobs.ts");
+  const { checkReaIntegrity, REA_AGENTS } = await import("../src/rea.ts");
+  const spawned: Array<{ cmd: string; argv: string[]; opts: SpawnOptions }> = [];
+  Object.assign(process.env, SECRETS);
+  try {
+    setJobDeps({
+      spawn: (cmd, argv, opts) => {
+        spawned.push({ cmd, argv, opts });
+        return fakeChild(0, '{"ok":true}');
+      },
+      integrity: () => checkReaIntegrity(async () => REA_AGENTS.integrity),
+    });
+    const q = await queueAppJob();
+    startJob(q.job, "jobs-board", "Tester");
+    await until("the job ran", () => getJob(q.job)!.status === "done");
+  } finally {
+    for (const k of Object.keys(SECRETS)) delete process.env[k];
+  }
+  assert.equal(spawned.length, 1);
+  const { argv, opts } = spawned[0];
+  assert.ok(argv.includes("rea-agents@6.9.0"), argv.join(" "));
+  assert.ok(!argv.some((a) => a.includes("@latest")));
+  const env = opts.env as Record<string, string>;
+  for (const k of Object.keys(env)) assert.ok(!SECRET.test(k), `the job was given ${k}`);
+  assert.ok(Object.keys(env).some((k) => k.toUpperCase() === "PATH"), "it can find programs");
+  const cwd = String(opts.cwd);
+  assert.ok(!isUnder(cwd, process.env.FOUNDATION_DATA_DIR!), `${cwd} is in data/`);
+  assert.ok(isUnder(cwd, process.env.FOUNDATION_WORK_DIR!), `${cwd} is under the work folder`);
+});
+
+test("a REA job whose pinned version doesn't match the registry fails with a plain sentence and starts nothing", async () => {
+  const { startJob, getJob, setJobDeps } = await import("../src/jobs.ts");
+  const { checkReaIntegrity } = await import("../src/rea.ts");
+  const spawned: string[] = [];
+  setJobDeps({
+    spawn: (cmd) => {
+      spawned.push(cmd);
+      return fakeChild();
+    },
+    integrity: () => checkReaIntegrity(async () => "sha512-swapped=="),
+  });
+  const q = await queueAppJob();
+  startJob(q.job, "jobs-board", "Tester");
+  await until("the job failed", () => getJob(q.job)!.status === "error");
+  assert.match(getJob(q.job)!.output, /npm's registry says rea-agents@6\.9\.0 is sha512-swapped==.*didn't start/);
+  assert.equal(spawned.length, 0, "nothing started");
+});
+
+test("the Claude Code route of a REA job gets only Claude Code's own extras, in its own folder", async () => {
+  const { jobSpawnOptions } = await import("../src/jobs.ts");
+  Object.assign(process.env, SECRETS, { CLAUDE_CONFIG_DIR: join(dir, "claude-home") });
+  try {
+    const o = jobSpawnOptions({ id: "job_abc123" }, { route: "claude" });
+    const env = o.env as Record<string, string>;
+    assert.equal(env.ANTHROPIC_API_KEY, undefined, "never the API key: claude -p would bill it");
+    assert.equal(env.CLAUDE_CONFIG_DIR, join(dir, "claude-home"));
+    for (const k of Object.keys(env)) assert.ok(!SECRET.test(k), k);
+    assert.equal(resolve(String(o.cwd)), resolve(process.env.FOUNDATION_WORK_DIR!, "jobs", "job_abc123"));
+    assert.equal((jobSpawnOptions({ id: "job_abc123" }, { route: "rea-agents" }).env as Record<string, string>).CLAUDE_CONFIG_DIR, undefined, "rea-agents doesn't get Claude Code's");
+  } finally {
+    for (const k of [...Object.keys(SECRETS), "CLAUDE_CONFIG_DIR"]) delete process.env[k];
+  }
 });

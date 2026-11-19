@@ -25,6 +25,8 @@ dist-ssr
 
 # Foundation server data (SQLite, uploaded files)
 /data/
+# folders of their own for the programs the server starts (Claude Code, REA): beside data/, never in it
+/work/
 .env
 apps/server/.env
 

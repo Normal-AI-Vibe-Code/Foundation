@@ -36,7 +36,8 @@ function start(home: string, port: number) {
 }
 
 async function up(port: number, child: ChildProcess): Promise<{ ok?: boolean; name?: string } | null> {
-  for (let i = 0; i < 300 && child.exitCode === null; i++) {
+  // up to two minutes: a loaded machine has taken a minute to boot it (tsx compiles on start)
+  for (let i = 0; i < 1200 && child.exitCode === null; i++) {
     try {
       const r = await fetch(`http://127.0.0.1:${port}/api/health`);
       if (r.ok) return (await r.json()) as { ok?: boolean; name?: string };

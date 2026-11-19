@@ -67,7 +67,8 @@ async function start(extra: Record<string, string>): Promise<Server> {
   child.stderr!.on("data", (d) => (said.out += d));
   const s: Server = { child, base: `http://127.0.0.1:${port}`, home, said };
   servers.push(s);
-  for (let i = 0; i < 400 && child.exitCode === null; i++) {
+  // up to two minutes: a loaded machine has taken a minute to boot it (tsx compiles on start)
+  for (let i = 0; i < 1200 && child.exitCode === null; i++) {
     try {
       if ((await fetch(`${s.base}/api/health`)).ok) return s;
     } catch {

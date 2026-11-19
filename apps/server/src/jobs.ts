@@ -12,16 +12,20 @@
  *    machine with REA's MCP server, told the goal and to report findings
  *    with evidence. Run `npx rea-agents setup` once to register REA with
  *    Claude Code.
+ * rea-agents is pinned (rea.ts REA_AGENTS) and checked against npm's registry
+ * before it starts; each job runs in its own folder under the work folder with
+ * an environment from an allowlist (childenv.ts; ADR-001 G13).
  */
 
 import { startHandoff } from "./vision.ts";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { childEnv, workFolder } from "./childenv.ts";
 import { randomBytes } from "node:crypto";
 import { boardMaps, logActivity } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
 import { editBoard } from "./boards.ts";
 import { config } from "./config.ts";
-import { here, reaCommand } from "./rea.ts";
+import { checkReaIntegrity, CLAUDE_CODE_ENV, here, reaCommand } from "./rea.ts";
 import type { ToolCtx } from "./tools.ts";
 
 export interface JobRow {
@@ -74,10 +78,51 @@ export function startJob(id: string, boardId: string, by: string) {
   run("update jobs set status = 'running', output = '' where id = ?", id);
   setCard(boardId, id, "running");
   editBoard(boardId, "jobs", (doc) => logActivity(doc, { who: by, role: "human", text: `started reverse-engineering ${job.target}` }));
+  // the pinned rea-agents starts only if npm's registry still says what was pinned (rea.ts REA_AGENTS)
+  if (plan.route === "rea-agents") {
+    void jobDeps
+      .integrity()
+      .then((refused) => (refused ? failJob(job, boardId, refused) : launch(job, boardId, plan)))
+      .catch((e: Error) => failJob(job, boardId, e.message));
+    return getJob(id)!;
+  }
+  launch(job, boardId, plan);
+  return getJob(id)!;
+}
 
+/**
+ * How a job's program is started, and how the pinned rea-agents is checked. Tests swap these
+ * (setJobDeps) so nothing runs and nothing goes to the network.
+ */
+export const jobDeps: {
+  spawn: (cmd: string, argv: string[], opts: SpawnOptions) => ChildProcess;
+  integrity: () => Promise<string | null>;
+} = { spawn: (cmd, argv, opts) => spawn(cmd, argv, opts), integrity: () => checkReaIntegrity() };
+export function setJobDeps(d: Partial<typeof jobDeps>) {
+  Object.assign(jobDeps, d);
+}
+
+/**
+ * What a job's program gets (ADR-001 G13): its own folder under the work folder, never `data/`, and an
+ * environment from the allowlist, never the server's. rea-agents' static JavaScript analysis needs no
+ * model and no key, so it gets BASE only (npx finds npm's cache and settings through the home folders
+ * in it). The Claude Code route gets what Claude Code needs to find the person's login (CLAUDE_CODE_ENV),
+ * and REA's MCP server is the one `npx rea-agents setup` registered with it.
+ */
+export function jobSpawnOptions(job: { id: string }, plan: { route: "rea-agents" | "claude" }): SpawnOptions {
+  return {
+    cwd: workFolder("jobs", job.id),
+    env: childEnv(plan.route === "claude" ? CLAUDE_CODE_ENV : []),
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  };
+}
+
+function launch(job: JobRow, boardId: string, plan: { route: "rea-agents" | "claude"; cmd: string; argv: string[] }) {
+  const id = job.id;
   let child: ChildProcess;
   try {
-    child = spawn(plan.cmd, plan.argv, { cwd: config.dataDir, env: process.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    child = jobDeps.spawn(plan.cmd, plan.argv, jobSpawnOptions(job, plan));
   } catch (e) {
     return failJob(job, boardId, `couldn't start ${plan.cmd}: ${(e as Error).message}`);
   }

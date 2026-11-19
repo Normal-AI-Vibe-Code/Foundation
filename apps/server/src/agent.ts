@@ -56,7 +56,8 @@ function contextBlock(opts: { boardId: string; user: UserInfo; persona?: "shiba"
 import { describeCrewWork, joinCrew, leaveCrew, setDoing, type CrewMember, seatName } from "./crew.ts";
 import { setHelperStarter } from "./tools.ts";
 import { runScript } from "./script.ts";
-import { claudeCommand, here, type Runtime } from "./rea.ts";
+import { CLAUDE_CODE_ENV, claudeCommand, here, type Runtime } from "./rea.ts";
+import { childEnv, workFolder } from "./childenv.ts";
 
 const SYSTEM = `You are the Foundation agent — the company brain of Form Industries, living inside Foundation, a shared grid where the team keeps its projects, files, designs, running apps and agents together.
 
@@ -434,13 +435,26 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
 
 // ---------- subscription runtime (Claude Code, T3-style session) ----------
 
+/**
+ * Where and with what Claude Code runs (ADR-001 G13). One folder under the work folder for every
+ * subscription turn, never `data/`: Claude Code keeps its sessions per working folder, and `--resume`
+ * finds a session only from the folder it was made in, so the folder stays the same from turn to turn.
+ * Its environment is the allowlist plus CLAUDE_CODE_ENV (its login), never ANTHROPIC_API_KEY or any
+ * other key: with that key set, `claude -p` would bill it instead of the person's plan.
+ */
+export function subscriptionSpawnOptions(): { cwd: string; env: Record<string, string> } {
+  return { cwd: workFolder("agent"), env: childEnv(CLAUDE_CODE_ENV) };
+}
+
 async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent) => void, runId: string) {
   const c = claudeStart();
   if (!c.ok) throw new Error(`The subscription runtime can't start: ${c.reason}`);
   const key = convKey(opts);
   // a short-lived session for this person, so the agent's writes are theirs
   const token = createSession(opts.user.id, 2 * 3600_000, "agent");
-  const mcpFile = join(config.dataDir, `mcp-${randomBytes(6).toString("hex")}.json`);
+  // the run's pass to the board, in a folder of the run's own (not data/, not the folder Claude Code works in), gone when it ends
+  const runDir = workFolder("runs", /^[A-Za-z0-9_-]+$/.test(runId) ? runId : `run_${randomBytes(6).toString("hex")}`);
+  const mcpFile = join(runDir, "mcp.json");
   writeFileSync(
     mcpFile,
     JSON.stringify({
@@ -479,7 +493,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
   emit({ type: "status", status: "thinking" });
   await new Promise<void>((resolve, reject) => {
     // no shell: the prompt is one argument, whatever it holds
-    const child = spawn(c.cmd, [...c.pre, ...argv], { cwd: config.dataDir, env: process.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const child = spawn(c.cmd, [...c.pre, ...argv], { ...subscriptionSpawnOptions(), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     opts.signal.addEventListener("abort", () => child.kill("SIGTERM"));
     let buf = "";
     let err = "";
@@ -532,9 +546,13 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
         emit({ type: "done", runtime: "subscription", usage: { input: ev.usage?.input_tokens ?? 0, output: ev.usage?.output_tokens ?? 0 } });
       }
     };
-    child.on("error", reject);
+    child.on("error", (e) => {
+      rmSync(runDir, { recursive: true, force: true });
+      revokeSession(token);
+      reject(e);
+    });
     child.on("close", (code) => {
-      rmSync(mcpFile, { force: true });
+      rmSync(runDir, { recursive: true, force: true });
       revokeSession(token);
       if (code === 0 || opts.signal.aborted) resolve();
       else reject(new Error(`Claude Code exited ${code}: ${err.slice(-600)}`));
