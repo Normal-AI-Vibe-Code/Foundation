@@ -45,6 +45,8 @@ import { useBoardTick } from "./Presence";
 import { POSTS } from "../settings/SettingsPage";
 import { longDate } from "../settings/releases";
 import { renderMarkdown } from "../utils/markdown";
+import { frameAllow, frameFor } from "../panels/frameSandbox";
+import { useFrameContext } from "../lib/frames";
 import { BrowserGlyph, ChangesGlyph, FilesGlyph, T3Glyph, TerminalGlyph } from "./glyphs";
 
 export const TOOLS: Array<{ id: ToolId; name: string; tip: string; glyph: ReactNode }> = [
@@ -287,6 +289,8 @@ function BrowserTool() {
   const [text, setText] = useState("");
   const [nonce, setNonce] = useState(0);
   const url = stack.list[stack.at] ?? "";
+  const frameCtx = useFrameContext();
+  const decision = url ? frameFor(url, frameCtx) : null;
   const go = (raw: string) => {
     const u = normal(raw);
     if (!u) return;
@@ -325,14 +329,20 @@ function BrowserTool() {
           On the grid
         </button>
       </form>
-      {url ? (
-        <iframe key={`${url}#${nonce}`} className="tool-frame" src={url} title={url} referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals" data-browser-frame />
+      {url && !decision?.ok ? (
+        <div className="tool-empty" data-frame-refused>
+          <b>Not shown here</b>
+          <p>{decision?.reason}</p>
+        </div>
+      ) : url && decision?.ok ? (
+        // a typed address follows the frame rules (frameSandbox.ts): sandboxed, its own origin only for a saved app
+        frameCtx.ready && <iframe key={`${url}#${nonce}`} className="tool-frame" src={decision.url} title={url} referrerPolicy="no-referrer" allow={frameAllow(decision)} sandbox={decision.sandbox} data-browser-frame />
       ) : (
         <div className="tool-empty">
           <b>A page, beside the grid</b>
           <p>Type an address or a search. Some sites won't show inside another app (they say so with a blank page); ↗ opens those in your browser. "On the grid" makes the page a live card everyone on the grid sees.</p>
           <span className="tool-chips">
-            {["localhost:1430/#/design", "github.com/joshleong/Foundation", "docs.anthropic.com"].map((u) => (
+            {["github.com/joshleong/Foundation", "docs.anthropic.com", "developer.mozilla.org"].map((u) => (
               <button key={u} className="f-pill" onClick={() => go(u)}>
                 {u}
               </button>
@@ -520,6 +530,15 @@ export function t3PageUrl(url: string, here: string = typeof window !== "undefin
   return here === "localhost" ? url.replace(/^http:\/\/127\.0\.0\.1:/, "http://localhost:") : url;
 }
 
+/** the configured T3 address's origin: the page the server hands over for T3 (/api/t3host/open), not anything typed */
+function t3Origin(page: string): string | null {
+  try {
+    return new URL(page).origin;
+  } catch {
+    return null;
+  }
+}
+
 function T3Tool({ shown }: { shown: boolean }) {
   const ui = useUi();
   const { t3, host } = useAvailable();
@@ -527,6 +546,8 @@ function T3Tool({ shown }: { shown: boolean }) {
   const [page, setPage] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const viewer = ui.role === "viewer";
+  const frameCtx = useFrameContext();
+  const t3Frame = page ? frameFor(page, { ...frameCtx, t3: t3Origin(page) }) : null;
   useEffect(() => {
     void refreshAvailable();
     const t = setInterval(() => void refreshAvailable(), t3 === "running" ? 8000 : 3000);
@@ -573,8 +594,14 @@ function T3Tool({ shown }: { shown: boolean }) {
           </>
         )}
       </div>
-      {t3 === "running" && page ? (
-        <iframe key={page} className="tool-frame" src={page} title="T3" allow="clipboard-read; clipboard-write; microphone" data-t3-frame />
+      {t3 === "running" && page && t3Frame?.ok ? (
+        // T3's own address (from the server, not typed) keeps its origin; still sandboxed, and never Foundation (frameSandbox.ts)
+        <iframe key={page} className="tool-frame" src={t3Frame.url} title="T3" allow={frameAllow(t3Frame)} sandbox={t3Frame.sandbox} data-t3-frame />
+      ) : t3 === "running" && page && t3Frame && !t3Frame.ok ? (
+        <div className="tool-empty" data-frame-refused>
+          <b>T3</b>
+          <p>{t3Frame.reason}</p>
+        </div>
       ) : (
         <div className="tool-empty">
           <b>This computer's agents</b>

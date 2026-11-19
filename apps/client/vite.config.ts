@@ -27,7 +27,8 @@ const proxy = {
 // routes are proxied so the session cookie is same-origin in dev.
 export default defineConfig(async () => ({
   plugins: [react()],
-  define: { __FOUNDATION_VERSION__: JSON.stringify(version) },
+  // the proxied server is Foundation too: a frame never shows it (src/lib/frames.ts)
+  define: { __FOUNDATION_VERSION__: JSON.stringify(version), __FOUNDATION_PROXY_TARGET__: JSON.stringify(server) },
   clearScreen: false,
   server: {
     // FOUNDATION_CLIENT_PORT moves it (scripts/dev-orphans-check.mjs runs the whole launcher above 15000)

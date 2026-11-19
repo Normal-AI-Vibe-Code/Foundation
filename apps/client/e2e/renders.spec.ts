@@ -9,7 +9,7 @@
 
 import { test, expect } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { CLIENT, person, settle } from "./helpers";
+import { CLIENT, FRAME, person, settle } from "./helpers";
 
 const OUT = process.env.RENDERS_OUT ?? "../../docs/evidence/e2e-results";
 
@@ -37,8 +37,8 @@ test("renders per gesture: the whole-board layers stay still while one card chan
   const table = await tool("add_table", { section: "Data", name: "People", columns: ["Name", "Lat", "Lng"], rows: [["Ada", 51.5, -0.12], ["Grace", 40.7, -74]] });
   await tool("add_section", { name: "Apps" });
   await tool("add_note", { section: "Apps", title: "About the apps", markdown: "Two apps, wired." });
-  const a = await tool("add_panel", { section: "Apps", panel: "app", name: "Source", url: `${CLIENT}/e2e/frame.html`, ports: [{ name: "out", dir: "out" }] });
-  const b = await tool("add_panel", { section: "Apps", panel: "app", name: "Sink", url: `${CLIENT}/e2e/frame.html`, ports: [{ name: "in", dir: "in" }] });
+  const a = await tool("add_panel", { section: "Apps", panel: "app", name: "Source", url: FRAME, ports: [{ name: "out", dir: "out" }] });
+  const b = await tool("add_panel", { section: "Apps", panel: "app", name: "Sink", url: FRAME, ports: [{ name: "in", dir: "in" }] });
   await tool("connect", { from_panel: a.id, from_port: "out", to_panel: b.id, to_port: "in", label: "data" });
 
   await page.goto(`/?board=${board}`);

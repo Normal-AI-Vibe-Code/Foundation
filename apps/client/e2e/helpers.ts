@@ -2,6 +2,11 @@ import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 /** :1450 by default; E2E_CLIENT_PORT moves it (Windows can reserve 1437–1536 at boot) */
 export const CLIENT = `http://localhost:${process.env.E2E_CLIENT_PORT ?? 1450}`;
+/**
+ * the stand-in live app (e2e/frame.html), served from another origin than Foundation's (the stand-in Slack's):
+ * Foundation never frames its own pages (src/panels/frameSandbox.ts)
+ */
+export const FRAME = `http://127.0.0.1:${process.env.E2E_SLACK_PORT ?? 4440}/e2e/frame.html`;
 
 /** a signed-in person in their own browser context (cookies apart) */
 export async function person(browser: Browser, name: string, email: string, board = "company"): Promise<{ context: BrowserContext; page: Page }> {

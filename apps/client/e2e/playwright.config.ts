@@ -22,6 +22,8 @@ const SLACK_PORT = process.env.E2E_SLACK_PORT ?? "4440";
 const MESHY_PORT = process.env.E2E_MESHY_PORT ?? "4445";
 process.env.E2E_MESHY_PORT = MESHY_PORT;
 process.env.E2E_CLIENT_PORT = CLIENT_PORT;
+// the stand-in Slack also serves the stand-in live app (helpers.ts FRAME): on its own origin, not Foundation's
+process.env.E2E_SLACK_PORT = SLACK_PORT;
 export const CLIENT = `http://localhost:${CLIENT_PORT}`;
 
 export default defineConfig({

@@ -8,7 +8,7 @@
  */
 
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { CLIENT, person, settle } from "./helpers";
+import { CLIENT, FRAME, person, settle } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-17_bottom-bar";
 let admin: Page;
@@ -268,7 +268,7 @@ test("the tools: a terminal that runs a line for an admin, the change log, the f
   await admin.locator('[data-tool-tab="files"]').click();
   await expect(pane.locator(".tool-files")).toBeVisible();
   await admin.locator('[data-tool-tab="browser"]').click();
-  await pane.locator("[data-browser-addr]").fill("localhost:" + new URL(admin.url()).port + "/e2e/frame.html");
+  await pane.locator("[data-browser-addr]").fill(FRAME.replace(/^http:\/\//, ""));
   await pane.locator("[data-browser-addr]").press("Enter");
   await expect(pane.locator("[data-browser-frame]")).toBeVisible();
   await admin.screenshot({ path: `${SHOTS}/11_browser.png` });

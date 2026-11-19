@@ -13,7 +13,7 @@
 
 import { test, type Page } from "@playwright/test";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { CLIENT, settle, waitLive } from "./helpers";
+import { CLIENT, FRAME as FRAME_PAGE, settle, waitLive } from "./helpers";
 
 const GPU = !!process.env.PERF_GPU;
 const DPR = Number(process.env.PERF_DPR ?? 2);
@@ -232,7 +232,7 @@ test("a heavy board: 27 photos, 4 videos, 15 live apps", async ({ browser }) => 
         });
       });
     },
-    { objects: FIXTURE.objects, urls, grid: FIXTURE.grid, frame: `${CLIENT}/e2e/frame.html` },
+    { objects: FIXTURE.objects, urls, grid: FIXTURE.grid, frame: FRAME_PAGE },
   );
   await page.waitForFunction((n) => document.querySelectorAll(".world [data-obj-id]").length >= n, FIXTURE.objects.filter((o) => o.k !== "table").length, { timeout: 30_000 });
   await page.reload();
