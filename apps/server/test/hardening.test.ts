@@ -313,7 +313,7 @@ test("Vision Code's transcripts: an admin in person, not an agent's bearer, the 
 
 // ---------- 7. sending to Slack as a person needs the person ----------
 
-test("posting, sharing, inviting, huddle notes, asks and a channel read that can start an agent: refused to an agent's bearer and the service token", async () => {
+test("posting, sharing, inviting, huddle notes, asks, a channel read that can start an agent and building the Slack board: refused to an agent's bearer and the service token", async () => {
   const doors: Array<[string, unknown]> = [
     ["/api/slack/channels/C1/messages", { text: "hello from an agent" }],
     ["/api/slack/channels/C1/share", { board: "company", title: "x" }],
@@ -321,6 +321,8 @@ test("posting, sharing, inviting, huddle notes, asks and a channel read that can
     ["/api/slack/channels/C1/huddle-notes", { board: "company", huddleId: "h1" }],
     ["/api/asks", { board: "company", assignee: "someone@example.test", prompt: "click this link" }],
     ["/api/slack/board/sync?board=company", { channel: "C1" }],
+    // building or re-reading the whole Slack board reads every channel, and a read can start an agent turn
+    ["/api/slack/board", {}],
   ];
   for (const [path, body] of doors) {
     for (const bearer of [agent, SERVICE]) {

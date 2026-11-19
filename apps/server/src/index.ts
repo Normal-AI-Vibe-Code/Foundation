@@ -624,9 +624,12 @@ r.get("/api/slack/live", async (req) => {
   requireUser(req);
   return slackLiveStatus();
 });
-/** make the Slack board (or bring the one there is up to date) and say where it is */
+/**
+ * make the Slack board (or bring the one there is up to date) and say where it is. It reads every channel
+ * the app is in, and a read can start an agent turn: a person's press, like a single channel's read below
+ */
 r.post("/api/slack/board", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Building or re-reading the Slack board");
   requireWriter(u);
   return slackDo(() => buildSlackBoard(u));
 });
