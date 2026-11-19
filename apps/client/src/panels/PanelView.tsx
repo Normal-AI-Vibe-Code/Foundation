@@ -577,6 +577,9 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
       ) : mime.startsWith("video/") ? (
         <video src={shown} muted loop playsInline controls preload="metadata" />
       ) : mime === "application/pdf" ? (
+        // no sandbox attribute: Chromium's PDF viewer shows nothing in a sandboxed frame. The server answers every
+        // file with a CSP sandbox and nosniff, and anything that isn't a passive type (a page, an SVG, a script) as a
+        // download of opaque bytes, so this frame can only ever hold the browser's PDF viewer or a download (files.ts)
         live && shown ? <iframe src={shown} title={name} /> : <div className="file-card-glyph">PDF</div>
       ) : CAD.test(name) ? (
         <div className="cad-card">
