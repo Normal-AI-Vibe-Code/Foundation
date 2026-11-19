@@ -333,3 +333,31 @@ html[data-server-switch] .huddle-pip ~ .upload-tray-place {
   left: var(--space-3);
   transform-origin: bottom left;
 }
+
+/* ---------- in the side menu (2026-11-18): the panel opens in the menu's own flow, right above the Settings
+   band, on the menu's paper (no glass): the grids above give it the room, and its type is the menu's ---------- */
+
+.server-switch-inline {
+  overflow: hidden;
+}
+.server-switch-panel.is-inline {
+  width: 100%;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-top: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-frost);
+}
+.server-switch-panel.is-inline .server-switch-head {
+  padding: 0 0 var(--space-1);
+}
+.server-switch-panel.is-inline .server-switch-option {
+  padding: var(--space-3);
+  gap: var(--space-2);
+  background: var(--color-panel);
+}
+/* #/design: the side menu's open panel on the menu's paper */
+.server-switch-menu-demo {
+  background: var(--color-void);
+  border-right: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}

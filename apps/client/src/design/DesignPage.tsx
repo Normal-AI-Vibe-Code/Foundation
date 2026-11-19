@@ -2512,6 +2512,13 @@ const SWITCH_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps
 function ServerSwitchDemo() {
   return (
     <div className="update-demo server-switch-demo">
+      {/* signed in (2026-11-18): it opens in the side menu's own flow, right above the Settings band, on the menu's paper */}
+      <div style={{ width: 272 }}>
+        <div className="f-eyebrow update-demo-label">In the side menu, open above Settings</div>
+        <div className="server-switch-menu-demo">
+          <ServerSwitchView {...SWITCH_BASE} still open host={null} panelOnly />
+        </div>
+      </div>
       {SWITCH_STATES.map((d, i) => (
         <div key={i} style={{ width: 360 }}>
           <div className="f-eyebrow update-demo-label">{d.label}</div>

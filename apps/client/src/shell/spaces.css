@@ -997,3 +997,8 @@
 .hud-search {
   padding-right: var(--space-4);
 }
+/* the server switch's panel, when open (server.css): in flow between the grids and the Settings band */
+.side-pane .pane-server-slot {
+  flex: none;
+  min-height: 0;
+}
