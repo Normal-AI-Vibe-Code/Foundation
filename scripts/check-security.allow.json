@@ -1,0 +1,26 @@
+[
+  {
+    "rule": "secret",
+    "file": "apps/server/test/places.test.ts",
+    "match": "sha256:3021d90eb943",
+    "why": "A bare PEM header written into a temp folder to prove places skip key files; there is no key after it."
+  },
+  {
+    "rule": "secret-file",
+    "file": "apps/client/.env.desktop",
+    "match": "apps/client/.env.desktop",
+    "why": "Vite's desktop-mode settings: only the default server URL, no secret. Read by vite build --mode desktop."
+  },
+  {
+    "rule": "secret-file",
+    "file": "apps/slack-agent/.env.sample",
+    "match": "apps/slack-agent/.env.sample",
+    "why": "The Slack agent's template with every value empty, kept under the name its upstream sample uses."
+  },
+  {
+    "rule": "unpinned",
+    "file": "apps/client/src/design/DesignPage.tsx",
+    "match": "pip install trimesh",
+    "why": "Text of a demo machine ask drawn on #/design; never run."
+  }
+]
