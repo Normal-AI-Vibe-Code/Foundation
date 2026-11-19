@@ -29,7 +29,7 @@ test("the badge counts what waits, by who it's from; related work doesn't wait",
 });
 
 test("a picture in markdown loads on sight only from Foundation's files or the text itself; the web's waits for a press", () => {
-  assert.ok(renderMarkdown("![Rim drive](/files/f_abc)").includes('<img class="md-img" src="/files/f_abc" alt="Rim drive"'));
+  assert.ok(renderMarkdown("![Rim drive](/files/f_0123456789abcdef)").includes('<img class="md-img" src="/files/f_0123456789abcdef" alt="Rim drive"'));
   // the web's: a placeholder with its host and Load image (utils/markdown.ts), not an <img>
   const web = renderMarkdown("![x](https://example.com/a.png)");
   assert.ok(!web.includes("<img") && web.includes('data-src="https://example.com/a.png"') && web.includes("Load image"));
