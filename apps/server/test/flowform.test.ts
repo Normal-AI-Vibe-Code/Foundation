@@ -481,3 +481,35 @@ test("desktop: a sign-in nobody presses for expires, and a late press does nothi
     ff.attemptClock.now = () => Date.now();
   }
 });
+
+test("web: where to land afterwards is a path on this site, never another site however it's spelled", async () => {
+  const ff = await load();
+  for (const ok of ["/", "/b/plan", "/?arrive", "/b/plan#x"]) assert.equal(ff.safeReturn(ok), ok);
+  for (const bad of ["//evil.example", "/\\evil.example", "/\\/evil.example", "\\\\evil.example", "https://evil.example", "/b\nLocation: x", "/\tevil", "evil", "", null]) assert.equal(ff.safeReturn(bad), "/", String(bad));
+  // and the attempt keeps that
+  const start = res();
+  ff.startWeb(req(`/auth/flowform/start?return=${encodeURIComponent("/\\evil.example")}`), start.r);
+  const { one } = await import("../src/db.ts");
+  assert.equal(one<{ return_to: string }>("select return_to from flowform_attempts where nonce_hash = ?", sha(nonceOf(start.out.headers.location as string)))?.return_to, "/");
+});
+
+test("Google's own sign-in comes back only to the browser that started it", async () => {
+  const { config } = await import("../src/config.ts");
+  const { googleStart, googleCallback, GOOGLE_STATE_COOKIE } = await import("../src/auth.ts");
+  const saved = config.google.clientId;
+  config.google.clientId = "test-client.apps.googleusercontent.com";
+  try {
+    const a = googleStart();
+    const state = new URL(a.url).searchParams.get("state")!;
+    assert.match(a.cookie, new RegExp(`^${GOOGLE_STATE_COOKIE}=${state}; Path=/auth/google; HttpOnly; SameSite=Lax`));
+    // another browser (no cookie, or another sign-in's) is refused before Google is asked anything
+    await assert.rejects(googleCallback("code", state, ""), /started in a different browser/);
+    const b = googleStart();
+    const other = new URL(googleStart().url).searchParams.get("state")!;
+    await assert.rejects(googleCallback("code", new URL(b.url).searchParams.get("state")!, other), /started in a different browser/);
+    // a state is spent once, whichever browser brought it
+    await assert.rejects(googleCallback("code", state, state), /sign-in expired/);
+  } finally {
+    config.google.clientId = saved;
+  }
+});

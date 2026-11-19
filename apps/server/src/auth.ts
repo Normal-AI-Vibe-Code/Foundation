@@ -44,18 +44,22 @@ export function fromLoopback(req: Req): boolean {
   return loopback && !req.headers["x-forwarded-for"] && !req.headers.forwarded && !req.headers["x-real-ip"];
 }
 
+const LOOPBACK_HOST = /^(localhost|127\.0\.0\.1|\[::1\])(:\d{1,5})?$/i;
+
 /**
  * Why dev sign-in (no password) is refused for this request, or null when it may go ahead. Anything that
  * can reach the port and passes here becomes "a person", so it asks (ADR-001 G0): turned on
  * (FOUNDATION_DEV_LOGIN=1); an allowlist to keep to (an empty one admits everyone); a request from this
- * computer; and no agent with a shell running here (Foundation's T3 gives agents one, and one of them could
- * sign itself in as a person).
+ * computer, by a loopback name (a proxy on this computer, such as the client's dev server opened to the
+ * network, forwards other computers' requests from loopback under the name they used); and nothing with a
+ * shell running here (`shell` names it: Foundation's T3 gives agents one, the built-in terminal is one, a
+ * job may run Claude Code; any of them could sign itself in as a person).
  */
-export function devSignInRefusal(req: Req, t3Running: boolean): string | null {
+export function devSignInRefusal(req: Req, shell: string | false): string | null {
   if (!config.devLogin) return "Sign-in by email alone is off on this server. To use it on your own computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart the server.";
   if (config.allowlist.length === 0) return "Sign-in by email alone needs an allowlist (FOUNDATION_ALLOWLIST), and this server has none, so it is refused.";
-  if (!fromLoopback(req)) return "Sign-in by email alone works only from the computer the server runs on.";
-  if (t3Running) return "Sign-in by email alone is refused while T3 is running here, because its agents have a shell on this computer. Stop T3, or sign in with Google.";
+  if (!fromLoopback(req) || !LOOPBACK_HOST.test(String(req.headers.host ?? ""))) return "Sign-in by email alone works only from the computer the server runs on.";
+  if (shell) return `Sign-in by email alone is refused while ${shell} is running here, because it has a shell on this computer. Stop it, or sign in with Google.`;
   return null;
 }
 
@@ -217,6 +221,16 @@ export function isPerson(req: Req, _user?: UserInfo): boolean {
 // ---------- Google OAuth ----------
 
 const pendingStates = new Map<string, number>();
+/** the browser that started a Google sign-in holds its state in this cookie; the callback must come back to it */
+export const GOOGLE_STATE_COOKIE = "foundation_google_state";
+
+/** where Google is asked to sign the person in, and the cookie that binds that sign-in to this browser */
+export function googleStart(): { url: string; cookie: string } {
+  const url = googleAuthUrl();
+  const state = new URL(url).searchParams.get("state")!;
+  const secure = config.publicUrl.startsWith("https") ? "; Secure" : "";
+  return { url, cookie: `${GOOGLE_STATE_COOKIE}=${state}; Path=/auth/google; HttpOnly; SameSite=Lax; Max-Age=600${secure}` };
+}
 
 export function googleAuthUrl(): string {
   if (!config.google.clientId) throw new HttpError(501, "Google sign-in is not configured (GOOGLE_CLIENT_ID)");
@@ -233,10 +247,16 @@ export function googleAuthUrl(): string {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
-export async function googleCallback(code: string, state: string): Promise<UserInfo> {
+/**
+ * Google came back. Only to the browser that started (its state cookie, `presented`, names this state):
+ * another browser's callback is someone else's sign-in, and finishing it here would sign this browser in as
+ * them (login CSRF).
+ */
+export async function googleCallback(code: string, state: string, presented: string): Promise<UserInfo> {
   const issued = pendingStates.get(state);
   pendingStates.delete(state);
   if (!issued || Date.now() - issued > 10 * 60_000) throw new HttpError(400, "sign-in expired, try again");
+  if (!presented || !safeEq(presented, state)) throw new HttpError(400, "This sign-in was started in a different browser. Start again from Foundation.");
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },

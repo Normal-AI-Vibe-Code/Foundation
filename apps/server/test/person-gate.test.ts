@@ -271,10 +271,40 @@ test("dev sign-in's rule: only a loopback peer, and not one a proxy forwards", a
   process.env.FOUNDATION_DEV_LOGIN = "1";
   process.env.FOUNDATION_ALLOWLIST = "@example.test";
   const { devSignInRefusal } = await import("../src/auth.ts");
-  const req = (addr: string, headers: Record<string, string> = {}) => ({ socket: { remoteAddress: addr }, headers }) as unknown as Parameters<typeof devSignInRefusal>[0];
+  // (a request names the server it asks: a loopback name here, as a browser on this computer does)
+  const req = (addr: string, headers: Record<string, string> = {}) => ({ socket: { remoteAddress: addr }, headers: { host: "localhost:1430", ...headers } }) as unknown as Parameters<typeof devSignInRefusal>[0];
   for (const addr of ["127.0.0.1", "::1", "::ffff:127.0.0.1"]) assert.equal(devSignInRefusal(req(addr), false), null, addr);
   for (const addr of ["192.168.1.20", "10.0.0.5", "::ffff:192.168.1.20", ""]) assert.match(devSignInRefusal(req(addr), false) ?? "", /only from the computer the server runs on/, addr);
   assert.match(devSignInRefusal(req("127.0.0.1", { "x-forwarded-for": "203.0.113.9" }), false) ?? "", /only from the computer/);
   assert.match(devSignInRefusal(req("127.0.0.1", { forwarded: "for=203.0.113.9" }), false) ?? "", /only from the computer/);
-  assert.match(devSignInRefusal(req("127.0.0.1"), true) ?? "", /T3 is running/);
+  assert.match(devSignInRefusal(req("127.0.0.1"), "T3") ?? "", /T3 is running/);
+  // a proxy on this computer that forwards another computer's request without saying so (the client's dev
+  // server opened to the network): the request still names the address that computer used, not a loopback name
+  for (const host of ["192.168.1.20:1430", "foundation.local:1430", "localhost.evil.example", ""]) assert.match(devSignInRefusal(req("127.0.0.1", { host }), false) ?? "", /only from the computer/, host);
+  for (const host of ["127.0.0.1:4410", "[::1]:4410", "LOCALHOST:1430"]) assert.equal(devSignInRefusal(req("127.0.0.1", { host }), false), null, host);
+  // anything else here with a shell: the built-in terminal, a job that can run Claude Code
+  assert.match(devSignInRefusal(req("127.0.0.1"), "the built-in terminal") ?? "", /refused while the built-in terminal is running here/);
+  assert.match(devSignInRefusal(req("127.0.0.1"), "a REA job (it can run Claude Code)") ?? "", /refused while a REA job/);
+});
+
+test("dev sign-in: a page elsewhere can't sign this browser in (login CSRF); refused while a REA job runs here", async () => {
+  // a browser's cross-site form POST says where it comes from
+  for (const origin of ["https://evil.example", "http://localhost:9999", "null"]) {
+    const r = await call(main, "POST", "/auth/dev", { body: { email: "kai@example.test", name: "kai" }, headers: { origin } });
+    assert.equal(r.status, 403, `${origin}: ${r.text}`);
+    assert.match(r.json.error, /can't sign anyone in to Foundation/);
+    assert.equal(r.cookie, "");
+  }
+  // the client's own page, and a program that sends no Origin (as these checks do), still can
+  assert.equal((await call(main, "POST", "/auth/dev", { body: { email: "kai@example.test", name: "kai" }, headers: { origin: "http://localhost:1430" } })).status, 200);
+  assert.equal((await devSignIn(main, "kai@example.test")).status, 200);
+  // a job that can run Claude Code, running here: refused until it stops
+  const db = new DatabaseSync(join(main.home, "data", "foundation.db"));
+  db.prepare("insert into jobs (id, kind, target, goal, board_id, status, created_by, created_at) values ('job_shell', 'rea', 'https://example.com', 'g', 'company', 'running', 'test', ?)").run(Date.now());
+  const held = await devSignIn(main, "kai@example.test");
+  assert.equal(held.status, 403, held.text);
+  assert.match(held.json.error, /refused while a REA job/);
+  db.prepare("update jobs set status = 'done' where id = 'job_shell'").run();
+  db.close();
+  assert.equal((await devSignIn(main, "kai@example.test")).status, 200);
 });

@@ -216,9 +216,9 @@ export function beginDesktop(req: Req) {
   return { url, poll, code, expiresIn: DESKTOP_TTL / 1000 };
 }
 
-function safeReturn(raw: string | null) {
-  // only same-origin paths; never an absolute URL
-  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+export function safeReturn(raw: string | null) {
+  // only same-origin paths; never an absolute URL, and no backslash or control character (a browser reads "/\host" as "//host")
+  return raw && raw.startsWith("/") && !raw.startsWith("//") && !/[\\\u0000-\u001f\u007f]/.test(raw) ? raw : "/";
 }
 
 interface FlowformMe {

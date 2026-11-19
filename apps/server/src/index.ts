@@ -12,8 +12,8 @@ import type { PanelDoc, UserInfo } from "@foundation/protocol";
 import { WebSocketServer } from "ws";
 import { config } from "./config.ts";
 import { one } from "./db.ts";
-import { HttpError, json, readJson, Router, sse, type Req } from "./http.ts";
-import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, googleAuthUrl, googleCallback, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
+import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
+import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
 import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
@@ -24,7 +24,7 @@ import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
 import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
-import { requestHostTerminal } from "./hostterm.ts";
+import { hostTerminals, requestHostTerminal } from "./hostterm.ts";
 import { changelog } from "./changelog.ts";
 import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3HostRunning, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
@@ -86,10 +86,20 @@ r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 // public: also what this server is, and the oldest client it still works with (clientversion.ts)
 r.get("/auth/config", () => ({ google: Boolean(config.google.clientId), devLogin: config.devLogin, flowform: { url: flowform.flowformUrl() }, version: SERVER_VERSION, minClient: minClient() || null }));
 r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
+/** what on this computer has a shell now, if anything: dev sign-in waits until it stops (auth.ts devSignInRefusal) */
+function shellRunning(): string | false {
+  if (t3HostRunning()) return "T3";
+  if (hostTerminals() > 0) return "the built-in terminal";
+  if (one("select 1 from jobs where status = 'running' and kind = 'rea' limit 1")) return "a REA job (it can run Claude Code)";
+  return false;
+}
 r.post("/auth/dev", async (req, res) => {
-  // off unless FOUNDATION_DEV_LOGIN=1; then only from this computer, with an allowlist, while T3 isn't running (ADR-001 G0)
-  const refused = devSignInRefusal(req, t3HostRunning());
+  // off unless FOUNDATION_DEV_LOGIN=1; then only from this computer, with an allowlist, while nothing here has a shell (ADR-001 G0)
+  const refused = devSignInRefusal(req, shellRunning());
   if (refused) throw new HttpError(403, refused);
+  // a page elsewhere can't sign this browser in as someone (login CSRF): a browser always says which page a POST comes from
+  const origin = req.headers.origin;
+  if (origin !== undefined && !originAllowed(String(origin))) throw new HttpError(403, `A page at ${String(origin).slice(0, 80)} can't sign anyone in to Foundation. Open Foundation itself.`);
   const { email, name, bearer } = await readJson<{ email?: string; name?: string; bearer?: boolean }>(req);
   if (!email || !/^[^@\s]+@[^@\s]+$/.test(email)) throw new HttpError(400, "enter an email");
   if (!isAllowed(email)) throw new HttpError(403, `${email} is not on Foundation's allowlist`);
@@ -98,11 +108,13 @@ r.post("/auth/dev", async (req, res) => {
   return { user, ...signIn(res, user.id, bearer === true) };
 });
 r.get("/auth/google/start", (_req, res) => {
-  res.writeHead(302, { location: googleAuthUrl() });
+  // the sign-in is bound to this browser: the callback must bring back the state this cookie holds
+  const { url, cookie } = googleStart();
+  res.writeHead(302, { location: url, "set-cookie": cookie });
   res.end();
 });
 r.get("/auth/google/callback", async (req, res) => {
-  const user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "");
+  const user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "", parseCookies(req.headers.cookie)[GOOGLE_STATE_COOKIE] ?? "");
   setSessionCookie(res, createSession(user.id));
   res.writeHead(302, { location: config.clientUrl });
   res.end();
