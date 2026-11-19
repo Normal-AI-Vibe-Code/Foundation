@@ -1,0 +1,22 @@
+Review fixes, 2026-11-18 (worktree from main at 075cb24)
+
+Full suites at the end
+  npm test -w @foundation/server   tests 405, pass 399, fail 0, skipped 6 (as before: platform-only checks)
+  npm test -w @foundation/client   tests 207, pass 206, fail 0, todo 1 (the existing "repository passes every rule" todo)
+  npm run typecheck                clean (client and server)
+  node scripts/check-security.mjs --summary
+                                   per rule: {"open-gap-words":45}, all 45 in SPEC.md, which is being rewritten
+                                   separately; every other rule clean (8 waived by the allowlist, each with a reason,
+                                   child-process waivers by exact line)
+  ... --diff origin/main           adds gap findings in docs added and removed in unpushed history (that history is
+                                   being rewritten separately); no secret in any unpushed commit or message
+  (first full client run: one failure, a fixture in today-talk.test.ts using a file id Foundation never makes,
+   fixed in its own commit; then 206/206)
+
+In the browser (vite on its own port, ?rafshim, #/design and a rendered copy of the server's page)
+  01-signin-code-day.jpg / -night.jpg   the code the desktop sign-in shows while it waits ("Signing in an app")
+  02-run-card-night.jpg / 03-day.jpg    a job's card at rest and asking before Run: whole target and goal ("Running a job")
+  04-confirm-page-day.jpg / -night.jpg  the page the browser lands on after Google in a desktop sign-in: who, the code,
+                                        "This is me, sign that app in" / "Not me" (server-rendered, no script, never framed)
+
+Not run for real: the desktop app's sign-in end to end, a Claude Code turn, a REA job.
