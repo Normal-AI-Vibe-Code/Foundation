@@ -58,6 +58,8 @@ export const CONFIG = {
   gapDocs: { files: ["SPEC.md", "README.md"], under: "docs/", extensions: [".md", ".html"], exclude: ["docs/evidence/"] },
   // Docs that cite code with line numbers for ordinary reasons (design notes, walkthroughs).
   noGapDocs: [],
+  // Rule open-gap-words: docs that are about security throughout. Elsewhere it reads only marked security notes.
+  securityDocs: ["docs/SECURITY.md", "docs/decisions/"],
   // Rule unpinned: where runtime code lives, and which files count as source there.
   codeRoots: ["apps/", "packages/", "scripts/"],
   codeExtensions: [".ts", ".tsx", ".js", ".mjs", ".cjs", ".jsx", ".json", ".sh", ".ps1", ".py", ".rs", ".toml", ".yml", ".yaml", ".html", ".bat", ".cmd"],
@@ -333,6 +335,29 @@ export function isGapDoc(file, config = CONFIG) {
 
 // ---------------------------------------------------------------------------
 // Rule open-gap-words.
+// Applies to the whole of a security doc (CONFIG.securityDocs), and in any other public doc only to the
+// lines between <!-- security-notes --> and <!-- /security-notes -->.
+export function isSecurityDoc(file, config = CONFIG) {
+  return (config.securityDocs ?? []).some((p) => (p.endsWith("/") ? file.startsWith(p) : file === p));
+}
+/** the text with every line outside a security-notes region blanked (line numbers kept) */
+export function securityNotesOnly(text) {
+  let inside = false;
+  return text
+    .split("\n")
+    .map((l) => {
+      if (l.includes("<!-- security-notes -->")) {
+        inside = true;
+        return "";
+      }
+      if (l.includes("<!-- /security-notes -->")) {
+        inside = false;
+        return "";
+      }
+      return inside ? l : "";
+    })
+    .join("\n");
+}
 // ---------------------------------------------------------------------------
 /** words that say an item is still open */
 export const OPEN_WORDS = /\bstill open\b|\bnot yet\b|\bopen:|\bstays open\b/i;
@@ -431,8 +456,10 @@ export function scanText(file, text, config = CONFIG) {
   });
   for (const h of findChildProcess(file, text, config)) out.push({ rule: "child-process", file, line: h.line, match: h.match, text: h.text, sentence: `${file}:${h.line}: this ${h.what}.` });
   if (isGapDoc(file, config)) for (const h of findGaps(text, file)) out.push({ rule: "gap", file, line: h.line, match: h.match, text: lines[h.line - 1].trim(), sentence: `${file}:${h.line}: ${h.match} is a code reference with a line number in a public doc: say it in general terms, or mark the row closed with its commit.` });
+  // only where security status is written: the security docs, and a doc's own marked security notes.
+  // A product's known issues say "not yet" and name functions all the time; the check can't tell those apart.
   if (isGapDoc(file, config))
-    for (const h of findOpenGapWords(text)) out.push({ rule: "open-gap-words", file, line: h.line, match: h.match, text: lines[h.line - 1].trim(), sentence: `${file}:${h.line}: an open item described with a route, tool or setting name (${h.what} "${h.match.slice(0, 60)}"): say it in general terms.` });
+    for (const h of findOpenGapWords(isSecurityDoc(file, config) ? text : securityNotesOnly(text))) out.push({ rule: "open-gap-words", file, line: h.line, match: h.match, text: lines[h.line - 1].trim(), sentence: `${file}:${h.line}: an open item described with a route, tool or setting name (${h.what} "${h.match.slice(0, 60)}"): say it in general terms.` });
   return out;
 }
 

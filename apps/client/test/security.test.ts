@@ -207,7 +207,7 @@ test("the repository has no secrets and tracks no secret files", () => {
   assert.deepEqual(urgent.map((p: { sentence: string }) => p.sentence), []);
 });
 
-test("the repository passes every rule", { todo: "rea-agents is fetched unpinned and eight server spots hand children the whole environment; both are being fixed (childenv.ts). Drop this todo when npm run check:security is clean." }, () => {
+test("the repository passes every rule", () => {
   const { problems } = applyAllow(scanTracked(), readAllow());
   assert.deepEqual(problems.map((p: { sentence: string }) => p.sentence), []);
 });
@@ -289,4 +289,15 @@ test("npm run check checks the commits about to be pushed (with --diff origin/ma
   const { refExists } = await import("../../../scripts/check-security.mjs" as string);
   assert.equal(refExists("no-such-ref-here"), false);
   assert.equal(refExists("HEAD"), true);
+});
+
+test("open-gap-words reads security docs whole, and other docs only inside their marked security notes", async () => {
+  const m = await import("../../../scripts/check-security.mjs" as string);
+  assert.ok(m.isSecurityDoc("docs/SECURITY.md") && m.isSecurityDoc("docs/decisions/ADR-001-working-together.md"));
+  assert.ok(!m.isSecurityDoc("SPEC.md") && !m.isSecurityDoc("docs/floorplan.md"));
+  const route = j("/api/", "widgets/paint");
+  const doc = ["- Not yet: `paint_widget` picks its own colour.", "<!-- security-notes -->", `- Still open: ${route} paints in any colour.`, "<!-- /security-notes -->", `- Still open: ${route} again.`].join("\n");
+  // a product note outside the marks is not a finding; the same words inside them are, with its line number kept
+  assert.deepEqual(m.findOpenGapWords(m.securityNotesOnly(doc)).map((h: { line: number }) => h.line), [3]);
+  assert.equal(m.findOpenGapWords(doc).length, 3, "a security doc is read whole");
 });
