@@ -2,8 +2,10 @@
  * Which pages may use the session cookie, and which names this server answers to.
  *
  * - **Origins.** Pages that may call this server with credentials (CORS) are exactly: the client
- *   (FOUNDATION_CLIENT_URL), the desktop app's window (its fixed http://localhost:31440, and
- *   tauri://localhost), and FOUNDATION_CORS_ORIGINS. Not "any localhost port": a page another program
+ *   (FOUNDATION_CLIENT_URL), FOUNDATION_CORS_ORIGINS, and the desktop app's window (its fixed
+ *   http://localhost:31440, and tauri://localhost) only when the desktop app started this server
+ *   (startedForDesktop). Otherwise nothing tells that port's page from any other program's, so a
+ *   server started another way trusts it only if FOUNDATION_CORS_ORIGINS lists it. Not "any localhost port": a page another program
  *   serves on this computer (a dev server an agent started, T3's own UI, a machine's published port) is
  *   the same site as the server, so the SameSite cookie rides along with its requests.
  * - **Cookie writes.** A request that changes something (anything but GET, HEAD, OPTIONS) or opens a
@@ -34,10 +36,22 @@ function originOf(url: string): string | null {
   }
 }
 
+/**
+ * This server was started by the desktop app: both ways it starts one (the server it carries, and a
+ * checkout's; apps/client/src-tauri/src/local_server.rs, and scripts/desktop-server.mjs's check) set
+ * FOUNDATION_EXIT_WITH_PARENT=1 so the server leaves with the app. `npm run dev` doesn't.
+ */
+export const startedForDesktop = (env: NodeJS.ProcessEnv = process.env) => env.FOUNDATION_EXIT_WITH_PARENT === "1";
+
+/** the pages that may call a server with these settings with credentials, exactly */
+export function originsFor(o: { clientUrl: string; corsOrigins: string[]; desktop: boolean }): Set<string> {
+  return new Set([originOf(o.clientUrl) ?? strip(o.clientUrl), ...(o.desktop ? DESKTOP_PAGE_ORIGINS : []), ...o.corsOrigins.map(strip)].filter(Boolean));
+}
+
 let origins: Set<string> | null = null;
 /** the pages that may call this server with credentials, exactly */
 export function allowedOrigins(): Set<string> {
-  origins ??= new Set([originOf(config.clientUrl) ?? strip(config.clientUrl), ...DESKTOP_PAGE_ORIGINS, ...config.corsOrigins.map(strip)].filter(Boolean));
+  origins ??= originsFor({ clientUrl: config.clientUrl, corsOrigins: config.corsOrigins, desktop: startedForDesktop() });
   return origins;
 }
 
