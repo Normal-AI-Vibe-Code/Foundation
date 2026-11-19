@@ -1978,6 +1978,7 @@ body.is-viewer .frame-grip {
   font-family: var(--font-code);
   font-size: var(--text-11);
   color: var(--color-dim);
+  white-space: nowrap;
   user-select: none;
 }
 .md-link-host::before { content: "↗ "; }
