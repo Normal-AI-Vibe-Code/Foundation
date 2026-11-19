@@ -55,7 +55,7 @@ import { callAppTool, listAppTools } from "./apptools.ts";
 import { companySnapshot, readConnector } from "./connectors.ts";
 import { createAsk } from "./hermes.ts";
 import { queueJob } from "./jobs.ts";
-import { isCad, readFileText, shareFileWith } from "./files.ts";
+import { isCad, readFileText, requireFileVisible, shareFileWith } from "./files.ts";
 import { bringForCard, listPlace, listPlaces, readPlaceText } from "./places.ts";
 import { attachToStage, chooseArtifact, completeStage, describePipeline, setChecklist, startPipeline, updateStageSettings } from "./pipeline.ts";
 import { stageDef } from "@foundation/protocol";
@@ -417,7 +417,7 @@ export const TOOLS: BoardTool[] = [
       sources: z.array(z.enum(["files", "slack", "board"])).optional(),
       limit: z.number().int().min(1).max(100).optional(),
     }),
-    run: async (ctx, { query, sources, limit }) => findImages(getBoard(ctx.boardId).doc, ctx.boardId, query, sources, limit),
+    run: async (ctx, { query, sources, limit }) => findImages(getBoard(ctx.boardId).doc, ctx.boardId, query, ctx.userId, sources, limit),
   }),
   def({
     name: "lay_out",
@@ -592,7 +592,10 @@ export const TOOLS: BoardTool[] = [
     description: "Put a picture (an image file in the archive, by its file id) or a character (its id or its card's id) into a collection by hand.",
     schema: z.object({ collection: z.string(), file_id: z.string().optional(), character: z.string().optional(), request_id: z.string().optional() }),
     write: true,
-    run: (ctx, { collection, file_id, character }) => ({ item: putIn(ctx.boardId, collection, { file: file_id, character }, ctx.actor) }),
+    run: (ctx, { collection, file_id, character }) => {
+      if (file_id) requireFileVisible(ctx.userId, file_id);
+      return { item: putIn(ctx.boardId, collection, { file: file_id, character }, ctx.actor) };
+    },
   }),
   def({
     name: "collection_take_out",
@@ -859,7 +862,8 @@ export const TOOLS: BoardTool[] = [
     name: "read_file",
     description: "Read the text of an uploaded file (text, markdown, CSV, JSON, code; STEP/IGES header).",
     schema: z.object({ file_id: z.string() }),
-    run: (_ctx, { file_id }) => readFileText(file_id, 40_000),
+    // a file answers to its board: one on a members-only board this person isn't on is "no such file"
+    run: (ctx, { file_id }) => (requireFileVisible(ctx.userId, file_id), readFileText(file_id, 40_000)),
   }),
   def({
     name: "ask_person",
@@ -1081,6 +1085,7 @@ export const TOOLS: BoardTool[] = [
     write: true,
     run: async (ctx, i) => {
       if (!i.file_id && !i.url) throw new Error("give a file_id or a url");
+      if (i.file_id) requireFileVisible(ctx.userId, i.file_id);
       const art = await attachToStage(ctx.boardId, i.stage_panel, { fileId: i.file_id, url: i.url, name: i.name, note: i.note }, ctx.actor);
       touch(ctx, i.stage_panel, `attached ${art.name}`);
       return art;

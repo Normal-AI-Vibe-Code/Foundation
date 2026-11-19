@@ -15,7 +15,7 @@ import { one } from "./db.ts";
 import { HttpError, json, readJson, Router, sse, type Req } from "./http.ts";
 import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, googleAuthUrl, googleCallback, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
 import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
-import { archiveFile, listFiles, reindexFilesIfNeeded, serveFile, uploadFile } from "./files.ts";
+import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
 import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
@@ -202,16 +202,18 @@ r.post("/api/agent/token", (req) => {
 
 // ---------- boards ----------
 
+// a members-only board is listed, and answers, only to its members (members.ts): to anyone else it isn't there
 r.get("/api/boards", (req) => {
   const u = requireUser(req);
-  return { boards: listBoards().map((b) => ({ ...b, role: boardRole(u.id, b.id) })) };
+  const hidden = hiddenBoards(u);
+  return { boards: listBoards().filter((b) => !hidden.has(b.id)).map((b) => ({ ...b, role: boardRole(u.id, b.id) })) };
 });
 r.get("/api/boards/:id/epoch", (req) => {
-  requireUser(req);
+  requireBoard(requireUser(req), req.params.id);
   return { epoch: boardEpoch(req.params.id) };
 });
 r.get("/api/boards/:id/people", (req) => {
-  requireUser(req);
+  requireBoard(requireUser(req), req.params.id);
   return { people: boardPeople(req.params.id) };
 });
 // ---------- the plan board (docs/plan.json; Settings → Plan) ----------
@@ -235,8 +237,10 @@ r.post("/api/plan/sync", async (req) => {
   return syncPlan(u);
 });
 
+// who may edit a board: an admin, in person (an admin's agent token can't change roles)
 r.post("/api/boards/:id/people", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Changing who may edit a board");
+  requireBoard(u, req.params.id);
   const { userId, role } = await readJson<{ userId?: string; role?: "member" | "viewer" | null }>(req);
   if (!userId || (role !== null && role !== "member" && role !== "viewer")) throw new HttpError(400, "userId and role (member, viewer or null) required");
   setBoardRole(u, req.params.id, userId, role);
@@ -269,6 +273,7 @@ r.post("/api/boards", async (req) => {
     }
   }
   if (body.parent) {
+    requireBoard(requireUser(req), String(body.parent));
     requireWriter(requireUser(req), String(body.parent));
     const out = setBoardParent(id, String(body.parent));
     if ("error" in out) throw new HttpError(400, out.error);
@@ -279,6 +284,7 @@ r.post("/api/boards", async (req) => {
 r.post("/api/boards/:id", async (req) => {
   const u = requireUser(req);
   const id = req.params.id;
+  requireBoard(u, id);
   if (!listBoards().some((b) => b.id === id)) throw new HttpError(404, "No such grid");
   requireWriter(u, id);
   const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
@@ -298,7 +304,10 @@ r.post("/api/boards/:id", async (req) => {
   // a grid of grids: put it inside another (which must be one this person can write too), or back at the top
   if (body.parent !== undefined) {
     const parent = body.parent === null || body.parent === "" ? null : String(body.parent);
-    if (parent) requireWriter(u, parent);
+    if (parent) {
+      requireBoard(u, parent);
+      requireWriter(u, parent);
+    }
     const out = setBoardParent(id, parent);
     if ("error" in out) throw new HttpError(400, out.error);
   }
@@ -482,6 +491,7 @@ r.post("/api/asks/:id/resolve", async (req) => {
   const u = requireUser(req);
   const { fileId } = await readJson<{ fileId?: string }>(req);
   requireBoard(u, one<{ board_id: string }>("select board_id from asks where id = ?", req.params.id)?.board_id);
+  if (fileId) requireFileVisible(u.id, fileId);
   return resolveAsk(req.params.id, u.name, fileId);
 });
 
@@ -514,6 +524,7 @@ r.post("/api/huddles/:id/recordings", async (req) => {
   const b = await readJson<{ board?: string; fileId?: string; sessionId?: string; startedAt?: number; endedAt?: number }>(req);
   if (!b.fileId) throw new HttpError(400, "fileId required");
   requireBoard(u, b.board ?? "company");
+  requireFileVisible(u.id, b.fileId);
   try {
     return attachRecording(b.board ?? "company", req.params.id, { fileId: b.fileId, person: u.name, sessionId: b.sessionId, startedAt: b.startedAt ?? Date.now(), endedAt: b.endedAt ?? Date.now() });
   } catch (e) {
@@ -553,6 +564,7 @@ r.post("/api/slack/channels/:id/share", async (req) => {
   const u = requireUser(req);
   const b = await readJson<{ board?: string; objectId?: string; title?: string; note?: string }>(req);
   const board = b.board ?? "company";
+  requireBoard(u, board);
   const text = shareText({ by: u.name, board, objectId: b.objectId, title: b.title || "A place", note: b.note });
   return slackDo(async () => ({ ...(await postMessage(req.params.id, text, u, { board, objectId: b.objectId ?? null })), url: boardLink(board, b.objectId) }));
 });
@@ -580,6 +592,8 @@ r.post("/api/slack/channels/:id/huddle-notes", async (req) => {
   const u = requireUser(req);
   const b = await readJson<{ board?: string; huddleId?: string; sessionId?: string; summary?: string }>(req);
   const board = b.board ?? "company";
+  // a members-only board's huddle transcript is its members' to share
+  requireBoard(u, board);
   const h = huddleOn(board, b.huddleId ?? "");
   const s = huddleArchive(board, h.id).find((x) => x.id === b.sessionId) ?? huddleArchive(board, h.id)[0];
   if (!s) throw new HttpError(404, "that huddle hasn't met yet");
@@ -746,6 +760,7 @@ r.post("/api/boards/:id/machines/load", async (req) => {
   requireBoard(u, req.params.id);
   const b = await readJson<{ fileId?: string; engine?: string }>(req);
   if (!b.fileId) throw new HttpError(400, "name the file to load");
+  requireFileVisible(u.id, b.fileId);
   return loadImage(req.params.id, b.fileId, u.name, b.engine);
 });
 
@@ -783,6 +798,7 @@ r.get("/api/agents/available", (req) => {
 });
 r.post("/api/boards/:id/agents", async (req) => {
   const u = requireUser(req);
+  requireBoard(u, req.params.id);
   requireWriter(u, req.params.id);
   const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
   if (!place || !agent) throw new HttpError(400, "place (a section id, or * for the grid) and agent required");
@@ -790,6 +806,7 @@ r.post("/api/boards/:id/agents", async (req) => {
 });
 r.post("/api/boards/:id/agents/remove", async (req) => {
   const u = requireUser(req);
+  requireBoard(u, req.params.id);
   requireWriter(u, req.params.id);
   const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
   if (!place || !agent) throw new HttpError(400, "place and agent required");
@@ -912,12 +929,18 @@ r.post("/api/today/profile", async (req) => {
 
 // ---------- Vision Code (T3) sessions, read-only ----------
 
+// whole coding transcripts, on no board: an admin, in person
+function requireT3Reader(req: Req) {
+  const u = requirePerson(req, "Reading Vision Code's threads");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can read Vision Code's threads.");
+  return u;
+}
 r.get("/api/t3/threads", async (req) => {
-  requireUser(req);
+  requireT3Reader(req);
   return t3Threads();
 });
 r.get("/api/t3/threads/:id", async (req) => {
-  requireUser(req);
+  requireT3Reader(req);
   const t = await t3Thread(req.params.id);
   if (!t) throw new HttpError(404, "no such Vision Code thread");
   return t;

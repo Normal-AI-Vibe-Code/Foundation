@@ -67,9 +67,9 @@ export function requireWriter(user: UserInfo, boardId?: string | null) {
   if (role === "viewer") throw new HttpError(403, boardId ? `View only: you can read “${boardId}” but not change it. An admin can make you a member.` : "View only: your account can read but not change boards.");
 }
 
-/** set (or with null, clear) someone's role on one board — admins only */
+/** set (or with null, clear) someone's role on one board — admins only, in person (the route asks requirePerson) */
 export function setBoardRole(by: UserInfo, boardId: string, userId: string, role: "member" | "viewer" | null) {
-  if (by.role !== "admin") throw new HttpError(403, "Only an admin can change who may edit a board");
+  if (by.role !== "admin" || by.id === "agent") throw new HttpError(403, "Only an admin can change who may edit a board");
   if (!one("select id from users where id = ?", userId)) throw new HttpError(404, "no such person");
   if (role === null) run("delete from board_roles where board_id = ? and user_id = ?", boardId, userId);
   else

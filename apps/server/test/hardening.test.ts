@@ -20,6 +20,7 @@ import { request as httpRequest } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { WebSocket } from "ws";
 
 const serverDir = resolve(import.meta.dirname, "..");
@@ -215,6 +216,99 @@ test("a socket opened with the cookie from another page is refused; from the cli
   assert.equal(await openSocket("/sync/company", { cookie: ada, origin: CLIENT }), 101);
   // a bearer on the socket needs no Origin
   assert.equal(await openSocket("/sync/company", { authorization: `Bearer ${agent}` }), 101);
+});
+
+// ---------- 6. a members-only board's things stay its members' ----------
+
+let boss = ""; // an admin's cookie
+let bossAgent = ""; // the admin's agent's bearer
+let mia = ""; // a member of the secret board
+let secret = ""; // a members-only board Ada isn't on
+let secretFile = ""; // a picture on it
+let secretDoc = ""; // a text file on it
+
+test("setup: a members-only board with a picture and a note file on it, that Ada isn't on", async () => {
+  boss = await signIn("boss@example.test");
+  mia = await signIn("mia@example.test");
+  bossAgent = (await call("POST", "/api/agent/token", { cookie: boss })).json.token;
+  assert.ok(bossAgent);
+  const made = await call("POST", "/api/boards", { cookie: boss, body: { name: "Secret plans" } });
+  assert.equal(made.status, 200, made.text);
+  secret = made.json.id;
+  const miaId = (await call("GET", "/api/me", { cookie: mia })).json.user.id;
+  const db = new DatabaseSync(join(home, "data", "foundation.db"));
+  db.prepare("insert into board_members (board_id, user_id, role, source, added_at) values (?, ?, 'editor', 'test', ?)").run(secret, miaId, Date.now());
+  db.close();
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
+  const pic = await call("POST", `/api/files?board=${secret}&name=${encodeURIComponent("rotor secret.png")}`, { cookie: mia, raw: png, headers: { "content-type": "image/png" } });
+  assert.equal(pic.status, 200, pic.text);
+  secretFile = pic.json.file.id;
+  const doc = await call("POST", `/api/files?board=${secret}&name=plan.txt`, { cookie: mia, raw: "the secret plan", headers: { "content-type": "text/plain" } });
+  secretDoc = doc.json.file.id;
+  // Ada can't see it at all
+  assert.equal((await call("GET", `/files/${secretDoc}`, { cookie: ada })).status, 404);
+});
+
+test("a non-member's list, epoch, people, rename, agents and Slack shares don't reach a members-only board", async () => {
+  for (const who of [{ cookie: ada }, { bearer: agent }]) {
+    const list = await call("GET", "/api/boards", who);
+    assert.equal(list.status, 200);
+    assert.ok(!list.json.boards.some((b: { id: string }) => b.id === secret), "not listed");
+    assert.equal((await call("GET", `/api/boards/${secret}/epoch`, who)).status, 404);
+    assert.equal((await call("GET", `/api/boards/${secret}/people`, who)).status, 404);
+    assert.equal((await call("POST", `/api/boards/${secret}`, { ...who, body: { name: "Mine now", url: "https://evil.example" } })).status, 404);
+    assert.equal((await call("POST", `/api/boards/${secret}/agents`, { ...who, body: { place: "*", agent: "claude" } })).status, 404);
+    assert.equal((await call("POST", `/api/boards/${secret}/agents/remove`, { ...who, body: { place: "*", agent: "claude" } })).status, 404);
+    assert.equal((await call("POST", "/api/boards", { ...who, body: { name: "Inside", parent: secret } })).status, 404);
+  }
+  // a member still sees it
+  assert.ok((await call("GET", "/api/boards", { cookie: mia })).json.boards.some((b: { id: string }) => b.id === secret));
+  assert.equal((await call("GET", `/api/boards/${secret}/epoch`, { cookie: mia })).status, 200);
+  // its huddle notes and links aren't Ada's to send anywhere (refused before Slack, which isn't connected here)
+  assert.equal((await call("POST", "/api/slack/channels/C1/huddle-notes", { cookie: ada, body: { board: secret, huddleId: "h1" } })).status, 404);
+  assert.equal((await call("POST", "/api/slack/channels/C1/share", { cookie: ada, body: { board: secret, title: "x" } })).status, 404);
+});
+
+test("a member of one board can't read another's files or pictures through the board tools", async () => {
+  const tool = (name: string, input: unknown, who: CallOpts = { bearer: agent }) => call("POST", `/api/boards/company/tools/${name}`, { ...who, body: input });
+  for (const who of [{ bearer: agent }, { cookie: ada }]) {
+    const read = await tool("read_file", { file_id: secretDoc }, who);
+    assert.notEqual(read.status, 200, read.text);
+    assert.doesNotMatch(read.text, /secret plan/);
+    const found = await tool("find_images", { query: "rotor secret", sources: ["files"] }, who);
+    assert.equal(found.status, 200, found.text);
+    assert.ok(!found.text.includes(secretFile), "the picture isn't found");
+    const laid = await tool("lay_out", { title: "Borrowed", items: [{ ref: `file:${secretFile}` }] }, who);
+    assert.ok(!laid.text.includes(`/files/${secretFile}`), laid.text);
+    const put = await tool("collection_put", { collection: "nope", file_id: secretFile }, who);
+    assert.notEqual(put.status, 200);
+    assert.match(put.text, /no such file/);
+  }
+  // the board's member reads it (through a tool on that board)
+  const own = await call("POST", `/api/boards/${secret}/tools/read_file`, { cookie: mia, body: { file_id: secretDoc } });
+  assert.equal(own.status, 200, own.text);
+  assert.match(own.text, /the secret plan/);
+  // and other doors that take a file id
+  assert.equal((await call("POST", "/api/huddles/h1/recordings", { cookie: ada, body: { board: "company", fileId: secretFile } })).status, 404);
+});
+
+test("roles: an admin's agent token can't change who may edit a board; the admin in person can", async () => {
+  const vicId = (await call("GET", "/api/me", { cookie: await signIn("vic@example.test") })).json.user.id;
+  for (const bearer of [bossAgent, SERVICE]) {
+    const r = await call("POST", "/api/boards/company/people", { bearer, body: { userId: vicId, role: "viewer" } });
+    assert.equal(r.status, 403, r.text);
+    assert.match(r.json.error, /needs a person/);
+  }
+  assert.equal((await call("POST", "/api/boards/company/people", { cookie: ada, body: { userId: vicId, role: "viewer" } })).status, 403, "a member isn't an admin");
+  assert.equal((await call("POST", "/api/boards/company/people", { cookie: boss, body: { userId: vicId, role: null } })).status, 200);
+});
+
+test("Vision Code's transcripts: an admin in person, not an agent's bearer, the service token or a member", async () => {
+  for (const who of [{ bearer: agent }, { bearer: bossAgent }, { bearer: SERVICE }, { cookie: ada }]) {
+    assert.equal((await call("GET", "/api/t3/threads", who)).status, 403, JSON.stringify(Object.keys(who)));
+    assert.equal((await call("GET", "/api/t3/threads/t1", who)).status, 403);
+  }
+  assert.equal((await call("GET", "/api/t3/threads", { cookie: boss })).status, 200);
 });
 
 // ---------- 5. asking this computer's model server: a person, an exact loopback origin ----------

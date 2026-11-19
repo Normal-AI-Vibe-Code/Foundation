@@ -23,6 +23,8 @@ import { all, indexDoc, needsFileReindex, one, run } from "./db.ts";
 import { readFileSync } from "node:fs";
 import { HttpError, readBody, type Req } from "./http.ts";
 import { backfillFileText, documentBody, isDocument, queueFileText, storedText } from "./filetext.ts";
+import { canSeeBoard } from "./members.ts";
+import type { UserInfo } from "@foundation/protocol";
 
 export interface FileRow {
   id: string;
@@ -286,6 +288,24 @@ export function serveFile(req: Req, res: ServerResponse, id: string) {
   res.writeHead(200, { ...headers, "content-length": size });
   if (req.method === "HEAD") return res.end();
   createReadStream(path).pipe(res);
+}
+
+/**
+ * May this person (or the agent working for them) see this file: it answers to the board it belongs to, so
+ * a file on a members-only board is that board's members' (a file on no board is everyone's). Board tools
+ * and routes that take a file id ask this before they read, copy or show it.
+ */
+export function canSeeFile(userId: string, fileId: string): boolean {
+  const row = one<{ board_id: string | null }>("select board_id from files where id = ?", fileId);
+  if (!row) return false;
+  if (!row.board_id) return true;
+  const user = userId === "agent" ? { id: "agent", role: "member" } : one<{ id: string; role: string }>("select id, role from users where id = ?", userId);
+  return Boolean(user && canSeeBoard(user as UserInfo, row.board_id));
+}
+
+/** the same, as a refusal: a file on a board this person can't see answers like a missing one */
+export function requireFileVisible(userId: string, fileId: string) {
+  if (!canSeeFile(userId, fileId)) throw new HttpError(404, "no such file");
 }
 
 export async function readFileText(id: string, max = 200_000): Promise<string> {

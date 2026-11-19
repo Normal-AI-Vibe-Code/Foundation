@@ -15,7 +15,7 @@ import * as Y from "yjs";
 import { appendSection, boardMaps, findSection, putNote, uid, type MediaDoc, type NoteDoc, type PanelDoc, type SectionDoc } from "@foundation/protocol";
 import { all, one } from "./db.ts";
 import { editBoard } from "./boards.ts";
-import { storeFile, type FileRow } from "./files.ts";
+import { canSeeFile, storeFile, type FileRow } from "./files.ts";
 import { searchLocal } from "./search.ts";
 
 // ---------- finding ----------
@@ -116,8 +116,8 @@ async function slackImages(query: string, limit: number): Promise<{ found: Found
   }
 }
 
-/** images Foundation already has: uploaded files (full text) and image cards on the board */
-function archiveImages(query: string, boardId: string, limit: number): Found[] {
+/** images Foundation already has: uploaded files (full text) and image cards on the board; only files on boards `viewer` can see */
+function archiveImages(query: string, boardId: string, limit: number, viewer: string): Found[] {
   const ws = words(query);
   const out = new Map<string, Found>();
   // full-text hits first (names, and where imported images came from)
@@ -125,11 +125,11 @@ function archiveImages(query: string, boardId: string, limit: number): Found[] {
     if (h.source !== "file") continue;
     const id = h.id.replace(/^file:/, "");
     const f = one<FileRow>("select * from files where id = ? and archived_at is null", id);
-    if (f && IMAGE.test(f.mime)) out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
+    if (f && IMAGE.test(f.mime) && canSeeFile(viewer, f.id)) out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
   }
   // then names, word by word (search wants every word; a name may have only some)
   for (const f of all<FileRow>("select * from files where archived_at is null and mime like 'image/%' order by created_at desc limit 500")) {
-    if (out.has(`file:${f.id}`) || !ws.length || matches(f.name, ws) === 0) continue;
+    if (out.has(`file:${f.id}`) || !ws.length || matches(f.name, ws) === 0 || !canSeeFile(viewer, f.id)) continue;
     out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
   }
   return [...out.values()].slice(0, limit);
@@ -143,11 +143,12 @@ function boardImages(doc: Y.Doc, query: string): Found[] {
     .map((o) => ({ ref: `media:${o.id}`, source: "board" as const, title: o.name, from: `on the board, in “${m.sections.get(o.sectionId)?.name ?? "?"}”`, url: o.src }));
 }
 
-export async function findImages(doc: Y.Doc, boardId: string, query: string, sources: Array<"files" | "slack" | "board"> = ["files", "slack", "board"], limit = 40) {
+/** `viewer`: the person the search is for (or "agent", the service token): files on boards they can't see aren't found */
+export async function findImages(doc: Y.Doc, boardId: string, query: string, viewer: string, sources: Array<"files" | "slack" | "board"> = ["files", "slack", "board"], limit = 40) {
   const notes: string[] = [];
   const found: Found[] = [];
   if (sources.includes("board")) found.push(...boardImages(doc, query));
-  if (sources.includes("files")) found.push(...archiveImages(query, boardId, limit));
+  if (sources.includes("files")) found.push(...archiveImages(query, boardId, limit, viewer));
   if (sources.includes("slack")) {
     const s = await slackImages(query, limit);
     found.push(...s.found);
@@ -169,7 +170,8 @@ export async function findImages(doc: Y.Doc, boardId: string, query: string, sou
 /** an image's file in Foundation's archive, importing it from Slack if that's where it lives */
 async function fileFor(ref: string, boardId: string, userId: string): Promise<{ file: FileRow; title?: string; from?: string; at?: number } | null> {
   if (ref.startsWith("file:")) {
-    const file = one<FileRow>("select * from files where id = ?", ref.slice(5));
+    // a file answers to its board: one on a board this person can't see isn't theirs to lay out
+    const file = canSeeFile(userId, ref.slice(5)) ? one<FileRow>("select * from files where id = ?", ref.slice(5)) : undefined;
     return file ? { file } : null;
   }
   if (ref.startsWith("slack:")) {
@@ -277,7 +279,7 @@ export async function layOut(
       if (it.ref?.startsWith("media:")) {
         const o = boardMaps(doc).objects.get(it.ref.slice(6));
         const fileId = o?.kind === "media" ? /\/files\/(f_[a-z0-9]+)/.exec(o.src)?.[1] : undefined;
-        const file = fileId ? one<FileRow>("select * from files where id = ?", fileId) : undefined;
+        const file = fileId && canSeeFile(ctx.userId, fileId) ? one<FileRow>("select * from files where id = ?", fileId) : undefined;
         if (file) placed.push({ kind: "image", file, ...(await pixelSize(file)), title: it.title ?? file.name, caption: it.caption, at: file.created_at });
         else skipped.push(`${it.ref} (not a stored image)`);
       } else if (it.ref) {
