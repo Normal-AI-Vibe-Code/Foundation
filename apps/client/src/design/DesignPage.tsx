@@ -19,6 +19,7 @@ import { motion } from "motion/react";
 import { durations, easings, isNight, setNight, springs } from "@foundation/ui";
 import { initAsciiWind2 } from "../login/asciiWind2";
 import { SignInCode } from "../login/SignInCode";
+import { JobWhat } from "../panels/JobWhat";
 import { Mark } from "../brand/Mark";
 import { UpdateCard } from "../update/UpdateCard";
 import { ServerSwitchView, type ServerSwitchViewProps } from "../server/ServerSwitch";
@@ -166,7 +167,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
   machines: ["Machines"],
-  agents: ["The crew", "Agents in a section", "Agents in the section"],
+  agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
   own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Rune renderer"],
@@ -1107,6 +1108,19 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           <HeldPageDemo width={400} word="Stopped" tone="idle" title="Machine stopped — web-box isn't running" reason="Its disk is kept: Start runs it again." show viewer />
           <HeldPageDemo width={260} word="Not started" tone="idle" kind="removed" title="Machine gone — web-box was removed" reason="Removed by Ada, with its disk. Start makes a fresh one." show />
           <HeldPageDemo width={260} word="Gone" tone="idle" kind="gone" title="Machine gone — web-box isn't on the board any more" reason="This page was port 80 of it. There's nothing left to load." />
+        </div>
+      </Section>
+
+      <Section title="Running a job" note="A job an agent queued (reverse-engineering with REA, a Vision hand-off) waits on its card for a person. Before Run the card shows what will run, from the job itself, never the card's text: the whole target and the whole goal, in code type, wrapping anywhere and scrolling, never cut. Run asks first, on a raised pane inside the card: which program will run (Claude Code, rea-agents, Vision Code), the target and goal again, Run it in violet and Cancel. The press names exactly what it showed; the server runs only that, and refuses if the job changed since. A finished job's text starts with whose output it is.">
+        <div className="job-demos">
+          {[false, true].map((asking) => (
+            <div key={String(asking)} className="job-demo">
+              <JobWhat
+                what={{ target: "C:\\Users\\ada\\Projects\\shroud-configurator\\resources\\app.asar", goal: "Map how it works: structure, data flow, APIs, and anything we can reuse. Then list every IPC channel the renderer uses, with the arguments each takes.", program: "rea-agents", shown: "" }}
+                ask={asking ? { onRun: () => {}, onCancel: () => {} } : undefined}
+              />
+            </div>
+          ))}
         </div>
       </Section>
 

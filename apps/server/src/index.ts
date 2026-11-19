@@ -21,7 +21,7 @@ import { listApps, probeApp, saveApp } from "./apps.ts";
 import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
-import { getJob, listJobs, startJob } from "./jobs.ts";
+import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
 import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { requestHostTerminal } from "./hostterm.ts";
@@ -683,17 +683,20 @@ r.get("/api/jobs/:id", (req) => {
   const job = getJob(req.params.id);
   if (!job) throw new HttpError(404, "no such job");
   requireBoard(u, job.board_id);
-  return { job };
+  // what the card and its confirmation show: the whole target and goal from the job itself, and the hash a Run names
+  return { job, ...jobShown(job) };
 });
 // a job runs third-party code or spends on a model: only a person presses Run (jobs.ts; ADR-001 G1)
-r.post("/api/jobs/:id/run", (req) => {
+r.post("/api/jobs/:id/run", async (req) => {
   const u = requirePerson(req, "Running a job");
   const job = getJob(req.params.id);
   if (!job) throw new HttpError(404, "no such job");
   requireBoard(u, job.board_id);
   // seeing the job's board isn't enough: a viewer of it can't start what runs on it
   requireWriter(u, job.board_id);
-  return { job: startJob(job.id, job.board_id ?? "company", u.name) };
+  // it runs only what the card showed: the press names the hash of the target and goal it showed (jobs.ts)
+  const { shown } = await readJson<{ shown?: string }>(req);
+  return { job: startJob(job.id, job.board_id ?? "company", u.name, typeof shown === "string" ? shown : "") };
 });
 
 // ---------- machines (Kiri or Docker, through the Engine API) ----------

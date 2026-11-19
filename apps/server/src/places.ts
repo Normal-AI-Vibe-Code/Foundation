@@ -34,6 +34,7 @@ import { all, db, one, run } from "./db.ts";
 import { imageSize } from "./construct.ts";
 import { storeFile, type FileRow } from "./files.ts";
 import { HttpError } from "./http.ts";
+import { isSecretName } from "./secretnames.ts";
 
 db.exec(`
   create table if not exists places (
@@ -73,18 +74,15 @@ function within(outer: string, inner: string) {
   return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
-/** names that are never listed or read, wherever they are */
-const SECRET = [
-  /^\./, // dotfiles and dot-folders: .env, .git, .ssh, .aws, .npmrc …
-  /^node_modules$/i,
-  /\.(pem|key|pfx|p12|jks|keystore|kdbx|ppk|ovpn)$/i,
-  /^id_(rsa|dsa|ecdsa|ed25519)/i,
-  /credential/i,
-  /^secrets?(\.|$)/i,
-  /^ntuser\./i,
-  /^(desktop\.ini|thumbs\.db)$/i,
-];
-export const isSecretName = (name: string) => SECRET.some((r) => r.test(name));
+/** names that are never listed or read, wherever they are (secretnames.ts) */
+export { isSecretName };
+
+/** the real locations of every approved place that is reachable now (a REA job's local target must be inside one: rea.ts) */
+export function approvedRoots(): string[] {
+  return listPlaces()
+    .map((p) => real(p.path))
+    .filter((p): p is string => Boolean(p));
+}
 
 function real(p: string): string | null {
   try {

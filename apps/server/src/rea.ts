@@ -12,10 +12,17 @@
  *  - claude → `claude.exe` on PATH as is; a `claude.cmd` runs the cli.js it
  *    wraps under this Node; a shim with no script in it is refused.
  * macOS and Linux run `npx` and `claude` as they always have.
+ *
+ * A local target (a file or folder on this computer) must be inside a folder a
+ * person approved (places.ts), checked on its real path (no `..`, no link out),
+ * and is never the home folder or above it, nor a hidden file or folder, a key
+ * or a credential store (secretnames.ts). Web addresses are unchanged.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
+import { isSecretName } from "./secretnames.ts";
 
 export interface Runtime {
   platform: NodeJS.Platform;
@@ -27,6 +34,12 @@ export interface Runtime {
   exists: (f: string) => boolean;
   isDir: (f: string) => boolean;
   read: (f: string) => string;
+  /** the real location of a path (links and junctions followed), or null when there is none */
+  real: (f: string) => string | null;
+  /** the person's home folder */
+  home: string;
+  /** folders a person approved (places.ts): a local target must be inside one */
+  places: string[];
 }
 
 export const here = (): Runtime => ({
@@ -43,6 +56,16 @@ export const here = (): Runtime => ({
     }
   },
   read: (f) => readFileSync(f, "utf8"),
+  real: (f) => {
+    try {
+      return realpathSync.native(f);
+    } catch {
+      return null;
+    }
+  },
+  home: homedir(),
+  // the job fills these in from the approved places (jobs.ts); none here means no local target passes
+  places: [],
 });
 
 export type Refused = { ok: false; reason: string };
@@ -83,10 +106,37 @@ export function shimScript(shim: string, rt: Runtime): string | null {
   return rt.exists(script) ? script : null;
 }
 
+/** is `inner` the same as `outer`, or inside it (case-blind on Windows) */
+function within(outer: string, inner: string, rt: Pick<Runtime, "platform">) {
+  const p = pathOf(rt);
+  const n = (s: string) => (rt.platform === "win32" ? s.toLowerCase() : s);
+  const rel = p.relative(n(outer), n(inner));
+  return rel === "" || (!rel.startsWith("..") && !p.isAbsolute(rel));
+}
+
+/**
+ * Why a job may not run on this local path (already its real location), or null. Never the home
+ * folder or anything that holds it (it holds sign-ins and keys); never a hidden file or folder, key or
+ * credential store anywhere on the path (.ssh, .aws, .env, .claude, .config, .gnupg, .npmrc and the
+ * like); and only inside a folder a person approved.
+ */
+export function localTargetRefusal(at: string, rt: Pick<Runtime, "platform" | "real" | "home" | "places">): string | null {
+  const home = rt.real(rt.home) ?? rt.home;
+  if (within(at, home, rt)) return `${at} is your home folder or holds it, with its sign-ins and keys, so no job runs on it.`;
+  const parts = at.split(/[\\/]+/).filter(Boolean);
+  if (parts.some((part) => isSecretName(part) && !/^[a-z]:$/i.test(part)))
+    return `${at} is, or is inside, a hidden file or folder, a key or a credential store (like .ssh, .aws, .env, .claude or .config), so no job runs on it.`;
+  const roots = rt.places.map((r) => rt.real(r) ?? r);
+  if (!roots.some((r) => within(r, at, rt)))
+    return `${at} isn't inside a folder a person approved for Foundation (Settings → Places), so no job runs on it. An admin can approve the folder it's in, then press Run again.`;
+  return null;
+}
+
 /**
  * The target: a web address (http/https, or a bare `host.tld/…`) or a path on
- * this computer that exists. Never one that starts with "-" (a program would
- * read it as an option) or holds control characters.
+ * this computer that exists, inside an approved place (localTargetRefusal).
+ * Never one that starts with "-" (a program would read it as an option) or
+ * holds control characters.
  */
 export function checkTarget(raw: string, rt: Runtime): Target | Refused {
   const target = raw.trim();
@@ -105,7 +155,15 @@ export function checkTarget(raw: string, rt: Runtime): Target | Refused {
   }
   const p = pathOf(rt);
   const local = p.resolve(rt.cwd, target);
-  if (rt.exists(local)) return { ok: true, kind: rt.isDir(local) || /\.asar$/i.test(local) ? "app" : "file", target: local };
+  if (rt.exists(local)) {
+    if (target.split(/[\\/]+/).includes("..")) return refuse(`The target "${target}" climbs out of a folder (".."). Give the full path of what to examine.`);
+    // checked where it really is: a link or junction is followed before the rules apply
+    const at = rt.real(local);
+    if (!at) return refuse(`${local} can't be resolved to where it really is on this computer.`);
+    const no = localTargetRefusal(at, rt);
+    if (no) return refuse(no);
+    return { ok: true, kind: rt.isDir(at) || /\.asar$/i.test(at) ? "app" : "file", target: at };
+  }
   // a bare host like github.com/morluto/rea
   if (/^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?(\/\S*)?$/i.test(target)) {
     try {

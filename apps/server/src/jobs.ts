@@ -15,19 +15,27 @@
  * rea-agents is pinned (rea.ts REA_AGENTS) and checked against npm's registry
  * before it starts; each job runs in its own folder under the work folder with
  * an environment from an allowlist (childenv.ts, started through child.ts; ADR-001 G13).
+ *
+ * What runs is what a person saw: a local target must be inside an approved
+ * place (rea.ts localTargetRefusal); the card and its confirmation show the
+ * whole target and goal; queueing stores a hash of them (`shown_hash`), and
+ * Run is refused unless the press names that hash and the row still matches it.
+ * The output on the card says which program wrote it.
  */
 
 import { startHandoff } from "./vision.ts";
 import { childOptions, spawnChild, type ChildOptions, type ChildProcess, type SpawnOptions } from "./child.ts";
 import { workFolder } from "./childenv.ts";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { boardMaps, logActivity } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
 import { editBoard } from "./boards.ts";
 import { config } from "./config.ts";
-import { checkReaIntegrity, CLAUDE_CODE_ENV, here, reaCommand } from "./rea.ts";
+import { checkReaIntegrity, checkTarget, CLAUDE_CODE_ENV, here, reaCommand, type Runtime } from "./rea.ts";
 import type { ToolCtx } from "./tools.ts";
 import { audit } from "./audit.ts";
+import { approvedRoots } from "./places.ts";
+import { HttpError } from "./http.ts";
 
 export interface JobRow {
   id: string;
@@ -40,11 +48,38 @@ export interface JobRow {
   created_by: string | null;
   created_at: number;
   finished_at: number | null;
+  /** sha256 of what the card shows (kind, target, goal) when it was queued: Run must name it */
+  shown_hash?: string | null;
+}
+
+/** the hash of what a job's card shows: its kind, its whole target and its whole goal */
+export const shownHash = (job: Pick<JobRow, "kind" | "target" | "goal">) => createHash("sha256").update(JSON.stringify([job.kind, job.target, job.goal])).digest("hex");
+
+/** what the card and its confirmation show (the job's own row, never the card's text) and the hash a Run must name */
+export function jobShown(job: JobRow) {
+  return { target: job.target, goal: job.goal, program: jobProgram(job), shown: job.shown_hash ?? shownHash(job) };
+}
+
+/** the program a job would start, in words (null: it would be refused before anything starts) */
+export function jobProgram(job: Pick<JobRow, "kind" | "target">): string | null {
+  if (job.kind === "vision") return "Vision Code";
+  const t = checkTarget(job.target, jobRuntime());
+  return !t.ok ? null : t.kind === "app" ? "rea-agents" : "Claude Code";
 }
 
 export function queueJob(ctx: ToolCtx, kind: string, target: string, goal: string): JobRow {
   const id = `job_${randomBytes(6).toString("hex")}`;
-  run("insert into jobs (id, kind, target, goal, board_id, status, created_by, created_at) values (?, ?, ?, ?, ?, 'queued', ?, ?)", id, kind, target, goal, ctx.boardId, ctx.actor, Date.now());
+  run(
+    "insert into jobs (id, kind, target, goal, board_id, status, created_by, created_at, shown_hash) values (?, ?, ?, ?, ?, 'queued', ?, ?, ?)",
+    id,
+    kind,
+    target,
+    goal,
+    ctx.boardId,
+    ctx.actor,
+    Date.now(),
+    shownHash({ kind, target, goal }),
+  );
   return one<JobRow>("select * from jobs where id = ?", id)!;
 }
 
@@ -68,15 +103,22 @@ export function setCard(boardId: string, jobId: string, status: "running" | "don
   });
 }
 
-export function startJob(id: string, boardId: string, by: string) {
+/**
+ * A person pressed Run on the card that showed `shown` (jobShown). It runs only if that is what the job
+ * was queued with and the row still says so: a target or goal changed since is never run unseen.
+ */
+export function startJob(id: string, boardId: string, by: string, shown: string) {
   const job = getJob(id);
   if (!job) throw new Error("no such job");
   if (job.status === "running") return job;
+  const queued = job.shown_hash ?? shownHash(job);
+  if (shown !== queued || shownHash(job) !== queued)
+    throw new HttpError(409, "What this job would run isn't what its card showed. Open the card again and check the target and goal before pressing Run.");
   // a person's press (the route asks requirePerson); `by` is their name
   audit({ actor_kind: "person", actor_name: by, board_id: boardId, door: "route", action: "job.start", target: `${job.id} ${job.kind}`, provenance: job.kind === "vision" ? "ours-local" : "external", service: job.kind === "vision" ? "Vision Code" : "REA (npm registry, Claude)", decision: "allowed", approved_by: by, result: "ok" });
   if (job.kind === "vision") return startVisionJob(job, boardId, by);
   // the target is checked and the program resolved before anything runs: no shell, the target is one argument (rea.ts)
-  const plan = reaCommand(job, config.claudeCli, here());
+  const plan = reaCommand(job, config.claudeCli, jobRuntime());
   if (!plan.ok) return refuseJob(job, boardId, by, plan.reason);
   run("update jobs set status = 'running', output = '' where id = ?", id);
   setCard(boardId, id, "running");
@@ -100,9 +142,21 @@ export function startJob(id: string, boardId: string, by: string) {
 export const jobDeps: {
   spawn: (cmd: string, argv: string[], opts: ChildOptions<SpawnOptions>) => ChildProcess;
   integrity: () => Promise<string | null>;
-} = { spawn: (cmd, argv, opts) => spawnChild(cmd, argv, opts), integrity: () => checkReaIntegrity() };
+  /** the folders a person approved, by their real location (places.ts) */
+  places: () => string[];
+} = { spawn: (cmd, argv, opts) => spawnChild(cmd, argv, opts), integrity: () => checkReaIntegrity(), places: () => approvedRoots() };
 export function setJobDeps(d: Partial<typeof jobDeps>) {
   Object.assign(jobDeps, d);
+}
+
+/** this computer, with the places a person approved */
+function jobRuntime(): Runtime {
+  return { ...here(), places: jobDeps.places() };
+}
+
+/** what the card says above a finished job's output: whose words they are */
+export function outputLabel(route: "rea-agents" | "claude") {
+  return route === "claude" ? "Claude Code's output (a program's words, not Foundation's):" : "rea-agents' output (a program's words, not Foundation's):";
 }
 
 /**
@@ -142,7 +196,7 @@ function launch(job: JobRow, boardId: string, plan: { route: "rea-agents" | "cla
     clearInterval(flush);
     const ok = code === 0;
     run("update jobs set status = ?, output = ?, finished_at = ? where id = ?", ok ? "done" : "error", out, Date.now(), id);
-    setCard(boardId, id, ok ? "done" : "error", ok ? out.slice(0, 4000) : `failed (${code}): ${out.slice(-800)}`);
+    setCard(boardId, id, ok ? "done" : "error", `${outputLabel(plan.route)}\n${ok ? out.slice(0, 4000) : `failed (${code}): ${out.slice(-800)}`}`);
   });
   return getJob(id)!;
 }

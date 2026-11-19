@@ -295,6 +295,8 @@ for (const sql of [
   "alter table flowform_attempts add column code text",
   "alter table flowform_attempts add column confirm_hash text",
   "alter table flowform_attempts add column confirmed_at integer",
+  // what a job's card showed when it was queued (jobs.ts shownHash): Run must name it, and the row must still match
+  "alter table jobs add column shown_hash text",
   "create index if not exists files_sha on files(sha256)",
   `create table if not exists file_text (
      sha256 text primary key, v integer not null, status text not null,

@@ -152,6 +152,9 @@ function winRt(files: Record<string, string>): Runtime {
     exists: (f) => f in files,
     isDir: () => false,
     read: (f) => files[f] ?? "",
+    real: (f) => f,
+    home: "C:\\Users\\Ada",
+    places: [],
   };
 }
 

@@ -10,6 +10,7 @@
  * once engaged (click), so panning the grid over them stays smooth.
  */
 
+import { JobWhat, type JobShown } from "./JobWhat";
 import { PipelineBody } from "./PipelineView";
 import { CollectionBody } from "./CollectionView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
@@ -820,6 +821,20 @@ function AskBody({ panel }: { panel: PanelMeta }) {
 
 function AgentBody({ panel }: { panel: PanelMeta }) {
   const [output, setOutput] = useState<string>("");
+  const [what, setWhat] = useState<JobShown | null>(null);
+  const [asking, setAsking] = useState(false);
+  const waiting = Boolean(panel.sessionId) && panel.status !== "running" && panel.status !== "done";
+  // before Run: what will run, from the job itself
+  useEffect(() => {
+    if (!panel.sessionId || !waiting) return;
+    let live = true;
+    api<JobShown>(`/api/jobs/${panel.sessionId}`)
+      .then((r) => live && setWhat({ target: r.target, goal: r.goal, program: r.program, shown: r.shown }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [panel.sessionId, waiting]);
   useEffect(() => {
     if (!panel.sessionId || panel.status !== "running") return;
     const t = setInterval(() => {
@@ -829,21 +844,28 @@ function AgentBody({ panel }: { panel: PanelMeta }) {
     }, 1500);
     return () => clearInterval(t);
   }, [panel.sessionId, panel.status]);
-  const run = () =>
-    api(`/api/jobs/${panel.sessionId}/run`, { method: "POST" })
+  // Run asks first, showing the whole target and goal; the press names what it showed, and the server runs only that
+  const run = () => {
+    if (!what) return;
+    setAsking(false);
+    api(`/api/jobs/${panel.sessionId}/run`, { method: "POST", json: { shown: what.shown } })
       .then(() => toast("Starting…", "agent"))
       .catch((e) => toast((e as Error).message, "bad"));
+  };
   return (
     <div className="agent-body">
       <div className="agent-status">
         <span className={`f-dot ${panel.status === "running" ? "is-agent is-live" : panel.status === "done" ? "is-ok" : panel.status === "error" ? "is-bad" : ""}`} />
         <span>{panel.status ?? "idle"}</span>
-        {panel.sessionId && panel.status !== "running" && panel.status !== "done" && (
-          <button className="f-pill is-agent" onClick={run}>
+        {panel.sessionId && panel.status !== "running" && panel.status !== "done" && !asking && (
+          <button className="f-pill is-agent" disabled={!what} onClick={() => setAsking(true)}>
             Run
           </button>
         )}
       </div>
+      {waiting && what ? (
+        <JobWhat what={what} ask={asking ? { onRun: run, onCancel: () => setAsking(false) } : undefined} />
+      ) : null}
       {/^https?:\/\/\S+$/.test(output.trim()) ? (
         // a hand-off: the job's output is where the work is happening
         <div className="agent-handoff">
@@ -852,7 +874,7 @@ function AgentBody({ panel }: { panel: PanelMeta }) {
             Open in Vision Code ↗
           </a>
         </div>
-      ) : (
+      ) : waiting && what && panel.status !== "error" ? null : (
         <pre className="agent-output">{panel.status === "running" ? output.slice(-4000) || "…" : panel.text}</pre>
       )}
     </div>
