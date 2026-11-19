@@ -83,6 +83,32 @@ You are one of the crew: people see you on the board as a named cursor (your nam
 - If the ask has parts that can run at the same time in different places (a second data source, a separate section), call_in_help with exact instructions for one part, and do the rest yourself. Most asks need no helper. Set your plan before you call one in: your helpers get it.
 - Called in as a helper (your <you> says by whom), you start with your part, the lead's plan and what the crew has made so far. Call crew_work before you make each thing, and don't make what a teammate has made or is making: build on it, or say it's there.`;
 
+/**
+ * What `claude -p` is started with for a board run: Foundation's tools and nothing of the person's own.
+ * `--strict-mcp-config`: only the MCP server in Foundation's config (the board's tools), not the person's
+ * user, project or plugin MCP servers (mail, docs, trackers). `--setting-sources ""`: none of their settings
+ * files (user, project, local), so their permission allow-rules, hooks and env don't widen a board run.
+ * Flag names as Claude Code 2.1.288's `claude --help` gives them.
+ */
+export function subscriptionArgs(o: { prompt: string; mcpFile: string; system: string }): string[] {
+  return [
+    "-p",
+    o.prompt,
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--mcp-config",
+    o.mcpFile,
+    "--strict-mcp-config",
+    "--setting-sources",
+    "",
+    "--append-system-prompt",
+    o.system,
+    "--allowedTools",
+    "mcp__foundation__*",
+  ];
+}
+
 const histories = new Map<string, Anthropic.MessageParam[]>();
 const claudeSessions = new Map<string, string>();
 
@@ -471,19 +497,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
     { mode: 0o600 },
   );
   const prompt = `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`;
-  const argv = [
-    "-p",
-    prompt,
-    "--output-format",
-    "stream-json",
-    "--verbose",
-    "--mcp-config",
-    mcpFile,
-    "--append-system-prompt",
-    SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + "\nYour board tools are the mcp__foundation__* tools.",
-    "--allowedTools",
-    "mcp__foundation__*",
-  ];
+  const argv = subscriptionArgs({ prompt, mcpFile, system: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + "\nYour board tools are the mcp__foundation__* tools." });
   // the Claude Code session to continue: this server's memory, else the last run of this tab
   const resume =
     claudeSessions.get(key) ??

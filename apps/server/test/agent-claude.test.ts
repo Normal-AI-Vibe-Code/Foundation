@@ -85,6 +85,33 @@ test("a subscription turn reaches the stand-in with its prompt as one argument",
   assert.ok(turn[1].startsWith(prompt), "the prompt arrived whole: quotes, &, |, %PATH% and the line break untouched");
   assert.deepEqual(turn.slice(2, 5), ["--output-format", "stream-json", "--verbose"]);
   assert.ok(turn.includes("--mcp-config") && turn.includes("--allowedTools"));
+  // Foundation's tools only: its own MCP config, strictly, and none of the person's settings files
+  assert.ok(turn.includes("--strict-mcp-config"), "only the MCP servers in Foundation's config");
+  assert.equal(turn[turn.indexOf("--setting-sources") + 1], "", "no user, project or local settings: the empty value arrived as one argument");
+});
+
+test("the argument builder: Foundation's MCP config, strictly; no setting sources; only the board's tools pre-approved", async () => {
+  const { subscriptionArgs } = await import("../src/agent.ts");
+  const a = subscriptionArgs({ prompt: "hi --strict-mcp-config", mcpFile: "/w/runs/r1/mcp.json", system: "sys" });
+  assert.deepEqual(a, [
+    "-p",
+    "hi --strict-mcp-config",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--mcp-config",
+    "/w/runs/r1/mcp.json",
+    "--strict-mcp-config",
+    "--setting-sources",
+    "",
+    "--append-system-prompt",
+    "sys",
+    "--allowedTools",
+    "mcp__foundation__*",
+  ]);
+  // the prompt is one argument and never read as a flag: the flags stand on their own after it
+  assert.equal(a.filter((x) => x === "--strict-mcp-config").length, 1);
+  assert.equal(a.indexOf("--mcp-config") + 1, a.indexOf("/w/runs/r1/mcp.json"));
 });
 
 test("Claude Code gets no keys, works outside data/, and its pass to the board is in a run folder that goes with the run (ADR-001 G13)", async () => {
