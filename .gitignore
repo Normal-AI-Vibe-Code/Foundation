@@ -46,3 +46,6 @@ apps/client/src-tauri/server/*
 
 # detailed open security findings: never committed (docs/SECURITY.md says why)
 /.private/
+
+# agents' own scratch checkouts: never part of the repository
+/.claude/worktrees/
