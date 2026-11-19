@@ -170,6 +170,15 @@ export function T3Glyph({ size = 16 }: { size?: number }) {
   );
 }
 
+/** open it whole, as a tab of its own: two arrows to opposite corners */
+export function ExpandGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M9.5 3h3.5v3.5M13 3L9 7M6.5 13H3V9.5M3 13l4-4" />
+    </svg>
+  );
+}
+
 /** settings for something (the agents, on Ask's pill): three sliders */
 export function SlidersGlyph({ size = 16 }: { size?: number }) {
   return (

@@ -16,14 +16,15 @@ import { api } from "../lib/api";
 import { initials, useBoardTick, usePeers } from "./Presence";
 import { FloorEdge } from "./FloorEdge";
 import { ago, isSystemGrid, paneSpring } from "./SidePane";
-import { wouldLoop } from "../lib/grids";
+import { isPageKind, wouldLoop } from "../lib/grids";
+import { THEMES } from "@foundation/ui";
 import { KIND_GLYPH, KIND_NAME, type BoardRow } from "./Shell";
 
 interface Props {
   user: UserInfo;
   space: BoardRow | null;
   boards: BoardRow[];
-  onUpdate(id: string, patch: { name?: string; parent?: string | null }): void;
+  onUpdate(id: string, patch: { name?: string; parent?: string | null; theme?: "day" | "night" | null }): void;
 }
 
 export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
@@ -63,7 +64,7 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
                   <select className="info-pick" value={space.parent ?? ""} disabled={!canEdit} aria-label="The grid this one is inside" onChange={(e) => onUpdate(space.id, { parent: e.target.value || null })}>
                     <option value="">No grid (the top of All Grids)</option>
                     {boards
-                      .filter((b) => b.kind !== "page" && !isSystemGrid(b.id) && !wouldLoop(space.id, b.id, boards))
+                      .filter((b) => !isPageKind(b.kind) && !isSystemGrid(b.id) && !wouldLoop(space.id, b.id, boards))
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map((b) => (
                         <option key={b.id} value={b.id}>
@@ -72,7 +73,22 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
                       ))}
                   </select>
                 </dd>
-                {kind === "page" && space.url && (
+                {/* the theme this grid wears while it's the one in focus (DESIGN.md §2.1): paper follows the orb; a grid may pin day or night */}
+                {!isPageKind(kind) && (
+                  <>
+                    <dt>Look</dt>
+                    <dd>
+                      <select className="info-pick" value={space.theme ?? "paper"} disabled={!canEdit} aria-label="The look this grid wears" data-grid-theme onChange={(e) => onUpdate(space.id, { theme: e.target.value === "day" || e.target.value === "night" ? e.target.value : null })}>
+                        {(["paper", "day", "night"] as const).map((t) => (
+                          <option key={t} value={t}>
+                            {t === "paper" ? "Paper (follows day and night)" : THEMES[t].name}
+                          </option>
+                        ))}
+                      </select>
+                    </dd>
+                  </>
+                )}
+                {isPageKind(kind) && space.url && (
                   <>
                     <dt>Address</dt>
                     <dd className="info-url" title={space.url}>
@@ -80,7 +96,7 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
                     </dd>
                   </>
                 )}
-                {kind !== "page" && <Counts />}
+                {!isPageKind(kind) && <Counts />}
               </dl>
             </section>
 

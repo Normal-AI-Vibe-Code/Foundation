@@ -13,7 +13,7 @@
 
 import { Terminal as XTerm, type ITheme } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { onNight } from "@foundation/ui";
+import { onLook } from "@foundation/ui";
 import { openSocket } from "../lib/api";
 import { IS_MAC } from "../lib/keys";
 import { clipKey, joinRows } from "./machineWords";
@@ -222,10 +222,10 @@ export function mountTerminal(node: HTMLElement, h: TerminalHooks): MachineTermi
     t = setTimeout(refit, 80);
   });
   ro.observe(node);
-  const offNight = onNight(() => {
-    // the tokens fade over 1.4 s: repaint at the midpoint and at the end
-    setTimeout(() => (term.options.theme = themeFromTokens(node)), 700);
-    setTimeout(() => (term.options.theme = themeFromTokens(node)), 1500);
+  // the look changed (day and night, or the theme of the place in focus): the tokens fade over 1.4 s,
+  // so repaint now, at the midpoint and at the end
+  const offNight = onLook(() => {
+    for (const ms of [0, 700, 1500]) setTimeout(() => (term.options.theme = themeFromTokens(node)), ms);
   });
   return {
     term,

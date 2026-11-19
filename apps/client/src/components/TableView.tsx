@@ -28,6 +28,8 @@ import {
   resizeTable,
   setActiveObject,
   setObjectFloat,
+  setObjectFolded,
+  setObjectPinned,
 } from "../state/store";
 import {
   insertTableCols,
@@ -115,6 +117,7 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
       if (e.button !== 0) return;
       if ((e.target as HTMLElement).closest("button, input")) return;
       e.stopPropagation();
+      if (table.pinned) return; // pinned: it is the section's ground, and moves with the section
       if (!table.float) setObjectFloat(table.id, true); // grabbing undocks it
       const d = dragRef.current;
       d.active = true;
@@ -530,12 +533,13 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
   return (
     <div
       ref={rootRef}
-      className="table-anchor"
+      className={"table-anchor" + (table.pinned ? " is-pinned" : "") + (table.folded ? " is-folded" : "")}
       style={{ width: ROWNUM_W + table.cols * CELL_W }}
     >
       <motion.div
         className={"table-card" + (isActive ? " ctx-active" : "")}
-        initial={{ scale: 0.55, opacity: 0, y: 60, rotate: -1.5 }}
+        // pinned, it is part of the section's paper: it doesn't arrive like a card
+        initial={table.pinned ? false : { scale: 0.55, opacity: 0, y: 60, rotate: -1.5 }}
         animate={{ scale: 1, opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: "spring", stiffness: 230, damping: 19, mass: 1.05 }}
         onPointerDown={() => setActiveObject(table.id)}
@@ -553,9 +557,11 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
             requestSnap({ kind: "object", id: table.id });
           }}
         >
-          <div className="grip">
-            <span /><span /><span />
-          </div>
+          {!table.pinned && (
+            <div className="grip">
+              <span /><span /><span />
+            </div>
+          )}
           {renaming ? (
             <input
               className="table-name-input"
@@ -582,14 +588,26 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
           {table.createdBy && (
             <AgentPill name={table.createdBy} tip={`Made by ${table.createdBy}, an agent`} className="is-inline" />
           )}
+          {table.pinned && <span className="table-pinned-tag">{table.cols} × {table.rows} · pinned to the section</span>}
           <div className="header-actions">
-            <button
-              className={"icon-btn float-btn" + (table.float ? " floating" : "")}
-              data-tip={table.float ? "Dock into the section" : "Float freely"}
-              onClick={() => setObjectFloat(table.id, !table.float)}
-            >
-              {table.float ? "✥" : "⌗"}
+            {table.folded && (
+              <button className="icon-btn" data-tip="Restore" aria-label="Restore" onClick={() => setObjectFolded(table.id, false)} data-card-restore>
+                ▢
+              </button>
+            )}
+            {/* pinned: it spans its section; unpinned, it is a card that docks or floats */}
+            <button className={"icon-btn pin-btn" + (table.pinned ? " is-on" : "")} data-tip={table.pinned ? "Unpin: back to a card" : "Pin to the section: span it"} aria-label={table.pinned ? "Unpin" : "Pin to the section"} aria-pressed={!!table.pinned} onClick={() => setObjectPinned(table.id, !table.pinned)} data-table-pin>
+              <PinGlyph />
             </button>
+            {!table.pinned && (
+              <button
+                className={"icon-btn float-btn" + (table.float ? " floating" : "")}
+                data-tip={table.float ? "Dock into the section" : "Float freely"}
+                onClick={() => setObjectFloat(table.id, !table.float)}
+              >
+                {table.float ? "✥" : "⌗"}
+              </button>
+            )}
             <button
               className="icon-btn is-remove"
               data-tip="Delete table"
@@ -600,9 +618,10 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
           </div>
         </div>
 
-        {/* spreadsheet grid */}
+        {/* spreadsheet grid (kept, not drawn, while minimized) */}
         <div
           className="sheet"
+          hidden={!!table.folded}
           tabIndex={0}
           ref={sheetRef}
           onKeyDown={onKeyDown}
@@ -618,7 +637,8 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
           {cells}
         </div>
 
-        {/* add row / add column controls */}
+        {/* add row / add column controls (a pinned table's width is its section's: its cells' menu adds to it) */}
+        {!table.pinned && !table.folded && (<>
         <motion.button
           className="add-btn add-col"
           whileHover={{ scale: 1.15 }}
@@ -639,6 +659,7 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
         >
           +
         </motion.button>
+        </>)}
       </motion.div>
 
       {/* image lightbox — springs out of the cell into an overlay */}
@@ -678,3 +699,12 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
     </div>
   );
 });
+
+/** a pin: the card is held to its section */
+function PinGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M9.6 2.2l4.2 4.2-2 .6-2.3 2.3.2 3.2-1.4 1.4-6-6 1.4-1.4 3.2.2L9 4.2zM5.2 10.8L2.4 13.6" />
+    </svg>
+  );
+}

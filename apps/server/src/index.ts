@@ -14,7 +14,7 @@ import { config } from "./config.ts";
 import { one } from "./db.ts";
 import { HttpError, json, readJson, Router, sse, type Req } from "./http.ts";
 import { clearSession, createSession, googleAuthUrl, googleCallback, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
-import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
+import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
@@ -25,6 +25,7 @@ import { getJob, listJobs, startJob } from "./jobs.ts";
 import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { requestHostTerminal } from "./hostterm.ts";
+import { requestHostBrowser } from "./hostbrowser.ts";
 import { changelog } from "./changelog.ts";
 import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
@@ -240,22 +241,30 @@ r.post("/api/boards/:id/people", async (req) => {
 });
 r.post("/api/boards", async (req) => {
   requireWriter(requireUser(req));
-  const body = await readJson<{ name?: string; kind?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
+  const body = await readJson<{ name?: string; kind?: string; folder?: string | null; url?: string; parent?: string | null; app?: string }>(req);
   const kind: SpaceKind = SPACE_KINDS.includes(body.kind as SpaceKind) ? (body.kind as SpaceKind) : "grid";
-  const url = kind === "page" ? cleanPageUrl(body.url) : null;
+  // an app as a tab: one of Foundation's own (T3: its address is minted each time it opens), or one at an address
+  const app = kind === "app" && (BUILT_IN_APPS as readonly string[]).includes(String(body.app)) ? String(body.app) : null;
+  const url = kind === "page" || (kind === "app" && !app) ? cleanPageUrl(body.url) : null;
   if (kind === "page" && !url) throw new HttpError(400, "A web page needs an address (http or https)");
+  if (kind === "app" && !app && !url) throw new HttpError(400, "An app needs an address (http or https), or to be one Foundation knows");
+  if (kind === "app") {
+    // an app has one tab: opening it again goes to the one there is
+    const there = listBoards().find((b) => b.kind === "app" && (app ? b.app === app : !b.app && b.url === url));
+    if (there) return { id: there.id, existing: true };
+  }
   let name = (body.name ?? "").trim().slice(0, 80);
   if (!name) {
     // an unnamed space takes a name nothing else has: "Untitled grid", then "Untitled grid 2"…
-    const base = kind === "page" ? new URL(url!).hostname : kind === "deck" ? "Untitled presentation" : "Untitled grid";
+    const base = app === "t3" ? "T3" : kind === "page" || kind === "app" ? new URL(url!).hostname : kind === "deck" ? "Untitled presentation" : "Untitled grid";
     const taken = new Set(listBoards().map((b) => b.name));
     name = base;
     for (let n = 2; taken.has(name); n++) name = `${base} ${n}`;
   }
-  const id = createBoardRow(name, { kind, folder: cleanFolder(body.folder), url });
+  const id = createBoardRow(name, { kind, folder: cleanFolder(body.folder), url, app });
   // the server lays the first sections, so two people opening a new space at once don't both seed it
   // (a deck's sections are its slides; a page space keeps a board for its people and activity, with nothing on it)
-  if (kind !== "page") {
+  if (!isPageKind(kind)) {
     const doc = getBoard(id).doc;
     if (boardMaps(doc).sections.size === 0) {
       editBoard(id, "system", (d) => {
@@ -277,8 +286,10 @@ r.post("/api/boards/:id", async (req) => {
   const id = req.params.id;
   if (!listBoards().some((b) => b.id === id)) throw new HttpError(404, "No such grid");
   requireWriter(u, id);
-  const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
-  const patch: { name?: string; folder?: string | null; url?: string } = {};
+  const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null; theme?: string | null }>(req);
+  const patch: { name?: string; folder?: string | null; url?: string; theme?: "day" | "night" | null } = {};
+  // the look this grid pins for everyone who opens it ('day' | 'night'); anything else lets go: paper, following the orb
+  if (body.theme !== undefined) patch.theme = cleanTheme(body.theme);
   if (body.name !== undefined) {
     const name = String(body.name).trim().slice(0, 80);
     if (!name) throw new HttpError(400, "A grid needs a name");
@@ -905,6 +916,8 @@ r.get("/api/t3/threads/:id", async (req) => {
 
 // ---------- the built-in terminal (hostterm.ts): a shell on this computer, for an admin, in person ----------
 r.post("/api/host-terminal", (req) => requestHostTerminal(req));
+// the built-in browser (hostbrowser.ts): a real browser on this computer, for an admin, in person; the key opens its socket
+r.post("/api/host-browser", (req) => requestHostBrowser(req));
 // what changed in Foundation's own code (changelog.ts): read-only, for anyone signed in
 r.get("/api/changelog", async (req) => {
   requireUser(req);

@@ -1,0 +1,381 @@
+/* A release as a release page (settings/ReleasePage.tsx; DESIGN.md → Release page). On tokens only: it wears
+   the theme of the place it's in (white over the room on Today, ink on paper on a grid). */
+
+.release-card {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) 0 var(--space-6);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-frost);
+}
+.release-card:last-child {
+  border-bottom: 0;
+}
+
+/* the cover: the mark and the version set large, on a wash of the accent */
+.release-cover {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border-radius: var(--radius-pane);
+  background:
+    radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--color-pulse) 16%, transparent), transparent 62%),
+    radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--color-agent) 12%, transparent), transparent 60%),
+    var(--color-panel);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+.release-mark {
+  flex: none;
+  color: var(--color-pulse);
+}
+.release-cover-words {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.release-version {
+  font: 300 var(--text-32) / 1 var(--font-display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-frost);
+}
+.release-date {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+}
+
+.release-title {
+  margin: 0;
+  font: 600 var(--text-20) / 1.2 var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--color-frost);
+}
+/* the small description under it: the post's own opening */
+.release-lede {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.55 var(--font-sans);
+}
+
+/* what it's made of: one bar, a segment per part, then the counts */
+.release-made {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.release-bar {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  height: 6px;
+}
+.release-bar-seg {
+  flex: 1 1 0;
+  min-width: 4px;
+  border-radius: var(--radius-pill);
+}
+.release-counts {
+  flex: none;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+/* the parts, as tiles: icon · name · count, and one sentence under them */
+.release-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--space-3);
+}
+.release-tile {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow:
+    var(--shadow-sheet),
+    inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out-soft);
+}
+.release-tile:hover {
+  box-shadow:
+    var(--shadow-sheet),
+    inset 0 0 0 1px var(--color-line-strong);
+}
+.release-tile:active {
+  transform: scale(0.98);
+}
+.release-tile-glyph {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.release-tile-name {
+  min-width: 0;
+  font: 600 var(--text-13) / 1.25 var(--font-sans);
+}
+.release-tile-count {
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.release-tile-what {
+  grid-column: 1 / -1;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+
+.release-more {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-pulse);
+  font: 600 var(--text-12) / 1.4 var(--font-sans);
+  cursor: pointer;
+}
+.release-more:hover {
+  text-decoration: underline;
+}
+.release-caret {
+  display: inline-block;
+  transition: rotate var(--dur-quick) var(--ease-out-soft);
+}
+.release-caret.is-open {
+  rotate: 90deg;
+}
+
+/* the full notes: a note's body without the note's own padding, scroller or text cursor */
+.release-card .release-body {
+  height: auto;
+  padding: 0;
+  overflow: visible;
+  cursor: auto;
+  color: var(--color-mist);
+  font-size: var(--text-13);
+  line-height: 1.6;
+}
+.release-card .release-body h2 {
+  scroll-margin-top: var(--space-5);
+}
+
+/* in Settings → Releases the page has the cover's place: the card is the description, the bar and the tiles */
+.release-card.is-compact {
+  padding: 0;
+  border-bottom: 0;
+}
+.release-card.is-compact .release-lede {
+  font-size: var(--text-14);
+}
+
+@container (max-width: 340px) {
+  .release-cover {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+  .release-version {
+    font-size: var(--text-24);
+  }
+  .release-made {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+}
+
+/* the change log's Code face: commits by the day they landed */
+.tool-day {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-1);
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.tool-day:first-child {
+  margin-top: var(--space-3);
+}
+.tool-day span {
+  color: var(--color-dim);
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 500;
+}
+.tool-log-head.has-kind {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: start;
+}
+.tool-log-kind {
+  grid-row: 1 / span 2;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+
+/* ---------- #/design: the themes, the release page, a card's menu ---------- */
+.theme-demo {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-5);
+}
+.theme-demo-card {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.theme-demo-face {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 150px;
+  padding: var(--space-5);
+  border-radius: var(--radius-pane);
+  border: 1px solid var(--color-line);
+  background: var(--color-void);
+  color: var(--color-frost);
+}
+.theme-demo-face b {
+  font: 600 var(--text-16) / 1.2 var(--font-display);
+}
+.theme-demo-face p {
+  margin: 0;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.theme-demo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.theme-demo-row code {
+  margin-left: auto;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-code);
+}
+/* the room is a picture: here, the shade it lays down, so the white reads */
+.theme-demo-card.is-room,
+.release-demo-face.is-room {
+  border-radius: var(--radius-pane);
+  background:
+    radial-gradient(120% 120% at 20% 0%, color-mix(in srgb, var(--color-agent) 55%, transparent), transparent 60%),
+    radial-gradient(100% 120% at 100% 100%, color-mix(in srgb, var(--color-warn) 40%, transparent), transparent 62%),
+    color-mix(in srgb, var(--color-room-shade) 82%, var(--color-agent));
+}
+.theme-demo-card.is-room figcaption {
+  padding: 0 var(--space-3) var(--space-3);
+  color: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+}
+.theme-demo-card figcaption {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.theme-demo-card figcaption code {
+  margin-right: var(--space-2);
+  color: var(--color-frost);
+  font: 600 var(--text-11) / 1 var(--font-code);
+}
+.theme-demo-card.is-room figcaption code {
+  color: var(--color-over-room);
+}
+.release-demo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+.release-demo-face {
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pane);
+  border: 1px solid var(--color-line);
+}
+.cardmenu-demo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+.cardmenu-demo-menu {
+  position: static;
+}
+.cardmenu-demo-section {
+  flex: 1;
+  min-width: 320px;
+  max-width: 640px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+  overflow: hidden;
+}
+.cardmenu-demo-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 42px;
+  padding: 0 var(--space-5);
+  font: 600 var(--text-14) / 1 var(--font-sans);
+  color: var(--color-frost);
+}
+.cardmenu-demo-body {
+  position: relative;
+  padding-bottom: var(--space-7);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--color-frost) 13%, transparent) 1.1px, transparent 1.4px);
+  background-size: 28px 28px;
+}
+.cardmenu-demo-body .table-anchor {
+  position: static;
+}
+.cardmenu-demo-body .table-anchor.is-pinned .header-actions {
+  opacity: 1;
+}
+.cardmenu-demo-folded {
+  position: absolute;
+  right: var(--space-5);
+  bottom: var(--space-3);
+  width: 240px;
+}
+.cardmenu-demo-folded .frame-card {
+  position: relative;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-sheet);
+}

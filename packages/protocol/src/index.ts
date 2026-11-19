@@ -129,6 +129,14 @@ interface ObjectBaseDoc {
    * the actor of the tool call that made them.
    */
   createdBy?: string;
+  /**
+   * Pinned to its section (2026-11-18): it leaves the flow and spans the section, drawn on the section's own
+   * paper from under the header down, at the section's full width; other cards lie over it. One to a section.
+   * Unpinned, it is a card again. Tables first (a new section a person adds starts with one).
+   */
+  pinned?: boolean;
+  /** Minimized: drawn as its title bar alone, wherever it sits; its content is kept and comes back when restored */
+  folded?: boolean;
 }
 
 export interface TableDoc extends ObjectBaseDoc {

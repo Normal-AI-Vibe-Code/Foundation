@@ -767,7 +767,7 @@
 }
 .side-pane .pane-foot {
   border-top: 0;
-  /* the orb, then you, from the Settings icon's left edge (2026-11-17) */
+  /* you, from the Settings icon's left edge, and the orb at the other end (2026-11-18) */
   padding-left: var(--space-4);
 }
 .pane-empty.is-create {

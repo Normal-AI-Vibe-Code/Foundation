@@ -21,7 +21,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { MACHINE_AGENT_ACTIVE_MS, type MachineAgentAct, type MachineState } from "@foundation/protocol";
-import { onNight } from "@foundation/ui";
+import { onLook } from "@foundation/ui";
 import type { PanelMeta } from "../state/store";
 import { SERVER_NAME, api } from "../lib/api";
 import { desktopRefusal as refusalWords, olderServer } from "./machineWords";
@@ -298,9 +298,8 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
       }
     };
     window.addEventListener("message", onMsg);
-    const offNight = onNight(() => {
-      setTimeout(paint, 700);
-      setTimeout(paint, 1500);
+    const offNight = onLook(() => {
+      for (const ms of [0, 700, 1500]) setTimeout(paint, ms);
     });
     return () => {
       window.removeEventListener("message", onMsg);

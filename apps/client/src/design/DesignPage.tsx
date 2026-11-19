@@ -106,6 +106,7 @@ function TodayDemo() {
     </div>
   );
 }
+import { CardMenuDemo, ReleasePageDemo, ThemesDemo } from "./ThemeDemos";
 import { PlanBoard, ReleasesTab, type NewCardInput, type SyncState } from "../settings/SettingsPage";
 import type { ReleasePost } from "../settings/releases";
 import { syncSentence } from "../settings/plan";
@@ -156,18 +157,18 @@ const TYPE = [
 
 /** which of the page's sections make up each chapter of the design grid (protocol DESIGN_CHAPTERS), by title */
 export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
-  foundations: ["The mark", "Surfaces", "Ink & accents", "Type", "Shape"],
+  foundations: ["The mark", "Surfaces", "Ink & accents", "Themes", "Type", "Shape"],
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
   floor: ["The floor", "Chrome on call", "Server switch", "Desktop updates"],
-  cards: ["Using a card", "Adding files", "Text box", "Writing together"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Text box", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
   machines: ["Machines"],
   agents: ["The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
-  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Rune renderer"],
+  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Release page", "Rune renderer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
 const Only = createContext<Set<string> | null>(null);
@@ -242,6 +243,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           ))}
           <span className="design-note">Data uses --viz-1…8 in order.</span>
         </div>
+      </Section>
+
+      <Section title="Themes" note="The interface wears the theme of what is in focus (the shell sets data-theme on the root; packages/ui setTheme). Paper is the default and follows the orb. A grid may pin Always day or Always night for everyone on it (its ⓘ pane → Look). The room is Today: the floor's panes go clear and their ink goes white over the Shiba's room. An app opened as a tab is its own look inside its frame, with paper around it. Each is also a class (.f-paper, .f-day, .f-night, .f-room) for a surface that must wear one whatever is in focus. Anything that resolves tokens by hand (a terminal's colours) listens to onLook and reads them again.">
+        <ThemesDemo />
       </Section>
 
       <Section title="Type" note="Hanken Grotesk (OFL, bundled). Display prefers Lufga where licensed. Scale 11/12/13/14/16/20/24/32 — no half sizes.">
@@ -1164,6 +1169,14 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <div className="design-releases">
           <ReleasesTab posts={DEMO_POSTS} route="" />
         </div>
+      </Section>
+
+      <Section title="Release page" note="The Changes tool's first face, and what heads a post in Settings → Releases: a release drawn from its own post. A cover (the mark in pulse, the version in display 300/32, the date, THIS APP on the one running) on a wash of the accent and the agent tint over the panel well; the title in display 20/600; the post's opening paragraph as the description (mist 13/1.55); one bar cut in proportion to the post's parts in the data colours, with the counts (changes · fixes) in dim tabular 11; then each part as a tile on raised paper: its icon on a 14 % wash of its colour, its name 13/600, how many things it lists, and one sentence in mist 12. A tile opens the full notes at its part. On tokens only: white over the room on Today, ink on paper elsewhere.">
+        <ReleasePageDemo post={DEMO_POSTS[0]} />
+      </Section>
+
+      <Section title="A card's menu, pinned and minimized" note="Right-click any card: its name, then Frame it, Full screen and Minimize; Pin to the section or Unpin (a table), Let it fill the section or Show as a card (an app), Float or Dock; Inputs and outputs… (the right pane: every port with its type, what is on it now in full, and each card it is wired to); Open as a tab (an app); Copy a link; Remove in the bad colour, last. A viewer gets the ones that change nothing. A table's cells keep their own menu. Pinned, a table leaves the flow and spans its section on the section's own paper: no card under it, its rules only, at the section's exact width; the flow's cards lie over it. A section a person adds starts with one. Minimized, a card is its bar alone (40 tall), always showing, with ▢ to restore.">
+        <CardMenuDemo />
       </Section>
 
       <Section title="Rune renderer" note="A second engine beside the web renderer (Settings → Renderer; it's this device's choice, and the web renderer is the default). While Rune draws the board, a quiet glass pill in the bottom bar says so, beside the zoom: a green dot when it's drawing, a breathing blue one while it starts, amber and Rune off when it was asked for and couldn't run (the label says why, and a toast says it once). A press opens the list of where Rune stands. In Settings the two engines are raised cards, the chosen one ringed blue; under them, whether WebGPU and the build are here, then the ledger: each part of the board with one of four words. Never violet: which engine draws is a person's choice.">

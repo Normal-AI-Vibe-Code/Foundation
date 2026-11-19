@@ -10,6 +10,9 @@ export async function person(browser: Browser, name: string, email: string, boar
   if (!res.ok()) throw new Error(`dev login for ${email}: ${res.status()} ${await res.text()}`);
   // a clean floor: no side pane, no tabs, no search (what's remembered is per context anyway)
   await context.addInitScript(() => localStorage.setItem("foundation-floor", JSON.stringify({ pane: false, tabs: [], tab: null, search: false })));
+  // these specs were written when the wheel moved the paper: they keep that setting (Settings → General).
+  // The default, a wheel that zooms, has its own spec (wheel-zoom.spec.ts)
+  await context.addInitScript(() => localStorage.getItem("foundation-wheel") ?? localStorage.setItem("foundation-wheel", "pan"));
   const page = await context.newPage();
   await page.goto(`/?board=${encodeURIComponent(board)}`);
   await waitLive(page);

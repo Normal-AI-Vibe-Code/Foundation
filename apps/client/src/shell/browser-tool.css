@@ -1,0 +1,270 @@
+/*
+ * The Browser tool's real browser (BrowserTool.tsx): its tab strip, the loading line, the page, and what sits
+ * over the page (a question from the page, what an agent just did, who has the keys). The address row is the
+ * tools pane's own (.tool-addr in shell.css). Tokens only; nothing here transitions a colour.
+ */
+
+.btool {
+  position: relative;
+}
+
+/* ---- tabs: a 36 px strip over a hairline, each tab a pill as the pane's own tabs are */
+.btool-tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.btool-tabs > .f-dot {
+  margin-right: var(--space-3);
+}
+.btool-tab {
+  flex: 0 1 180px;
+  min-width: 72px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+  outline: 0;
+}
+.btool-tab:hover {
+  color: var(--color-frost);
+}
+.btool-tab:focus-visible {
+  box-shadow: 0 0 0 1px var(--color-line-strong);
+}
+.btool-tab.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+}
+.btool-tab.is-agent {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-agent) 50%, transparent);
+}
+.btool-tab-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btool-tab-x {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.btool-tab-x:hover {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+.btool-tab-new {
+  width: 26px;
+  height: 26px;
+}
+.btool-again {
+  margin-left: auto;
+}
+.btool-agents {
+  flex: none;
+}
+
+/* ---- the loading line: 2 px under the address row, a bar that runs while the page loads */
+.btool-load {
+  flex: none;
+  height: 2px;
+  overflow: hidden;
+}
+.btool-load.is-on::before {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+  animation: btool-run 1.1s var(--ease-move) infinite;
+}
+@keyframes btool-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btool-load.is-on::before {
+    width: 100%;
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ---- the page: pictures of it on a canvas that fills the pane */
+.btool-page {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-raise);
+  outline: 0;
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+.btool-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* who has the keys: a line round the page while it does, and how to get them back */
+.btool-page.has-keys::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--color-pulse);
+  pointer-events: none;
+}
+.btool-held {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  box-shadow: 0 0 0 1px var(--color-line);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+  pointer-events: none;
+  animation: btool-fade 4s var(--ease-out-soft) forwards;
+}
+@keyframes btool-fade {
+  0%,
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.btool-wait {
+  position: absolute;
+  top: var(--space-5);
+  left: var(--space-5);
+  margin: 0;
+}
+
+/* what an agent just did, along the page's foot */
+.btool-did {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  max-width: calc(100% - var(--space-6));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-panel);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px var(--color-line);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  pointer-events: none;
+  animation: btool-rise var(--dur-pane) var(--ease-out-soft);
+}
+.btool-did span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btool-did-mark {
+  flex: none;
+  color: var(--color-agent);
+  font-style: normal;
+}
+.btool-did b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+@keyframes btool-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* a question from the page (alert, confirm, prompt), or the browser having closed: a small sheet over the page */
+.btool-veil {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-6) var(--space-5);
+  background: color-mix(in srgb, var(--color-void) 55%, transparent);
+  cursor: default;
+}
+.btool-sheet {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-pane);
+  background: var(--color-panel);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+  user-select: text;
+  animation: btool-rise var(--dur-pane) var(--ease-out-soft);
+}
+.btool-sheet p {
+  margin: 0;
+  max-height: 40vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.btool-sheet-from {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+}
+.btool-sheet .tool-addr-field {
+  flex: none;
+}
+.btool-sheet-presses {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
