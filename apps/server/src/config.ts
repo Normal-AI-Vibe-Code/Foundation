@@ -81,7 +81,15 @@ export const config = {
   /** run agent turns through Claude Code on this machine (subscription) */
   claudeCli: env("FOUNDATION_CLAUDE_CLI", "claude"),
   slack: { token: env("SLACK_USER_TOKEN") || env("SLACK_BOT_TOKEN") },
-  github: { token: env("GITHUB_TOKEN"), org: env("FOUNDATION_GITHUB_ORG", "") },
+  github: {
+    token: env("GITHUB_TOKEN"),
+    org: env("FOUNDATION_GITHUB_ORG", ""),
+    /** the only GitHub owners (users or orgs) the repo tools read, comma-separated; unset: any (github.ts checkRepo) */
+    owners: env("FOUNDATION_GITHUB_OWNERS")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  },
   /** live company apps (connectors) */
   connectors: {
     factoryform: env("FACTORYFORM_URL", "http://127.0.0.1:3001"),

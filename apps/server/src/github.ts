@@ -76,23 +76,76 @@ const toInfo = (r: GhRepo): RepoInfo => ({
   private: r.private,
 });
 
+/** how an API path is fetched: tests put a stand-in here, to see exactly what would be asked of GitHub */
+export const githubTransport: { get: <T>(path: string) => Promise<T> } = { get: (path) => api(path) };
+
+// ---------- what a repository name may be ----------
+//
+// Every API path is built from a repository's owner and name. Unchecked, a "repo" like
+// `org/private/contents/.env?x=` turns a README read into a read of any file the token can see. So a repo is
+// exactly owner/name in GitHub's own characters, nothing more; a path inside one is split into checked,
+// encoded segments; and FOUNDATION_GITHUB_OWNERS, when set, names the only owners Foundation reads.
+
+const REPO = /^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/;
+
+/** a refusal in plain words, before anything is asked of GitHub */
+export class RepoRefused extends Error {}
+
+/** owner/name exactly as GitHub spells a repository, or null */
+function cleanRepo(s: string): string | null {
+  const r = s.trim().replace(/\.git$/, "");
+  return REPO.test(r) && !r.includes("..") ? r : null;
+}
+
+/** a repository named by owner/name or its github.com address, or null when it isn't one */
 export function parseRepo(input: string): string | null {
-  const m = /github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:[/#?]|$)/.exec(input) ?? /^([\w.-]+)\/([\w.-]+)$/.exec(input.trim());
-  return m ? `${m[1]}/${m[2]}` : null;
+  const m = /github\.com[/:]([\w.-]+)\/([\w.-]+?)(?:\.git)?(?:[/#?]|$)/.exec(input);
+  return cleanRepo(m ? `${m[1]}/${m[2]}` : input);
+}
+
+/** the owners Foundation reads (FOUNDATION_GITHUB_OWNERS), or null for any */
+const ownersAllowed = () => (config.github.owners.length ? config.github.owners : null);
+
+/** may Foundation read this owner's repositories (FOUNDATION_GITHUB_OWNERS; unset: any) */
+export function ownerAllowed(owner: string): boolean {
+  const list = ownersAllowed();
+  return !list || list.includes(owner.toLowerCase());
+}
+
+/** the repository as owner/name, or a plain refusal: not a repository's name, or an owner not on the list */
+export function checkRepo(input: string): string {
+  const repo = parseRepo(input);
+  if (!repo) throw new RepoRefused(`“${input.slice(0, 120)}” isn't a GitHub repository: write owner/name (letters, digits, . _ -) or its github.com address.`);
+  const owner = repo.split("/")[0];
+  if (!ownerAllowed(owner)) throw new RepoRefused(`Foundation reads GitHub repositories of ${ownersAllowed()!.join(", ")} only (FOUNDATION_GITHUB_OWNERS), not ${owner}'s.`);
+  return repo;
+}
+
+/** /repos/owner/name, each part encoded */
+function repoBase(input: string): string {
+  const [owner, name] = checkRepo(input).split("/");
+  return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+}
+
+/** the API path of a file inside a repository: each segment checked (no empty, . or ..) and encoded */
+export function contentsPath(repo: string, file: string): string {
+  const parts = file.split("/");
+  if (!file || parts.some((p) => p === "" || p === "." || p === "..")) throw new RepoRefused(`“${file.slice(0, 120)}” isn't a path inside a repository: name a file like docs/readme.md, without empty parts, . or ..`);
+  return `${repoBase(repo)}/contents/${parts.map(encodeURIComponent).join("/")}`;
 }
 
 export async function repoInfo(repo: string): Promise<RepoInfo> {
-  return toInfo(await api<GhRepo>(`/repos/${repo}`));
+  return toInfo(await githubTransport.get<GhRepo>(repoBase(repo)));
 }
 
 export async function repoReadme(repo: string): Promise<string> {
-  const r = await api<{ content: string; encoding: string }>(`/repos/${repo}/readme`);
+  const r = await githubTransport.get<{ content: string; encoding: string }>(`${repoBase(repo)}/readme`);
   return Buffer.from(r.content, r.encoding as BufferEncoding).toString("utf8");
 }
 
 export async function repoCommits(repo: string, n = 8) {
-  const rows = await api<Array<{ sha: string; html_url: string; commit: { message: string; author: { name: string; date: string } } }>>(
-    `/repos/${repo}/commits?per_page=${n}`,
+  const rows = await githubTransport.get<Array<{ sha: string; html_url: string; commit: { message: string; author: { name: string; date: string } } }>>(
+    `${repoBase(repo)}/commits?per_page=${Math.max(1, Math.min(100, Math.floor(n) || 8))}`,
   );
   return rows.map((c) => ({ sha: c.sha.slice(0, 7), url: c.html_url, message: c.commit.message.split("\n")[0], author: c.commit.author.name, date: c.commit.author.date }));
 }
@@ -104,11 +157,14 @@ export async function repoCommits(repo: string, n = 8) {
  * for "supply" should find our supply-chain repo, not strangers'.
  */
 export async function searchRepos(q: string, limit = 8): Promise<RepoInfo[]> {
+  const n = Math.max(1, Math.min(50, Math.floor(limit) || 8));
+  // only the owners Foundation reads (FOUNDATION_GITHUB_OWNERS), whatever GitHub answers
+  const ours = (r: RepoInfo) => ownerAllowed(r.fullName.split("/")[0] ?? "");
   if (config.github.org) {
-    const r = await api<{ items: GhRepo[] }>(`/search/repositories?q=${encodeURIComponent(q)}+org:${config.github.org}&per_page=${limit}`);
-    return r.items.map(toInfo);
+    const r = await githubTransport.get<{ items: GhRepo[] }>(`/search/repositories?q=${encodeURIComponent(q)}+org:${encodeURIComponent(config.github.org)}&per_page=${n}`);
+    return r.items.map(toInfo).filter(ours);
   }
-  return matchRepos(await myRepos(), q).slice(0, limit);
+  return matchRepos(await myRepos(), q).filter(ours).slice(0, n);
 }
 
 let mine: { at: number; repos: RepoInfo[] } | null = null;
@@ -119,7 +175,7 @@ async function myRepos(): Promise<RepoInfo[]> {
   if (mine && Date.now() - mine.at < MINE_TTL) return mine.repos;
   const repos: RepoInfo[] = [];
   for (let page = 1; page <= 3; page++) {
-    const rows = await api<GhRepo[]>(`/user/repos?per_page=100&page=${page}&sort=pushed&affiliation=owner,collaborator,organization_member`).catch(() => [] as GhRepo[]);
+    const rows = await githubTransport.get<GhRepo[]>(`/user/repos?per_page=100&page=${page}&sort=pushed&affiliation=owner,collaborator,organization_member`).catch(() => [] as GhRepo[]);
     repos.push(...rows.map(toInfo));
     if (rows.length < 100) break;
   }
@@ -145,7 +201,7 @@ export function matchRepos(repos: RepoInfo[], q: string): RepoInfo[] {
  */
 export async function discoverRepo(appUrl: string): Promise<RepoInfo | null> {
   const direct = parseRepo(appUrl);
-  if (direct) return repoInfo(direct).catch(() => null);
+  if (direct) return ownerAllowed(direct.split("/")[0]) ? repoInfo(direct).catch(() => null) : null;
   let host: string;
   try {
     host = new URL(appUrl).hostname;

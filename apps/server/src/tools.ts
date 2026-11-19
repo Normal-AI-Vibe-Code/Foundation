@@ -50,7 +50,7 @@ import { canSeeBoard } from "./members.ts";
 import type { UserInfo } from "@foundation/protocol";
 import { one } from "./db.ts";
 import { searchAll } from "./search.ts";
-import { discoverRepo, parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
+import { checkRepo, discoverRepo, parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { callAppTool, listAppTools } from "./apptools.ts";
 import { companySnapshot, readConnector } from "./connectors.ts";
 import { createAsk } from "./hermes.ts";
@@ -726,7 +726,8 @@ export const TOOLS: BoardTool[] = [
     schema: z.object({ app_url_or_name: z.string() }),
     run: async (_ctx, { app_url_or_name }) => {
       const direct = parseRepo(app_url_or_name);
-      if (direct) return repoInfo(direct);
+      // a repository by name: checked (an owner Foundation reads) before anything is asked of GitHub
+      if (direct) return repoInfo(checkRepo(direct));
       const viaUrl = /^https?:/.test(app_url_or_name) ? await discoverRepo(app_url_or_name) : null;
       if (viaUrl) return viaUrl;
       const { searchRepos } = await import("./github.ts");
@@ -738,7 +739,8 @@ export const TOOLS: BoardTool[] = [
     description: "Read a GitHub repo's README and recent commits — to understand an app before wiring or changing it.",
     schema: z.object({ repo: z.string() }),
     run: async (_ctx, { repo }) => {
-      const r = parseRepo(repo) ?? repo;
+      // exactly owner/name (or its github.com address), of an owner Foundation reads: refused before any request otherwise
+      const r = checkRepo(repo);
       const [readme, commits] = await Promise.all([repoReadme(r).catch(() => "(no README)"), repoCommits(r).catch(() => [])]);
       return { readme: readme.slice(0, 12_000), commits };
     },

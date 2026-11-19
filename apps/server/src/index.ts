@@ -18,7 +18,7 @@ import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, edi
 import { archiveFile, listFiles, reindexFilesIfNeeded, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
-import { parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
+import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, listJobs, startJob } from "./jobs.ts";
@@ -434,8 +434,12 @@ r.post("/api/apps/probe", async (req) => {
 });
 r.get("/api/repo", async (req) => {
   requireUser(req);
-  const repo = parseRepo(req.query.get("repo") ?? "");
-  if (!repo) throw new HttpError(400, "owner/name or a GitHub URL");
+  let repo: string;
+  try {
+    repo = checkRepo(req.query.get("repo") ?? "");
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
   const [info, readme, commits] = await Promise.all([repoInfo(repo), repoReadme(repo).catch(() => ""), repoCommits(repo).catch(() => [])]);
   return { info, readme: readme.slice(0, 40_000), commits };
 });
