@@ -116,6 +116,11 @@ export function clearSession(req: Req, res: ServerResponse) {
   res.setHeader("set-cookie", `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
+/** the request carries the sign-in cookie (whether or not its session is still live) */
+export function hasSessionCookie(req: { headers: { cookie?: string } }): boolean {
+  return Boolean(parseCookies(req.headers.cookie)[COOKIE]);
+}
+
 export function tokenFrom(req: Req): string | null {
   const auth = req.headers.authorization;
   if (auth?.startsWith("Bearer ")) return auth.slice(7);

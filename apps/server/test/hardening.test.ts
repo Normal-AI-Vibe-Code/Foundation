@@ -5,6 +5,9 @@
  * - Uploaded files can't run as the app: a file is shown in place only if it is a passive type (a picture,
  *   a video, a PDF, plain text, a 3D model); anything else (a page, an SVG, a script) comes back as a
  *   download of opaque bytes, and every file answer carries nosniff and a CSP sandbox.
+ * - Only our own pages use the session cookie: a change or a socket signed in by the cookie must come from
+ *   the client's page (or the desktop app's window, or FOUNDATION_CORS_ORIGINS); a bearer needs no Origin;
+ *   CORS names exactly those pages; and every request must name this server (DNS rebinding).
  * - Agents' leave to use a machine's desktop is set only by a person's press (the socket side, and the leave's
  *   server-only map, are in tickets.test.ts and machines-desktop.test.ts).
  */
@@ -13,9 +16,11 @@ import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { WebSocket } from "ws";
 
 const serverDir = resolve(import.meta.dirname, "..");
 const SERVICE = "h".repeat(40);
@@ -124,6 +129,92 @@ test("setup: a person and her agent's token", async () => {
   assert.equal(t.status, 200, t.text);
   agent = t.json.token;
   assert.ok(agent);
+});
+
+// ---------- 3. only our own pages use the session cookie; the server answers only to its own names ----------
+
+/** a raw request, for headers fetch won't let a test set (Host) */
+function rawRequest(method: string, path: string, headers: Record<string, string>, body?: string) {
+  return new Promise<{ status: number; text: string }>((done, fail) => {
+    const q = httpRequest({ host: "127.0.0.1", port, method, path, headers }, (res) => {
+      let text = "";
+      res.on("data", (d) => (text += d));
+      res.on("end", () => done({ status: res.statusCode ?? 0, text }));
+    });
+    q.on("error", fail);
+    q.end(body);
+  });
+}
+
+/** open a socket; its status if refused, 101 if it opened */
+function openSocket(path: string, headers: Record<string, string>, extra: { host?: string } = {}) {
+  return new Promise<number>((done) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}${path}`, { headers: { ...headers, ...(extra.host ? { host: extra.host } : {}) } });
+    ws.once("open", () => (ws.close(), done(101)));
+    ws.once("unexpected-response", (_q, res) => done(res.statusCode ?? 0));
+    ws.once("error", () => done(-1));
+  });
+}
+
+test("a cookie POST from another page on this computer is refused; the same from the client's page works", async () => {
+  const foreign = await call("POST", "/api/agent/token", { cookie: ada, origin: "http://localhost:9999" });
+  assert.equal(foreign.status, 403, foreign.text);
+  assert.match(foreign.json.error, /A page at http:\/\/localhost:9999 can't use your Foundation sign-in/);
+  for (const o of ["http://127.0.0.1:5173", "http://localhost:31441", "null", "https://evil.example"]) {
+    assert.equal((await call("POST", "/api/agent/token", { cookie: ada, origin: o })).status, 403, o);
+  }
+  assert.equal((await call("POST", "/api/agent/token", { cookie: ada, origin: CLIENT })).status, 200);
+  // the desktop app's own window, by its fixed origin
+  assert.equal((await call("POST", "/api/agent/token", { cookie: ada, origin: "http://localhost:31440" })).status, 200);
+  // no Origin: only if the browser says the request is its own page's (or typed in)
+  const silent = await call("POST", "/api/agent/token", { cookie: ada, origin: null });
+  assert.equal(silent.status, 403);
+  assert.match(silent.json.error, /didn't say which page it came from/);
+  assert.equal((await call("POST", "/api/agent/token", { cookie: ada, origin: null, headers: { "sec-fetch-site": "cross-site" } })).status, 403);
+  assert.equal((await call("POST", "/api/agent/token", { cookie: ada, origin: null, headers: { "sec-fetch-site": "same-site" } })).status, 403);
+  assert.equal((await call("POST", "/api/agent/token", { cookie: ada, origin: null, headers: { "sec-fetch-site": "same-origin" } })).status, 200);
+  // a read with the cookie is not a change: no Origin needed
+  assert.equal((await call("GET", "/api/me", { cookie: ada, origin: null })).json.user?.email, "ada@example.test");
+});
+
+test("CORS answers exactly our own pages, not any localhost port", async () => {
+  const pre = (origin: string) => fetch(`${base}/api/me`, { method: "OPTIONS", headers: { origin, "access-control-request-method": "POST" } });
+  assert.equal((await pre(CLIENT)).headers.get("access-control-allow-origin"), CLIENT);
+  assert.equal((await pre("tauri://localhost")).headers.get("access-control-allow-origin"), "tauri://localhost");
+  for (const o of ["http://localhost:9999", "http://127.0.0.1:1430", "http://localhost:4410", "https://evil.example"]) {
+    assert.equal((await pre(o)).headers.get("access-control-allow-origin"), null, o);
+  }
+});
+
+test("a bearer needs no Origin (agents, MCP, the service token)", async () => {
+  const r = await call("POST", "/api/boards/company/tools/read_board", { bearer: agent, body: {} });
+  assert.equal(r.status, 200, r.text);
+  assert.equal((await call("POST", "/api/boards/company/tools/read_board", { bearer: SERVICE, body: {} })).status, 200);
+  // a bearer beside a cookie is the bearer's request, from wherever
+  assert.equal((await call("POST", "/api/boards/company/tools/read_board", { bearer: agent, cookie: ada, origin: "http://localhost:9999", body: {} })).status, 200);
+});
+
+test("a request that doesn't name this server (DNS rebinding) is refused, dev sign-in included", async () => {
+  for (const host of ["evil.example", `evil.example:${port}`, "localhost:9999", `127.0.0.2:${port}`, `localhost.evil.example:${port}`]) {
+    const r = await rawRequest("GET", "/api/health", { host });
+    assert.equal(r.status, 421, host);
+    assert.match(r.text, /doesn't answer to/);
+  }
+  const dev = await rawRequest("POST", "/auth/dev", { host: `evil.example:${port}`, "content-type": "application/json" }, JSON.stringify({ email: "boss@example.test", name: "x", bearer: true }));
+  assert.equal(dev.status, 421, dev.text);
+  assert.doesNotMatch(dev.text, /session/);
+  // its own names: loopback on its port (or the client's), and the hosts of its public and client addresses
+  for (const host of [`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`, "localhost:1430"]) assert.equal((await rawRequest("GET", "/api/health", { host })).status, 200, host);
+  assert.equal(await openSocket("/sync/company", { authorization: `Bearer ${agent}` }, { host: `evil.example:${port}` }), 421);
+});
+
+test("a socket opened with the cookie from another page is refused; from the client's page it opens", async () => {
+  assert.equal(await openSocket("/sync/company", { cookie: ada, origin: "http://localhost:9999" }), 403);
+  assert.equal(await openSocket("/machines/company/pnl_x/tty", { cookie: ada, origin: "http://localhost:9999" }), 403);
+  assert.equal(await openSocket("/sync/company", { cookie: ada }), 403, "no Origin, no Sec-Fetch-Site");
+  assert.equal(await openSocket("/sync/company", { cookie: ada, origin: CLIENT }), 101);
+  // a bearer on the socket needs no Origin
+  assert.equal(await openSocket("/sync/company", { authorization: `Bearer ${agent}` }), 101);
 });
 
 // ---------- 2. agents' leave to use a desktop: only a person's press ----------

@@ -38,6 +38,7 @@ import { attachTerminal } from "./machines.ts";
 import { attachDesktop } from "./machinedesktop.ts";
 import { canSeeBoard } from "./members.ts";
 import { canWrite } from "./roles.ts";
+import { cookieOriginRefusal } from "./origins.ts";
 
 export const TICKET_TTL_MS = 30_000;
 /** tests move the clock */
@@ -139,6 +140,12 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => attachHostTerminal(ht[1], ws, who));
+    return;
+  }
+  // a socket signed in by the cookie is opened by one of our own pages (cross-site WebSocket hijacking: origins.ts)
+  if (cookieOriginRefusal(req, { upgrade: true, ticket: url.searchParams.has("ticket") })) {
+    socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+    socket.destroy();
     return;
   }
   const who = socketWho(req, url);

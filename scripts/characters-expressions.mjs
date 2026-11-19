@@ -44,7 +44,8 @@ if (!session) stop("Set FOUNDATION_SESSION to your `foundation_session` cookie f
 async function call(path, body) {
   const res = await fetch(`${base}${path}`, {
     method: body ? "POST" : "GET",
-    headers: { cookie: `foundation_session=${session}`, ...(body ? { "content-type": "application/json" } : {}) },
+    // sent by you, from no web page: a press signed in by the cookie must say where it comes from (origins.ts)
+    headers: { cookie: `foundation_session=${session}`, "sec-fetch-site": "none", ...(body ? { "content-type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(180_000),
   });

@@ -63,6 +63,7 @@ import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, rest
 import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
 import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
+import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
 import { gridOutline } from "./subgrids.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
@@ -1057,18 +1058,17 @@ function gateWrites(req: Req, path: string) {
 
 // ---------- server ----------
 
-function corsAllowed(origin: string) {
-  return origin === config.clientUrl || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || origin === "tauri://localhost" || config.corsOrigins.includes(origin);
-}
-
 const server = createServer(async (rawReq, res: ServerResponse) => {
   const req = rawReq as Req;
   const url = new URL(req.url ?? "/", "http://local");
   req.query = url.searchParams;
-  // the client on its own port (dev), the desktop app's page (http://localhost:31440, tauri://localhost) and
-  // FOUNDATION_CORS_ORIGINS. The app on a hosted server sends a bearer (Authorization), so preflights are kept 10 minutes
+  // a request must name this server (DNS rebinding: origins.ts), whatever it is for, /auth/dev included
+  const misnamed = hostRefusal(req);
+  if (misnamed) return json(res, { error: misnamed }, 421);
+  // exactly the client (FOUNDATION_CLIENT_URL), the desktop app's window (http://localhost:31440, tauri://localhost)
+  // and FOUNDATION_CORS_ORIGINS. The app on a hosted server sends a bearer (Authorization), so preflights are kept 10 minutes
   const origin = req.headers.origin;
-  if (origin && corsAllowed(origin)) {
+  if (origin && originAllowed(origin)) {
     res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("access-control-allow-headers", "content-type, authorization, range, mcp-session-id, mcp-protocol-version");
@@ -1081,6 +1081,9 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     return res.end();
   }
   try {
+    // a change signed in by the cookie comes from one of our own pages (cross-site request forgery: origins.ts)
+    const forged = cookieOriginRefusal(req);
+    if (forged) throw new HttpError(403, forged);
     if (url.pathname === "/mcp") {
       const user = userFromRequest(req);
       if (!user) throw new HttpError(401, "MCP needs a bearer token (POST /api/agent/token)");
@@ -1103,7 +1106,15 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 * 1024 });
 // every socket (sync, huddles, a machine's terminal) and how it proves who opens it: sockets.ts
-server.on("upgrade", (req, socket, head) => handleUpgrade(wss, req, socket, head));
+server.on("upgrade", (req, socket, head) => {
+  // a socket must name this server too (DNS rebinding: origins.ts); whose page opens it is checked in handleUpgrade
+  if (hostRefusal(req)) {
+    socket.write("HTTP/1.1 421 Misdirected Request\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+  handleUpgrade(wss, req, socket, head);
+});
 
 reindexFilesIfNeeded();
 watchFactoryForm();

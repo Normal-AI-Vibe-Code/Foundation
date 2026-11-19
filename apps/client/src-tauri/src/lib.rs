@@ -8,7 +8,8 @@
 //! on Windows, tauri://localhost on macOS). Cookies are matched by host, not port,
 //! so a Foundation server on http://localhost:4410 is the same site: its
 //! SameSite=Lax session cookie, the sync WebSocket and SSE all reach it, and its
-//! CORS already admits http://localhost:<port>. The bundled client still opens when
+//! CORS admits this window's fixed origin by name (apps/server/src/origins.ts; not
+//! any other localhost port). The bundled client still opens when
 //! the server is down, so the device's board copies keep working offline.
 
 mod local_server;

@@ -30,12 +30,21 @@ export const config = {
   host: env("FOUNDATION_HOST", "127.0.0.1"),
   publicUrl: env("FOUNDATION_PUBLIC_URL", `http://localhost:${port}`),
   clientUrl: env("FOUNDATION_CLIENT_URL", "http://localhost:1430"),
-  /** more page origins that may call this server with credentials (comma-separated), beyond the client, localhost and the desktop app */
   /** the oldest client this server still works with (x.y.z; unset: any). Older ones get no board socket and are told to update (clientversion.ts) */
   minClient: env("FOUNDATION_MIN_CLIENT").trim(),
+  /** more page origins that may call this server with credentials (comma-separated, exact), beyond the client and the desktop app's window (origins.ts) */
   corsOrigins: env("FOUNDATION_CORS_ORIGINS")
     .split(",")
     .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean),
+  /**
+   * more names this server answers to (comma-separated Host values, exact: "foundation.example.com" or
+   * "192.168.1.20:4410"), beyond localhost/127.0.0.1/[::1] on its own or the client's port and the hosts of
+   * FOUNDATION_PUBLIC_URL and FOUNDATION_CLIENT_URL. Anything else is refused (DNS rebinding; origins.ts)
+   */
+  hosts: env("FOUNDATION_HOSTS")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
   dataDir: resolve(root, env("FOUNDATION_DATA_DIR", "data")),
   /** where third-party programs Foundation starts get folders of their own (childenv.ts workFolder): beside the data folder, never in it (ADR-001 G13) */

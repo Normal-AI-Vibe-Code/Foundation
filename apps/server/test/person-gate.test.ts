@@ -88,7 +88,8 @@ after(() => {
 
 async function call(s: Server, method: string, path: string, opts: { cookie?: string; bearer?: string; body?: unknown; headers?: Record<string, string> } = {}) {
   const headers: Record<string, string> = { ...(opts.headers ?? {}) };
-  if (opts.cookie) headers.cookie = opts.cookie;
+  // a person's browser sends its cookie from the client's page, and says so (origins.ts)
+  if (opts.cookie) Object.assign(headers, { cookie: opts.cookie, origin: "http://localhost:1430" }, opts.headers ?? {});
   if (opts.bearer) headers.authorization = `Bearer ${opts.bearer}`;
   if (opts.body !== undefined) headers["content-type"] = "application/json";
   const res = await fetch(`${s.base}${path}`, { method, headers, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) });

@@ -36,6 +36,9 @@ export default defineConfig({
     deviceScaleFactor: 1,
     colorScheme: "dark",
     actionTimeout: 10_000,
+    // the checks' own calls (context.request) sign in by cookie like the page does, and say they come from the
+    // client's page as the browser would: the server refuses a cookie change from any other page (origins.ts)
+    extraHTTPHeaders: { origin: CLIENT },
   },
   webServer: [
     {
