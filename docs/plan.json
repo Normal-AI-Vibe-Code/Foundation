@@ -2009,7 +2009,7 @@
       "milestone": "apps",
       "area": "security",
       "status": "review",
-      "body": "Things only a person may start are refused to an agent's token everywhere, with a test for each. Slice 1 of ADR-001 (docs/decisions/ADR-001-working-together.md). Built on branch adr-001/slice-1-person-gate (local, not pushed); waits for Josh to merge."
+      "body": "Things only a person may start are refused to an agent's token everywhere, with a test for each; programs Foundation starts get no keys, a pinned REA and a folder outside data/. Slice 1 of ADR-001 (docs/decisions/ADR-001-working-together.md). Merged to main 2026-11-18. In Review until a person runs one real agent turn from the page, which checks that Claude Code still finds its login."
     },
     {
       "id": "wt-tool-doors",
