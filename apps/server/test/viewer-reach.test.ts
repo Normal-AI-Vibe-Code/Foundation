@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { createServer } from "node:net";
+import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -37,6 +38,28 @@ let base = "";
 let home = "";
 let said = "";
 
+/** a stand-in Slack (SLACK_API_BASE) for the channel-reading route: two channels the bot can see */
+let slack: HttpServer;
+let slackBase = "";
+const slackReads: string[] = [];
+before(async () => {
+  slack = createHttpServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://x");
+    const send = (o: unknown) => res.end(JSON.stringify(o));
+    const channel = url.searchParams.get("channel") ?? "";
+    if (url.pathname === "/conversations.info") return send({ ok: true, channel: { id: channel, name: channel.toLowerCase(), is_private: false, is_member: true } });
+    if (url.pathname === "/conversations.history") {
+      slackReads.push(channel);
+      return send({ ok: true, messages: [{ ts: "1793000001.000100", user: "UKAI", text: `in ${channel}` }] });
+    }
+    if (url.pathname === "/users.info") return send({ ok: true, user: { name: "kai", profile: { display_name: "Kai" } } });
+    send({ ok: false, error: "unknown_method" });
+  });
+  await new Promise<void>((ok) => slack.listen(0, "127.0.0.1", ok));
+  slackBase = `http://127.0.0.1:${(slack.address() as { port: number }).port}`;
+});
+after(() => slack?.close());
+
 before(async () => {
   home = mkdtempSync(join(tmpdir(), "foundation-viewer-reach-"));
   const port = await freePort();
@@ -56,6 +79,8 @@ before(async () => {
     FOUNDATION_ALLOWLIST: "@example.test",
     FOUNDATION_ADMIN_EMAILS: "boss@example.test",
     FOUNDATION_SERVICE_TOKEN: SERVICE,
+    SLACK_API_BASE: slackBase,
+    SLACK_BOT_TOKEN: "xoxb-standin",
   });
   child = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], { cwd: serverDir, env, stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
   child.stdout!.on("data", (d) => (said += d));
@@ -224,4 +249,26 @@ test("a viewer's agent token is refused every route that needs a person", async 
     if (r.status !== 403) wrong.push(`${method} ${path}: ${r.status} ${r.text.slice(0, 160)}`);
   }
   assert.deepEqual(wrong, [], "every person-only route refused");
+});
+
+// ---------- reading a Slack channel is tied to the board that has it ----------
+
+test("a Slack channel is read for a board that has it on a card, and no other channel the bot can see", async () => {
+  // no board named: refused, and Slack isn't asked
+  assert.equal((await call("GET", "/api/slack/channels/C0SECRET", { cookie: boss })).status, 400);
+  // a channel the company board doesn't have: refused, even to an admin
+  const no = await call("GET", "/api/slack/channels/C0SECRET?board=company", { cookie: boss });
+  assert.equal(no.status, 404, no.text);
+  assert.match(no.json.error, /isn't on this board/);
+  assert.deepEqual(slackReads, [], "Slack wasn't read");
+  // a person puts #design on the board: it reads, for anyone who sees the board (a viewer too)
+  const added = await call("POST", "/api/boards/company/tools/add_slack_channel", { cookie: boss, body: { channel: "C0DESIGN1" } });
+  assert.equal(added.status, 200, added.text);
+  const yes = await call("GET", "/api/slack/channels/C0DESIGN1?board=company", { cookie: vic });
+  assert.equal(yes.status, 200, yes.text);
+  assert.match(yes.text, /in C0DESIGN1/);
+  // and still not the other one, nor #design read for a board that doesn't have it
+  assert.equal((await call("GET", "/api/slack/channels/C0SECRET?board=company", { cookie: vic })).status, 404);
+  assert.equal((await call("GET", "/api/slack/channels/C0DESIGN1?board=elsewhere", { cookie: boss })).status, 404);
+  assert.deepEqual(slackReads, ["C0DESIGN1"]);
 });

@@ -114,7 +114,8 @@ function Channel({ panel, live }: { panel: PanelMeta; live: boolean }) {
   const list = useRef<HTMLDivElement>(null);
 
   const load = (fresh = false) =>
-    api<{ messages: SlackMessage[] }>(`/api/slack/channels/${panel.channel}${fresh ? "?fresh=1" : ""}`)
+    // read for this board: the server reads only channels the board has on it
+    api<{ messages: SlackMessage[] }>(`/api/slack/channels/${panel.channel}?board=${encodeURIComponent(boardId)}${fresh ? "&fresh=1" : ""}`)
       .then((r) => {
         setMsgs(r.messages);
         setError("");

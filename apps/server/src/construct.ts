@@ -17,6 +17,7 @@ import { all, one } from "./db.ts";
 import { editBoard } from "./boards.ts";
 import { canSeeFile, storeFile, type FileRow } from "./files.ts";
 import { searchLocal } from "./search.ts";
+import { SLACK_SEARCH_NOT_YOURS, slackUserTokenFor } from "./slackuser.ts";
 
 // ---------- finding ----------
 
@@ -70,10 +71,16 @@ async function slackGet<T>(method: string, params: Record<string, string>, token
   return body;
 }
 
-/** images in Slack about the query: search.files with the user token, else the bot's files.list filtered by name */
-async function slackImages(query: string, limit: number): Promise<{ found: Found[]; note?: string }> {
-  const { user, bot } = slackTokens();
+/**
+ * images in Slack about the query: search.files with the user token when the search is its owner's (slackuser.ts),
+ * else the bot's files.list filtered by name. `viewer`: who the search is for.
+ */
+async function slackImages(query: string, limit: number, viewer: string): Promise<{ found: Found[]; note?: string }> {
+  const tokens = slackTokens();
+  const bot = tokens.bot;
+  const user = tokens.user ? ((await slackUserTokenFor(viewer)) ?? "") : "";
   if (!user && !bot) {
+    if (tokens.user) return { found: [], note: SLACK_SEARCH_NOT_YOURS };
     return { found: [], note: "Slack isn't connected, so Slack wasn't searched. Set SLACK_USER_TOKEN (search:read) to search Slack's files, or SLACK_BOT_TOKEN with files:read (SPEC §6)." };
   }
   const toFound = (f: SlackFile): Found => ({
@@ -109,7 +116,9 @@ async function slackImages(query: string, limit: number): Promise<{ found: Found
       .sort((a, b) => b.n - a.n);
     return {
       found: scored.slice(0, limit).map((x) => toFound(x.f)),
-      note: "Searched Slack by file names and comments (the bot token can't full-text search; set SLACK_USER_TOKEN for that).",
+      note: tokens.user
+        ? `Searched Slack by file names and comments, with what the bot can see. ${SLACK_SEARCH_NOT_YOURS}`
+        : "Searched Slack by file names and comments (the bot token can't full-text search; set SLACK_USER_TOKEN for that).",
     };
   } catch (e) {
     return { found: [], note: `Slack: ${(e as Error).message}` };
@@ -150,7 +159,7 @@ export async function findImages(doc: Y.Doc, boardId: string, query: string, vie
   if (sources.includes("board")) found.push(...boardImages(doc, query));
   if (sources.includes("files")) found.push(...archiveImages(query, boardId, limit, viewer));
   if (sources.includes("slack")) {
-    const s = await slackImages(query, limit);
+    const s = await slackImages(query, limit, viewer);
     found.push(...s.found);
     if (s.note) notes.push(s.note);
   }
@@ -175,9 +184,10 @@ async function fileFor(ref: string, boardId: string, userId: string): Promise<{ 
     return file ? { file } : null;
   }
   if (ref.startsWith("slack:")) {
+    // the bot's token, or the user token only when this ask is its owner's (slackuser.ts)
     const { user, bot } = slackTokens();
-    const token = bot || user;
-    if (!token) throw new Error("Slack isn't connected (SLACK_BOT_TOKEN with files:read)");
+    const token = bot || (user ? await slackUserTokenFor(userId) : null);
+    if (!token) throw new Error(user ? SLACK_SEARCH_NOT_YOURS : "Slack isn't connected (SLACK_BOT_TOKEN with files:read)");
     const { file: f } = await slackGet<{ file: SlackFile }>("files.info", { file: ref.slice(6) }, token);
     const url = f.url_private_download ?? f.url_private;
     if (!url || !IMAGE.test(f.mimetype ?? "")) return null;

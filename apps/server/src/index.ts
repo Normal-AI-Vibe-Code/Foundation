@@ -55,7 +55,7 @@ import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { answerAppToolAsk } from "./apptools.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
-import { buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
+import { boardHasChannel, buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
 import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, bringInStarter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter, setApproval } from "./characters.ts";
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
@@ -551,8 +551,13 @@ r.get("/api/slack/channels", (req) => {
   requireUser(req);
   return slackDo(async () => ({ channels: await listChannels() }));
 });
+// a channel is read for a board that has it (a Slack card, or the Slack board's section): not any channel the bot sees
 r.get("/api/slack/channels/:id", (req) => {
-  requireUser(req);
+  const u = requireUser(req);
+  const board = req.query.get("board") ?? "";
+  if (!board) throw new HttpError(400, "which board is this channel on? (?board=)");
+  requireBoard(u, board);
+  if (!listBoards().some((b) => b.id === board) || !boardHasChannel(board, req.params.id)) throw new HttpError(404, "That Slack channel isn't on this board. Put it on the board (a Slack card) to read it here.");
   return slackDo(async () => ({ channel: await channelInfo(req.params.id), messages: await channelHistory(req.params.id, 40, req.query.get("fresh") === "1") }));
 });
 // posting, sharing, inviting and handing over huddle notes go out under the person's name ("<name> via

@@ -9,8 +9,9 @@
  * Reads are polled while a card is on screen and cached here for a few
  * seconds, so ten people looking at one channel cost one Slack call.
  *
- * Search keeps using the user token (search:read) in search.ts; this module
- * never needs it. SLACK_API_BASE points the client at a stand-in (tests).
+ * Search uses the user token (search:read) in search.ts, only for its owner's
+ * own asks (slackuser.ts); this module never needs it. Reading a channel by
+ * id is tied to a board that has it (slacklive.ts boardHasChannel). SLACK_API_BASE points the client at a stand-in (tests).
  */
 
 import { config } from "./config.ts";

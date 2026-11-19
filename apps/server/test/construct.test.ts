@@ -25,6 +25,9 @@ before(async () => {
   slack = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
     if (req.headers.authorization !== "Bearer xoxp-test" && req.headers.authorization !== "Bearer xoxb-test") return res.writeHead(401).end();
+    // the user token is the test person's own Slack (slackuser.ts asks whose it is), so their search may use it
+    if (url.pathname === "/auth.test") return res.end(JSON.stringify(req.headers.authorization === "Bearer xoxp-test" ? { ok: true, user_id: "UTESTER" } : { ok: true, user_id: "UBOT" }));
+    if (url.pathname === "/users.info") return res.end(JSON.stringify(url.searchParams.get("user") === "UTESTER" ? { ok: true, user: { profile: { email: "u@formindustries.com" } } } : { ok: false, error: "user_not_found" }));
     const meta = (f: (typeof FILES)[number]) => ({ id: f.id, name: f.name, title: f.title, mimetype: "image/png", timestamp: f.ts, username: "noa", channels: ["airform-pthp"], permalink: `https://slack.example/${f.id}`, url_private_download: `${base}/download/${f.id}` });
     if (url.pathname === "/search.files") {
       const q = (url.searchParams.get("query") ?? "").toLowerCase();

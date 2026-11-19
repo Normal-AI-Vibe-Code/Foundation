@@ -61,6 +61,7 @@ import { attachToStage, chooseArtifact, completeStage, describePipeline, setChec
 import { stageDef } from "@foundation/protocol";
 import { huddleArchive, transcriptText } from "./huddles.ts";
 import { channelHistory, channelInfo, listChannels } from "./slack.ts";
+import { boardHasChannel } from "./slacklive.ts";
 import { describeMachines, proposeMachine, validImage } from "./machines.ts";
 import { askToRun, findMachineCard } from "./machineasks.ts";
 import { useDesktop, type DesktopAction, type DesktopResult } from "./machinedesktop.ts";
@@ -313,8 +314,10 @@ export const TOOLS: BoardTool[] = [
     description: "Search everything Foundation can see: board cards, uploaded files (full text and CAD headers), Slack, GitHub repos and registered apps.",
     schema: z.object({ query: z.string() }),
     run: async (ctx, { query }) => {
-      const { hits } = await searchAll(query, { boardId: ctx.boardId });
-      return hits.slice(0, 15).map((h) => `[${h.source}] ${h.title}${h.objectId ? ` (card ${h.objectId})` : ""}${h.url ? ` ${h.url}` : ""} — ${h.snippet}`).join("\n") || "no results";
+      // Slack is searched as the person this agent acts for, and only if the user token is theirs (slackuser.ts)
+      const { hits, notes } = await searchAll(query, { boardId: ctx.boardId, slackAs: ctx.userId });
+      const found = hits.slice(0, 15).map((h) => `[${h.source}] ${h.title}${h.objectId ? ` (card ${h.objectId})` : ""}${h.url ? ` ${h.url}` : ""} — ${h.snippet}`).join("\n") || "no results";
+      return notes.length ? `${found}\n\n${notes.join("\n")}` : found;
     },
   }),
   def({
@@ -1235,7 +1238,9 @@ export const TOOLS: BoardTool[] = [
     name: "slack_read",
     description: "Read a Slack channel's recent messages (oldest first). Agents read Slack; posting is left to people on the card.",
     schema: z.object({ channel: z.string().describe("channel id (a slack card's channel)"), limit: z.number().int().min(1).max(100).optional() }),
-    run: async (_ctx, i) => {
+    run: async (ctx, i) => {
+      // only a channel this board has taken in (a Slack card, or the Slack board's section): not any the bot can see
+      if (!boardHasChannel(ctx.boardId, i.channel)) throw new HttpError(403, `Slack channel ${i.channel} isn't on this board. Put it on the board (add_slack_channel) to read it here.`);
       const msgs = await channelHistory(i.channel, i.limit ?? 30);
       return msgs.map((m) => `[${new Date(m.at).toISOString().slice(0, 16).replace("T", " ")}] ${m.name}: ${m.text}`).join("\n") || "(no messages)";
     },
