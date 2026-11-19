@@ -211,3 +211,82 @@ test("the repository passes every rule", { todo: "rea-agents is fetched unpinned
   const { problems } = applyAllow(scanTracked(), readAllow());
   assert.deepEqual(problems.map((p: { sentence: string }) => p.sentence), []);
 });
+
+test("child processes: every way to reach child_process, the runtime's bindings, worker threads and cluster is caught outside the one door", async () => {
+  const { findChildProcess: find } = await import("../../../scripts/check-security.mjs" as string);
+  const cp = j("child", "_process");
+  const lines = [
+    `const cp = require("${cp}");`,
+    `const cp = require('node:${cp}');`,
+    `const cp = await import("node:${cp}");`,
+    `const cp = await import(\`node:${cp}\`);`,
+    `const cp = createRequire(import.meta.url)("${cp}");`,
+    `import { spawn } from "node:${cp}";`,
+    j("const b = process.bind", "ing('spawn_sync');"),
+    j("const b = process['bind", "ing']('spawn_sync');"),
+    j('import { Worker } from "node:worker', '_threads";'),
+    j('const { Worker } = require("worker', '_threads");'),
+    j('import cluster from "node:clus', 'ter";'),
+    j('const c = await import("clus', 'ter");'),
+  ];
+  for (const l of lines) {
+    assert.equal(find("apps/server/src/new.ts", l).length, 1, l);
+    assert.equal(find("apps/server/src/child.ts", l).length, 0, `the one door may: ${l}`);
+  }
+  // look-alikes are not
+  for (const l of ["const childProcess = 1;", "// child processes go through child.ts", "const binding = x.binding;", "import { a } from './worker.ts';"]) assert.equal(find("apps/server/src/new.ts", l).length, 0, l);
+});
+
+test("the allowlist can name a line's exact text: it waives that line only, never a new, different line with the same match", () => {
+  const at = (line: number, text: string) => ({ rule: "child-process", file: "apps/server/src/rea.ts", line, match: j("env: process", ".env"), text, sentence: `rea.ts:${line}: …` });
+  const entry = { rule: "child-process", file: "apps/server/src/rea.ts", match: j("env: process", ".env"), line: j("env: process", ".env,"), why: "describes this computer" };
+  const known = at(47, j("env: process", ".env,"));
+  const added = at(90, j("spawn(cmd, args, { env: process", ".env });"));
+  const r = applyAllow([known, added], [entry]);
+  assert.equal(r.waived, 1);
+  assert.deepEqual(r.problems.map((p: { line: number }) => p.line), [90], "the new line is a finding");
+  // without `line`, an entry waives by file and match (as before)
+  const loose = applyAllow([known, added], [{ ...entry, line: undefined }]);
+  assert.equal(loose.waived, 2);
+  // the repository's own child-process waivers each name their line
+  for (const e of readAllow().filter((e: { rule: string }) => e.rule === "child-process")) assert.equal(typeof e.line, "string", `${e.file}: an entry names its line`);
+});
+
+test("open-gap-words: an open item in a public doc names no route, tool or function, or environment variable", async () => {
+  const { findOpenGapWords: find } = await import("../../../scripts/check-security.mjs" as string);
+  const route = j("/api/", "widgets/paint");
+  const env = j("FOUNDATION_", "WIDGET_MODE");
+  // on the same line as the words
+  assert.equal(find(`- Still open: ${route} paints in any colour.`).length, 1);
+  assert.equal(find(`- Not yet: \`paint_widget\` picks its own colour.`).length, 1);
+  assert.equal(find(`- The gate stays open while ${env} is on.`).length, 1);
+  assert.equal(find(`Open: \`paintWidget\` ignores the palette.`).length, 1);
+  assert.equal(find(`- not yet checked: ${j("/m", "cp")} lists the widgets`).length, 1);
+  // under a heading that says so, to the next heading of its level; sub-headings stay under it
+  const doc = ["## Still open", "", `- ${route} keeps the old palette`, "### Detail", `- \`mix_paint\` mixes twice`, "## Done", `- ${route} uses the palette`].join("\n");
+  assert.deepEqual(find(doc).map((h: { line: number }) => h.line), [3, 5]);
+  // under a bullet that says so: its continuation and sub-bullets, not its next sibling
+  const list = ["- Still open, in two parts:", `  - ${env} on a shared screen`, "  continued with `pickColour()`", `- Closed: ${route} uses the palette`].join("\n");
+  assert.deepEqual(find(list).map((h: { line: number }) => h.line), [2, 3]);
+  // general terms pass; so do the same names where nothing is said to be open
+  assert.equal(find("- Still open: some widgets have more colours than intended; tracked privately.").length, 0);
+  assert.equal(find(`- Built: ${route} uses the palette, and \`paintWidget\` checks it.`).length, 0);
+  assert.equal(find("- Not yet: `npm run check` on every push.").length, 0, "a command is not a tool name");
+  // fenced code is not a heading
+  assert.equal(find(["```", "## Still open", "```", `- ${route}`].join("\n")).length, 0);
+});
+
+test("npm run check checks the commits about to be pushed (with --diff origin/main), and says so when it can't", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { spawnSync } = await import("node:child_process");
+  const root = new URL("../../../", import.meta.url);
+  const pkg = JSON.parse(readFileSync(new URL("package.json", root), "utf8"));
+  assert.match(pkg.scripts.check, /check:security -- --diff origin\/main --tree-if-no-ref/);
+  // a ref that isn't here: a warning that only the tree was checked, and no "not a commit" problem
+  const r = spawnSync(process.execPath, ["scripts/check-security.mjs", "--diff", "no-such-ref-here", "--tree-if-no-ref"], { cwd: root, encoding: "utf8" });
+  assert.match(r.stderr, /no-such-ref-here is not a commit here .*checked the tracked tree only, NOT the commits that would be pushed/);
+  assert.doesNotMatch(r.stdout, /is not a commit here; fetch it/);
+  const { refExists } = await import("../../../scripts/check-security.mjs" as string);
+  assert.equal(refExists("no-such-ref-here"), false);
+  assert.equal(refExists("HEAD"), true);
+});

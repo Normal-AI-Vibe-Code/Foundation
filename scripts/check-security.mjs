@@ -7,6 +7,9 @@
  *                                                  each unpushed commit, its message, the working tree
  *                                                  and untracked files, so a secret added and removed
  *                                                  again in unpushed history is still caught
+ *   … --diff [ref] --tree-if-no-ref                as --diff, but where ref doesn't exist here (no remote
+ *                                                  yet, or not fetched) it warns and checks the tree only
+ *                                                  (`npm run check` runs it this way)
  *
  * Rules (each finding names its rule; scripts/check-security.allow.json can
  * waive one exact finding, with a reason):
@@ -14,13 +17,19 @@
  *   secret-file    a .env file, a private key or data/secret.key tracked by git
  *   unpinned       runtime code fetched without an exact version (the latest tag, npx/uvx/pip
  *                  without a pin, curl piped to a shell, docker images with no tag)
- *   child-process  server code that starts processes outside the allowed files, or hands a
- *                  child the server's whole environment
+ *   child-process  server code that starts processes outside the allowed files (child_process by
+ *                  import, require, dynamic import or createRequire; process.binding; worker_threads
+ *                  or cluster), or hands a child the server's whole environment
  *   gap            a public doc that cites code with a line number for a gap still open
+ *   open-gap-words a public doc's open item ("still open", "not yet", "open:", "stays open", on
+ *                  the line or in the heading or bullet it sits under) that names a route, a
+ *                  tool or function in backticks, or an environment variable
  *
  * One sentence per problem, with file:line; exit 1 on any problem. Secret
  * values are never printed: only their first 6 characters, length and a
- * sha256 fingerprint, which is also what an allowlist entry can name.
+ * sha256 fingerprint, which is also what an allowlist entry can name. An
+ * entry may also name the exact text of the line (`line`), so it waives that
+ * line only and never a new, different line in the same file.
  * Run by `npm run check` and by the client tests (apps/client/test/security.test.ts).
  *
  * To run it before every push, use the sample hook once per clone:
@@ -283,18 +292,26 @@ export function unpinnedApplies(file) {
 // ---------------------------------------------------------------------------
 // Rule child-process.
 // ---------------------------------------------------------------------------
-const CHILD_IMPORT = /(?:from\s+|require\(\s*|import\(\s*)["'](?:node:)?child_process["']/;
+/** child_process by `from`, `require(`, `import(` or a `createRequire(…)(` call, quoted any way (template literals too) */
+const CHILD_IMPORT = /(?:from\s+|require\(\s*|import\(\s*|\)\(\s*)["'`](?:node:)?child_process["'`]/;
+/** the other ways to run code beside the server: its internal bindings, worker threads, a cluster */
+const OTHER_RUNNERS = [
+  { re: /\bprocess\s*\.\s*binding\b|\bprocess\s*\[\s*["'`]binding["'`]\s*\]/, what: "reaches the runtime's internal bindings (process.binding) outside the allowed files; start processes through apps/server/src/child.ts" },
+  { re: /(?:from\s+|require\(\s*|import\(\s*|\)\(\s*)["'`](?:node:)?(?:worker_threads|cluster)["'`]/, what: "imports worker_threads or cluster outside the allowed files; code that runs beside the server goes through apps/server/src/child.ts, or is waived line by line with a reason" },
+];
 const WHOLE_ENV = /\benv\s*:\s*process\.env\b(?![.[])|\.\.\.\s*process\.env\b(?![.[])/g;
 
-/** Child-process problems in one file's text: [{ line, what, match }]. */
+/** Child-process problems in one file's text: [{ line, what, match, text }]. */
 export function findChildProcess(file, text, config = CONFIG) {
   if (!file.startsWith(config.serverSrc)) return [];
   const out = [];
   const lines = text.split(/\r?\n/);
   const allowed = config.allowChildProcess.includes(file);
   lines.forEach((l, i) => {
-    if (!allowed && CHILD_IMPORT.test(l)) out.push({ line: i + 1, what: "imports child_process outside the allowed files; start processes through apps/server/src/childenv.ts", match: l.trim() });
-    for (const m of l.matchAll(WHOLE_ENV)) out.push({ line: i + 1, what: "hands a child (or an object) the server's whole environment; pass only the variables it needs", match: m[0] });
+    const t = l.trim();
+    if (!allowed && CHILD_IMPORT.test(l)) out.push({ line: i + 1, what: "imports child_process outside the allowed files; start processes through apps/server/src/childenv.ts", match: t, text: t });
+    if (!allowed) for (const r of OTHER_RUNNERS) if (r.re.test(l)) out.push({ line: i + 1, what: r.what, match: t, text: t });
+    for (const m of l.matchAll(WHOLE_ENV)) out.push({ line: i + 1, what: "hands a child (or an object) the server's whole environment; pass only the variables it needs", match: m[0], text: t });
   });
   return out;
 }
@@ -312,6 +329,54 @@ export function isGapDoc(file, config = CONFIG) {
   if (config.noGapDocs.includes(file)) return false;
   if (g.files.includes(file)) return true;
   return file.startsWith(g.under) && g.extensions.includes(ext(file));
+}
+
+// ---------------------------------------------------------------------------
+// Rule open-gap-words.
+// ---------------------------------------------------------------------------
+/** words that say an item is still open */
+export const OPEN_WORDS = /\bstill open\b|\bnot yet\b|\bopen:|\bstays open\b/i;
+/** what an open item must not name in public: a route, a tool or function in backticks, an environment variable */
+export const OPEN_DETAIL = [
+  { what: "a route", re: /(?<![\w.-])\/(?:api|auth)\/[^\s`'")\]]*|(?<![\w.-])\/mcp\b/g },
+  { what: "a tool or function name", re: /`(?:[a-z][a-z0-9]*_[a-z0-9_]+|[a-z][a-z0-9]*[A-Z][A-Za-z0-9]*|[A-Za-z_$][\w$.]*\(\))`/g },
+  { what: "an environment variable", re: /(?<![\w-])[A-Z][A-Z0-9]*_[A-Z0-9_]*[A-Z0-9](?![\w-])/g },
+];
+
+/**
+ * Lines of a public doc that describe an open item with a route, tool or setting name: [{ line, match, what }].
+ * An item is open when its own line says so, or the heading or bullet it sits under does (a heading's
+ * section runs to the next heading of the same or a higher level; a bullet's to its next sibling).
+ */
+export function findOpenGapWords(text) {
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  let heading = { level: 0, open: false };
+  /** open bullets above this line, by indent */
+  let bullets = [];
+  let fence = false;
+  lines.forEach((l, i) => {
+    if (/^\s*```/.test(l)) fence = !fence;
+    const h = fence ? null : /^(#{1,6})\s+(.*)$/.exec(l);
+    if (h) {
+      const level = h[1].length;
+      if (level <= heading.level || !heading.open) heading = { level, open: OPEN_WORDS.test(h[2]) };
+      bullets = [];
+    }
+    const b = /^(\s*)(?:[-*+]|\d+[.)])\s+/.exec(l);
+    const indent = b ? b[1].replace(/\t/g, "    ").length : /^\s*$/.test(l) ? -1 : (/^(\s*)/.exec(l)?.[1].length ?? 0);
+    if (b) {
+      bullets = bullets.filter((x) => x.indent < indent);
+      bullets.push({ indent, open: OPEN_WORDS.test(l) });
+    } else if (indent === 0 && !h) bullets = [];
+    const open = OPEN_WORDS.test(l) || (heading.open && !h) || bullets.some((x) => x.open);
+    if (!open) return;
+    for (const d of OPEN_DETAIL) {
+      d.re.lastIndex = 0;
+      for (const m of l.matchAll(d.re)) out.push({ line: i + 1, match: m[0], what: d.what });
+    }
+  });
+  return out;
 }
 
 /** Code references with line numbers that are not marked closed: [{ line, match }]. */
@@ -364,8 +429,10 @@ export function scanText(file, text, config = CONFIG) {
     for (const h of findSecrets(l, file)) out.push(secretFinding(file, i + 1, h));
     if (unp) for (const h of findUnpinned(l, file)) out.push({ rule: "unpinned", file, line: i + 1, match: h.match, sentence: `${file}:${i + 1}: this ${h.what} ("${h.match.slice(0, 80)}"); pin an exact version.` });
   });
-  for (const h of findChildProcess(file, text, config)) out.push({ rule: "child-process", file, line: h.line, match: h.match, sentence: `${file}:${h.line}: this ${h.what}.` });
-  if (isGapDoc(file, config)) for (const h of findGaps(text, file)) out.push({ rule: "gap", file, line: h.line, match: h.match, sentence: `${file}:${h.line}: ${h.match} is a code reference with a line number in a public doc: say it in general terms, or mark the row closed with its commit.` });
+  for (const h of findChildProcess(file, text, config)) out.push({ rule: "child-process", file, line: h.line, match: h.match, text: h.text, sentence: `${file}:${h.line}: this ${h.what}.` });
+  if (isGapDoc(file, config)) for (const h of findGaps(text, file)) out.push({ rule: "gap", file, line: h.line, match: h.match, text: lines[h.line - 1].trim(), sentence: `${file}:${h.line}: ${h.match} is a code reference with a line number in a public doc: say it in general terms, or mark the row closed with its commit.` });
+  if (isGapDoc(file, config))
+    for (const h of findOpenGapWords(text)) out.push({ rule: "open-gap-words", file, line: h.line, match: h.match, text: lines[h.line - 1].trim(), sentence: `${file}:${h.line}: an open item described with a route, tool or setting name (${h.what} "${h.match.slice(0, 60)}"): say it in general terms.` });
   return out;
 }
 
@@ -459,9 +526,15 @@ export function readAllow(file = join(ROOT, CONFIG.allowFile)) {
   return JSON.parse(readFileSync(file, "utf8"));
 }
 
-/** Does an allowlist entry waive this finding? Match is the exact matched text or its fingerprint. */
+/**
+ * Does an allowlist entry waive this finding? Match is the exact matched text or its fingerprint. An entry
+ * that names `line` (the line's exact text, trimmed) waives that line only: a new, different line in the
+ * same file with the same match is a new finding.
+ */
 export function waives(entry, f) {
-  return entry.rule === f.rule && entry.file === f.file && (entry.match === f.match || (f.fingerprint !== undefined && entry.match === f.fingerprint));
+  if (entry.rule !== f.rule || entry.file !== f.file) return false;
+  if (!(entry.match === f.match || (f.fingerprint !== undefined && entry.match === f.fingerprint))) return false;
+  return entry.line === undefined || (typeof f.text === "string" && entry.line === f.text);
 }
 
 /**
@@ -519,15 +592,29 @@ export function summarize(findings) {
   return { byRule, byFile };
 }
 
+/** does `ref` name a commit here */
+export function refExists(ref) {
+  try {
+    git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function main(argv) {
   const i = argv.indexOf("--diff");
   const files = trackedFiles();
   let findings = scanTracked(files);
+  const early = [];
   if (i >= 0) {
     const ref = argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[i + 1] : "origin/main";
-    findings = findings.concat(scanSince(ref));
+    if (!refExists(ref) && argv.includes("--tree-if-no-ref"))
+      early.push(`${ref} is not a commit here (no remote yet, or not fetched): checked the tracked tree only, NOT the commits that would be pushed or their messages. Fetch it (git fetch origin) to check those.`);
+    else findings = findings.concat(scanSince(ref));
   }
   const { problems, waived, warnings } = applyAllow(findings, readAllow());
+  for (const w of early) console.warn(`warning: ${w}`);
   problems.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
   for (const w of [...configWarnings(files), ...warnings]) console.warn(`warning: ${w}`);
   for (const p of problems) console.log(p.sentence);

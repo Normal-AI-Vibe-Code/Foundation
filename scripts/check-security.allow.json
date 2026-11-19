@@ -27,12 +27,28 @@
     "rule": "child-process",
     "file": "apps/server/src/rea.ts",
     "match": "env: process.env",
+    "line": "env: process.env,",
     "why": "here() describes this computer so the server can find programs on PATH; it is read by the server and never passed to a child (child.ts builds every child environment)."
   },
   {
     "rule": "child-process",
     "file": "apps/server/src/t3paths.ts",
     "match": "env: process.env",
+    "line": "export const here = (): Where => ({ platform: process.platform, arch: process.arch, env: process.env, home: homedir() });",
     "why": "here() describes this computer so the server can find the t3 program; it is read by the server and never passed to a child (child.ts builds every child environment)."
+  },
+  {
+    "rule": "child-process",
+    "file": "apps/server/src/filetext.ts",
+    "match": "import { Worker } from \"node:worker_threads\";",
+    "line": "import { Worker } from \"node:worker_threads\";",
+    "why": "Document text extraction runs in a worker thread of the server itself (extract-worker.ts), with a time and memory limit: no program is started and no environment is handed over."
+  },
+  {
+    "rule": "child-process",
+    "file": "apps/server/src/extract-worker.ts",
+    "match": "import { parentPort } from \"node:worker_threads\";",
+    "line": "import { parentPort } from \"node:worker_threads\";",
+    "why": "The worker side of the server's own text extraction (filetext.ts): it reads bytes it is handed and answers; it starts nothing."
   }
 ]
