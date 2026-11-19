@@ -142,9 +142,10 @@ test("unpinned: the latest tag, npx, uvx, pip, curl into a shell, docker images"
 test("child processes: only the allowed files import child_process; nobody hands over the whole environment", () => {
   const imp = j('import { spawn } from "node:child', '_process";');
   assert.equal(findChildProcess("apps/server/src/new.ts", imp).length, 1);
-  assert.equal(findChildProcess("apps/server/src/childenv.ts", imp).length, 0);
+  assert.equal(findChildProcess("apps/server/src/child.ts", imp).length, 0);
+  assert.equal(findChildProcess("apps/server/src/childenv.ts", imp).length, 1); // only the one door
   assert.equal(findChildProcess("apps/client/src/x.ts", imp).length, 0); // outside the server
-  assert.equal(findChildProcess("apps/server/src/childenv.ts", j("spawn(c, a, { env: process", ".env });")).length, 1);
+  assert.equal(findChildProcess("apps/server/src/child.ts", j("spawn(c, a, { env: process", ".env });")).length, 1);
   assert.equal(findChildProcess("apps/server/src/x.ts", j("const e = { ...process", ".env, TERM: 'dumb' };")).length, 1);
   assert.equal(findChildProcess("apps/server/src/x.ts", j("const env = { PATH: process", ".env.PATH };")).length, 0);
   assert.equal(findChildProcess("apps/server/src/x.ts", j("const k = process", ".env.KEY;")).length, 0);

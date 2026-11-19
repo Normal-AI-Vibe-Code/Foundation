@@ -22,5 +22,17 @@
     "file": "apps/client/src/design/DesignPage.tsx",
     "match": "pip install trimesh",
     "why": "Text of a demo machine ask drawn on #/design; never run."
+  },
+  {
+    "rule": "child-process",
+    "file": "apps/server/src/rea.ts",
+    "match": "env: process.env",
+    "why": "here() describes this computer so the server can find programs on PATH; it is read by the server and never passed to a child (child.ts builds every child environment)."
+  },
+  {
+    "rule": "child-process",
+    "file": "apps/server/src/t3paths.ts",
+    "match": "env: process.env",
+    "why": "here() describes this computer so the server can find the t3 program; it is read by the server and never passed to a child (child.ts builds every child environment)."
   }
 ]

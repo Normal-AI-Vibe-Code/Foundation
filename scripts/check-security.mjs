@@ -41,17 +41,7 @@ export const CONFIG = {
   // Rule child-process: the files under apps/server/src that may import
   // node:child_process. Everything else goes through these.
   allowChildProcess: [
-    "apps/server/src/childenv.ts", // the one door: stays (not on main yet; another agent is adding it)
-    "apps/server/src/agent.ts", // to remove when agent runs go through childenv.ts
-    "apps/server/src/jobs.ts", // to remove when jobs spawn through childenv.ts
-    "apps/server/src/changelog.ts", // to remove when its git call goes through childenv.ts
-    "apps/server/src/flowform-import.ts", // to remove when the import's git/unzip goes through childenv.ts
-    "apps/server/src/github.ts", // to remove when gh calls go through childenv.ts
-    "apps/server/src/hostterm.ts", // to remove when the host terminal spawns through childenv.ts
-    "apps/server/src/machines.ts", // to remove when machine processes start through childenv.ts
-    "apps/server/src/plan.ts", // to remove when plan sync spawns through childenv.ts
-    "apps/server/src/t3host.ts", // to remove when the t3 host starts through childenv.ts
-    "apps/server/src/vision.ts", // to remove when vision runs spawn through childenv.ts
+    "apps/server/src/child.ts", // the one door every program the server starts goes through
   ],
   // Where the child-process rule looks.
   serverSrc: "apps/server/src/",

@@ -176,7 +176,7 @@ export function claudeCommand(cli: string, rt: Runtime): Command | Refused {
 const CMD_SPECIAL = /[%!^&|<>"]/;
 
 /**
- * The one rea-agents Foundation runs (ADR-001 G13: no `@latest`, fetched at run time). npm's
+ * The one rea-agents Foundation runs (ADR-001 G13: an exact version, never the newest one fetched at run time). npm's
  * registry, 2026-11-18: rea-agents 6.9.0, MIT, github.com/morluto/rea. Before a job starts, the
  * registry's integrity for this exact version is compared with the one here (checkReaIntegrity), and
  * npx itself checks the tarball it fetches against the registry's. A new version is a change here,
