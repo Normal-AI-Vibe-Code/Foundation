@@ -311,6 +311,30 @@ test("Vision Code's transcripts: an admin in person, not an agent's bearer, the 
   assert.equal((await call("GET", "/api/t3/threads", { cookie: boss })).status, 200);
 });
 
+// ---------- 7. sending to Slack as a person needs the person ----------
+
+test("posting, sharing, inviting, huddle notes, asks and a channel read that can start an agent: refused to an agent's bearer and the service token", async () => {
+  const doors: Array<[string, unknown]> = [
+    ["/api/slack/channels/C1/messages", { text: "hello from an agent" }],
+    ["/api/slack/channels/C1/share", { board: "company", title: "x" }],
+    ["/api/slack/channels/C1/invite", { board: "company", huddleId: "h1" }],
+    ["/api/slack/channels/C1/huddle-notes", { board: "company", huddleId: "h1" }],
+    ["/api/asks", { board: "company", assignee: "someone@example.test", prompt: "click this link" }],
+    ["/api/slack/board/sync?board=company", { channel: "C1" }],
+  ];
+  for (const [path, body] of doors) {
+    for (const bearer of [agent, SERVICE]) {
+      const r = await call("POST", path, { bearer, body });
+      assert.equal(r.status, 403, `${path}: ${r.text}`);
+      assert.match(r.json.error, /needs a person/, path);
+    }
+    // a person gets past the gate (to Slack not being connected here, or the route's own answer)
+    const p = await call("POST", path, { cookie: ada, body });
+    assert.doesNotMatch(p.text, /needs a person/, path);
+    assert.notEqual(p.status, 403, `${path}: ${p.text}`);
+  }
+});
+
 // ---------- 5. asking this computer's model server: a person, an exact loopback origin ----------
 
 test("the local model lookup: refused to an agent's bearer and the service token; a person may ask only a loopback origin", async () => {

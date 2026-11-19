@@ -481,8 +481,9 @@ r.get("/api/asks", (req) => {
   const hidden = hiddenBoards(u);
   return { asks: listAsks(req.query.get("board") ?? undefined).filter((a) => !hidden.has(a.board_id)) };
 });
+// an ask DMs the assignee on Slack as "Foundation · <name> asks": a person's (agents ask with the ask_person tool)
 r.post("/api/asks", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Asking someone on Slack as you");
   const b = await readJson<{ board: string; assignee: string; prompt: string; kind?: string; section?: string }>(req);
   requireBoard(u, b.board);
   return createAsk({ boardId: b.board, actor: u.name, userId: u.id }, { assignee: b.assignee, prompt: b.prompt, kind: b.kind ?? "cad_upload", section: b.section });
@@ -554,14 +555,16 @@ r.get("/api/slack/channels/:id", (req) => {
   requireUser(req);
   return slackDo(async () => ({ channel: await channelInfo(req.params.id), messages: await channelHistory(req.params.id, 40, req.query.get("fresh") === "1") }));
 });
+// posting, sharing, inviting and handing over huddle notes go out under the person's name ("<name> via
+// Foundation"): a person's press, never an agent's bearer or the service token
 r.post("/api/slack/channels/:id/messages", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Posting to Slack as you");
   const b = await readJson<{ text?: string }>(req);
   return slackDo(() => postMessage(req.params.id, b.text ?? "", u));
 });
 /** send the channel a link to a place on the board */
 r.post("/api/slack/channels/:id/share", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Sharing to Slack as you");
   const b = await readJson<{ board?: string; objectId?: string; title?: string; note?: string }>(req);
   const board = b.board ?? "company";
   requireBoard(u, board);
@@ -570,7 +573,7 @@ r.post("/api/slack/channels/:id/share", async (req) => {
 });
 /** invite the channel into a huddle on the board */
 r.post("/api/slack/channels/:id/invite", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Inviting a Slack channel as you");
   const b = await readJson<{ board?: string; huddleId?: string; create?: Omit<NewHuddle, "channel"> }>(req);
   const board = b.board ?? "company";
   requireBoard(u, board);
@@ -589,7 +592,7 @@ r.post("/api/slack/channels/:id/invite", async (req) => {
 });
 /** hand a huddle session's notes (transcript + recordings) to a channel */
 r.post("/api/slack/channels/:id/huddle-notes", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Sending huddle notes to Slack as you");
   const b = await readJson<{ board?: string; huddleId?: string; sessionId?: string; summary?: string }>(req);
   const board = b.board ?? "company";
   // a members-only board's huddle transcript is its members' to share
@@ -616,8 +619,9 @@ r.post("/api/slack/board", async (req) => {
   return slackDo(() => buildSlackBoard(u));
 });
 /** read one channel into its section now */
+// a read can end in an agent turn (slacklive.ts wantCurate, once a person turned agents on): a person's press
 r.post("/api/slack/board/sync", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Reading a Slack channel into the board");
   const board = req.query.get("board") ?? "";
   requireBoard(u, board);
   const { channel } = await readJson<{ channel?: string }>(req);
