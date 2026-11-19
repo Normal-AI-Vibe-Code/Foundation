@@ -155,3 +155,25 @@ Order: S1 and C1 first, together. Then I1, B1, A1 and H1 side by side. Then R1 a
 - A stand-in bridge: an inbound webhook makes a portal and a ghost; an agent's draft does not leave; a person's press sends it; a bearer's press is refused.
 - The scenario: a STEP file dropped into a channel, a huddle started on it by two people, taken to a grid, recorded, ended; the clock card replays it: videos seek together, lines light as they were said, the section shows the card that was added halfway only after halfway.
 - `npm test`, `npm run typecheck`, the e2e specs, `#/design` day and night, evidence in `docs/evidence/2026-11-18_chatform/`.
+
+## 6. As built: the core server (S1, 2026-11-18)
+
+What differs from, or adds to, §2. Builders after S1 read this before `chat.ts`.
+
+**Routes.** `GET /api/chat/threads` → `{ threads: [{ root, channel: {id,name,kind} }] }` (threads the asker started or replied in). `DELETE /api/chat/messages/:id` returns `{ message }` (the stub) and also takes `?confirm=true`. Archive, leave and members return `{ channel }` (`null` when the asker can no longer see it). Creating: `members` are user ids or `agent:<Name>`; `dm` or `group` is decided by the head count; `kind: "agent"` needs `agent: {name, via?, session?}`; `kind: "portal"` is refused over HTTP (bridges call `createChannel`). Open and private names are unique among unarchived channels over HTTP (409); `createChannel()` from server code does not enforce it. `join` is for open channels and never for a viewer account (a member adds them). Renaming is the maker's or an admin's; topic and purpose any non-viewer member's.
+
+**Who is speaking.** `requestParty(req, body?) → { user, party, person }`: a person's session is that person; an agent-kind bearer or the service token is an agent, named by the `X-Foundation-Agent` header or the body's `as` (`X-Foundation-Agent-Via` sets `via`), working for the session's user (`forName`). A person's request ignores `as`.
+
+**Messages.** Paging without `root` returns top-level messages only; with `root`, the thread, its first message first. `since` is made-or-changed since. `limit` 50, at most 200. A post with `place` is `type: "link"`. `mentions` holds user ids, `"agent:<Name>"` for an agent, `"channel"` and `"here"`. Every message in a dm, group, agent or portal channel is a mention for the others in it. Posting marks the channel read for the author; posting or reacting in an open channel joins them (a "joined" system line). Replies and system lines have a `seq` and count as unread (`lastSeq − readSeq`). A repeated `requestId` (per channel and author) or `origin` (per channel) returns the first message. Silent posts (history) send nothing, count nothing, notify no listener.
+
+**Ghosts.** `ghostParty` returns the *person's* party when the ghost row has `user_id` set (a ghost that is one of us).
+
+**Events.** `hello` has `rev: 0`; a `presence` follows it. A thread reply sends `message` and a `message-changed` for its root. `read` goes to the person concerned, all their windows. Removal from a non-open channel sends them `channel-gone`. Typing is throttled to one per 1.5 s per person, channel and thread, and is not echoed to the typer.
+
+**More exports.** `CHAT_BOARD = "chat"`, `SYSTEM_PARTY`, `channelView`, `removeMessage`, `react`, `pin`, `setRead`, `ensureGeneral`, `registerChatAgents(fn: () => ChatAgentRef[])`, `knownAgents`, `resolveMentions`, `onPublish`, `onlineUsers`, `canSeeChatFile`, `searchChat`, `unreadsFor`, `chatFocus`, `exportChannel`, `exportMarkdown`, `linkPreview`.
+
+**Files.** Uploads go to board `chat`. A chat file opens for its uploader and for anyone who can read a message (not removed) that carries it; admins get no exception. A message may carry the poster's own chat uploads, chat files they can already see, or files from boards they can see.
+
+**Search and Today.** Chat rows are indexed with `board_id = "chat"`; ⌘K filters them per person. Today's focus kind is `"message"` (id `message:<channel>`, href `#/chat/chat/<id>`): mentions anywhere, and unread in a dm, group or agent conversation.
+
+**Admins** do not read private channels they are not in (nor DMs), so they cannot moderate them either.

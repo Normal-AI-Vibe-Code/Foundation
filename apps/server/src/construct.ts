@@ -128,7 +128,7 @@ function archiveImages(query: string, boardId: string, limit: number): Found[] {
     if (f && IMAGE.test(f.mime)) out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
   }
   // then names, word by word (search wants every word; a name may have only some)
-  for (const f of all<FileRow>("select * from files where archived_at is null and mime like 'image/%' order by created_at desc limit 500")) {
+  for (const f of all<FileRow>("select * from files where archived_at is null and mime like 'image/%' and (board_id is null or board_id != 'chat') order by created_at desc limit 500")) {
     if (out.has(`file:${f.id}`) || !ws.length || matches(f.name, ws) === 0) continue;
     out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
   }

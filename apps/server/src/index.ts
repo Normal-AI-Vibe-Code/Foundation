@@ -63,6 +63,7 @@ import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.t
 import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 import { gridOutline } from "./subgrids.ts";
+import { canSeeChatFile, chatRoutes } from "./chat.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -363,10 +364,16 @@ r.get("/files/:id", (req, res) => {
   serveFile(req, res, req.params.id);
 });
 
-/** a file on a members-only board is that board's */
+/** a file on a members-only board is that board's; a chat upload is its uploader's and its messages' readers' (chat.ts) */
 function requireFileBoard(user: UserInfo, fileId: string) {
-  requireBoard(user, one<{ board_id: string | null }>("select board_id from files where id = ?", fileId)?.board_id);
+  const board = one<{ board_id: string | null }>("select board_id from files where id = ?", fileId)?.board_id;
+  if (board === "chat" && !canSeeChatFile(user, fileId)) throw new HttpError(404, "no such file");
+  requireBoard(user, board);
 }
+
+// ---------- ChatForm (chat.ts) ----------
+
+chatRoutes(r);
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
 
@@ -1028,10 +1035,12 @@ r.post("/api/agent/runs/:id/stop", (req) => {
  * and preferences (their goals, profile and settings are theirs, not a board's). The board is the
  * route's :id, or ?board=, else the person's account role decides.
  */
-const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/apps\/probe$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
+const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/apps\/probe$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/, /^\/api\/chat\//];
 function gateWrites(req: Req, path: string) {
   if (req.method === "GET" || req.method === "OPTIONS" || !path.startsWith("/api/")) return;
   if (READ_POSTS.some((p) => p.test(path))) return;
+  // a chat upload: chat's rules, not a board's (a viewer posts files where it's a member; chat.ts checks attaching)
+  if (path === "/api/files" && req.query.get("board") === "chat") return;
   const user = userFromRequest(req);
   if (!user) return; // the route's own requireUser answers 401
   const board = /^\/api\/boards\/([^/]+)/.exec(path)?.[1] ?? req.query.get("board");

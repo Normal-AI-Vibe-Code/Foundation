@@ -70,7 +70,11 @@ export async function uploadFile(req: Req, userId: string): Promise<FileRow> {
 export async function storeFile(body: Buffer, f: { name: string; mime: string; boardId: string | null; userId: string; about?: string }): Promise<FileRow> {
   const { name, mime, boardId, userId } = f;
   const sha = createHash("sha256").update(body).digest("hex");
-  const same = one<FileRow>("select * from files where sha256 = ? and board_id is ? and archived_at is null", sha, boardId);
+  // a chat upload ("chat", ChatForm's reserved board) is its uploader's until a message carries it: the same bytes from someone else are their own file
+  const same =
+    boardId === "chat"
+      ? one<FileRow>("select * from files where sha256 = ? and board_id = 'chat' and uploaded_by is ? and archived_at is null", sha, userId)
+      : one<FileRow>("select * from files where sha256 = ? and board_id is ? and archived_at is null", sha, boardId);
   if (same) return same;
   const dest = filePath(sha);
   if (!existsSync(dest)) {
@@ -173,9 +177,11 @@ export function cadHeaderText(head: string): string {
 }
 
 export function listFiles(boardId?: string | null) {
+  // chat uploads are listed by the messages that carry them (chat.ts decides who sees those), never here
+  if (boardId === "chat") return [];
   return boardId
     ? all<FileRow>("select * from files where board_id = ? and archived_at is null order by created_at desc limit 500", boardId)
-    : all<FileRow>("select * from files where archived_at is null order by created_at desc limit 500");
+    : all<FileRow>("select * from files where archived_at is null and board_id is not 'chat' order by created_at desc limit 500");
 }
 
 export function archiveFile(id: string) {

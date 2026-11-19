@@ -32,6 +32,7 @@ import { HttpError } from "./http.ts";
 import { logActivity } from "@foundation/protocol";
 import { listApps } from "./apps.ts";
 import { config } from "./config.ts";
+import { chatFocus } from "./chat.ts";
 
 db.exec(`
 create table if not exists profiles (
@@ -312,7 +313,8 @@ export function saveCompanyGoal(user: Pick<UserInfo, "id" | "name">, g: CompanyG
 
 // ---------- focus ----------
 
-export type FocusKind = "ask" | "goal" | "mention" | "stage" | "file" | "changes" | "related";
+/** message: ChatForm, a channel with mentions of them, or a DM or group with unread (href `#/chat/chat/<channel>`) */
+export type FocusKind = "ask" | "goal" | "mention" | "message" | "stage" | "file" | "changes" | "related";
 
 export interface FocusItem {
   id: string;
@@ -510,7 +512,7 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
       q,
     );
     for (const r of rows) {
-      if (seen.has(r.ref) || !r.board_id) continue;
+      if (seen.has(r.ref) || !r.board_id || r.board_id === "chat") continue; // chat uploads are their messages' (chat.ts)
       seen.add(r.ref);
       items.push({
         id: `related:${r.source}:${r.ref}`,
@@ -527,7 +529,10 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
     }
   }
 
-  const rank: Record<FocusKind, number> = { ask: 0, goal: 1, stage: 2, mention: 3, file: 4, changes: 5, related: 6 };
+  // ChatForm: mentions of them and unread DMs
+  items.push(...chatFocus(user, now));
+
+  const rank: Record<FocusKind, number> = { ask: 0, goal: 1, stage: 2, mention: 3, message: 3, file: 4, changes: 5, related: 6 };
   return items.sort((a, b) => rank[a.kind] - rank[b.kind] || (a.tone === "bad" ? -1 : 0) - (b.tone === "bad" ? -1 : 0) || b.at - a.at).slice(0, 24);
 }
 

@@ -34,6 +34,7 @@ import { CLOSE_TOO_OLD, clientTooOld } from "./clientversion.ts";
 import { HttpError, type Req } from "./http.ts";
 import { attachConnection, boardEpoch, syncAccess } from "./boards.ts";
 import { attachHuddle } from "./huddles.ts";
+import { attachChat, CHAT_SOCKET_PATH, chatSocketIsPerson } from "./chatsock.ts";
 import { attachTerminal } from "./machines.ts";
 import { attachDesktop } from "./machinedesktop.ts";
 import { canSeeBoard } from "./members.ts";
@@ -51,6 +52,8 @@ const VNC = new RegExp(`^/machines/(${ID})/(${ID})/vnc$`);
 
 /** the board a socket path belongs to, or null if it isn't one of ours */
 export function socketBoard(path: string): string | null {
+  // ChatForm's one socket: the reserved board "chat" (open to everyone signed in); chat.ts decides what each event reaches
+  if (path === CHAT_SOCKET_PATH) return "chat";
   return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path) ?? VNC.exec(path))?.[1] ?? null;
 }
 
@@ -120,6 +123,18 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => attachHostTerminal(ht[1], ws, who));
+    return;
+  }
+  // ChatForm (chatsock.ts): whether its opener is a person is read before a ticket is spent
+  if (url.pathname === CHAT_SOCKET_PATH) {
+    const person = chatSocketIsPerson(req, url);
+    const who = socketUser(req, url);
+    if (!who) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachChat(ws, who, person));
     return;
   }
   const user = socketUser(req, url);
