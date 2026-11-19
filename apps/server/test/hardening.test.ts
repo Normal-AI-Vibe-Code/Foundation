@@ -5,6 +5,8 @@
  * - Uploaded files can't run as the app: a file is shown in place only if it is a passive type (a picture,
  *   a video, a PDF, plain text, a 3D model); anything else (a page, an SVG, a script) comes back as a
  *   download of opaque bytes, and every file answer carries nosniff and a CSP sandbox.
+ * - Agents' leave to use a machine's desktop is set only by a person's press (the socket side, and the leave's
+ *   server-only map, are in tickets.test.ts and machines-desktop.test.ts).
  */
 
 import { after, before, test } from "node:test";
@@ -122,6 +124,20 @@ test("setup: a person and her agent's token", async () => {
   assert.equal(t.status, 200, t.text);
   agent = t.json.token;
   assert.ok(agent);
+});
+
+// ---------- 2. agents' leave to use a desktop: only a person's press ----------
+
+test("letting agents use a desktop: refused to an agent's bearer and the service token, a person gets past the gate", async () => {
+  for (const bearer of [agent, SERVICE]) {
+    const r = await call("POST", "/api/boards/company/machines/pnl_none/agents", { bearer, body: { allow: true } });
+    assert.equal(r.status, 403, r.text);
+    assert.match(r.json.error, /needs a person/);
+  }
+  // past the person gate, the route's own answer: there's no such card here
+  const p = await call("POST", "/api/boards/company/machines/pnl_none/agents", { cookie: ada, body: { allow: true } });
+  assert.equal(p.status, 404, p.text);
+  assert.match(p.json.error, /no such machine card/);
 });
 
 // ---------- 1. uploaded files can't run as the app ----------

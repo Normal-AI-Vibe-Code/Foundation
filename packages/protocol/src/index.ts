@@ -32,6 +32,7 @@ export const BOARD = {
   characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
   agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
   collections: "collections", // collection panel id → CollectionState (what it has gathered, and the section it lays out into; kept by the server alone)
+  desktopLeave: "desktopLeave", // machine panel id → DesktopLeave (a person's leave for agents to use its desktop, and an agent's ask for it; kept by the server alone, off the card)
 } as const;
 
 /** the place that means "the whole grid" in the board's `agents` map */
@@ -297,15 +298,8 @@ export interface MachineState {
    * machine's disk, so Remove clears it.
    */
   desktop?: MachineDesktop;
-  /**
-   * A person let agents use this machine's desktop (look at it, move the
-   * pointer, type): who and when. Unset is the default: agents can't.
-   * Only a signed-in person who can edit the board sets it, from their
-   * browser; anyone who can edit takes it away; Remove clears it.
-   */
-  agentsMay?: { by: string; at: number };
-  /** an agent tried to use the desktop without that leave: the card offers the person the button */
-  agentAsked?: { by: string; for?: string; at: number };
+  // whether agents may use the desktop is not on the card (a writer's socket could set it there): the board's
+  // `desktopLeave` map, which only the server writes (desktopLeaveOf)
   /** what agents last did on the desktop, newest last (a few kept): the card shows who is driving */
   agentActs?: MachineAgentAct[];
   /** the machine's pipes: when /foundation/in was last written and /foundation/out last read, and what was in them */
@@ -449,6 +443,25 @@ export interface AppToolAsk {
 /** the commands agents asked to run in a machine (and, on an app's card, the tools they asked to use), newest last */
 export function machineAsksOf(doc: Y.Doc, panelId: string): MachineAsk[] {
   return boardMaps(doc).machineAsks.get(panelId) ?? [];
+}
+
+/**
+ * Agents' leave to use a machine's desktop, kept by the server alone in the board's `desktopLeave` map (a
+ * writer's sync socket can't set it: only a person's press, through the server, does).
+ */
+export interface DesktopLeave {
+  /**
+   * A person let agents use this machine's desktop (look at it, move the pointer, type): who and when.
+   * Unset is the default: agents can't. Only a signed-in person who can edit the board sets it, from their
+   * browser; anyone who can edit takes it away; Remove clears it.
+   */
+  agentsMay?: { by: string; at: number };
+  /** an agent tried to use the desktop without that leave: the card offers the person the button */
+  agentAsked?: { by: string; for?: string; at: number };
+}
+
+export function desktopLeaveOf(doc: Y.Doc, panelId: string): DesktopLeave {
+  return boardMaps(doc).desktopLeave.get(panelId) ?? {};
 }
 
 // ---------- Slack sections: a section kept for a channel ----------
@@ -660,6 +673,7 @@ export function boardMaps(doc: Y.Doc) {
     characters: doc.getMap<CharacterState>(BOARD.characters),
     agents: doc.getMap<PostedAgent[]>(BOARD.agents),
     collections: doc.getMap<CollectionState>(BOARD.collections),
+    desktopLeave: doc.getMap<DesktopLeave>(BOARD.desktopLeave),
   };
 }
 

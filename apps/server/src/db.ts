@@ -287,6 +287,9 @@ for (const sql of [
   // files: what an import said about where it came from (kept so a re-index keeps it), and the text
   // read out of documents, by content (filetext.ts)
   "alter table files add column about text",
+  // a socket ticket says whether a person asked for it (1) or an agent did (0; null: before this): a machine's
+  // terminal and desktop take input from a person only (sockets.ts)
+  "alter table ws_tickets add column person integer",
   "create index if not exists files_sha on files(sha256)",
   `create table if not exists file_text (
      sha256 text primary key, v integer not null, status text not null,

@@ -294,7 +294,7 @@ export function attachConnection(boardId: string, ws: WebSocket, readOnly = fals
  * everyone, the sender included, gets the correction. Without this, someone with edit rights could
  * make a fake ask appear on a machine card or rewrite who is in a huddle.
  */
-export const SERVER_MAPS = ["huddles", "machineAsks", "slack", "characters", "agents", "collections"] as const;
+export const SERVER_MAPS = ["huddles", "machineAsks", "slack", "characters", "agents", "collections", "desktopLeave"] as const;
 function guardServerMaps(board: Board) {
   for (const name of SERVER_MAPS) {
     const map = board.doc.getMap<unknown>(name);

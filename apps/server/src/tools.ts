@@ -23,6 +23,7 @@ import {
   boardMaps,
   cellRef,
   describeBoard,
+  desktopLeaveOf,
   findSection,
   isHostable,
   leafSectionOf,
@@ -967,9 +968,10 @@ export const TOOLS: BoardTool[] = [
         machines: d.machines.map((m) => {
           const card = objects.get(m.id) as PanelDoc;
           const st = card.machine!;
+          const may = desktopLeaveOf(getBoard(ctx.boardId).doc, m.id).agentsMay;
           return {
             ...m,
-            desktop: st.desktop?.state === "ready" ? { screen: `${st.desktop.w ?? 1280}x${st.desktop.h ?? 800}`, agents_may_use_it: Boolean(st.agentsMay), ...(st.agentsMay ? { allowed_by: st.agentsMay.by } : { note: "a person lets agents use it on the card: Let agents use this desktop" }) } : (st.desktop?.state ?? "none: a person adds one on the card"),
+            desktop: st.desktop?.state === "ready" ? { screen: `${st.desktop.w ?? 1280}x${st.desktop.h ?? 800}`, agents_may_use_it: Boolean(may), ...(may ? { allowed_by: may.by } : { note: "a person lets agents use it on the card: Let agents use this desktop" }) } : (st.desktop?.state ?? "none: a person adds one on the card"),
             pipes: describeIo(ctx.boardId, card),
           };
         }),

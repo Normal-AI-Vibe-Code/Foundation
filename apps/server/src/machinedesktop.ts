@@ -36,9 +36,10 @@
 
 import type { Socket } from "node:net";
 import type { WebSocket } from "ws";
-import { MACHINE_AGENT_ACTIVE_MS, type MachineAgentAct, type MachineState, type PanelDoc } from "@foundation/protocol";
+import { boardMaps, desktopLeaveOf, logActivity, MACHINE_AGENT_ACTIVE_MS, type DesktopLeave, type MachineAgentAct, type MachineState, type PanelDoc } from "@foundation/protocol";
 import { HttpError } from "./http.ts";
 import { canWrite } from "./roles.ts";
+import { editBoard, getBoard } from "./boards.ts";
 import { demux, engineJson, execRaw, execSh, findContainer, hijack, machineHooks, machinePanel, UNBLOCK_FN, writeMachine } from "./machines.ts";
 import { findMachineCard } from "./machineasks.ts";
 import { aim, crewMember } from "./crew.ts";
@@ -341,9 +342,11 @@ machineHooks.started.push((boardId, panelId, person) => {
   install(boardId, panelId, { name: person });
 });
 
-machineHooks.ended.push((boardId, panelId) => {
+machineHooks.ended.push((boardId, panelId, why) => {
   const k = key(boardId, panelId);
   upAt.delete(k);
+  // Remove takes the disk and the desktop on it, and with them agents' leave to use it
+  if (why === "removed" && Object.keys(desktopLeave(boardId, panelId)).length) writeDesktopLeave(boardId, panelId, { agentsMay: undefined, agentAsked: undefined });
   for (const r of relays.get(k) ?? []) r.end("The machine stopped.");
 });
 
@@ -443,6 +446,23 @@ export function closeDesktops() {
 
 // ---------- agents: leave to use it ----------
 
+/** agents' leave for this machine's desktop: the board's `desktopLeave` map, which only the server writes (boards.ts SERVER_MAPS) */
+export function desktopLeave(boardId: string, panelId: string): DesktopLeave {
+  return desktopLeaveOf(getBoard(boardId).doc, panelId);
+}
+
+/** change that leave (undefined clears a field; nothing left clears the entry), with an activity line on the card */
+export function writeDesktopLeave(boardId: string, panelId: string, patch: Partial<DesktopLeave>, activity?: { who: string; role: "human" | "agent"; text: string; for?: string }) {
+  editBoard(boardId, "desktop-leave", (doc) => {
+    const m = boardMaps(doc);
+    const next: DesktopLeave = { ...desktopLeaveOf(doc, panelId), ...patch };
+    for (const k of Object.keys(next) as Array<keyof DesktopLeave>) if (next[k] === undefined) delete next[k];
+    if (Object.keys(next).length) m.desktopLeave.set(panelId, next);
+    else m.desktopLeave.delete(panelId);
+    if (activity) logActivity(doc, { ...activity, objectId: panelId });
+  });
+}
+
 /**
  * A person lets agents use this machine's desktop, or takes that back. Only
  * from their browser (the route asks requirePerson) on a board they can edit;
@@ -454,14 +474,14 @@ export function setAgentsMay(boardId: string, panelId: string, person: { id: str
   if (!panel.machine) throw new HttpError(404, "this card has no machine");
   const name = panel.machine.name;
   if (!allow) {
-    if (panel.machine.agentsMay) writeMachine(boardId, panelId, { agentsMay: undefined, agentAsked: undefined }, { who: person.name, role: "human", text: `stopped agents using ${name}'s desktop` });
+    if (desktopLeave(boardId, panelId).agentsMay) writeDesktopLeave(boardId, panelId, { agentsMay: undefined, agentAsked: undefined }, { who: person.name, role: "human", text: `stopped agents using ${name}'s desktop` });
     return machinePanel(boardId, panelId).machine!;
   }
   if (computerUseDefault(person.id) === "never") {
     throw new HttpError(403, "You've set agents' computer use to Never (Settings), so this stays off. Change that first if you mean to let them.");
   }
   if (panel.machine.desktop?.state !== "ready") throw new HttpError(409, `${name} has no desktop for agents to use yet. Add a desktop first.`);
-  writeMachine(boardId, panelId, { agentsMay: { by: person.name, at: Date.now() }, agentAsked: undefined }, { who: person.name, role: "human", text: `let agents use ${name}'s desktop` });
+  writeDesktopLeave(boardId, panelId, { agentsMay: { by: person.name, at: Date.now() }, agentAsked: undefined }, { who: person.name, role: "human", text: `let agents use ${name}'s desktop` });
   return machinePanel(boardId, panelId).machine!;
 }
 
@@ -599,10 +619,11 @@ export function useDesktop(ctx: DesktopCtx, machineRef: string, action: DesktopA
   }
   if (m.state !== "running") throw new Error(`${m.name} isn't running (${m.state}). A person starts it from its card.`);
   if (m.desktop?.state !== "ready") throw new Error(`${m.name} has no desktop${m.desktop?.state === "installing" ? " yet: it's being installed" : ""}. A person adds one on the machine's card (Desktop, then Add a desktop).`);
-  if (!m.agentsMay) {
+  const leave = desktopLeave(ctx.boardId, card.id);
+  if (!leave.agentsMay) {
     // say so on the card, where the person's button is (once a minute at most)
-    if (!m.agentAsked || m.agentAsked.by !== ctx.actor || Date.now() - m.agentAsked.at > 60_000) {
-      writeMachine(ctx.boardId, card.id, { agentAsked: { by: ctx.actor, ...forLine, at: Date.now() } }, { who: ctx.actor, role: "agent", text: `asked to use ${m.name}'s desktop`, ...forLine });
+    if (!leave.agentAsked || leave.agentAsked.by !== ctx.actor || Date.now() - leave.agentAsked.at > 60_000) {
+      writeDesktopLeave(ctx.boardId, card.id, { agentAsked: { by: ctx.actor, ...forLine, at: Date.now() } }, { who: ctx.actor, role: "agent", text: `asked to use ${m.name}'s desktop`, ...forLine });
     }
     const member = crewMember(ctx.crew);
     if (member) aim(member, { id: card.id, kind: "object" }, `waiting for leave to use ${m.name}'s desktop`);
@@ -613,7 +634,7 @@ export function useDesktop(ctx: DesktopCtx, machineRef: string, action: DesktopA
   const run = async (): Promise<DesktopResult> => {
     await ensureUp(ctx.boardId, card.id);
     // the leave may have been taken back while this waited its turn
-    if (!machinePanel(ctx.boardId, card.id).machine?.agentsMay) throw new Error(`Agents' leave to use ${m.name}'s desktop was taken back. Nothing was done.`);
+    if (!desktopLeave(ctx.boardId, card.id).agentsMay) throw new Error(`Agents' leave to use ${m.name}'s desktop was taken back. Nothing was done.`);
     const member = crewMember(ctx.crew);
     if (member) aim(member, { id: card.id, kind: "object" }, `${m.name}'s desktop: ${did}`);
     if (argv) {
@@ -622,7 +643,8 @@ export function useDesktop(ctx: DesktopCtx, machineRef: string, action: DesktopA
     }
     const act: MachineAgentAct = { by: ctx.actor, ...forLine, did, at: Date.now() };
     const prev = machinePanel(ctx.boardId, card.id).machine?.agentActs ?? [];
-    writeMachine(ctx.boardId, card.id, { agentActs: [...prev, act].slice(-KEEP_ACTS), agentAsked: undefined }, { who: ctx.actor, role: "agent", text: `${did} on ${m.name}'s desktop`, ...forLine });
+    writeMachine(ctx.boardId, card.id, { agentActs: [...prev, act].slice(-KEEP_ACTS) }, { who: ctx.actor, role: "agent", text: `${did} on ${m.name}'s desktop`, ...forLine });
+    if (desktopLeave(ctx.boardId, card.id).agentAsked) writeDesktopLeave(ctx.boardId, card.id, { agentAsked: undefined });
     let png: Buffer | undefined;
     let screen = { w: m.desktop!.w ?? DESKTOP_SCREEN.w, h: m.desktop!.h ?? DESKTOP_SCREEN.h };
     if (opts.look !== false || !argv) {

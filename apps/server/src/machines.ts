@@ -657,8 +657,9 @@ export async function removeMachine(boardId: string, panelId: string, person: st
   endTerminal(boardId, panelId, "The machine was removed.");
   fire(machineHooks.ended, boardId, panelId, "removed");
   await engineJson(engine, "DELETE", `/containers/${c.Id}?force=1&v=1`, undefined, 30_000);
-  // its disk is gone, and with it the desktop installed there, the leave agents had to use it, and its pipes' files
-  const gone = { desktop: undefined, wantDesktop: undefined, agentsMay: undefined, agentAsked: undefined, agentActs: undefined, io: undefined };
+  // its disk is gone, and with it the desktop installed there and its pipes' files (the leave agents had to use
+  // the desktop goes too: machinedesktop.ts clears it on the "removed" hook)
+  const gone = { desktop: undefined, wantDesktop: undefined, agentActs: undefined, io: undefined };
   writeMachine(boardId, panelId, { ...gone, state: "absent", containerId: undefined, ports: undefined, detail: `Removed by ${person}, with its disk. Start makes a fresh one.` }, { who: person, role: "human", text: `removed the machine ${panel.machine?.name ?? panel.name}` });
   return machinePanel(boardId, panelId).machine!;
 }
