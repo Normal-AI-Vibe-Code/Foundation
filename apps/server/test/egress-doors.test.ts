@@ -40,9 +40,10 @@ let boss = "";
 let vic = "";
 let adaAgent = "";
 let bossAgent = "";
+let home = "";
 
 before(async () => {
-  const home = mkdtempSync(join(tmpdir(), "foundation-egress-doors-"));
+  home = mkdtempSync(join(tmpdir(), "foundation-egress-doors-"));
   const port = await freePort();
   const env: NodeJS.ProcessEnv = {};
   for (const [k, v] of Object.entries(process.env)) if (!/^(FOUNDATION_|SLACK_|ANTHROPIC_|GOOGLE_|GITHUB_|GH_|MESHY_|T3)/.test(k)) env[k] = v;
@@ -177,4 +178,27 @@ test("the audit log: an admin in person reads it; a member, an admin's agent and
   assert.ok(after.json.rows.some((x: any) => x.action === "GET /api/audit" && x.decision === "refused" && x.actor_kind === "agent"), "an admin's agent asking is recorded");
   const board = await call("GET", "/api/audit?board=company&limit=500", { cookie: boss });
   assert.ok(board.json.rows.length > 0 && board.json.rows.every((x: any) => x.board_id === "company"));
+});
+
+test("an agent can't borrow the allowance of a board it can't see by naming it", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const made = await call("POST", "/api/boards", { cookie: boss, body: { name: "Members only" } });
+  assert.equal(made.status, 200, made.text);
+  const hidden = made.json.id as string;
+  const bossId = (await call("GET", "/api/me", { cookie: boss })).json.user.id;
+  const db = new DatabaseSync(join(home, "data", "foundation.db"));
+  db.prepare("insert into board_members (board_id, user_id, role, source, added_at) values (?, ?, 'owner', 'test', ?)").run(hidden, bossId, Date.now());
+  db.close();
+  // a person on it allows GitHub reads and Slack, Flowform and GitHub queries there
+  for (const body of [{ service: "GitHub", kind: "read" }, { service: "GitHub", kind: "query" }, { service: "Slack", kind: "query" }, { service: "Flowform", kind: "query" }]) {
+    assert.equal((await call("POST", `/api/boards/${hidden}/egress`, { cookie: boss, body })).status, 200);
+  }
+  // Ada's agent names that board on a read route: nothing goes out, as on a board with nothing allowed
+  const r = await call("GET", `/api/repo?repo=form-industries/rim&board=${hidden}`, { bearer: adaAgent });
+  assert.equal(r.status, 403, r.text);
+  assert.match(r.json.error, /Nothing was sent to GitHub: a person has to allow/);
+  // search names a board only the caller can see: it answers like a missing one
+  assert.equal((await call("GET", `/api/search?q=rim&board=${hidden}`, { bearer: adaAgent })).status, 404);
+  assert.equal((await call("GET", `/api/search?q=rim&board=${hidden}`, { cookie: ada })).status, 404);
+  assert.equal((await call("GET", "/api/search?q=rim&board=company", { bearer: adaAgent })).status, 200, "a board it can see still works");
 });

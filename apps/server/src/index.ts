@@ -419,6 +419,8 @@ r.post("/api/places/:id/bring", async (req) => {
 
 r.get("/api/search", async (req) => {
   const u = requireUser(req);
+  // a board named here is one the caller can see (its allowances decide what an agent's search may send)
+  requireBoard(u, req.query.get("board"));
   const q = (req.query.get("q") ?? "").trim();
   if (!q) return { hits: [], sources: {} };
   return searchAll(q, { boardId: req.query.get("board") ?? undefined, remote: req.query.get("remote") !== "0", hidden: hiddenBoards(u), userId: u.id });
@@ -1123,7 +1125,10 @@ function agentRouteScope(req: Req, path: string) {
   const user = userFromRequest(req);
   if (!user || isPerson(req)) return null;
   const service = user.id === "agent";
-  return routeScope(req.method ?? "GET", path, req.query.get("board"), { kind: service ? "service" : "agent", id: service ? "agent" : `agent:${user.id}`, name: user.name, for: service ? null : user.id });
+  // a board's allowance is lent only to a caller who can see that board: naming another one borrows nothing
+  const named = req.query.get("board");
+  const board = named && canSeeBoard(user, named) ? named : null;
+  return routeScope(req.method ?? "GET", path, board, { kind: service ? "service" : "agent", id: service ? "agent" : `agent:${user.id}`, name: user.name, for: service ? null : user.id });
 }
 
 // ---------- view only ----------
