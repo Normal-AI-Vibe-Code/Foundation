@@ -31,7 +31,9 @@ import { boardMaps, logActivity } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
 import { editBoard } from "./boards.ts";
 import { config } from "./config.ts";
-import { checkReaIntegrity, checkTarget, CLAUDE_CODE_ENV, here, reaCommand, type Runtime } from "./rea.ts";
+import { checkReaIntegrity, checkTarget, CLAUDE_CODE_ENV, here, REA_REGISTRY, reaCommand, type Runtime } from "./rea.ts";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ToolCtx } from "./tools.ts";
 import { audit } from "./audit.ts";
 import { approvedRoots } from "./places.ts";
@@ -162,14 +164,20 @@ export function outputLabel(route: "rea-agents" | "claude") {
 /**
  * What a job's program gets (ADR-001 G13): its own folder under the work folder, never `data/`, and an
  * environment from the allowlist, never the server's. rea-agents' static JavaScript analysis needs no
- * model and no key, so it gets BASE only (npx finds npm's cache and settings through the home folders
- * in it). The Claude Code route gets what Claude Code needs to find the person's login (CLAUDE_CODE_ENV),
+ * model and no key, so it gets BASE only (npx finds npm's cache through the home folders in it), and no npm
+ * settings file at all, the person's or the machine's: npx reads an empty one in the job's folder, so no npm
+ * sign-in goes with it and only the registry it was checked against is asked (rea.ts REA_REGISTRY, also on
+ * its command line). The Claude Code route gets what Claude Code needs to find the person's login (CLAUDE_CODE_ENV),
  * and REA's MCP server is the one `npx rea-agents@6.9.0 setup` registered with it.
  */
 export function jobSpawnOptions(job: { id: string }, plan: { route: "rea-agents" | "claude" }): ChildOptions<SpawnOptions> {
+  const cwd = workFolder("jobs", job.id);
+  if (plan.route === "claude") return childOptions<SpawnOptions>({ extras: CLAUDE_CODE_ENV }, { cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const none = join(cwd, "npmrc-none");
+  writeFileSync(none, "");
   return childOptions<SpawnOptions>(
-    { extras: plan.route === "claude" ? CLAUDE_CODE_ENV : [] },
-    { cwd: workFolder("jobs", job.id), stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
+    { extras: [], set: { npm_config_userconfig: none, npm_config_globalconfig: none, npm_config_registry: REA_REGISTRY } },
+    { cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
   );
 }
 

@@ -247,10 +247,17 @@ export const REA_AGENTS = {
 } as const;
 export const REA_SPEC = `${REA_AGENTS.name}@${REA_AGENTS.version}`;
 
+/**
+ * The one registry rea-agents is checked against and fetched from. npx is told it explicitly, so a person's
+ * npm settings that name another registry can't swap in what wasn't checked (jobs.ts also gives npx no
+ * npm settings file, so no npm sign-in goes with it).
+ */
+export const REA_REGISTRY = "https://registry.npmjs.org/";
+
 /** the registry's integrity string for one exact version (what `npm view <name>@<version> dist.integrity` says) */
 export type IntegrityLookup = (name: string, version: string) => Promise<string | undefined>;
 export const registryIntegrity: IntegrityLookup = async (name, version) => {
-  const res = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}/${encodeURIComponent(version)}`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+  const res = await fetch(`${REA_REGISTRY}${encodeURIComponent(name)}/${encodeURIComponent(version)}`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
   if (!res.ok) throw new Error(`npm's registry answered ${res.status}`);
   return ((await res.json()) as { dist?: { integrity?: string } }).dist?.integrity;
 };
@@ -280,7 +287,7 @@ export function reaCommand(job: { target: string; goal: string }, claudeCli: str
       return refuse(`On Windows npx runs rea-agents through cmd.exe, so a path with any of % ! ^ & | < > in it isn't passed to it: ${t.target}. Copy or move the app to a plain path, then press Run again.`);
     const npx = npxCommand(rt);
     if (!npx.ok) return npx;
-    return { ok: true, route: "rea-agents", target: t.target, cmd: npx.cmd, argv: [...npx.pre, "-y", REA_SPEC, "analyze-javascript-application", t.target, "--json"] };
+    return { ok: true, route: "rea-agents", target: t.target, cmd: npx.cmd, argv: [...npx.pre, `--registry=${REA_REGISTRY}`, "-y", REA_SPEC, "analyze-javascript-application", t.target, "--json"] };
   }
   const claude = claudeCommand(claudeCli, rt);
   if (!claude.ok) return claude;

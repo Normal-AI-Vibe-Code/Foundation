@@ -52,7 +52,7 @@ const NPX_CLI = "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npx-cli.js";
 const NPM_SHIM = (script: string) => `@ECHO off\r\nGOTO start\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\nIF EXIST "%dp0%\\node.exe" (\r\n  SET "_prog=%dp0%\\node.exe"\r\n) ELSE (\r\n  SET "_prog=node"\r\n)\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${script}" %*\r\n`;
 const APP_WIN = "C:\\Apps\\Slack\\resources\\app.asar";
 const APP_MAC = "/Applications/Slack.app/Contents/Resources/app.asar";
-const REA = (target: string) => ["-y", "rea-agents@6.9.0", "analyze-javascript-application", target, "--json"];
+const REA = (target: string) => ["--registry=https://registry.npmjs.org/", "-y", "rea-agents@6.9.0", "analyze-javascript-application", target, "--json"];
 
 test("npx on Windows: npm's npx-cli.js under this Node, never npx.cmd", () => {
   // next to the running Node (an ordinary install)
@@ -457,4 +457,35 @@ test("the output label names the program that wrote it", async () => {
   const { outputLabel } = await import("../src/jobs.ts");
   assert.match(outputLabel("claude"), /^Claude Code's output/);
   assert.match(outputLabel("rea-agents"), /^rea-agents' output/);
+});
+
+test("the pinned rea-agents is fetched from the registry it was checked against, with no npm settings file and no npm sign-in", async () => {
+  const { jobSpawnOptions } = await import("../src/jobs.ts");
+  const { REA_REGISTRY } = await import("../src/rea.ts");
+  const { readFileSync, existsSync } = await import("node:fs");
+  assert.equal(REA_REGISTRY, "https://registry.npmjs.org/");
+  // on the command line, before the package: npx asks this registry whatever a settings file says
+  const plan = reaCommand({ target: APP_MAC, goal: "" }, "claude", rt("darwin", { files: { [APP_MAC]: "" } }));
+  assert.ok(plan.ok);
+  assert.ok(plan.argv.indexOf(`--registry=${REA_REGISTRY}`) < plan.argv.indexOf("rea-agents@6.9.0"));
+  // the environment: no npm settings file (the person's, or the machine's), the registry named again, and no npm token
+  Object.assign(process.env, { NPM_TOKEN: "npm_not_real", npm_config__authToken: "npm_not_real", NPM_CONFIG_REGISTRY: "https://evil.example/" });
+  try {
+    const o = jobSpawnOptions({ id: "job_npm123" }, { route: "rea-agents" });
+    const env = o.env as Record<string, string>;
+    assert.equal(env.npm_config_registry, REA_REGISTRY);
+    for (const k of ["npm_config_userconfig", "npm_config_globalconfig"]) {
+      assert.ok(isUnder(env[k], String(o.cwd)), `${k} is in the job's own folder`);
+      assert.ok(existsSync(env[k]) && readFileSync(env[k], "utf8") === "", `${k} is an empty file`);
+    }
+    for (const k of Object.keys(env)) {
+      assert.ok(!/token|auth/i.test(k), `the job was given ${k}`);
+      if (k.toUpperCase() === "NPM_CONFIG_REGISTRY") assert.equal(env[k], REA_REGISTRY, "only the checked registry");
+    }
+    // the Claude Code route is not given npm's settings at all
+    const c = jobSpawnOptions({ id: "job_npm123" }, { route: "claude" }).env as Record<string, string>;
+    assert.equal(c.npm_config_userconfig, undefined);
+  } finally {
+    for (const k of ["NPM_TOKEN", "npm_config__authToken", "NPM_CONFIG_REGISTRY"]) delete process.env[k];
+  }
 });
