@@ -26,6 +26,7 @@ import { config } from "./config.ts";
 import { all, one, run } from "./db.ts";
 import { boardDigest, editBoard } from "./boards.ts";
 import { runTool, toolContent, TOOLS, type ToolCtx } from "./tools.ts";
+import { audit } from "./audit.ts";
 import { canWrite } from "./roles.ts";
 import { createSession, revokeSession } from "./auth.ts";
 import { logActivity } from "@foundation/protocol";
@@ -224,7 +225,7 @@ export async function runAgent(opts: {
   };
   try {
     if (runtime === "api") await runApi(opts, emit);
-    else if (runtime === "script") await runScript(opts, emit, { boardId: opts.boardId, actor: opts.crew?.name ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id });
+    else if (runtime === "script") await runScript(opts, emit, { boardId: opts.boardId, actor: opts.crew?.name ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" });
     else await runSubscription(opts, emit, runId);
     finish(opts.signal.aborted ? "stopped" : "done");
   } catch (e) {
@@ -272,6 +273,12 @@ export function startRun(opts: Omit<Parameters<typeof runAgent>[0], "emit" | "si
     setTimeout(() => live.delete(r.id), 60_000).unref?.();
   };
   emit({ type: "run", id: r.id });
+  // who started it: a person (the route asks requirePerson), a lead calling in help, or the Slack board's curator for the person who turned it on
+  audit(
+    opts.lead
+      ? { actor_kind: "agent", actor_id: opts.lead.id, actor_name: opts.lead.name, for_person: opts.user.id, board_id: opts.boardId, door: "agent-run", action: "run.start", target: r.id, decision: "allowed", result: "ok" }
+      : { actor_kind: "person", actor_id: opts.user.id, actor_name: opts.user.name, board_id: opts.boardId, door: "route", action: "run.start", target: r.id, decision: "allowed", approved_by: opts.user.id, result: "ok" },
+  );
   // every board turn is someone you can see: a name, a colour, a cursor on the board.
   // The Shiba isn't on a board (it talks to one person on their Today), so it has no cursor
   let crew: CrewMember | undefined;
@@ -344,6 +351,7 @@ export function stopRun(id: string, userId: string) {
   const r = live.get(id);
   if (!r || r.userId !== userId) return false;
   r.ctrl.abort();
+  audit({ actor_kind: "person", actor_id: userId, board_id: r.boardId, door: "route", action: "run.stop", target: id, decision: "allowed", result: "ok" });
   return true;
 }
 
@@ -367,6 +375,7 @@ export function stopAllRuns(boardId: string, userId: string): number {
   for (const r of live.values()) {
     if (r.done || r.userId !== userId || r.boardId !== boardId || r.ctrl.signal.aborted) continue;
     r.ctrl.abort();
+    audit({ actor_kind: "person", actor_id: userId, board_id: boardId, door: "route", action: "run.stop", target: r.id, decision: "allowed", result: "ok" });
     n++;
   }
   return n;
@@ -398,7 +407,7 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
     role: "user",
     content: `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`,
   });
-  const ctx: ToolCtx = { boardId: opts.boardId, actor: opts.crew?.name ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id };
+  const ctx: ToolCtx = { boardId: opts.boardId, actor: opts.crew?.name ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" };
   const tools = apiTools();
   let usage = { input: 0, output: 0 };
 
@@ -480,6 +489,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
   const key = convKey(opts);
   // a short-lived session for this person, so the agent's writes are theirs
   const token = createSession(opts.user.id, 2 * 3600_000, "agent");
+  audit({ actor_kind: "service", actor_id: "server", actor_name: "Foundation", for_person: opts.user.id, board_id: opts.boardId, door: "agent-run", action: "agent_token.mint", target: runId, decision: "allowed", reason: "a run's own MCP bearer, 2 hours", result: "ok" });
   // the run's pass to the board, in a folder of the run's own (not data/, not the folder Claude Code works in), gone when it ends
   const runDir = workFolder("runs", /^[A-Za-z0-9_-]+$/.test(runId) ? runId : `run_${randomBytes(6).toString("hex")}`);
   const mcpFile = join(runDir, "mcp.json");

@@ -44,6 +44,7 @@ import { demux, engineJson, execRaw, execSh, findContainer, hijack, machineHooks
 import { findMachineCard } from "./machineasks.ts";
 import { aim, crewMember } from "./crew.ts";
 import { computerUseDefault } from "./prefs.ts";
+import { audit } from "./audit.ts";
 
 export const DESKTOP_SCREEN = { w: 1280, h: 800 };
 const DIR = "/tmp/foundation-desktop";
@@ -474,6 +475,7 @@ export function setAgentsMay(boardId: string, panelId: string, person: { id: str
   if (!panel.machine) throw new HttpError(404, "this card has no machine");
   const name = panel.machine.name;
   if (!allow) {
+    audit({ actor_kind: "person", actor_id: person.id, actor_name: person.name, board_id: boardId, door: "route", action: "desktop_leave.revoke", target: panelId, provenance: "ours-local", decision: "allowed", result: "ok" });
     if (desktopLeave(boardId, panelId).agentsMay) writeDesktopLeave(boardId, panelId, { agentsMay: undefined, agentAsked: undefined }, { who: person.name, role: "human", text: `stopped agents using ${name}'s desktop` });
     return machinePanel(boardId, panelId).machine!;
   }
@@ -482,6 +484,7 @@ export function setAgentsMay(boardId: string, panelId: string, person: { id: str
   }
   if (panel.machine.desktop?.state !== "ready") throw new HttpError(409, `${name} has no desktop for agents to use yet. Add a desktop first.`);
   writeDesktopLeave(boardId, panelId, { agentsMay: { by: person.name, at: Date.now() }, agentAsked: undefined }, { who: person.name, role: "human", text: `let agents use ${name}'s desktop` });
+  audit({ actor_kind: "person", actor_id: person.id, actor_name: person.name, board_id: boardId, door: "route", action: "desktop_leave.allow", target: panelId, provenance: "ours-local", decision: "allowed", approved_by: person.id, result: "ok" });
   return machinePanel(boardId, panelId).machine!;
 }
 

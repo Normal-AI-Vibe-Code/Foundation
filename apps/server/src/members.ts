@@ -13,6 +13,7 @@
 import type { UserInfo } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
 import { HttpError } from "./http.ts";
+import { audit } from "./audit.ts";
 
 export type BoardRole = "owner" | "editor" | "viewer";
 
@@ -51,6 +52,8 @@ export function setMember(boardId: string, userId: string, role: BoardRole, sour
        on conflict (board_id, user_id) do update set role = excluded.role, source = excluded.source`,
     boardId, userId, role, source, Date.now(),
   );
+  // membership comes from an import (Flowform's rooms) or the server itself; it is recorded as that
+  audit({ actor_kind: "service", actor_id: source, actor_name: source, board_id: boardId, door: "route", action: "board_member.set", target: `${userId}:${role}`, decision: "allowed", result: "ok" });
 }
 
 export function listMembers(boardId: string) {

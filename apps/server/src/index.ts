@@ -65,6 +65,7 @@ import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
 import { gridOutline } from "./subgrids.ts";
+import { audit, readAudit, verifyAudit } from "./audit.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -92,6 +93,7 @@ r.post("/auth/dev", async (req, res) => {
   if (!email || !/^[^@\s]+@[^@\s]+$/.test(email)) throw new HttpError(400, "enter an email");
   if (!isAllowed(email)) throw new HttpError(403, `${email} is not on Foundation's allowlist`);
   const user = upsertUser(email, name ?? "");
+  audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, door: "route", action: "sign_in.dev", target: bearer === true ? "app session" : "browser session", decision: "allowed", result: "ok" });
   return { user, ...signIn(res, user.id, bearer === true) };
 });
 r.get("/auth/google/start", (_req, res) => {
@@ -197,6 +199,7 @@ r.post("/api/ws-ticket", async (req) => {
 /** a bearer for an external agent (Claude Code, Codex, Vision) acting as you: a person makes it (an agent's token can't mint itself a longer one), and it lasts a week (ADR-001 G9) */
 r.post("/api/agent/token", (req) => {
   const u = requirePerson(req, "Making an agent token");
+  audit({ actor_kind: "person", actor_id: u.id, actor_name: u.name, door: "route", action: "agent_token.mint", target: `${AGENT_TOKEN_DAYS} days`, decision: "allowed", approved_by: u.id, result: "ok" });
   return { token: createSession(u.id, AGENT_TOKEN_DAYS * 864e5, "agent"), mcp: `${config.publicUrl}/mcp?board=company` };
 });
 
@@ -1072,6 +1075,18 @@ r.post("/api/agent/runs/stop-all", async (req) => {
 r.post("/api/agent/runs/:id/stop", (req) => {
   const user = requireUser(req);
   return { stopped: stopRun(req.params.id, user.id) };
+});
+
+// ---------- the audit log, and what agents may send outside (audit.ts, egress.ts) ----------
+
+// who did what: an admin, in person, reads it (audit.ts). Rows hold no argument values, results or message text
+r.get("/api/audit", (req) => {
+  const u = requirePerson(req, "Reading the audit log");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can read the audit log.");
+  const board = req.query.get("board");
+  const after = Number(req.query.get("after") ?? 0);
+  const limit = Number(req.query.get("limit") ?? 100);
+  return { rows: readAudit({ board, after, limit }), chain: verifyAudit() };
 });
 
 // ---------- view only ----------

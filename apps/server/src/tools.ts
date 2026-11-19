@@ -69,6 +69,7 @@ import { describeIo, ensureMachinePorts, watchMachine } from "./machineio.ts";
 import { writeDigest } from "./digest.ts";
 import { flowformCall, flowformTools } from "./flowformlink.ts";
 import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, stepTarget, travel, type CrewMember } from "./crew.ts";
+import { audit, callScope, type AuditInput, type CallScope, type Door } from "./audit.ts";
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
@@ -94,6 +95,8 @@ export interface ToolCtx {
   person?: boolean;
   /** the same, as origin/main's activity log said it ("human" is a person); kept so both callers agree */
   role?: "human" | "agent";
+  /** the door the call came through, for the audit log (audit.ts) */
+  door?: Door;
 }
 
 /**
@@ -102,8 +105,8 @@ export interface ToolCtx {
  * service token, Foundation's own agent).
  */
 export function httpToolCtx(boardId: string, user: { id: string; name: string }, person: boolean): ToolCtx {
-  if (person) return { boardId, actor: user.name, userId: user.id, person: true };
-  return { boardId, actor: user.id === "agent" ? user.name : `${user.name}'s agent`, userId: user.id };
+  if (person) return { boardId, actor: user.name, userId: user.id, person: true, door: "http" };
+  return { boardId, actor: user.id === "agent" ? user.name : `${user.name}'s agent`, userId: user.id, door: "http" };
 }
 
 export interface BoardTool<S extends z.ZodTypeAny = z.ZodTypeAny> {
@@ -1421,19 +1424,87 @@ export function toolByName(name: string) {
   return TOOLS.find((t) => t.name === name);
 }
 
-/** Run a tool with idempotency on request_id and input validation. */
+/**
+ * Who is calling, for the audit log. A person acting directly is only the HTTP door with their own
+ * browser's cookie or their app's sign-in (`person`, set by httpToolCtx from isPerson); everything else
+ * is an agent acting for its person (a crew run, an agent bearer), or the service token.
+ */
+function actorOf(ctx: ToolCtx): Pick<AuditInput, "actor_kind" | "actor_id" | "actor_name" | "for_person"> {
+  if (ctx.person) return { actor_kind: "person", actor_id: ctx.userId, actor_name: ctx.actor };
+  const member = crewMember(ctx.crew);
+  if (!member && ctx.userId === "agent") return { actor_kind: "service", actor_id: "agent", actor_name: ctx.actor };
+  return { actor_kind: "agent", actor_id: member ? member.id : `agent:${ctx.userId}`, actor_name: ctx.actor, for_person: ctx.userId === "agent" ? null : ctx.userId };
+}
+
+/**
+ * The identifier a call acts on, for the audit log. Never content: only something that exists in
+ * Foundation under that id (a card or section on the board, a file, a board), a repository's
+ * owner/name, or a Slack channel's id. Anything else a caller put in an id field is left out, so a
+ * value can't reach the log by being passed as an id.
+ */
+function targetOf(boardId: string, name: string, input: unknown): string | null {
+  if (!input || typeof input !== "object") return null;
+  const i = input as Record<string, unknown>;
+  const str = (k: string) => (typeof i[k] === "string" && (i[k] as string).length <= 120 ? (i[k] as string) : null);
+  // the board is opened only when there is an id to look for (a tool that never touches a board leaves it shut)
+  let doc: Y.Doc | null | undefined;
+  const board0 = () => {
+    if (doc !== undefined) return doc;
+    try {
+      doc = getBoard(boardId).doc;
+    } catch {
+      doc = null; // no such board: ids can't be checked, so none is kept
+    }
+    return doc;
+  };
+  const onBoard = (v: string | null) => {
+    if (!v) return null;
+    const doc = board0();
+    if (!doc) return null;
+    const m = boardMaps(doc);
+    if (m.objects.has(v) || m.sections.has(v)) return v;
+    return findSection(doc, v)?.id ?? null;
+  };
+  const file = (v: string | null) => (v && one("select 1 from files where id = ?", v) ? v : null);
+  const board = (v: string | null) => (v && one("select 1 from boards where id = ?", v) ? v : null);
+  const card =
+    onBoard(str("id")) ?? onBoard(str("object_id")) ?? onBoard(str("panel")) ?? onBoard(str("stage_panel")) ?? onBoard(str("collection")) ?? onBoard(str("huddle")) ?? onBoard(str("target")) ?? onBoard(str("section")) ?? (str("machine") && board0() ? (findMachineCard(boardId, str("machine")!)?.id ?? null) : null);
+  const repo = str("repo") ? parseRepo(str("repo")!) : null;
+  const channel = str("channel") && /^[CGD][A-Z0-9]{6,20}$/.test(str("channel")!) ? str("channel") : null;
+  const t = card ?? file(str("file_id")) ?? board(str("to_board")) ?? repo ?? channel;
+  if (name === "call_app_tool" && str("tool") && /^[\w.-]{1,64}$/.test(str("tool")!)) return `${t ?? "?"}:${str("tool")}`;
+  return t;
+}
+
+/** Run a tool with idempotency on request_id and input validation; every call is recorded (audit.ts). */
 export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Promise<unknown> {
+  const door: Door = ctx.door ?? (ctx.person ? "http" : "agent-run");
+  const rec = (r: Partial<AuditInput> & Pick<AuditInput, "decision">) =>
+    audit({ ...actorOf(ctx), board_id: ctx.boardId, door, action: /^[a-z_]{1,40}$/.test(name) ? name : "(not a tool)", target: targetOf(ctx.boardId, name, rawInput), args: rawInput ?? {}, ...r });
   const tool = toolByName(name);
-  if (!tool) throw new Error(`unknown tool ${name}`);
+  if (!tool) {
+    rec({ decision: "refused", reason: "no such tool", result: "error" });
+    throw new Error(`unknown tool ${name}`);
+  }
   const parsed = tool.schema.safeParse(rawInput ?? {});
-  if (!parsed.success) throw new Error(`invalid input for ${name}: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+  if (!parsed.success) {
+    rec({ decision: "refused", reason: "invalid input", result: "error" });
+    throw new Error(`invalid input for ${name}: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+  }
   // viewers read: every other tool is a write (or acts for the board) and is refused
   if (!READ_TOOLS.has(name) && !canWrite(ctx.userId, ctx.boardId)) {
+    rec({ decision: "refused", reason: "view only" });
     throw new HttpError(403, `View only: this person can read the board “${ctx.boardId}” but not change it, so ${name} can't run. Say what you would change instead.`);
   }
   const rid = (parsed.data as { request_id?: string }).request_id;
   const key = rid ? `${ctx.boardId}:${ctx.userId}:${rid}` : null;
-  if (key && seenRequests.has(key)) return seenRequests.get(key);
+  if (key && seenRequests.has(key)) {
+    rec({ decision: "allowed", reason: "same request_id: the first call's result", result: "ok" });
+    return seenRequests.get(key);
+  }
+  // what this call may send, and who approved it: a person acting directly approves their own call
+  const scope: CallScope = { gated: false, allowed: new Set(), approvedBy: new Set(ctx.person ? [ctx.userId] : []), held: new Set() };
+  const approved = () => [...scope.approvedBy].join(",") || null;
   // a visible agent says what it's doing, and goes to what it's about to change before changing it
   const member = crewMember(ctx.crew);
   if (member && member.boardId === ctx.boardId) {
@@ -1442,7 +1513,16 @@ export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Pr
     if (tool.write) await travel(member, stepTarget(ctx.boardId, name, input), doing);
     else setDoing(member, doing);
   }
-  const out = await tool.run(ctx, parsed.data);
+  let out: unknown;
+  try {
+    out = await callScope.run(scope, () => tool.run(ctx, parsed.data));
+  } catch (e) {
+    // the error's words may carry what was asked: only that it was refused, or failed, is kept
+    const refused = e instanceof HttpError && e.status === 403;
+    rec({ decision: refused ? "refused" : "allowed", reason: refused ? "refused by the tool" : null, approved_by: approved(), result: "error" });
+    throw e;
+  }
+  rec(scope.asked ? { decision: "asked", reason: scope.asked } : { decision: "allowed", approved_by: approved(), result: "ok" });
   if (key) {
     seenRequests.set(key, out);
     if (seenRequests.size > 2000) seenRequests.delete(seenRequests.keys().next().value!);

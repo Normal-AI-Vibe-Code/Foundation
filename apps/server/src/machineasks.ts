@@ -27,6 +27,7 @@ import { execOnce } from "./machines.ts";
 import { canWrite } from "./roles.ts";
 import { HttpError } from "./http.ts";
 import { aim, crewMember, setDoing } from "./crew.ts";
+import { audit } from "./audit.ts";
 
 /** how long an ask waits for a person, by default and at most */
 export function askWaitMs() {
@@ -199,6 +200,7 @@ export function answerAsk(boardId: string, panelId: string, askId: string, perso
   if (!canWrite(person.id, boardId)) throw new HttpError(403, `View only: someone who can edit “${boardId}” answers an agent's command`);
   const w = waiting.get(askId);
   if (!w || w.boardId !== boardId || w.panelId !== panelId) throw new HttpError(404, "That command isn't waiting any more (it was answered, ran out of time, or its agent stopped)");
+  audit({ actor_kind: "person", actor_id: person.id, actor_name: person.name, board_id: boardId, door: "route", action: verdict === "run" ? "machine_ask.run" : "machine_ask.decline", target: `${panelId}:${askId}`, provenance: "ours-local", decision: "allowed", approved_by: verdict === "run" ? person.id : null, result: "ok" });
   w.decide(verdict === "run" ? { kind: "run", by: person.name } : { kind: "decline", by: person.name });
   return w.ask;
 }

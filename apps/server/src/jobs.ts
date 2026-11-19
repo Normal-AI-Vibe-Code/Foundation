@@ -27,6 +27,7 @@ import { editBoard } from "./boards.ts";
 import { config } from "./config.ts";
 import { checkReaIntegrity, CLAUDE_CODE_ENV, here, reaCommand } from "./rea.ts";
 import type { ToolCtx } from "./tools.ts";
+import { audit } from "./audit.ts";
 
 export interface JobRow {
   id: string;
@@ -71,6 +72,8 @@ export function startJob(id: string, boardId: string, by: string) {
   const job = getJob(id);
   if (!job) throw new Error("no such job");
   if (job.status === "running") return job;
+  // a person's press (the route asks requirePerson); `by` is their name
+  audit({ actor_kind: "person", actor_name: by, board_id: boardId, door: "route", action: "job.start", target: `${job.id} ${job.kind}`, provenance: job.kind === "vision" ? "ours-local" : "external", service: job.kind === "vision" ? "Vision Code" : "REA (npm registry, Claude)", decision: "allowed", approved_by: by, result: "ok" });
   if (job.kind === "vision") return startVisionJob(job, boardId, by);
   // the target is checked and the program resolved before anything runs: no shell, the target is one argument (rea.ts)
   const plan = reaCommand(job, config.claudeCli, here());

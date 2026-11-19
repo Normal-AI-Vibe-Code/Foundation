@@ -31,7 +31,7 @@ function buildServer(boardId: string, user: UserInfo, crewId?: string) {
     server.registerTool(t.name, { description: t.description, inputSchema: shape }, async (args: unknown) => {
       try {
         const actor = crew ? crew.name : user.id === "agent" ? "Agent (MCP)" : `${user.name}'s agent`;
-        const out = await runTool({ boardId, actor, userId: user.id, crew: crew?.id }, t.name, args);
+        const out = await runTool({ boardId, actor, userId: user.id, crew: crew?.id, door: "mcp" }, t.name, args);
         // a picture in the result (a machine's screen) goes to the model as a picture, the rest as text
         const { text, image } = toolContent(out);
         return { content: [...(image ? [{ type: "image" as const, data: image.base64, mimeType: image.mime }] : []), { type: "text" as const, text }] };

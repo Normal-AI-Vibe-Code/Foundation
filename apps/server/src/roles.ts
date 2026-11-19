@@ -17,6 +17,7 @@ import type { UserInfo } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
 import { HttpError } from "./http.ts";
 import { dropConnections } from "./boards.ts";
+import { audit } from "./audit.ts";
 
 export type BoardRole = "admin" | "member" | "viewer";
 
@@ -69,7 +70,12 @@ export function requireWriter(user: UserInfo, boardId?: string | null) {
 
 /** set (or with null, clear) someone's role on one board — admins only, in person (the route asks requirePerson) */
 export function setBoardRole(by: UserInfo, boardId: string, userId: string, role: "member" | "viewer" | null) {
-  if (by.role !== "admin" || by.id === "agent") throw new HttpError(403, "Only an admin can change who may edit a board");
+  const rec = (decision: "allowed" | "refused", reason?: string) =>
+    audit({ actor_kind: by.id === "agent" ? "service" : "person", actor_id: by.id, actor_name: by.name, board_id: boardId, door: "route", action: "board_role.set", target: `${userId}:${role ?? "default"}`, decision, reason: reason ?? null, approved_by: decision === "allowed" ? by.id : null, result: decision === "allowed" ? "ok" : null });
+  if (by.role !== "admin" || by.id === "agent") {
+    rec("refused", "not an admin");
+    throw new HttpError(403, "Only an admin can change who may edit a board");
+  }
   if (!one("select id from users where id = ?", userId)) throw new HttpError(404, "no such person");
   if (role === null) run("delete from board_roles where board_id = ? and user_id = ?", boardId, userId);
   else
@@ -77,6 +83,7 @@ export function setBoardRole(by: UserInfo, boardId: string, userId: string, role
       "insert into board_roles (board_id, user_id, role, set_by, set_at) values (?, ?, ?, ?, ?) on conflict(board_id, user_id) do update set role = excluded.role, set_by = excluded.set_by, set_at = excluded.set_at",
       boardId, userId, role, by.id, Date.now(),
     );
+  rec("allowed");
   dropConnections(boardId, userId); // they reconnect under the new role
 }
 

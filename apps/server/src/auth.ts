@@ -21,6 +21,7 @@ import type { UserInfo } from "@foundation/protocol";
 import { config } from "./config.ts";
 import { one, run } from "./db.ts";
 import { HttpError, parseCookies, type Req } from "./http.ts";
+import { audit } from "./audit.ts";
 
 const SESSION_DAYS = 30;
 /** an agent's bearer (/api/agent/token) lasts a week (ADR-001 G9) */
@@ -174,25 +175,40 @@ export function requireUser(req: Req): UserInfo {
  */
 export function requirePerson(req: Req, what = "This"): UserInfo {
   const u = requireUser(req);
-  const refuse = () => new HttpError(403, `${what} needs a person: press the button on the card. Agents can propose, not run.`);
-  if (u.id === AGENT_USER.id) throw refuse();
+  if (personBehind(req, u)) return u;
+  // recorded: who was refused, at which route, and on which board (audit.ts); never the request's body
+  const path = new URL(req.url ?? "/", "http://local").pathname;
+  audit({
+    actor_kind: u.id === AGENT_USER.id ? "service" : "agent",
+    actor_id: u.id === AGENT_USER.id ? "agent" : `agent:${u.id}`,
+    actor_name: u.name,
+    for_person: u.id === AGENT_USER.id ? null : u.id,
+    board_id: /^\/api\/boards\/([^/]+)/.exec(path)?.[1] ?? req.query?.get("board") ?? null,
+    door: "route",
+    action: `${req.method ?? "?"} ${path}`,
+    decision: "refused",
+    reason: `${what} needs a person`,
+  });
+  throw new HttpError(403, `${what} needs a person: press the button on the card. Agents can propose, not run.`);
+}
+
+/** requirePerson's test, for a signed-in user: their browser's cookie with no bearer, or their app's sign-in bearer */
+function personBehind(req: Req, u: UserInfo): boolean {
+  if (u.id === AGENT_USER.id) return false;
   const auth = req.headers.authorization;
   if (auth) {
     // a bearer is a person only if it is an app's sign-in session
     const s = auth.startsWith("Bearer ") ? userFromSessionHash(hashToken(auth.slice(7))) : null;
-    if (s?.kind !== "app") throw refuse();
-    return u;
+    return s?.kind === "app";
   }
   const cookie = parseCookies(req.headers.cookie)[COOKIE];
-  if (!cookie || userFromSessionHash(hashToken(cookie))?.kind === "agent") throw refuse();
-  return u;
+  return Boolean(cookie) && userFromSessionHash(hashToken(cookie!))?.kind !== "agent";
 }
 
-/** is this request a person (requirePerson's test: their browser's cookie, or their app's sign-in bearer), without refusing it */
+/** is this request a person (requirePerson's test), without refusing it or recording a refusal */
 export function isPerson(req: Req, _user?: UserInfo): boolean {
   try {
-    requirePerson(req);
-    return true;
+    return personBehind(req, requireUser(req));
   } catch {
     return false;
   }
