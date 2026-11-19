@@ -1,4 +1,5 @@
 import { fullscreenCard, inUse, releaseCard } from "../lib/cardUse";
+import { wheelKind, wheelMemory } from "../lib/wheelKind";
 import { cardWheel } from "../lib/cardScroll";
 import { installScrollHint, noteAltScroll } from "../lib/scrollHint";
 import { keys } from "../lib/keys";
@@ -570,11 +571,16 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     publishPointer(null, null);
   }, []);
 
+  // the wheel gesture under way: a trackpad's stays a pan until the wheel rests (lib/wheelKind.ts)
+  const wheelMem = useRef(wheelMemory());
   const onWheel = useCallback(
     (e: WheelEvent) => {
       const container = containerRef.current;
       if (!container) return;
-      const zooming = e.ctrlKey || e.metaKey;
+      // 2026-11-17, Josh: "Scroll wheel should be zoom in Foundation" (a mouse wheel zooms; a trackpad's
+      // two-finger scroll still pans, and a pinch zooms: lib/wheelKind.ts)
+      const kind = wheelKind(e, wheelMem.current);
+      const zooming = kind !== "pan";
       // panning the grid ends a card's use, so it can't catch the wheel as it slides under the pointer;
       // a zoom keeps the card under the pointer, so a terminal or a desktop in use keeps the keys
       if (!zooming) releaseCard();
@@ -583,10 +589,11 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
         const cx = e.clientX - r.left;
         const cy = e.clientY - r.top;
         // trackpad pinch arrives as small ctrl-wheel deltas: follow the fingers 1:1;
-        // a mouse wheel with ⌘/ctrl takes bigger steps on the spring
-        const pinch = e.deltaMode === 0 && Math.abs(e.deltaY) < 40;
+        // a mouse wheel takes bigger steps on the spring (lines are about 40 px each)
+        const pinch = kind === "zoom-pinch";
+        const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
         const oldS = pinch ? zoom.value : zoom.goal;
-        const factor = Math.exp(-e.deltaY * (pinch ? 0.011 : 0.0022));
+        const factor = Math.exp(-dy * (pinch ? 0.011 : 0.0022));
         const newS = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldS * factor));
         const ratio = newS / oldS;
         if (pinch) {

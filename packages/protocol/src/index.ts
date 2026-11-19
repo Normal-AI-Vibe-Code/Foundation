@@ -314,7 +314,57 @@ export interface MachineState {
   agentActs?: MachineAgentAct[];
   /** the machine's pipes: when /foundation/in was last written and /foundation/out last read, and what was in them */
   io?: MachineIo;
+  /**
+   * Public links to its ports (2026-11-17): a tunnel (Cloudflare's quick tunnels, cloudflared on this computer)
+   * a person opened, with who and when. Anyone with the link reaches that port; Stop, the machine stopping or
+   * Foundation restarting ends it.
+   */
+  shares?: MachineShare[];
+  /** a pull under way, in bytes, for the card's bar (detail keeps the words) */
+  pull?: { done: number; total: number };
+  /** what the machine offers as functions: executables in /foundation/functions, read when the card looks */
+  functions?: MachineFunction[];
+  /**
+   * A node of a Kubernetes cluster (k3s; 2026-11-17, Josh: "options to start a kubernetes cluster and pods"):
+   * the cluster's id and name, this node's role, and for a worker the server's machine name (it joins it by
+   * name on the cluster's own network). Every node is a machine card of its own, so it can be moved anywhere.
+   */
+  cluster?: { id: string; name: string; role: "server" | "agent"; server?: string };
+  /** a pod opened as a card of its own: its terminal is `kubectl exec` through the cluster's server */
+  pod?: { server: string; ns: string; name: string; node?: string; phase?: string };
+  /** per function: the keys of the pictures it has had (the next run takes only new ones), the last 400 */
+  fnDone?: Record<string, string[]>;
+  /** its Start puts ImageMagick and the example picture functions in it (a machine laid by Process in a machine) */
+  wantFunctions?: boolean;
+  /** the example functions going in, or why they didn't */
+  fnSetup?: { state: "installing" | "error"; by: string; at: number; detail?: string };
 }
+
+export interface MachineShare {
+  port: number;
+  url: string;
+  by: string;
+  at: number;
+}
+
+/**
+ * A function a machine offers (2026-11-17, Josh: "functions that are able to reach into the VM"): an executable
+ * in /foundation/functions/<name>. Its first comment lines say what it takes and gives:
+ *   # about: Trims each picture and makes it 1024 px
+ *   # in: images        (images | text | json | files)
+ *   # out: images
+ * It runs with IN and OUT set to two folders: what it's given is in IN (one file each, or in.txt / in.json),
+ * and what it leaves in OUT comes back.
+ */
+export interface MachineFunction {
+  name: string;
+  about?: string;
+  in: MachineFunctionKind;
+  out: MachineFunctionKind;
+  /** its last run: who, when, how many went in and came out, how long, and what it said (or wrote as text) */
+  last?: { at: number; by: string; ok: boolean; took: number; made: number; ms: number; said?: string; text?: string };
+}
+export type MachineFunctionKind = "images" | "text" | "json" | "files";
 
 export interface MachineDesktop {
   state: "installing" | "ready" | "error";

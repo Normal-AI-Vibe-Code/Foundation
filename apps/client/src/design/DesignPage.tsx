@@ -108,6 +108,7 @@ import { RichToolbar } from "../components/RichText";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
 import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
 import { MachineTools } from "../panels/MachineTools";
+import { MachineHeadSpecimens } from "./MachineSpecimens";
 import { AgentsMayLine, AgentUseLine, DesktopWell, ViewSwitch } from "../panels/MachineViewDesktop";
 import { IoLines } from "../panels/MachineViewIo";
 import type { MachineAsk, SlackSectionState } from "@foundation/protocol";
@@ -999,6 +1000,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         </div>
         <MachineAsksDemo />
         <MachineUseDemo />
+        <MachineHeadSpecimens />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
             <div className="machine-body is-pulling">

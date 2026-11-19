@@ -25,12 +25,12 @@
 import "@xterm/xterm/css/xterm.css";
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { boardMaps, MACHINE_DISTROS, type MachineAsk, type MachineState } from "@foundation/protocol";
-import { addPanel, addSectionAdjacent, getState, type PanelMeta } from "../state/store";
+import { type PanelMeta } from "../state/store";
 import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { askAgent, toast, useUi } from "../state/ui";
 import { useOnScreen } from "./PanelView";
-import { MACHINE_STATE_WORD, machineTone, portUrl } from "./machinePage";
+import { MACHINE_STATE_WORD, machineTone } from "./machinePage";
 import { unscaleMouse } from "./scaledMouse";
 import { putInUse } from "../lib/cardUse";
 import { HOLDS_KEYS, escEscToLeave } from "../lib/keysHeld";
@@ -39,7 +39,11 @@ import { KeysLine, useRingWidth } from "./MachineViewBits";
 import { AgentUse, Desktop, ViewSwitch, useMachineView } from "./MachineViewDesktop";
 import { IoView } from "./MachineViewIo";
 import { desktopRecipe } from "./machineWords";
-import { AgentGlyph, DesktopGlyph, LockGlyph, PullGlyph, ShieldGlyph, TerminalGlyph } from "../shell/glyphs";
+import { AgentGlyph, DesktopGlyph, GlobeGlyph, LockGlyph, PackageGlyph, PlayGlyph, PullGlyph, ShieldGlyph, StopGlyph, TerminalGlyph } from "../shell/glyphs";
+import { HubSearch } from "./MachineHub";
+import { AddressBar, MachineTitle } from "./MachineBar";
+import { Access } from "./MachineAccess";
+import { ClusterStart, ClusterView, PodWell } from "./MachineCluster";
 import { copyText, mountTerminal, readClipboard, type MachineTerminal } from "./machineTerminal";
 import { MachineTools, copiedWords, openMachineWindow, pastedWords, useFlash } from "./MachineTools";
 
@@ -104,17 +108,14 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
 
   return (
     <div ref={host} className={`machine-body is-${m.state}`}>
-      <div className="machine-head">
-        <StatePill m={m} noEngine={noEngine && m.state !== "running"} away={Boolean(engine?.asleep && m.containerId)} />
-        {engine && (
-          <span className="machine-engine" data-tip={engine.asleep ? `${engine.name} is installed here and asleep: Start wakes it` : `${engine.name} ${engine.version ?? ""}: the engine this machine runs on`}>
-            {engine.name} {engine.asleep ? "· asleep" : engine.version}
-          </span>
-        )}
-        {m.image && <code className="machine-image">{m.image}</code>}
-        {m.state === "running" && <ViewSwitch view={view} onView={setView} panelId={panel.id} />}
-        {m.state === "running" && <Ports panel={panel} m={m} />}
-      </div>
+      {/* the head (2026-11-17, redrawn): the title row with the actions, then the views and the machine's address */}
+      <MachineTitle panel={panel} m={m} viewer={viewer || noEngine} engineName={engine?.name} engineVersion={engine?.asleep ? "· asleep" : engine?.version} pill={<StatePill m={m} noEngine={noEngine && m.state !== "running"} away={Boolean(engine?.asleep && m.containerId)} />} />
+      {m.state === "running" && (
+        <div className="machine-nav-row">
+          <ViewSwitch view={view} onView={setView} panelId={panel.id} only={m.pod ? ["terminal", "access"] : m.cluster?.role === "server" ? ["cluster", "terminal", "io", "access"] : m.cluster ? ["terminal", "io", "access"] : undefined} />
+          <AddressBar panel={panel} m={m} viewer={viewer} />
+        </div>
+      )}
       <MachineAsks panelId={panel.id} viewer={viewer} />
       {m.state === "running" && <AgentUse panelId={panel.id} m={m} viewer={viewer} view={view} onWatch={() => setView("desktop")} />}
       {noEngine && m.state !== "running" ? (
@@ -126,23 +127,30 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
           <Desktop panel={panel} m={m} viewer={viewer} />
         ) : view === "io" ? (
           <IoView panel={panel} viewer={viewer} />
+        ) : view === "access" ? (
+          <AccessWaiting panel={panel} m={m} viewer={viewer} />
+        ) : view === "cluster" && m.cluster?.role === "server" ? (
+          <ClusterView panel={panel} m={m} viewer={viewer} />
         ) : (
           <Terminal panelId={panel.id} name={m.name} canType={!viewer} />
         )
+      ) : m.pod ? (
+        <PodWell m={m} />
       ) : m.state === "pulling" || m.state === "starting" ? (
-        <div className="machine-progress">
-          <span className="f-dot is-warn is-live" />
-          <span>{m.detail ?? "Starting…"}</span>
-        </div>
+        <PullWell m={m} />
+      ) : m.cluster ? (
+        <ClusterStart m={m} viewer={viewer} />
       ) : m.state === "stopped" && m.containerId ? (
-        <div className="machine-well">
-          <div className="connector-offline-title">{engine?.asleep ? `${m.name} is out of reach` : `${m.name} is stopped`}</div>
-          <div className="connector-offline-reason">{m.detail ?? "Its disk is kept: Start runs it again."}</div>
+        <div className="machine-well machine-hero">
+          <span className="machine-hero-mark">
+            <StopGlyph size={22} />
+          </span>
+          <div className="machine-hero-title connector-offline-title">{engine?.asleep ? `${m.name} is out of reach` : `${m.name} is stopped`}</div>
+          <div className="machine-hero-lede connector-offline-reason">{m.detail ?? "Its disk is kept: Start runs it again."}</div>
         </div>
       ) : (
         <Picker panel={panel} m={m} engine={engine} viewer={viewer} />
       )}
-      {!noEngine && <Controls panel={panel} m={m} viewer={viewer} engine={engine} />}
     </div>
   );
 }
@@ -153,6 +161,12 @@ export function MachineBody({ panel }: { panel: PanelMeta }) {
 const ANSWERED_MS = 2 * 60_000;
 
 /** the commands agents asked to run here: the board's `machineAsks`, written by the server alone */
+/** the Access view, told how many of the agents' commands are waiting */
+function AccessWaiting({ panel, m, viewer }: { panel: PanelMeta; m: MachineState; viewer: boolean }) {
+  const asks = useMachineAsks(panel.id);
+  return <Access panel={panel} m={m} viewer={viewer} waiting={asks.filter((a) => a.state === "waiting").length} />;
+}
+
 function useMachineAsks(panelId: string): MachineAsk[] {
   const [asks, setAsks] = useState<MachineAsk[]>([]);
   useEffect(() => {
@@ -276,31 +290,26 @@ function StatePill({ m, noEngine, away }: { m: MachineState; noEngine: boolean; 
   );
 }
 
-/** a machine's published ports: each opens as a web page in the section, or in the browser */
-function Ports({ panel, m }: { panel: PanelMeta; m: MachineState }) {
-  if (!m.ports?.length) return null;
+/**
+ * Pulling or starting (2026-11-17, redrawn): the centred column, the mark breathing, what it's doing, and a bar
+ * of the bytes pulled when the engine says how many. Also drawn on #/design.
+ */
+export function PullWell({ m }: { m: Pick<MachineState, "state" | "detail" | "image" | "pull"> }) {
+  const pct = m.pull && m.pull.total ? Math.min(100, (m.pull.done / m.pull.total) * 100) : null;
   return (
-    <span className="machine-ports">
-      {m.ports.map((p) => {
-        const url = portUrl(p.host);
-        return (
-          <button
-            key={p.port}
-            className="f-pill machine-port"
-            data-tip={`Port ${p.port} in the machine, on ${url} here. Opens it as a page in this section.`}
-            onClick={() => {
-              // a machine that fills its section gets a section beside it for the page (a card behind it would be hidden)
-              const hosted = getState().sections[panel.sectionId]?.host === panel.id;
-              const where = hosted ? addSectionAdjacent(panel.sectionId, "right") : panel.sectionId;
-              // the page knows where it came from, so it follows the machine (stopped, removed, running again)
-              if (where) addPanel(where, { panel: "link", name: `${m.name}:${p.port}`, url, text: `Port ${p.port} of the machine ${m.name}`, fromMachine: { panel: panel.id, port: p.port, name: m.name } });
-            }}
-          >
-            :{p.port} ↗
-          </button>
-        );
-      })}
-    </span>
+    <div className="machine-progress machine-hero machine-pull">
+      <span className="machine-hero-mark is-busy">{m.state === "pulling" ? <PullGlyph size={22} /> : <PlayGlyph size={22} />}</span>
+      <div className="machine-hero-title">{m.state === "pulling" ? `Pulling ${m.image ?? "the image"}` : "Starting"}</div>
+      {pct !== null && (
+        <div className="machine-pull-bar" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
+          <i style={{ transform: `scaleX(${pct / 100})` }} />
+        </div>
+      )}
+      <span className="machine-desk-said machine-copyable" onPointerDown={(e) => e.stopPropagation()}>
+        <span className="f-dot is-warn is-live" />
+        {m.detail ?? "Starting…"}
+      </span>
+    </div>
   );
 }
 
@@ -343,6 +352,7 @@ function Picker({ panel, m, engine, viewer }: { panel: PanelMeta; m: MachineStat
   const [tars, setTars] = useState<ArchiveFile[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [desk, setDesk] = useState(Boolean(m.wantDesktop));
+  const [ports, setPorts] = useState((m.wantPorts ?? []).join(", "));
   useEffect(() => setImage(m.image ?? ""), [m.image]);
   useEffect(() => {
     if (!engine) return;
@@ -382,7 +392,9 @@ function Picker({ panel, m, engine, viewer }: { panel: PanelMeta; m: MachineStat
       onImage={setImage}
       onLoad={(f) => void load(f as ArchiveFile)}
       onDesk={setDesk}
-      start={<StartButton panel={panel} m={m} image={image} engine={engine} viewer={viewer} desktop={desk && desktopRecipe(image || m.image || "") !== "no"} />}
+      ports={ports}
+      onPorts={setPorts}
+      start={<StartButton panel={panel} m={m} image={image} engine={engine} viewer={viewer} desktop={desk && desktopRecipe(image || m.image || "") !== "no"} ports={parsePorts(ports)} />}
     />
   );
 }
@@ -413,6 +425,9 @@ export function MachinePickerView(p: {
   onImage?: (img: string) => void;
   onLoad?: (f: { id: string; name: string }) => void;
   onDesk?: (on: boolean) => void;
+  ports?: string;
+  onPorts?: (v: string) => void;
+  hubStill?: Parameters<typeof HubSearch>[0]["still"];
   start: ReactNode;
 }) {
   const { m, viewer } = p;
@@ -479,7 +494,17 @@ export function MachinePickerView(p: {
             </div>
           </>
         )}
-        <input className="machine-field" value={p.image} disabled={viewer} spellCheck={false} placeholder="or any image: postgres:17, nginx:1.27, ghcr.io/…" onChange={(e) => p.onImage?.(e.target.value.trim())} onKeyDown={(e) => e.stopPropagation()} />
+        <HubSearch image={p.image} viewer={viewer} onImage={(i) => p.onImage?.(i)} still={p.hubStill} />
+        {p.image && !MACHINE_DISTROS.some((d) => d.image === p.image) && (
+          <div className="machine-picked">
+            <PackageGlyph size={16} /> <code>{p.image}</code>
+          </div>
+        )}
+        <label className="machine-ports-field" data-tip="Container ports to publish on 127.0.0.1: each gets an address on the card, a Foundation link and, if you open one, a public link">
+          <GlobeGlyph size={16} />
+          <span>Web ports</span>
+          <input value={p.ports ?? ""} disabled={viewer} spellCheck={false} placeholder="8080, 3000" inputMode="numeric" onChange={(e) => p.onPorts?.(e.target.value)} onKeyDown={(e) => e.stopPropagation()} aria-label="Web ports" />
+        </label>
         {!viewer && (
           <label className={`machine-option machine-with-desk${recipe === "no" ? " is-off" : ""}`} data-tip={recipe === "no" ? undefined : "Installed once it runs: an X server, XFCE and VNC, a few minutes. You can add it later too, from the card's Desktop view."}>
             <input type="checkbox" checked={p.desk && recipe !== "no"} disabled={recipe === "no"} onChange={(e) => p.onDesk?.(e.target.checked)} />
@@ -498,13 +523,18 @@ export function MachinePickerView(p: {
   );
 }
 
-function StartButton({ panel, m, image, engine, viewer, desktop }: { panel: PanelMeta; m: MachineState; image: string; engine?: EngineStatus; viewer: boolean; desktop?: boolean }) {
+/** "8080, 3000" → [8080, 3000]: whole numbers 1–65535, eight at most */
+export function parsePorts(text: string): number[] {
+  return [...new Set((text.match(/\d+/g) ?? []).map(Number).filter((n) => n > 0 && n < 65536))].slice(0, 8);
+}
+
+function StartButton({ panel, m, image, engine, viewer, desktop, ports }: { panel: PanelMeta; m: MachineState; image: string; engine?: EngineStatus; viewer: boolean; desktop?: boolean; ports?: number[] }) {
   const [busy, setBusy] = useState(false);
   if (viewer) return <div className="machine-note">View only: someone who can edit this board starts it.</div>;
   const start = async () => {
     setBusy(true);
     try {
-      await api(`/api/boards/${encodeURIComponent(board())}/machines/${panel.id}/start`, { method: "POST", json: { image: image || undefined, engine: engine?.id, ...(desktop ? { desktop: true } : {}) } });
+      await api(`/api/boards/${encodeURIComponent(board())}/machines/${panel.id}/start`, { method: "POST", json: { image: image || undefined, engine: engine?.id, ...(ports?.length ? { ports } : {}), ...(desktop ? { desktop: true } : {}) } });
     } catch (e) {
       toast((e as Error).message, "bad");
     } finally {
@@ -533,55 +563,6 @@ export function StartLine({ label, disabled, onStart, wakes, desktop }: { label:
           <ShieldGlyph size={14} /> Nothing from this computer mounted
         </li>
       </ul>
-    </div>
-  );
-}
-
-function Controls({ panel, m, viewer, engine }: { panel: PanelMeta; m: MachineState; viewer: boolean; engine?: EngineStatus }) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [arm, setArm] = useState(false);
-  useEffect(() => {
-    if (!arm) return;
-    const t = setTimeout(() => setArm(false), 3000);
-    return () => clearTimeout(t);
-  }, [arm]);
-  if (viewer || !m.containerId || m.state === "absent") return null;
-  const act = async (verb: "start" | "stop" | "restart" | "remove") => {
-    if (verb === "remove" && !arm) return setArm(true);
-    setBusy(verb);
-    setArm(false);
-    try {
-      await machineAction(panel.id, verb, verb === "remove" ? { confirm: true } : {});
-    } catch (e) {
-      toast((e as Error).message, "bad");
-    } finally {
-      setBusy(null);
-    }
-  };
-  const running = m.state === "running";
-  return (
-    <div className="machine-controls">
-      {!running && m.state !== "pulling" && m.state !== "starting" && (
-        <button className="f-pill is-accent" disabled={busy !== null} onClick={() => void act("start")}>
-          {busy === "start" ? "Starting…" : `Start on ${engine?.name ?? "the engine"}`}
-        </button>
-      )}
-      {running && (
-        <>
-          <button className="f-pill" disabled={busy !== null} onClick={() => void act("stop")} data-tip="Stop it. The disk is kept; Start runs it again.">
-            {busy === "stop" ? "Stopping…" : "Stop"}
-          </button>
-          <button className="f-pill" disabled={busy !== null} onClick={() => void act("restart")}>
-            {busy === "restart" ? "Restarting…" : "Restart"}
-          </button>
-        </>
-      )}
-      <span className="machine-name" data-tip={`The container is machine-${m.name}: \`kiri machine shell ${m.name}\` reaches it too`}>
-        {m.name}
-      </span>
-      <button className={`f-pill machine-remove${arm ? " is-armed" : ""}`} disabled={busy !== null} onClick={() => void act("remove")} data-tip="Remove the machine and its disk. The card stays.">
-        {busy === "remove" ? "Removing…" : arm ? "Remove it and its disk?" : "Remove"}
-      </button>
     </div>
   );
 }
