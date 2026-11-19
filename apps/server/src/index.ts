@@ -713,7 +713,7 @@ r.post("/api/jobs/:id/run", async (req) => {
   requireWriter(u, job.board_id);
   // it runs only what the card showed: the press names the hash of the target and goal it showed (jobs.ts)
   const { shown } = await readJson<{ shown?: string }>(req);
-  return { job: startJob(job.id, job.board_id ?? "company", u.name, typeof shown === "string" ? shown : "") };
+  return { job: startJob(job.id, job.board_id ?? "company", u.name, typeof shown === "string" ? shown : "", u.id) };
 });
 
 // ---------- machines (Kiri or Docker, through the Engine API) ----------

@@ -109,7 +109,7 @@ export function setCard(boardId: string, jobId: string, status: "running" | "don
  * A person pressed Run on the card that showed `shown` (jobShown). It runs only if that is what the job
  * was queued with and the row still says so: a target or goal changed since is never run unseen.
  */
-export function startJob(id: string, boardId: string, by: string, shown: string) {
+export function startJob(id: string, boardId: string, by: string, shown: string, byId?: string) {
   const job = getJob(id);
   if (!job) throw new Error("no such job");
   if (job.status === "running") return job;
@@ -117,7 +117,8 @@ export function startJob(id: string, boardId: string, by: string, shown: string)
   if (shown !== queued || shownHash(job) !== queued)
     throw new HttpError(409, "What this job would run isn't what its card showed. Open the card again and check the target and goal before pressing Run.");
   // a person's press (the route asks requirePerson); `by` is their name
-  audit({ actor_kind: "person", actor_name: by, board_id: boardId, door: "route", action: "job.start", target: `${job.id} ${job.kind}`, provenance: job.kind === "vision" ? "ours-local" : "external", service: job.kind === "vision" ? "Vision Code" : "REA (npm registry, Claude)", decision: "allowed", approved_by: by, result: "ok" });
+  // the person who pressed, by id (their name is only what they are called): who did it, and whose press approved it
+  audit({ actor_kind: "person", actor_id: byId ?? null, actor_name: by, board_id: boardId, door: "route", action: "job.start", target: `${job.id} ${job.kind}`, provenance: job.kind === "vision" ? "ours-local" : "external", service: job.kind === "vision" ? "Vision Code" : "REA (npm registry, Claude)", decision: "allowed", approved_by: byId ?? by, result: "ok" });
   if (job.kind === "vision") return startVisionJob(job, boardId, by);
   // the target is checked and the program resolved before anything runs: no shell, the target is one argument (rea.ts)
   const plan = reaCommand(job, config.claudeCli, jobRuntime());

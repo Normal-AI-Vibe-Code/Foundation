@@ -489,3 +489,15 @@ test("the pinned rea-agents is fetched from the registry it was checked against,
     for (const k of ["NPM_TOKEN", "npm_config__authToken", "NPM_CONFIG_REGISTRY"]) delete process.env[k];
   }
 });
+
+test("the audit log records who pressed Run by their id, and that their press approved it", async () => {
+  const { startJob, getJob, setJobDeps, jobShown } = await import("../src/jobs.ts");
+  const { checkReaIntegrity, REA_AGENTS } = await import("../src/rea.ts");
+  const { one } = await import("../src/db.ts");
+  setJobDeps({ spawn: () => fakeChild(0, "ok"), integrity: () => checkReaIntegrity(async () => REA_AGENTS.integrity) });
+  const q = await queueAppJob();
+  startJob(q.job, "jobs-board", "Tester", jobShown(getJob(q.job)!).shown, "u");
+  const row = one<{ actor_id: string; actor_name: string; approved_by: string }>("select actor_id, actor_name, approved_by from audit_log where action = 'job.start' and target like ? order by id desc limit 1", `${q.job} %`);
+  assert.deepEqual(row && { ...row }, { actor_id: "u", actor_name: "Tester", approved_by: "u" });
+  await until("the job ran", () => getJob(q.job)!.status === "done");
+});
