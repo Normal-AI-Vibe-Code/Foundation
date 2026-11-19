@@ -13,6 +13,7 @@ import { all } from "./db.ts";
 import { searchRepos } from "./github.ts";
 import { searchFlowformFiles } from "./flowform-live.ts";
 import { SLACK_SEARCH_NOT_YOURS, slackUserTokenFor } from "./slackuser.ts";
+import { guardEgress } from "./egressguard.ts";
 
 const REMOTE_TIMEOUT = 2500;
 /** Flowform searches Slack and Figma as well as its own files, through a fresh MCP session: it gets longer */
@@ -68,6 +69,7 @@ async function withTimeout<T>(p: Promise<T>, fallback: T, ms = REMOTE_TIMEOUT): 
 /** Slack messages, searched with the user token: only for its owner (`token` comes from slackUserTokenFor) */
 export async function searchSlack(q: string, token: string, limit = 8): Promise<SearchHit[]> {
   if (!token) return [];
+  guardEgress("Slack"); // an agent's search reaches Slack only where a person allowed it (egress.ts)
   const base = (process.env.SLACK_API_BASE || "https://slack.com/api").replace(/\/$/, "");
   const res = await fetch(`${base}/search.messages?query=${encodeURIComponent(q)}&count=${limit}&sort=score`, {
     headers: { authorization: `Bearer ${token}` },

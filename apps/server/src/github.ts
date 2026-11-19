@@ -7,6 +7,7 @@
 
 import { childOptions, execFileText, type ExecFileOptions } from "./child.ts";
 import { config } from "./config.ts";
+import { guardEgress } from "./egressguard.ts";
 
 /**
  * What `gh` gets beyond the allowlist (child.ts): its own credential and settings, and nothing else of
@@ -79,6 +80,12 @@ const toInfo = (r: GhRepo): RepoInfo => ({
 /** how an API path is fetched: tests put a stand-in here, to see exactly what would be asked of GitHub */
 export const githubTransport: { get: <T>(path: string) => Promise<T> } = { get: (path) => api(path) };
 
+/** every request to GitHub: an agent's call reaches it only where a person allowed it (egress.ts), before the transport */
+async function ghGet<T>(path: string): Promise<T> {
+  guardEgress("GitHub");
+  return githubTransport.get<T>(path);
+}
+
 // ---------- what a repository name may be ----------
 //
 // Every API path is built from a repository's owner and name. Unchecked, a "repo" like
@@ -135,16 +142,16 @@ export function contentsPath(repo: string, file: string): string {
 }
 
 export async function repoInfo(repo: string): Promise<RepoInfo> {
-  return toInfo(await githubTransport.get<GhRepo>(repoBase(repo)));
+  return toInfo(await ghGet<GhRepo>(repoBase(repo)));
 }
 
 export async function repoReadme(repo: string): Promise<string> {
-  const r = await githubTransport.get<{ content: string; encoding: string }>(`${repoBase(repo)}/readme`);
+  const r = await ghGet<{ content: string; encoding: string }>(`${repoBase(repo)}/readme`);
   return Buffer.from(r.content, r.encoding as BufferEncoding).toString("utf8");
 }
 
 export async function repoCommits(repo: string, n = 8) {
-  const rows = await githubTransport.get<Array<{ sha: string; html_url: string; commit: { message: string; author: { name: string; date: string } } }>>(
+  const rows = await ghGet<Array<{ sha: string; html_url: string; commit: { message: string; author: { name: string; date: string } } }>>(
     `${repoBase(repo)}/commits?per_page=${Math.max(1, Math.min(100, Math.floor(n) || 8))}`,
   );
   return rows.map((c) => ({ sha: c.sha.slice(0, 7), url: c.html_url, message: c.commit.message.split("\n")[0], author: c.commit.author.name, date: c.commit.author.date }));
@@ -161,7 +168,7 @@ export async function searchRepos(q: string, limit = 8): Promise<RepoInfo[]> {
   // only the owners Foundation reads (FOUNDATION_GITHUB_OWNERS), whatever GitHub answers
   const ours = (r: RepoInfo) => ownerAllowed(r.fullName.split("/")[0] ?? "");
   if (config.github.org) {
-    const r = await githubTransport.get<{ items: GhRepo[] }>(`/search/repositories?q=${encodeURIComponent(q)}+org:${encodeURIComponent(config.github.org)}&per_page=${n}`);
+    const r = await ghGet<{ items: GhRepo[] }>(`/search/repositories?q=${encodeURIComponent(q)}+org:${encodeURIComponent(config.github.org)}&per_page=${n}`);
     return r.items.map(toInfo).filter(ours);
   }
   return matchRepos(await myRepos(), q).filter(ours).slice(0, n);
@@ -175,7 +182,7 @@ async function myRepos(): Promise<RepoInfo[]> {
   if (mine && Date.now() - mine.at < MINE_TTL) return mine.repos;
   const repos: RepoInfo[] = [];
   for (let page = 1; page <= 3; page++) {
-    const rows = await githubTransport.get<GhRepo[]>(`/user/repos?per_page=100&page=${page}&sort=pushed&affiliation=owner,collaborator,organization_member`).catch(() => [] as GhRepo[]);
+    const rows = await ghGet<GhRepo[]>(`/user/repos?per_page=100&page=${page}&sort=pushed&affiliation=owner,collaborator,organization_member`).catch(() => [] as GhRepo[]);
     repos.push(...rows.map(toInfo));
     if (rows.length < 100) break;
   }

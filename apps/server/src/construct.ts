@@ -18,6 +18,7 @@ import { editBoard } from "./boards.ts";
 import { canSeeFile, storeFile, type FileRow } from "./files.ts";
 import { searchLocal } from "./search.ts";
 import { SLACK_SEARCH_NOT_YOURS, slackUserTokenFor } from "./slackuser.ts";
+import { guardEgress } from "./egressguard.ts";
 
 // ---------- finding ----------
 
@@ -65,6 +66,7 @@ interface SlackFile {
 }
 
 async function slackGet<T>(method: string, params: Record<string, string>, token: string): Promise<T> {
+  guardEgress("Slack"); // an agent's call reaches Slack only where a person allowed it (egress.ts)
   const res = await fetch(`${slackBase()}/${method}?${new URLSearchParams(params)}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
   const body = (await res.json()) as { ok: boolean; error?: string } & T;
   if (!body.ok) throw new Error(`Slack ${method}: ${body.error ?? "failed"}`);
@@ -191,6 +193,7 @@ async function fileFor(ref: string, boardId: string, userId: string): Promise<{ 
     const { file: f } = await slackGet<{ file: SlackFile }>("files.info", { file: ref.slice(6) }, token);
     const url = f.url_private_download ?? f.url_private;
     if (!url || !IMAGE.test(f.mimetype ?? "")) return null;
+    guardEgress("Slack");
     const res = await fetch(url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) throw new Error(`Slack wouldn't hand over ${f.name ?? f.id} (${res.status})`);
     const body = Buffer.from(await res.arrayBuffer());

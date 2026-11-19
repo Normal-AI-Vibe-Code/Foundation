@@ -11,6 +11,7 @@ import { ShibaDot } from "../today/notices";
 import { ShibaTalk } from "../today/ShibaTalk";
 import { PROVIDER_NAME, ProviderMark } from "../characters/providers";
 import { Group, Row, Seg } from "../settings/SettingsSpace";
+import { EgressView, type EgressState } from "../shell/EgressSettings";
 import "../panels/system-cards.css";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DesignChapter } from "@foundation/protocol";
@@ -1137,6 +1138,13 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <SubGridDemo />
       </Section>
 
+      <Section
+        title="What agents may send outside"
+        note="In a grid's own pane (the ⓘ on its tab), under who can change it: Agents on this board may send to. One group per outside service this server has set up, its name in 13/600 and a badge that says where it runs in words (↗ External service · Slack, a hairline pill in mist). Under it a row per kind of thing an agent would send, said plainly in mist 12, with Allowed by whom (ok green) or Not allowed (dim) beneath, and a switch at the right: blue with the knob over when on. Everything starts off. A person who can edit the grid flips one (on a members-only grid, its owner or an admin); a viewer sees the same rows with the switches held and a line saying who can change them. An agent that wanted to send gets a sentence saying a person has to allow it, and nothing goes. A person's own search from their browser needs none of this. Shown at 272 (the pane's own width), as a viewer, and at 220, the narrowest the pane goes."
+      >
+        <EgressDemo />
+      </Section>
+
       <Section title="Text box" note={`A note written as formatted text: what you see is what's kept. Click in it to write; a toolbar rides the card's foot while it has the caret (raised paper, card radius, 34 tall): the style (Body, Title, Heading, Subheading), bold, italic, underline, strikethrough, bulleted and numbered lists, quote, link, clear. A mark that's on is the pulse tint. ${keys("mod+B")}, ${keys("mod+I")} and ${keys("mod+U")} work as in any word processor. Under it, it is the note's own markdown in the note's shared text, so search, agents and the other renderer read it as they read any note; underline is kept as <u>. From the right-click menu (Text box), and from an empty section's Write.`}>
         <TextBoxDemo />
       </Section>
@@ -1387,6 +1395,39 @@ function AppToolAsksDemo() {
       {card(560, 420, [...done, first])}
       {card(400, 360, [changed], true)}
       {card(260, 360, [first])}
+    </div>
+  );
+}
+
+/** what a grid's agents may send outside (EgressSettings): an editor's pane at 272, a viewer's, and the narrowest pane (220) */
+function EgressDemo() {
+  const kinds = (service: string, on: Record<string, string | undefined>) => {
+    const words: Record<string, Record<string, string>> = {
+      Slack: { query: "Search words, to find messages and pictures in Slack", read: "Which channel or file to read, to read its messages or copy a picture in", message: "A message an agent writes, sent to a teammate as a direct message" },
+      GitHub: { query: "Search words, to find the company's repositories", read: "Which repository to read, to read its README and recent commits" },
+    };
+    return Object.entries(words[service]).map(([kind, sends]) => ({ kind, sends, allowed: Boolean(on[kind]), ...(on[kind] ? { allowedBy: on[kind] } : {}) }));
+  };
+  const services = (on: Record<string, Record<string, string | undefined>>): EgressState["services"] =>
+    ["Slack", "GitHub"].map((service) => ({ service, provenance: "external", badge: `External service · ${service}`, configured: true, kinds: kinds(service, on[service] ?? {}) }));
+  const editor: EgressState = { services: services({ Slack: { query: "Ada", read: "Ada" } }), canChange: true, who: "Anyone who can edit this grid can change these." };
+  const viewer: EgressState = { services: services({ Slack: { query: "Ada" } }), canChange: false, who: "Anyone who can edit this grid can change these." };
+  const narrow: EgressState = { services: services({}), canChange: true, who: "This grid's owner or an admin can change these." };
+  const [live, setLive] = useState(editor);
+  const pane = (width: number, state: EgressState, onToggle?: (s: string, k: string, on: boolean) => void) => (
+    <div className="side-pane space-info" style={{ width, border: "1px solid var(--color-line)", borderRadius: "var(--radius-pane)", background: "var(--color-void)" }}>
+      <div className="pane-scroll">
+        <EgressView state={state} onToggle={onToggle} />
+      </div>
+    </div>
+  );
+  const flip = (s: string, k: string, on: boolean) =>
+    setLive((cur) => ({ ...cur, services: cur.services.map((x) => (x.service !== s ? x : { ...x, kinds: x.kinds.map((y) => (y.kind !== k ? y : { ...y, allowed: on, allowedBy: on ? "you" : undefined })) })) }));
+  return (
+    <div className="adapt-row">
+      {pane(272, live, flip)}
+      {pane(272, viewer)}
+      {pane(220, narrow, () => {})}
     </div>
   );
 }

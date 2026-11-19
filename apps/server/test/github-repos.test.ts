@@ -39,6 +39,10 @@ gh.githubTransport.get = async <T>(path: string): Promise<T> => {
 
 const ada = upsertUser("ada@formindustries.com", "Ada");
 const ctx = { boardId: "company", actor: "Ada's agent", userId: ada.id };
+// Ada's agent reads GitHub from this board because Ada allowed it (egress.ts); the checks below are about names
+const { setAllowance } = await import("../src/egress.ts");
+setAllowance("company", ada, "GitHub", "read", true);
+setAllowance("company", ada, "GitHub", "query", true);
 
 beforeEach(() => {
   asked.length = 0;

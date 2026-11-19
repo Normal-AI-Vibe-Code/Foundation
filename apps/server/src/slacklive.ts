@@ -40,6 +40,7 @@ import { createBoardRow, editBoard, getBoard, listBoards } from "./boards.ts";
 import { storeFile } from "./files.ts";
 import { imageSize } from "./construct.ts";
 import { canWrite } from "./roles.ts";
+import { allowanceFor, setAllowance } from "./egress.ts";
 import { SlackError, channelItems, downloadFile, forgetChannels, joinChannel, lendToken, listChannels, slackConfigured, slackStatus, type ChannelItem, type SlackChannel, type SlackFileRef } from "./slack.ts";
 
 db.exec(`
@@ -565,6 +566,9 @@ export async function joinFor(boardId: string, channel: string, user: UserInfo) 
 export function setAgents(boardId: string, user: UserInfo, on: boolean) {
   const row = boardRow(boardId);
   if (!row) throw new SlackError("not_a_slack_board", "That isn't the Slack board");
+  // the agents here read each section's channel: turning them on is this person allowing Slack reads from this board
+  // (egress.ts; recorded as theirs). Turning them off leaves the allowance, which the board's pane takes back
+  if (on && !allowanceFor(boardId, "Slack", "read")) setAllowance(boardId, user, "Slack", "read", true);
   run("update slack_boards set agents_by = ?, agents_at = ? where board_id = ?", on ? user.id : null, on ? Date.now() : null, boardId);
   const agents = on ? { by: user.name, at: Date.now() } : undefined;
   editBoard(boardId, "slack", (doc) => {

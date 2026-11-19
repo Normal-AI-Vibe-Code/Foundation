@@ -65,7 +65,8 @@ import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
 import { gridOutline } from "./subgrids.ts";
-import { audit, readAudit, verifyAudit } from "./audit.ts";
+import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
+import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -1089,6 +1090,33 @@ r.get("/api/audit", (req) => {
   return { rows: readAudit({ board, after, limit }), chain: verifyAudit() };
 });
 
+// what agents on a board may send to outside services (egress.ts): anyone who can see the board reads it;
+// a person who can edit it (on a members-only board, its owner or an admin) sets it, from their own browser or app
+r.get("/api/boards/:id/egress", (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  return egressState(req.params.id, u);
+});
+const changeEgress = (on: boolean) => async (req: Req) => {
+  const u = requirePerson(req, on ? "Letting agents send outside" : "Taking back what agents may send outside");
+  requireBoard(u, req.params.id);
+  const b = await readJson<{ service?: string; kind?: string }>(req);
+  const sk = serviceKind(String(b.service ?? ""), String(b.kind ?? ""));
+  if (!sk) throw new HttpError(400, "Name a service and a kind of send it takes (GET this board's egress lists them)");
+  setAllowance(req.params.id, u, sk.service, sk.kind, on);
+  return egressState(req.params.id, u);
+};
+r.post("/api/boards/:id/egress", changeEgress(true));
+r.delete("/api/boards/:id/egress", changeEgress(false));
+
+/** an agent's request to a read route that reaches an outside service runs under the board's allowances (egress.ts routeScope) */
+function agentRouteScope(req: Req, path: string) {
+  const user = userFromRequest(req);
+  if (!user || isPerson(req)) return null;
+  const service = user.id === "agent";
+  return routeScope(req.method ?? "GET", path, req.query.get("board"), { kind: service ? "service" : "agent", id: service ? "agent" : `agent:${user.id}`, name: user.name, for: service ? null : user.id });
+}
+
 // ---------- view only ----------
 
 /**
@@ -1148,7 +1176,8 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     if (!m) throw new HttpError(404, "not found");
     req.params = m.params;
     gateWrites(req, url.pathname);
-    const out = await m.handler(req, res);
+    const scope = agentRouteScope(req, url.pathname);
+    const out = scope ? await callScope.run(scope, () => m.handler(req, res)) : await m.handler(req, res);
     if (!res.headersSent && out !== undefined) json(res, out);
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;

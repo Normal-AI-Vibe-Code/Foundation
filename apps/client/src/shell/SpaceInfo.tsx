@@ -4,7 +4,8 @@
  * place on the floor, and the spaces pane's fold brings that one back.
  *
  * Top to bottom: what the space is (name, canvas, folder, a page's address),
- * who is here now, who may change it (admins set that), and its activity.
+ * who is here now, who may change it (admins set that), what its agents may
+ * send to outside services (EgressSettings), and its activity.
  */
 
 import { useEffect, useState } from "react";
@@ -18,6 +19,7 @@ import { FloorEdge } from "./FloorEdge";
 import { ago, isSystemGrid, paneSpring } from "./SidePane";
 import { wouldLoop } from "../lib/grids";
 import { KIND_GLYPH, KIND_NAME, type BoardRow } from "./Shell";
+import { Egress } from "./EgressSettings";
 
 interface Props {
   user: UserInfo;
@@ -86,6 +88,7 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
 
             <Here me={user} />
             {user.role === "admin" && <People board={space.id} me={user.id} />}
+            <Egress board={space.id} />
             <Activity />
           </div>
           <FloorEdge side="right" value={ui.paneW} {...WIDTHS.pane} onChange={(w) => setUi({ paneW: w })} label="This grid's pane" />

@@ -15,6 +15,7 @@
  */
 
 import { config } from "./config.ts";
+import { guardEgress } from "./egressguard.ts";
 
 const READ_TTL = 4000;
 
@@ -54,6 +55,7 @@ export function slackConfigured() {
 
 async function call<T>(method: string, params: Record<string, unknown> = {}, post = false): Promise<T> {
   if (!token()) throw new SlackError("not_configured", "Slack isn't connected — set SLACK_BOT_TOKEN (SPEC §6)");
+  guardEgress("Slack"); // an agent's call reaches Slack only where a person allowed it (egress.ts)
   const headers: Record<string, string> = { authorization: `Bearer ${token()}` };
   let url = `${base()}/${method}`;
   let body: string | undefined;
@@ -331,6 +333,7 @@ export async function channelItems(channel: string, limit = 60): Promise<Channel
 /** a file's bytes, fetched as the app (Slack's file links are private) */
 export async function downloadFile(f: SlackFileRef, max = 40 * 1024 * 1024): Promise<Buffer> {
   if (!token()) throw new SlackError("not_configured", "Slack isn't connected");
+  guardEgress("Slack");
   let url = f.url;
   if (!url) {
     const r = await call<{ file: RawFile }>("files.info", { file: f.id });
