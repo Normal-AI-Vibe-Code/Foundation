@@ -835,7 +835,7 @@ function AgentBody({ panel }: { panel: PanelMeta }) {
         // a hand-off: the job's output is where the work is happening
         <div className="agent-handoff">
           <p>{panel.text}</p>
-          <a className="f-pill is-agent" href={output.trim()} target="_blank" rel="noopener">
+          <a className="f-pill is-agent" href={output.trim()} target="_blank" rel="noopener noreferrer">
             Open in Vision Code ↗
           </a>
         </div>

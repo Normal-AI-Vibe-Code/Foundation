@@ -1141,6 +1141,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <TextBoxDemo />
       </Section>
 
+      <Section title="Pictures and links from elsewhere" note="Text an agent, a tool, Slack, a README or another app wrote is drawn as markdown, and what it points at stays put until a person chooses. A picture from any address but Foundation's own files (or one written into the text) is a dashed pill on raised paper: Image from and its host in ink, and Load image, which loads that one picture, this time; nothing is remembered. A link says where it really goes: its host in code type, dim 11, beside the words (unless the words already name it), and it opens in a new tab that can't reach back. Only web addresses become links.">
+        <ElsewhereDemo />
+      </Section>
+
       <Section title="Writing together" note={`A note at rest is its markdown, tables included. Double-click and it opens as a CodeMirror editor on the note's shared text: monospace, the markdown's own marks dimmed, headings and strong text in weight, links blue — no colour of its own. Every keystroke is shared as it's typed, so two people can write in one note, even in one word, and both keep their words whole. Each person keeps their own colour: someone else's caret is a 2 px bar in it, named while it moves and quiet once it rests; their selection is a 22 % tint. A note at rest names whoever is writing in it with a breathing chip at the bottom right, clear of the bar that drops in at the top. ${keys("mod+Z")} takes back only your own words. The two editors below share one text: type in either.`}>
         <NoteEditorDemo />
       </Section>
@@ -1515,6 +1519,20 @@ function SectionAgentsDemo() {
           </header>
           <SectionAgentsView sectionName="Review" teams={null} recent={[]} canAsk={false} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** an agent's note pointing at a picture and a page elsewhere: the placeholder, and the link's real host */
+function ElsewhereDemo() {
+  const html = renderMarkdown(
+    "## Shroud supplier\n\nThe quote is in [the supplier's portal](https://portal.example-supplier.com/q/4471), and the drawing they sent:\n\n![rev C drawing](https://cdn.example-supplier.com/rev-c.png)\n\nThe model is in [github.com/form/shroud](https://github.com/form/shroud).",
+  );
+  return (
+    <div className="frame-card oncall-static" style={{ position: "relative", width: 400 }}>
+      <div className="note-inner">
+        <div className="note-rendered" dangerouslySetInnerHTML={{ __html: html }} />
       </div>
     </div>
   );

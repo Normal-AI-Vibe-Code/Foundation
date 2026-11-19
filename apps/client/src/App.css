@@ -1972,6 +1972,45 @@ body.is-viewer .frame-grip {
   border-bottom: 1px solid color-mix(in srgb, var(--color-pulse) 30%, transparent);
 }
 .note-rendered a:hover { border-bottom-color: var(--select); }
+/* rendered text (utils/markdown.ts): a link's real host beside it, and a picture from elsewhere waiting for a press */
+.md-link-host {
+  margin-left: var(--space-1);
+  font-family: var(--font-code);
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  user-select: none;
+}
+.md-link-host::before { content: "↗ "; }
+.md-img-remote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin: var(--space-1) 0;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  font-size: var(--text-12);
+  color: var(--color-dim);
+  user-select: none;
+  vertical-align: middle;
+}
+.md-img-remote-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-img-remote-label b { font-weight: 600; color: var(--color-frost); }
+.md-img-load {
+  flex: none;
+  height: var(--h-pill);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: inherit;
+  cursor: pointer;
+}
+.md-img-load:hover { border-color: var(--color-pulse); }
+.md-img-load:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 1px; }
 /* | tables | in a note: hairlines, a soft header, scroll sideways in a narrow note */
 .note-rendered .md-table { overflow-x: auto; margin: 6px 0; }
 .note-rendered table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
