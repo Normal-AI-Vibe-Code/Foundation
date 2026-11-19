@@ -1,6 +1,7 @@
 import { runCaseyAgent } from '../../agent/index.js';
 import { sessionStore } from '../../thread-context/index.js';
 import { buildFeedbackBlocks } from '../views/feedback-builder.js';
+import { refusal } from './sender.js';
 
 /**
  * Handle app_mention events and run the Casey agent.
@@ -8,6 +9,11 @@ import { buildFeedbackBlocks } from '../views/feedback-builder.js';
  * @returns {Promise<void>}
  */
 export async function handleAppMentioned({ client, context, event, logger, say, sayStream, setStatus }) {
+  const refused = refusal(event, context);
+  if (refused) {
+    logger.info(`Casey: not answering a mention (${refused})`);
+    return;
+  }
   try {
     const channelId = event.channel;
     const text = event.text || '';
