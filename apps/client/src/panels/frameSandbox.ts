@@ -7,10 +7,12 @@
  *   would run with the person's session under a frame someone else chose. Refused, with a sentence in its place.
  *   Only http(s) addresses are framed at all (no data:, blob:, javascript:, about:, file:).
  * - **Always sandboxed.** Scripts, forms, popups, modals and downloads.
- * - **Its own origin only when it's trusted.** `allow-same-origin` (its sign-in and storage work, and the bridge
- *   can address it by origin) is granted only to the origin of a saved app (the apps registry) or, for T3's frame,
- *   the configured T3 address. Any other address, typed or on a card, runs as an opaque origin: with scripts
- *   and same-origin together on a loopback port it would be same-site with Foundation.
+ * - **Its own origin unless it is on this computer and unknown.** `allow-same-origin` (its sign-in and storage
+ *   work) is kept by a web site that is not on this computer: its origin is its own, never Foundation's. An address
+ *   on this computer (a loopback name, any port) keeps its origin only if it is a saved app (the apps registry) or,
+ *   for T3's frame, the configured T3 address: any other local port, with scripts and same-origin together, would
+ *   be same-site with Foundation, so it runs as an opaque origin.
+ * - **Trusted** (the bridge sends to it; camera, microphone and clipboard reading) is only a saved app or T3.
  * - **The bridge** (app ↔ grid postMessage) names the frame's own origin when it sends, never "*", so it sends
  *   only to a frame that has one; it accepts a message only from that frame's window and from its origin ("null"
  *   for an opaque one).
@@ -29,7 +31,7 @@ export interface FrameContext {
 }
 
 export type FrameDecision =
-  | { ok: true; url: string; origin: string; sandbox: string; trusted: boolean }
+  | { ok: true; url: string; origin: string; sandbox: string; trusted: boolean; /** runs without an origin of its own (an unknown address on this computer) */ opaque: boolean }
   | { ok: false; reason: string };
 
 /** localhost and its subdomains, 127.0.0.0/8, ::1 (and its IPv4-mapped form), and the any-address */
@@ -52,7 +54,8 @@ export function frameFor(url: string, ctx: FrameContext): FrameDecision {
   if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, reason: "Only web pages (http or https) open here." };
   if (ctx.ours.includes(u.origin) || (isLoopbackHost(u.hostname) && ctx.ports.includes(portOf(u)))) return { ok: false, reason: OWN_PAGE };
   const trusted = ctx.saved.includes(u.origin) || Boolean(ctx.t3 && ctx.t3 === u.origin);
-  return { ok: true, url: u.href, origin: u.origin, sandbox: trusted ? `${SANDBOX} allow-same-origin` : SANDBOX, trusted };
+  const opaque = !trusted && isLoopbackHost(u.hostname);
+  return { ok: true, url: u.href, origin: u.origin, sandbox: opaque ? SANDBOX : `${SANDBOX} allow-same-origin`, trusted, opaque };
 }
 
 /** what the bridge sends to: the frame's own origin, or nothing (an opaque frame can't be named, and "*" is never used) */
@@ -63,7 +66,7 @@ export function bridgeTarget(d: FrameDecision): string | null {
 /** a message is the frame's own: from its window, and from its origin ("null" when it runs opaque) */
 export function bridgeAccepts(d: FrameDecision, e: { origin: string; source: unknown }, frameWindow: unknown): boolean {
   if (!d.ok || !frameWindow || e.source !== frameWindow) return false;
-  return e.origin === (d.trusted ? d.origin : "null");
+  return e.origin === (d.opaque ? "null" : d.origin);
 }
 
 /** what a frame may ask the browser for: camera and microphone, and reading the clipboard, only for a trusted one */

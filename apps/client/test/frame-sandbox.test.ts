@@ -47,14 +47,20 @@ test("only web addresses are framed: no data:, blob:, javascript:, about: or fil
   assert.match(refused("http://"), /can't be opened/);
 });
 
-test("always sandboxed; its own origin (allow-same-origin) only for a saved app", () => {
+test("always sandboxed; an unknown address on this computer runs without an origin, a web site keeps its own", () => {
   const app = frameFor("https://airformdata.com/rooms", ctx);
   assert.ok(app.ok);
   assert.equal(app.sandbox, `${SANDBOX} allow-same-origin`);
   const local = frameFor("http://127.0.0.1:3001/", ctx);
   assert.ok(local.ok && local.trusted, "a saved app on this computer keeps its origin");
-  // anything else, typed or on a card, runs opaque: scripts but no same-origin
-  for (const url of ["https://example.com/", "http://localhost:3001/" /* same port, another origin than the saved one */, "http://127.0.0.1:11502/" /* a machine's port */, "http://192.168.1.20:8080/"]) {
+  // a web site that isn't on this computer keeps its own origin (its sign-in works) but is not trusted
+  for (const url of ["https://example.com/", "http://192.168.1.20:8080/"]) {
+    const d = frameFor(url, ctx);
+    assert.ok(d.ok && !d.trusted && !d.opaque, url);
+    assert.equal(d.sandbox, `${SANDBOX} allow-same-origin`, url);
+  }
+  // an unknown address on this computer, typed or on a card, runs opaque: scripts but no same-origin
+  for (const url of ["http://localhost:3001/" /* same port, another origin than the saved one */, "http://127.0.0.1:11502/" /* a machine's port */, "http://app.localhost:5173/"]) {
     const d = frameFor(url, ctx);
     assert.ok(d.ok, url);
     assert.equal(d.sandbox, SANDBOX, url);
@@ -88,9 +94,12 @@ test("the bridge hears only its own frame's window, from that frame's origin", (
   assert.equal(bridgeAccepts(app, { origin: "https://airformdata.com", source: win }, win), true);
   assert.equal(bridgeAccepts(app, { origin: "https://evil.example", source: win }, win), false, "the frame navigated elsewhere");
   assert.equal(bridgeAccepts(app, { origin: "https://airformdata.com", source: other }, win), false, "another window with the right origin");
-  const opaque = frameFor("https://example.com/", ctx);
+  const opaque = frameFor("http://127.0.0.1:11502/", ctx);
   assert.equal(bridgeAccepts(opaque, { origin: "null", source: win }, win), true);
-  assert.equal(bridgeAccepts(opaque, { origin: "https://example.com", source: win }, win), false);
+  assert.equal(bridgeAccepts(opaque, { origin: "http://127.0.0.1:11502", source: win }, win), false);
+  const site = frameFor("https://example.com/", ctx);
+  assert.equal(bridgeAccepts(site, { origin: "https://example.com", source: win }, win), true);
+  assert.equal(bridgeAccepts(site, { origin: "null", source: win }, win), false);
   assert.equal(bridgeAccepts(frameFor("http://localhost:4410/", ctx), { origin: "http://localhost:4410", source: win }, win), false);
   assert.equal(bridgeAccepts(app, { origin: "https://airformdata.com", source: null }, null), false, "no frame, nothing heard");
 });

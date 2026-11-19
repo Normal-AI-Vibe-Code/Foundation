@@ -29,7 +29,7 @@ Open a private security advisory on the repository, or tell Josh directly. Pleas
 7. **Only Foundation's own pages may use a signed-in session.** In progress.
 8. **Sending outside is explicit, and recorded.** In progress: a person's approval for a send to an external service, and an append-only record of who did what, for whom, where it ran and who approved it, with no secrets or private content in it.
 9. **Text from elsewhere points; it doesn't fetch.** Markdown an agent, a tool, Slack or another app wrote shows a picture on sight only from Foundation's own files or one written into the text; any other waits for a person's press. A link shows its real host, opens in a new tab with no opener, and is only ever http(s).
-10. **A frame is fenced.** A frame never shows Foundation's own client or server, is always sandboxed, and keeps its own origin only for a saved app or the configured T3 address. The app bridge names the frame's origin and hears only that frame.
+10. **A frame is fenced.** A frame never shows Foundation's own client or server, is always sandboxed, and an unknown address on this computer runs without an origin of its own; a web site elsewhere keeps its own, and only a saved app or the configured T3 address is trusted with the app bridge, the camera and the microphone. The bridge names the frame's origin and hears only that frame.
 
 ## The security check
 
