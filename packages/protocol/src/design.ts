@@ -11,6 +11,7 @@ export const DESIGN_CHAPTERS = [
   { id: "cards", name: "Cards" },
   { id: "search", name: "Search and the hand" },
   { id: "live", name: "Huddles and Slack" },
+  { id: "chat", name: "ChatForm" },
   { id: "machines", name: "Machines" },
   { id: "agents", name: "Agents" },
   { id: "council", name: "The council" },

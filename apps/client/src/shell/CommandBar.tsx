@@ -5,7 +5,7 @@
  * sources stream in after.
  */
 
-import { goSettings, goToday } from "../lib/place";
+import { goChat, goSettings, goToday } from "../lib/place";
 import { openCouncil } from "../lib/councilOpen";
 import { newCharacter, openCharacterStudio } from "../lib/characterStudio";
 import { keys } from "../lib/keys";
@@ -176,6 +176,7 @@ export function CommandBar() {
       { id: "stop-crew", glyph: "■", label: "Stop all my agents on this board", hint: "the crew-wide stop, helpers too", run: () => void stopAllOnBoard() },
       { id: "connect", glyph: "⌁", label: "Connect Claude Code / Codex to this grid", hint: "copies an MCP command; more in Settings → Agents", run: copyMcpCommand },
       { id: "today", glyph: "◌", label: "Today", hint: "the Shiba, your todos, the company's apps", run: () => goToday() },
+      { id: "chatform", glyph: "✉", label: "Open ChatForm", hint: "channels, direct messages, threads, agents", run: () => goChat() },
       { id: "settings", glyph: "⚙", label: "Settings", hint: "appearance, agents, avatars, the plan, releases", run: () => goSettings() },
       { id: "design", glyph: "◐", label: "Design language", hint: "tokens, type, motion, effects", run: () => goSettings("design") },
       { id: "night", glyph: isNight() ? "☀" : "☾", label: isNight() ? "Day" : "Night", run: () => setNight(!isNight()) },
