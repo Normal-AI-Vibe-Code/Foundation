@@ -51,19 +51,22 @@ interface StandIn {
   hits: number;
   /** tools/call requests, by tool name */
   calls: Array<{ name: string; args: unknown }>;
+  /** MCP sessions opened (initialize requests): one per connection Foundation makes */
+  inits: number;
   /** what make_part says it does; changing it changes the tool's definition */
   makePartDescription: string;
   http: HttpServer;
 }
 
 async function standIn(): Promise<StandIn> {
-  const s: StandIn = { url: "", hits: 0, calls: [], makePartDescription: "Make a part: extrudes a sketch by a depth.", http: null as never };
+  const s: StandIn = { url: "", hits: 0, calls: [], inits: 0, makePartDescription: "Make a part: extrudes a sketch by a depth.", http: null as never };
   s.http = createHttpServer(async (req, res) => {
     s.hits++;
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
     const raw = Buffer.concat(chunks).toString("utf8");
     const body = raw ? JSON.parse(raw) : undefined;
+    if (body?.method === "initialize") s.inits++;
     const server = new McpServer({ name: "stand-in", version: "0.0.1" });
     server.registerTool("make_part", { description: s.makePartDescription, inputSchema: { depth: z.number() } }, async ({ depth }) => {
       s.calls.push({ name: "make_part", args: { depth } });
@@ -347,4 +350,37 @@ test("the machine route doesn't answer an app tool's ask, and the app route does
   const ask = asksOn(card)[0];
   assert.equal((await call("POST", `/api/boards/${BOARD}/machines/${card}/asks/${ask.id}/run`, { cookie: ada, body: {} })).status, 404);
   assert.equal((await call("POST", `/api/boards/${BOARD}/apps/${card}/asks/${ask.id}/run`, { cookie: ada, body: {} })).status, 404);
+});
+
+// ---------- a leave belongs to the board it was given on; a call is checked where it goes ----------
+
+test("an allowed call lists, checks and calls in one MCP session (the definition checked is the one listed where the call goes)", async () => {
+  const before = { inits: saved.inits, calls: saved.calls.length };
+  const ran = await agentTool("call_app_tool", { panel: card, tool: "make_part", args: { depth: 5 } });
+  assert.equal(ran.status, 200, ran.text);
+  assert.equal(saved.calls.length, before.calls + 1, "it was called");
+  assert.equal(saved.inits - before.inits, 1, "one session: list, check and call on the same connection, not a second one for the call");
+});
+
+test("an Allow on one board does nothing on another: the same tool there is held, and asks there", async () => {
+  const made = await call("POST", "/api/boards", { cookie: ada, body: { name: "Elsewhere" } });
+  assert.equal(made.status, 200, made.text);
+  const other = made.json.id as string;
+  const there = (name: string, input: unknown) => call("POST", `/api/boards/${other}/tools/${name}`, { bearer: agent, body: input });
+  const added = await there("add_panel", { panel: "app", name: "Vision", url: "http://127.0.0.1:9/", mcp: saved.url });
+  assert.equal(added.status, 200, added.text);
+  const otherCard = added.json.result.id as string;
+  // make_part is allowed on the company board (as it is defined now)...
+  const listedHere = await agentTool("app_tools", { panel: card });
+  assert.equal(listedHere.json.result.tools.find((t: { name: string }) => t.name === "make_part").status, "allowed");
+  // ...and not on this one
+  const listedThere = await there("app_tools", { panel: otherCard });
+  assert.equal(listedThere.json.result.tools.find((t: { name: string }) => t.name === "make_part").status, "not yet allowed");
+  const before = saved.calls.length;
+  const held = await there("call_app_tool", { panel: otherCard, tool: "make_part", args: { depth: 7 } });
+  assert.equal(held.status, 200, held.text);
+  assert.match(held.json.result, /^Nothing was called\. A person has been asked on the board/);
+  assert.equal(saved.calls.length, before, "not called on a board where nobody allowed it");
+  // every leave names the board it was given on
+  for (const row of allowanceRows()) assert.equal(row.board_id, BOARD);
 });

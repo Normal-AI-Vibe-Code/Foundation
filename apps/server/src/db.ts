@@ -95,19 +95,20 @@ create table if not exists apps (
   created_at integer not null
 );
 
--- A person's leave for agents to call one tool of one saved app (apptools.ts,
--- ADR-001 G3). Keyed by the tool's definition as it was listed when they
--- pressed Allow (sha256 of name, description and input schema): a tool whose
--- definition changes needs a new press.
+-- A person's leave for agents to call one tool of one saved app, on one board
+-- (apptools.ts, ADR-001 G3). Keyed by the board it was given on and by the
+-- tool's definition as it was listed when they pressed Allow (sha256 of name,
+-- description and input schema): another board, or a tool whose definition
+-- changes, needs a new press.
 create table if not exists app_tool_allowances (
+  board_id text not null,
   app_id text not null,
   tool text not null,
   def_hash text not null,
   allowed_by text not null,
   allowed_by_name text not null,
-  board_id text,
   allowed_at integer not null,
-  primary key (app_id, tool, def_hash)
+  primary key (board_id, app_id, tool, def_hash)
 );
 
 create table if not exists asks (
@@ -266,6 +267,31 @@ const FTS_SQL = `create virtual table search_fts using fts5(
     needsFileReindex = Boolean(existing);
   }
 }
+
+// app-tool leave was once keyed by app, tool and definition alone: rebuilt keyed by board too, each row
+// keeping the board it was given on (a row with no board recorded applies to no board, so it isn't kept)
+export function rekeyAppToolLeave(d: DatabaseSync) {
+  if ((d.prepare("pragma table_info(app_tool_allowances)").all() as Array<{ name: string; pk: number }>).some((c) => c.name === "board_id" && c.pk > 0)) return;
+  d.exec(`
+    begin;
+    alter table app_tool_allowances rename to app_tool_allowances_unboarded;
+    create table app_tool_allowances (
+      board_id text not null,
+      app_id text not null,
+      tool text not null,
+      def_hash text not null,
+      allowed_by text not null,
+      allowed_by_name text not null,
+      allowed_at integer not null,
+      primary key (board_id, app_id, tool, def_hash)
+    );
+    insert or ignore into app_tool_allowances (board_id, app_id, tool, def_hash, allowed_by, allowed_by_name, allowed_at)
+      select board_id, app_id, tool, def_hash, allowed_by, allowed_by_name, allowed_at from app_tool_allowances_unboarded where board_id is not null;
+    drop table app_tool_allowances_unboarded;
+    commit;
+  `);
+}
+rekeyAppToolLeave(db);
 
 // additive migrations — each is idempotent
 for (const sql of [

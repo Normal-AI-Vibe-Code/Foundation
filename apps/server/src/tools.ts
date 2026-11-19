@@ -780,7 +780,7 @@ export const TOOLS: BoardTool[] = [
       "List the MCP tools of an app on the board, and whether a person has allowed each (allowed, not yet allowed, changed since allowed). Only a saved app's tools: the card's MCP address must be one a person saved in Foundation's app registry.",
     schema: z.object({ panel: z.string() }),
     sends: [ext("Saved apps", "read", { ownGate: "only an address a person saved in the app registry is dialled (apptools.ts)" })],
-    run: async (ctx, { panel }) => listAppTools(getPanel(getBoard(ctx.boardId).doc, panel)),
+    run: async (ctx, { panel }) => listAppTools(ctx.boardId, getPanel(getBoard(ctx.boardId).doc, panel)),
   }),
   def({
     name: "call_app_tool",
