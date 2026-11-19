@@ -28,6 +28,17 @@ export const BASE_ENV = [
 
 export const SECRET_NAME = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i;
 
+/** a proxy address that carries a user name or password (http://user:pass@proxy:8080): a credential, not just where the network is */
+export function proxyWithCredentials(value: string): boolean {
+  try {
+    const u = new URL(value.includes("://") ? value : `http://${value}`);
+    return Boolean(u.username || u.password);
+  } catch {
+    return /@/.test(value);
+  }
+}
+const PROXY_NAME = /^(https?|all)_proxy$/i;
+
 /**
  * A new environment for a child: BASE plus `extras` (names the caller states, each with its reason
  * at the call), taken from `from` (the server's own by default). On Windows names match in any case
@@ -42,7 +53,8 @@ export function childEnv(extras: readonly string[] = [], from: NodeJS.ProcessEnv
     if (v === undefined) continue;
     const f = fold(k);
     if (named.has(f)) out[k] = v;
-    else if (base.has(f) && !SECRET_NAME.test(k)) out[k] = v;
+    // a proxy with a sign-in in its address is passed only to a program whose caller names it
+    else if (base.has(f) && !SECRET_NAME.test(k) && !(PROXY_NAME.test(k) && proxyWithCredentials(v))) out[k] = v;
   }
   return out;
 }

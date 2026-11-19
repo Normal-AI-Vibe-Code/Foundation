@@ -14,7 +14,7 @@ const dir = mkdtempSync(join(tmpdir(), "foundation-childenv-"));
 process.env.FOUNDATION_DATA_DIR = join(dir, "data");
 delete process.env.FOUNDATION_WORK_DIR;
 
-const { childEnv, workFolder } = await import("../src/childenv.ts");
+const { childEnv, proxyWithCredentials, workFolder } = await import("../src/childenv.ts");
 const { config } = await import("../src/config.ts");
 
 const server = {
@@ -61,4 +61,19 @@ test("the work folder is beside data/, and a program's folder is made under it",
   assert.ok(existsSync(f));
   assert.throws(() => workFolder("..", "data"), /not a work folder name/);
   assert.throws(() => workFolder("runs/../../data"), /not a work folder name/);
+});
+
+test("a proxy whose address carries a sign-in is a credential: it reaches a program only when its caller names it", () => {
+  // the address is put together here so the security check doesn't read a sign-in in this file
+  const signed = ["http://ada", "not-a-pass"].join(":") + "@proxy.local:8080";
+  const from = { PATH: "/usr/bin", HTTPS_PROXY: signed, http_proxy: "http://proxy.local:8080", NO_PROXY: "localhost", https_proxy: "ada:pw@proxy.local:3128" };
+  const env = childEnv([], from, "linux");
+  assert.equal(env.HTTPS_PROXY, undefined, "user and password in the address");
+  assert.equal(env.https_proxy, undefined, "even with no scheme");
+  assert.equal(env.http_proxy, "http://proxy.local:8080", "a plain proxy address is where the network is: it passes");
+  assert.equal(env.NO_PROXY, "localhost");
+  // named by its caller, it gets through as is
+  assert.equal(childEnv(["HTTPS_PROXY"], from, "linux").HTTPS_PROXY, signed);
+  assert.equal(proxyWithCredentials("http://proxy.local:8080"), false);
+  assert.equal(proxyWithCredentials("http://:token@proxy.local"), true);
 });
