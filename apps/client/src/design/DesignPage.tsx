@@ -18,6 +18,7 @@ import type { DesignChapter } from "@foundation/protocol";
 import { motion } from "motion/react";
 import { durations, easings, isNight, setNight, springs } from "@foundation/ui";
 import { initAsciiWind2 } from "../login/asciiWind2";
+import { SignInCode } from "../login/SignInCode";
 import { Mark } from "../brand/Mark";
 import { UpdateCard } from "../update/UpdateCard";
 import { ServerSwitchView, type ServerSwitchViewProps } from "../server/ServerSwitch";
@@ -160,7 +161,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   foundations: ["The mark", "Surfaces", "Ink & accents", "Type", "Shape"],
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
-  floor: ["The floor", "Chrome on call", "Server switch", "Desktop updates"],
+  floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
   cards: ["Using a card", "Adding files", "Text box", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
@@ -1171,6 +1172,19 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
 
       <Section title="Server switch" note="Bottom right, wherever the app can point at another server (the desktop app, or a page on another site's server), over the sign-in page too: a glass pill with a dot for whether the server this app uses answers (green), is starting or being checked (amber, breathing) or can't be reached (red), and its address. Pressed, it opens upward into both ways to have a server, on paper: This computer, where Start the server is the one blue action (the desktop app runs Foundation's server from a checkout; once it answers, the app uses it and reloads), and a remote server by address, where Connect reloads onto it to sign in. The one in use is ringed and tagged. A server that won't start says why in its own words, in red. Esc or a press outside puts it away. The call chip and the upload tray move up while it's there.">
         <ServerSwitchDemo />
+      </Section>
+
+      <Section title="Signing in an app" note="The desktop app (or a page on another site's server) signs in through Google in the system browser, like a device sign-in. While it waits it shows a code of eight, grouped in fours, from letters and digits that can't be mixed up (no 0/O, 1/I/L, 5/S, 2/Z), in code type, under the waiting line. After Google the browser lands on Foundation's own page (server-rendered, no script, never framed) that says, in plain words, an app on a computer is asking to sign in as this person, shows the same code large, and asks: This is me, sign that app in, or Not me. The app gets its session only after This is me, once; Not me ends it; the whole sign-in is over in five minutes.">
+        <div className="signin-demo f-day">
+          <div className="login-waiting" role="status">
+            <span className="f-dot is-live" />
+            <span>Finish signing in with Google in your browser.</span>
+            <button type="button" className="f-pill login-cancel">
+              Cancel
+            </button>
+          </div>
+          <SignInCode code="HM7Q-4KXT" />
+        </div>
       </Section>
 
       <Section title="Release notes" note="Settings → Releases: docs/blog/<version>.md, newest first. The versions run down a sticky list on the left (the current one raised paper, the one this app is built as tagged in blue); the post reads on the right at 720 px: an eyebrow with the version and date, the title in display 24, the body in mist 14/1.6 with frost headings and bold. Under 720 px the list runs across the top.">

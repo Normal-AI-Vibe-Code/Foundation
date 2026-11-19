@@ -112,6 +112,9 @@ r.get("/auth/flowform/start", (req, res) => flowform.startWeb(req, res));
 r.post("/auth/flowform/begin", (req) => flowform.beginDesktop(req));
 r.get("/auth/flowform/done/:nonce", (req, res) => flowform.done(req, res));
 r.post("/auth/flowform/poll", (req, res) => flowform.poll(req, res));
+// the person's press on the page /done shows a desktop sign-in: only then does the poll above get a session
+r.post("/auth/flowform/confirm/yes", (req, res) => flowform.confirm(req, res, "yes"));
+r.post("/auth/flowform/confirm/no", (req, res) => flowform.confirm(req, res, "no"));
 // a person's link to Flowform's boards and files, read-only, through its MCP endpoint (flowformlink.ts)
 r.get("/api/flowform/link", (req) => {
   const u = requireUser(req);
@@ -1164,7 +1167,8 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
   }
   try {
     // a change signed in by the cookie comes from one of our own pages (cross-site request forgery: origins.ts)
-    const forged = cookieOriginRefusal(req);
+    // (the desktop sign-in's press page posts from this server's own origin and uses no Foundation session: it checks its own origin and cookie)
+    const forged = url.pathname.startsWith("/auth/flowform/confirm/") ? null : cookieOriginRefusal(req);
     if (forged) throw new HttpError(403, forged);
     if (url.pathname === "/mcp") {
       const user = userFromRequest(req);

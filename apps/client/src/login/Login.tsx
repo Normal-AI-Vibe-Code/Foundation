@@ -17,7 +17,9 @@
  * same server and Google client. In the browser the page goes to flowform and
  * comes back with ?arrive, and this page dissolves on arrival. In the desktop
  * app Google refuses the embedded webview, so the system browser signs in and
- * this window polls, then dissolves when you come back to it. Dev sign-in
+ * this window polls, showing a code; the browser shows the same code and asks
+ * "This is me?" before this window gets its session (SignInCode.tsx), and the
+ * window dissolves when you come back to it. Dev sign-in
  * (name + allowlisted email) is for this machine.
  */
 
@@ -26,6 +28,7 @@ import { motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { initAsciiWind2 } from "./asciiWind2";
+import { SignInCode } from "./SignInCode";
 import { activeBoard } from "../sync/board";
 import { authConfig, BEARER, chooseServer, devLogin, flowformBegin, flowformPoll, SERVER, serverUrl } from "../lib/api";
 
@@ -112,6 +115,8 @@ export function Login({
   const [busy, setBusy] = useState(false);
   /** desktop: waiting on the system browser */
   const [waiting, setWaiting] = useState(false);
+  /** desktop: the code this window shows, to match the one the browser shows before "This is me" */
+  const [code, setCode] = useState<string | null>(null);
   /** the email sign-in, folded away until asked for */
   const [byEmail, setByEmail] = useState(false);
   /** the app (or a page on another site) can be pointed at another server: the Server line, folded until asked for */
@@ -231,7 +236,7 @@ export function Login({
       cancelAnimationFrame(soon);
       events.forEach((type) => el.removeEventListener(type, later));
     };
-  }, [frame, open, byEmail, error, waiting, cfg]);
+  }, [frame, open, byEmail, error, waiting, code, cfg]);
 
   /** centre of an element, in the root's box */
   const centreOf = (el: Element | null) => {
@@ -311,7 +316,8 @@ export function Login({
     // a page on another site's server (not the app) finishes the same way: Google in its own tab, this page polls
     const tab = inDesktop ? null : window.open("", "_blank");
     try {
-      const { url, poll, expiresIn } = await flowformBegin();
+      const { url, poll, code, expiresIn } = await flowformBegin();
+      setCode(code);
       if (tab) tab.location.href = url;
       else await openUrl(url);
       setWaiting(true);
@@ -336,6 +342,7 @@ export function Login({
       fail((err as Error).message);
     } finally {
       setWaiting(false);
+      setCode(null);
     }
   };
 
@@ -420,13 +427,16 @@ export function Login({
             </h1>
 
             {waiting ? (
-              <div className="login-waiting" role="status">
-                <span className="f-dot is-live" />
-                <span data-shape="text">Finish signing in with Google in your browser.</span>
-                <motion.button type="button" className="f-pill login-cancel" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press} onClick={() => cancelWait.current()}>
-                  Cancel
-                </motion.button>
-              </div>
+              <>
+                <div className="login-waiting" role="status">
+                  <span className="f-dot is-live" />
+                  <span data-shape="text">Finish signing in with Google in your browser.</span>
+                  <motion.button type="button" className="f-pill login-cancel" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press} onClick={() => cancelWait.current()}>
+                    Cancel
+                  </motion.button>
+                </div>
+                {code && <SignInCode code={code} />}
+              </>
             ) : (
               google && (
                 <>

@@ -290,6 +290,11 @@ for (const sql of [
   // a socket ticket says whether a person asked for it (1) or an agent did (0; null: before this): a machine's
   // terminal and desktop take input from a person only (sockets.ts)
   "alter table ws_tickets add column person integer",
+  // a desktop sign-in is like a device sign-in (flowform.ts): the code the window shows, the finishing
+  // browser's press cookie (hashed), and when the person pressed "This is me"
+  "alter table flowform_attempts add column code text",
+  "alter table flowform_attempts add column confirm_hash text",
+  "alter table flowform_attempts add column confirmed_at integer",
   "create index if not exists files_sha on files(sha256)",
   `create table if not exists file_text (
      sha256 text primary key, v integer not null, status text not null,
