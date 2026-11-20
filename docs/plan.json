@@ -2038,6 +2038,33 @@
       "issue": 191
     },
     {
+      "id": "machine-card-kiri",
+      "title": "The machine card redrawn: address and links, Docker Hub, Access, functions with a studio example, Kubernetes; the wheel zooms",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "review",
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-card/NOTES.md`). Josh: \"we can do a lot better with this Kiri interface …\". The head in two rows with Start/Stop, Restart, Remove at the top and the address bar with Share (a Foundation link relayed at /m/…, a public cloudflared link); Docker Hub in Start; Access as a panel of its own; functions in /foundation/functions as wired ports, with Process in a machine on a collection (ImageMagick trim-resize, sprite-sheet, describe); k3s clusters across machine cards with pods as cards; a mouse wheel zooms, a trackpad pans; Today's window buttons white. Checked: `e2e/machines-kiri.spec.ts` on Kiri (4), unit tests (19). Not done: the Tauri window not driven; a real cloudflared tunnel not opened; a function runs only on a press."
+    },
+    {
+      "id": "cloudflared-install",
+      "title": "Install cloudflared for public links (or leave them off)",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "Public links to a machine's port go through Cloudflare's free quick tunnels, which need cloudflared on this computer: `winget install --id Cloudflare.cloudflared`. Foundation doesn't install it. Without it Share says so and the Foundation link still works."
+    },
+    {
+      "id": "functions-auto-and-agents",
+      "title": "Functions that run by themselves on new pictures, and agents calling them",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "backlog",
+      "body": "A machine's function runs only on a person's press (2026-11-17). Next: an Auto switch per function (runs when what's wired in gains items), and a tool for agents to call one, behind a person's leave like the desktop's."
+    },
+    {
       "id": "pipes-older-server",
       "title": "Pipes on an older server say so",
       "kind": "bug",

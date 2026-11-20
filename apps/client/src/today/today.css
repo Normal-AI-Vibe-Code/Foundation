@@ -1002,3 +1002,5 @@ a.today-chip:active {
 .shell.is-place-today .side-pane .me-avatar {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-over-room) 60%, transparent);
 }
+
+/* the window's own buttons (minimize, maximize, close) wear the room theme too: tokens.css and shell.css */

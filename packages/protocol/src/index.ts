@@ -11,10 +11,12 @@
 import * as Y from "yjs";
 import type { CharacterState } from "./characters.ts";
 import type { CollectionState } from "./collections.ts";
+import type { UploaderState } from "./avatars.ts";
 export * from "./characters.ts";
 export * from "./collections.ts";
 export * from "./chat.ts";
 export * from "./replay.ts";
+export * from "./avatars.ts";
 
 // ---------- board document layout ----------
 
@@ -34,6 +36,7 @@ export const BOARD = {
   characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
   agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
   collections: "collections", // collection panel id → CollectionState (what it has gathered, and the section it lays out into; kept by the server alone)
+  uploaders: "uploaders", // uploader panel id → UploaderState (Foundation's avatars wired into it, its timer and its last upload; kept by the server alone)
   desktopLeave: "desktopLeave", // machine panel id → DesktopLeave (a person's leave for agents to use its desktop, and an agent's ask for it; kept by the server alone, off the card)
 } as const;
 
@@ -204,6 +207,7 @@ export type PanelKind =
   | "grid" // a grid inside this one (2026-11-15): the section that holds it stands for a child grid and opens it
   | "kanban" // a kanban board: columns of cards moved between them (the plan is one)
   | "design" // a chapter of the design language, live on its tokens
+  | "uploader" // Foundation's avatars: the characters wired into it are avatars on every Foundation; it uploads them to main's starter set, pressed or on a timer (avatars.ts)
   | "collection" // a collector: gathers what the cards wired into it make (pictures, characters) and can lay it out in a section; tiles drag out as copies
   | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
   | "character" // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
@@ -325,7 +329,57 @@ export interface MachineState {
   agentActs?: MachineAgentAct[];
   /** the machine's pipes: when /foundation/in was last written and /foundation/out last read, and what was in them */
   io?: MachineIo;
+  /**
+   * Public links to its ports (2026-11-17): a tunnel (Cloudflare's quick tunnels, cloudflared on this computer)
+   * a person opened, with who and when. Anyone with the link reaches that port; Stop, the machine stopping or
+   * Foundation restarting ends it.
+   */
+  shares?: MachineShare[];
+  /** a pull under way, in bytes, for the card's bar (detail keeps the words) */
+  pull?: { done: number; total: number };
+  /** what the machine offers as functions: executables in /foundation/functions, read when the card looks */
+  functions?: MachineFunction[];
+  /**
+   * A node of a Kubernetes cluster (k3s; 2026-11-17, Josh: "options to start a kubernetes cluster and pods"):
+   * the cluster's id and name, this node's role, and for a worker the server's machine name (it joins it by
+   * name on the cluster's own network). Every node is a machine card of its own, so it can be moved anywhere.
+   */
+  cluster?: { id: string; name: string; role: "server" | "agent"; server?: string };
+  /** a pod opened as a card of its own: its terminal is `kubectl exec` through the cluster's server */
+  pod?: { server: string; ns: string; name: string; node?: string; phase?: string };
+  /** per function: the keys of the pictures it has had (the next run takes only new ones), the last 400 */
+  fnDone?: Record<string, string[]>;
+  /** its Start puts ImageMagick and the example picture functions in it (a machine laid by Process in a machine) */
+  wantFunctions?: boolean;
+  /** the example functions going in, or why they didn't */
+  fnSetup?: { state: "installing" | "error"; by: string; at: number; detail?: string };
 }
+
+export interface MachineShare {
+  port: number;
+  url: string;
+  by: string;
+  at: number;
+}
+
+/**
+ * A function a machine offers (2026-11-17, Josh: "functions that are able to reach into the VM"): an executable
+ * in /foundation/functions/<name>. Its first comment lines say what it takes and gives:
+ *   # about: Trims each picture and makes it 1024 px
+ *   # in: images        (images | text | json | files)
+ *   # out: images
+ * It runs with IN and OUT set to two folders: what it's given is in IN (one file each, or in.txt / in.json),
+ * and what it leaves in OUT comes back.
+ */
+export interface MachineFunction {
+  name: string;
+  about?: string;
+  in: MachineFunctionKind;
+  out: MachineFunctionKind;
+  /** its last run: who, when, how many went in and came out, how long, and what it said (or wrote as text) */
+  last?: { at: number; by: string; ok: boolean; took: number; made: number; ms: number; said?: string; text?: string };
+}
+export type MachineFunctionKind = "images" | "text" | "json" | "files";
 
 export interface MachineDesktop {
   state: "installing" | "ready" | "error";
@@ -709,6 +763,7 @@ export function boardMaps(doc: Y.Doc) {
     characters: doc.getMap<CharacterState>(BOARD.characters),
     agents: doc.getMap<PostedAgent[]>(BOARD.agents),
     collections: doc.getMap<CollectionState>(BOARD.collections),
+    uploaders: doc.getMap<UploaderState>(BOARD.uploaders),
     desktopLeave: doc.getMap<DesktopLeave>(BOARD.desktopLeave),
   };
 }
