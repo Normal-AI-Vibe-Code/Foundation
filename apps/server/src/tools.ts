@@ -75,6 +75,8 @@ import { contentRefusal, decide, EgressHeld, heldSentence, sendsFor, type Send, 
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
+import { CHAT_TOOLS } from "./chattools.ts";
+import { addReplayCard, placeFile, timelineText, userById } from "./replay.ts";
 
 /** the person a tool acts for (Today's tools are theirs, not the board's) */
 function personOf(ctx: ToolCtx): UserInfo {
@@ -208,6 +210,7 @@ const PANEL_SIZES: Record<PanelKind, [number, number]> = {
   huddle: [560, 420],
   slack: [420, 520],
   crew: [380, 440],
+  replay: [360, 120],
 };
 
 function sectionOrCreate(doc: Y.Doc, section?: string) {
@@ -1124,7 +1127,7 @@ export const TOOLS: BoardTool[] = [
   def({
     name: "browser_tabs",
     description:
-      "The built-in browser's tabs: lists them (id, url, title) and says which one you are on. Optionally open a new tab at an address, select a tab by id (your next browser_ calls act there), or close one. The person's own view stays where they put it. Same leave as browser_read.",
+      "The built-in browser's tabs: lists them (id, url, title) and says which one you are on. A tab with `card` is the live page of that card on a grid (an app such as PartForm, DeployForm or FactoryForm opened in Foundation): select it to read or use that app as the person sees it. Optionally open a new tab at an address, select a tab by id (your next browser_ calls act there), or close one. The person's own view stays where they put it. Same leave as browser_read.",
     schema: z.object({
       open: z.string().min(1).max(4000).optional().describe("open a new tab at this address (or search words) and move to it"),
       select: z.string().max(12).optional().describe("a tab's id: act there from now on"),
@@ -1300,6 +1303,35 @@ export const TOOLS: BoardTool[] = [
       const s = huddleArchive(ctx.boardId, i.huddle, i.sessions ?? 1);
       return s.length ? s.map(transcriptText).join("\n\n---\n\n") : "This huddle hasn't met yet.";
     },
+  }),
+  def({
+    name: "replay_timeline",
+    description:
+      "Read a recorded huddle session as a timeline: who said what when (people, typed notes, agents), what was posted in its channel meanwhile, and what changed on the grid section it was kept on, change by change (cards added, moved, removed, notes written), each at its offset from the start. Use it to answer what was decided, who changed what, or what the grid looked like. `session` is the session id (hs_…, on a replay card or a huddle card). Reads only.",
+    schema: z.object({ session: z.string() }),
+    run: (ctx, i) => {
+      const u = userById(ctx.userId);
+      if (!u) return "A replay is read as a person (an agent working for someone): this caller isn't one.";
+      return timelineText(u, i.session);
+    },
+  }),
+  def({
+    name: "add_replay",
+    description:
+      "Put a recorded huddle session's clock card on this grid: a small card with the session's transport; scrubbing it redraws its section as it was at that moment, for the person scrubbing only (nothing on the grid changes). It goes in the given section, else the section the session was held over, else the grid's first. Asked twice for the same section, it adds one.",
+    schema: z.object({ session: z.string(), section: z.string().optional(), x: z.number().optional(), y: z.number().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      const card = addReplayCard(ctx.boardId, { userId: ctx.userId, actor: ctx.actor, person: ctx.person }, { session: i.session, section: i.section, x: i.x, y: i.y });
+      return { id: card.id, section: card.sectionId };
+    },
+  }),
+  def({
+    name: "place_file",
+    description: "Put a file you can see (a file shared in a ChatForm message, or another grid's) on a section of this grid as a file card (CAD shows in 3D), so people can talk it over there. The grid gets its own record of the same bytes.",
+    schema: z.object({ file: z.string().describe("the file id"), section: z.string().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => placeFile(ctx.boardId, { userId: ctx.userId, actor: ctx.actor, person: ctx.person }, { file: i.file, section: i.section }),
   }),
   def({
     name: "add_slack_channel",
@@ -1500,6 +1532,8 @@ export const TOOLS: BoardTool[] = [
       return `${h.name} is on it`;
     },
   }),
+  // ChatForm (chattools.ts): channels, read, search, post, react — the person's own access, no board
+  ...CHAT_TOOLS,
 ];
 
 export function toolByName(name: string) {

@@ -1,0 +1,54 @@
+[
+    {
+        "id": "U01ADA",
+        "team_id": "T0FORM",
+        "name": "ada",
+        "deleted": false,
+        "real_name": "Ada Lovelace",
+        "tz": "Europe/London",
+        "profile": {
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "email": "Ada@FormIndustries.com",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "team": "T0FORM"
+        },
+        "is_admin": true,
+        "is_owner": true,
+        "is_bot": false,
+        "is_app_user": false
+    },
+    {
+        "id": "U02NOA",
+        "team_id": "T0FORM",
+        "name": "noa",
+        "deleted": false,
+        "real_name": "Noa Kim",
+        "profile": {
+            "real_name": "Noa Kim",
+            "display_name": "noa",
+            "email": "noa@formindustries.com",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/noa_72.png",
+            "team": "T0FORM"
+        },
+        "is_admin": false,
+        "is_bot": false,
+        "is_app_user": false
+    },
+    {
+        "id": "U03BOT",
+        "team_id": "T0FORM",
+        "name": "deploybot",
+        "deleted": false,
+        "real_name": "deploybot",
+        "profile": {
+            "real_name": "deploybot",
+            "display_name": "",
+            "bot_id": "B03DEPLOY",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/bot_72.png",
+            "team": "T0FORM"
+        },
+        "is_bot": true,
+        "is_app_user": false
+    }
+]

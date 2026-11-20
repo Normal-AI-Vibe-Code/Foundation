@@ -12,6 +12,7 @@ import { config } from "./config.ts";
 import { all } from "./db.ts";
 import { searchRepos } from "./github.ts";
 import { searchFlowformFiles } from "./flowform-live.ts";
+import { chatHitFilter } from "./chat.ts";
 import { SLACK_SEARCH_NOT_YOURS, slackUserTokenFor } from "./slackuser.ts";
 import { guardEgress } from "./egressguard.ts";
 
@@ -29,7 +30,12 @@ function ftsQuery(q: string): string {
   return terms.map((t) => `"${t}"*`).join(" ");
 }
 
-export function searchLocal(q: string, boardId?: string, limit = 30, hidden?: Set<string>): SearchHit[] {
+/**
+ * `seeChat`: ChatForm's test of a message for the asker (chat.ts chatHitFilter), answering the channel to
+ * open or null. Without it no chat row is shown; chat uploads (board "chat") are never shown here, their
+ * messages are.
+ */
+export function searchLocal(q: string, boardId?: string, limit = 30, hidden?: Set<string>, seeChat?: (messageId: string) => string | null): SearchHit[] {
   const match = ftsQuery(q);
   if (!match) return [];
   // matches come back between \x02 and \x03 (never in text), then as «» once any «» the text itself
@@ -41,15 +47,20 @@ export function searchLocal(q: string, boardId?: string, limit = 30, hidden?: Se
     ...(boardId ? [match, boardId, limit] : [match, limit]),
   );
   // members-only boards a person isn't on stay out of their results (members.ts)
-  return rows.filter((r) => !(r.board_id && hidden?.has(r.board_id))).map((r) => ({
-    source: r.source as SearchHit["source"],
-    id: `${r.source}:${r.ref}`,
-    title: r.title,
-    snippet: markSnippet(r.snip),
-    objectId: r.source === "board" ? r.ref : r.source === "huddle" ? r.ref.split("/")[0] : undefined,
-    url: r.source === "file" ? `/files/${r.ref}` : undefined,
-    score: -r.rank,
-  }));
+  const chatAt = new Map<string, string | null>();
+  const chatChannel = (ref: string) => (chatAt.has(ref) ? chatAt.get(ref)! : (chatAt.set(ref, seeChat?.(ref) ?? null), chatAt.get(ref)!));
+  return rows
+    .filter((r) => !(r.board_id && hidden?.has(r.board_id)))
+    .filter((r) => r.board_id !== "chat" || (r.source === "chat" && chatChannel(r.ref) !== null))
+    .map((r) => ({
+      source: r.source as SearchHit["source"],
+      id: `${r.source}:${r.ref}`,
+      title: r.title,
+      snippet: markSnippet(r.snip),
+      objectId: r.source === "board" || r.source === "chat" ? r.ref : r.source === "huddle" ? r.ref.split("/")[0] : undefined,
+      url: r.source === "file" ? `/files/${r.ref}` : r.source === "chat" ? `#/chat/chat/${chatChannel(r.ref)}` : undefined,
+      score: -r.rank,
+    }));
 }
 
 /** a snippet as one line, its matches in «», nothing else in «» */
@@ -123,7 +134,8 @@ export async function searchAll(
   q: string,
   opts: { boardId?: string; remote?: boolean; hidden?: Set<string>; userId?: string; slackAs?: string } = {},
 ): Promise<{ hits: SearchHit[]; sources: Record<string, number>; notes: string[] }> {
-  const local = searchLocal(q, opts.boardId, 30, opts.hidden);
+  // chat messages only for a known person, and only those they may read
+  const local = searchLocal(q, opts.boardId, 30, opts.hidden, chatHitFilter(opts.userId));
   const apps = searchApps(q);
   const none: SearchHit[] = [];
   const notes: string[] = [];

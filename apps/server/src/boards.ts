@@ -38,6 +38,13 @@ export function onBoardChange(fn: (boardId: string, doc: Y.Doc) => void) {
   boardListeners.add(fn);
 }
 
+const updateListeners = new Set<(boardId: string, update: Uint8Array, at: number, origin: unknown) => void>();
+/** every change applied to a board's document (not its loading from disk; not awareness), with when and its origin; returns an unsubscribe (replay.ts keeps a recorded session's) */
+export function onBoardUpdate(fn: (boardId: string, update: Uint8Array, at: number, origin: unknown) => void): () => void {
+  updateListeners.add(fn);
+  return () => updateListeners.delete(fn);
+}
+
 const openListeners = new Set<(board: Board) => void>();
 /** a board is loaded into memory (each time: closeBoards forgets them) */
 export function onBoardOpen(fn: (board: Board) => void) {
@@ -166,6 +173,7 @@ export function getBoard(id: string): Board {
     for (const ws of board.conns.keys()) if (ws !== origin) send(ws, data);
     scheduleIndex(board);
     for (const fn of boardListeners) fn(id, doc);
+    for (const fn of updateListeners) fn(id, update, Date.now(), origin);
   });
 
   awareness.on("update", ({ added, updated, removed }: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {

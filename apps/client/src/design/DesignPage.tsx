@@ -33,7 +33,7 @@ import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { TOOLS } from "../shell/Tools";
 import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } from "../shell/wireGeometry";
 import { tunnelGeometry } from "../shell/wireGeometry";
-import { AppChip, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
+import { AppChip, AppRow, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
 import type { CompanyApp, CompanyGoal, FocusItem, Goal, Mood } from "../today/model";
 
 const NOW = Date.now();
@@ -55,8 +55,8 @@ const SAMPLE_GOALS: Goal[] = [
 ];
 const SAMPLE_APPS: CompanyApp[] = [
   { id: "factoryform", name: "FactoryForm", role: "Inventory, stations, work orders", url: "#", glyph: "⚙" },
-  { id: "bomform", name: "BomForm", role: "BOMs, certification", url: "#", glyph: "▤" },
-  { id: "hyperform", name: "HyperForm", role: "HyperForm programme", url: null, glyph: "◈" },
+  { id: "partform", name: "PartForm", role: "Every part and BOM", url: "#", glyph: "▤", signIn: "hyperform" },
+  { id: "fleetform", name: "FleetForm", role: "The fleet", url: null, glyph: "⛬" },
 ];
 
 function TodayDemo() {
@@ -98,6 +98,13 @@ function TodayDemo() {
           ))}
           {SAMPLE_GOALS.map((g, i) => (
             <GoalRow key={g.id} goal={g} pointed={i === 0} />
+          ))}
+        </section>
+        {/* the apps as Today's panel lists them: the row opens one in your browser, ⤢ opens it in Foundation */}
+        <section className="today-group" data-design-apps>
+          <h2 className="f-eyebrow">Apps</h2>
+          {SAMPLE_APPS.map((a, i) => (
+            <AppRow key={a.id} app={a} status={i === 0 ? "ok" : i === 1 ? "warn" : undefined} />
           ))}
         </section>
       </div>
@@ -145,6 +152,7 @@ import { PointerDemo } from "./PointerDemo";
 import { CharacterStudioDemo } from "./CharacterStudioDemo";
 import { CollectionDemo } from "./CollectionDemo";
 import { UploaderDemo } from "./UploaderDemo";
+import { ChatFormDemo } from "../chat/ChatDesign";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -169,6 +177,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Text box", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
+  chat: ["ChatForm"],
   machines: ["Machines"],
   agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
@@ -959,6 +968,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
 
       <Section title="The Slack board" note="One space with a section for every Slack channel, each kept current with its channel: a Summary note, a Latest note (the newest top-level messages) and the channel's latest images, newest first; a new one takes the first place and the rest move along. Each section wears a live Slack mark beside its count: Slack's octothorpe in the ink (the brand's colours stay out of the chrome), a word and a state dot. Live breathes green: Slack sends what's posted as it's posted. Polling is a still amber dot: the Slack app isn't running, so channels are read in turn while someone looks. Join is a hollow amber dot: the app isn't in the channel, and a press has it join. Offline is red, and the roll-over says why. Beside it, ✦: violet while agents write and keep the summaries, which only a person turns on.">
         <SlackMarks />
+      </Section>
+
+      <Section title="ChatForm" note="Foundation's conversations: channels, direct messages, groups, agents and the people beyond the bridges, one model. Its button sits right after Today, of Today's family, with what's for you beside the word (mentions, unread direct messages). The place keeps the top bar and the side menu: a strip with the tabs (Chat · Agents · Inbox · Huddles) and a search field drawn as a line; the sidebar on the floor (sections that fold; unread bold, mentions as the accent pill, muted dim); the timeline, newest at the foot, with day rules held at the top, a New rule in the accent, runs of one author within five minutes; a person is their initials on their colour, an agent its character in a violet ring with the Agent mark and whom it worked for, a ghost its service's monogram and via WhatsApp. Hover bar: quick reactions, react, reply in thread, pin, link, more. The composer is raised paper, ringed blue in focus (a person writes it): markdown tools, @ # :, files as chips with their progress. A thread opens beside it, over the timeline when the place is narrow. Ctrl/⌘+K inside it is the quick switcher.">
+        <ChatFormDemo />
       </Section>
 
       <Section title="Machines" note="A Linux machine or container in a section, on this computer's engine: Kiri or Docker (one wire, the Docker Engine API). The state pill leads: Running (green, breathing), Pulling and Starting (amber, with the engine's own progress), Stopped and Not started (grey), Error (red, in the engine's words), No engine (amber, a hatched well that says why). Kiri installed but asleep is not No engine: the tag says Kiri · asleep and Start wakes it first; a machine whose disk is on a sleeping Kiri is Out of reach (amber), never removed. Then the engine and its version, the image in code type, and published ports as pills that open the port as a page in the section. Start is the one blue action, and only a person presses it: an agent's proposal says so in violet. Running, the shared terminal fills the card (paper, ink, the tokens as its colours); viewers watch it under an amber View only tag. Remove asks twice. A page opened from a port follows its machine: while the machine isn't running the page's poster dims and the machine's state stands over it (the card's own pill, what happened in its words, Start it for a person and Show the machine), and it reloads by itself when the machine runs again; a removed machine, or a card taken off the board, says it's gone. An agent's command (machine_run) waits on the card under the head: violet, the agent's name, the command in code type, its why, and the time left; Run is a person's blue go-ahead beside Decline, and a viewer sees who can answer instead. Running and answered asks shrink to a line (amber running, green exit 0, red otherwise, struck through when declined or unanswered) for two minutes. Shown at 560, 400 and 260 px. Typing (2026-11-15): a plain click in the terminal puts the caret there; while the shell (or the desktop) has the keys the well wears the 2 px in-use ring and a raised line says Keys go to this machine · Esc Esc to leave, and none of the app's shortcuts take a key. The head's Terminal · Desktop switch shows the machine's graphical desktop on the same ground: none yet is a dashed well with Add a desktop (blue, a person's press; the package manager's own progress in amber while it installs). Agents use a desktop only where a person pressed Let agents use this desktop (a plain pill: the person's decision; once given, a violet dot, who and when, and Stop). While an agent drives, a violet line says ✦ who is using this desktop and what it just did, with its last few actions under it; an agent asking without leave gets the same line with the person's button. The pipes sit above the foot on the panel ground: In ← what's wired in, the value in code type, when, and /foundation/in; Out → where it goes, the value, when, and /foundation/out; one dim line on using them from the shell. A viewer sees the same without the buttons.">

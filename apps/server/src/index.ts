@@ -25,7 +25,8 @@ import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
 import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { hostTerminals, requestHostTerminal } from "./hostterm.ts";
-import { hostBrowserRunning, requestHostBrowser } from "./hostbrowser.ts";
+import { cardPageOf, hostBrowserRunning, requestHostBrowser } from "./hostbrowser.ts";
+import { pageIdsOk, readPagePicture } from "./pagepictures.ts";
 import { changelog } from "./changelog.ts";
 import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3HostRunning, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
@@ -36,7 +37,7 @@ import { SERVER_VERSION, minClient, requireCurrentClient } from "./clientversion
 import { httpToolCtx, runTool, TOOLS } from "./tools.ts";
 import { handleMcp } from "./mcp.ts";
 import { seedCompanyBoard } from "./seed.ts";
-import { addLine, attachRecording, huddleArchive, huddleForInvite, transcriptText, type NewHuddle } from "./huddles.ts";
+import { huddleArchive, huddleForInvite, huddleRoutes, transcriptText, type NewHuddle } from "./huddles.ts";
 import { boardLink, channelHistory, channelInfo, inviteText, listChannels, postMessage, shareText, SlackError, slackStatus } from "./slack.ts";
 import { appendSection, boardMaps, huddleStateOf } from "@foundation/protocol";
 import { migrateAllBoards } from "./migrate.ts";
@@ -71,6 +72,7 @@ import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
 import { gridOutline } from "./subgrids.ts";
+import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
 import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
 
@@ -413,10 +415,19 @@ r.get("/files/:id", (req, res) => {
   serveFile(req, res, req.params.id);
 });
 
-/** a file on a members-only board is that board's */
+/** a file on a members-only board is that board's; a chat upload is its uploader's and its messages' readers' (chat.ts) */
 function requireFileBoard(user: UserInfo, fileId: string) {
-  requireBoard(user, one<{ board_id: string | null }>("select board_id from files where id = ?", fileId)?.board_id);
+  const board = one<{ board_id: string | null }>("select board_id from files where id = ?", fileId)?.board_id;
+  if (board === "chat" && !canSeeChatFile(user, fileId)) throw new HttpError(404, "no such file");
+  requireBoard(user, board);
 }
+
+// ---------- ChatForm (chat.ts) ----------
+
+chatRoutes(r);
+(await import("./chatimport.ts")).chatImportRoutes(r); // history: Slack export zip and API pull in, ChatForm export out
+(await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
+(await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
 
@@ -542,35 +553,9 @@ function huddleOn(boardId: string, id: string) {
   if (!o || o.kind !== "panel" || o.panel !== "huddle") throw new HttpError(404, "no such huddle");
   return o;
 }
-r.get("/api/huddles/:id", (req) => {
-  const u = requireUser(req);
-  const board = req.query.get("board") ?? "company";
-  requireBoard(u, board);
-  const panel = huddleOn(board, req.params.id);
-  return { huddle: { id: panel.id, name: panel.name, channel: panel.channel ?? null, state: huddleStateOf(getBoard(board).doc, panel.id) ?? { people: [] } }, sessions: huddleArchive(board, panel.id) };
-});
-r.post("/api/huddles/:id/lines", async (req) => {
-  const u = requireUser(req);
-  const b = await readJson<{ board?: string; text?: string }>(req);
-  requireBoard(u, b.board ?? "company");
-  try {
-    return { line: addLine(b.board ?? "company", req.params.id, u, b.text ?? "", "typed") };
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message);
-  }
-});
-r.post("/api/huddles/:id/recordings", async (req) => {
-  const u = requireUser(req);
-  const b = await readJson<{ board?: string; fileId?: string; sessionId?: string; startedAt?: number; endedAt?: number }>(req);
-  if (!b.fileId) throw new HttpError(400, "fileId required");
-  requireBoard(u, b.board ?? "company");
-  requireFileVisible(u.id, b.fileId);
-  try {
-    return attachRecording(b.board ?? "company", req.params.id, { fileId: b.fileId, person: u.name, sessionId: b.sessionId, startedAt: b.startedAt ?? Date.now(), endedAt: b.endedAt ?? Date.now() });
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message);
-  }
-});
+// a grid's huddle and a channel's (ChatForm H1): start, lines, recordings, take to a grid, agents, live list, archive
+huddleRoutes(r);
+(await import("./replay.ts")).replayRoutes(r); // replay: a recorded session's timeline and takes (the grid as it was); attaching from Vision and approved places in chat
 
 // ---------- Slack channels (bot token; posts go out under the person's name) ----------
 
@@ -1100,7 +1085,20 @@ r.get("/api/t3/threads/:id", async (req) => {
 // ---------- the built-in terminal (hostterm.ts): a shell on this computer, for an admin, in person ----------
 r.post("/api/host-terminal", (req) => requestHostTerminal(req));
 // the built-in browser (hostbrowser.ts): a real browser on this computer, for an admin, in person; the key opens its socket
-r.post("/api/host-browser", (req) => requestHostBrowser(req));
+r.post("/api/host-browser", async (req) => {
+  // a page card's ask names its board, its card and its address: the board must be one this person can see
+  const page = cardPageOf(await readJson<{ board?: unknown; card?: unknown; url?: unknown }>(req).catch(() => null));
+  if (page) requireBoard(requireUser(req), page.board);
+  return requestHostBrowser(req, page);
+});
+/** the picture kept of a page card (pagepictures.ts): the board's, for anyone who can see the board */
+r.get("/api/boards/:id/pages/:panel/picture", (req, res) => {
+  requireBoard(requireUser(req), req.params.id);
+  const pic = pageIdsOk(req.params.id, req.params.panel) ? readPagePicture({ board: req.params.id, card: req.params.panel }) : null;
+  if (!pic) throw new HttpError(404, "no picture of this page yet");
+  res.writeHead(200, { "content-type": "image/jpeg", "content-length": pic.jpeg.length, "cache-control": "private, no-cache", "x-content-type-options": "nosniff" });
+  res.end(req.method === "HEAD" ? undefined : pic.jpeg);
+});
 // what changed in Foundation's own code (changelog.ts): read-only, for anyone signed in
 r.get("/api/changelog", async (req) => {
   requireUser(req);
@@ -1269,10 +1267,12 @@ function agentRouteScope(req: Req, path: string) {
  * and preferences (their goals, profile and settings are theirs, not a board's). The board is the
  * route's :id, or ?board=, else the person's account role decides.
  */
-const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
+const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/, /^\/api\/chat\//];
 function gateWrites(req: Req, path: string) {
   if (req.method === "GET" || req.method === "OPTIONS" || !path.startsWith("/api/")) return;
   if (READ_POSTS.some((p) => p.test(path))) return;
+  // a chat upload: chat's rules, not a board's (a viewer posts files where it's a member; chat.ts checks attaching)
+  if (path === "/api/files" && req.query.get("board") === "chat") return;
   const user = userFromRequest(req);
   if (!user) return; // the route's own requireUser answers 401
   const board = /^\/api\/boards\/([^/]+)/.exec(path)?.[1] ?? req.query.get("board");

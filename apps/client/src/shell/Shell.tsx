@@ -35,6 +35,7 @@ import { UploadTray } from "./UploadTray";
 import { SidePane, isSystemGrid } from "./SidePane";
 import { Today } from "../today/Today";
 import { SettingsSpace, SETTINGS_GRIDS } from "../settings/SettingsSpace";
+import { ChatForm } from "../chat/ChatForm";
 import { goGrid, placeOf } from "../lib/place";
 import { isPageKind, loadGrids, useGrids, type SpaceKind } from "../lib/grids";
 import { setTheme } from "@foundation/ui";
@@ -205,7 +206,10 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
       if (holdsKeys(e.target)) return;
       const mod = e.metaKey || e.ctrlKey;
       // in a text box, ⌘I and ⌘U are italic and underline, as in any word processor
-      const writing = !!(e.target as HTMLElement | null)?.closest?.(".rich-text");
+      const writing = !!(e.target as HTMLElement | null)?.closest?.(".rich-text, .chat-compose");
+      // in ChatForm, ⌘K is its quick switcher (chat/ChatForm.tsx); ⌘K there again opens the commands
+      const inChat = placeOf(window.location.hash).kind === "chat";
+      if (mod && e.key.toLowerCase() === "k" && inChat && !getUi().command) return;
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setUi({ command: !getUi().command });
@@ -240,7 +244,7 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
       } else if (e.key === "Escape" && getUi().engaged) {
         e.stopPropagation();
         setUi({ engaged: null });
-      } else if (!mod && !typing(e) && !talkTyping() && !getUi().command && !getUi().presenting) {
+      } else if (!mod && !inChat && !typing(e) && !talkTyping() && !getUi().command && !getUi().presenting) {
         if (e.key === "v" || e.key === "V") toggleTalk();
         else if (e.key === "p" || e.key === "P") setUi({ presenting: true });
       }
@@ -280,6 +284,7 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
       {onGrid && space?.kind === "app" && !ui.presenting && <AppCanvas space={space} />}
       {place.kind === "today" && !ui.presenting && <Today user={user} />}
       {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}
+      {place.kind === "chat" && !ui.presenting && <ChatForm place={place} user={user} />}
       {!ui.presenting && <TopBar boards={boards} current={onGrid ? current : ""} place={place} onSwitch={switchBoard} onNew={newSpace} onClose={closeSpace} onRename={(id, name) => void updateSpace(id, { name })} />}
       {!ui.presenting && (ui.paneView === "spaces" || !onGrid) && <SidePane user={user} boards={boards} current={current} place={place} onSwitch={switchBoard} onNew={newSpace} />}
       {!ui.presenting && ui.paneView === "info" && onGrid && <SpaceInfo user={user} space={space} boards={boards} onUpdate={updateSpace} />}

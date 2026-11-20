@@ -287,6 +287,20 @@
   grid-template-columns: 28px minmax(0, 1fr) 8px;
   align-items: center;
 }
+/* a linked app: the row opens it in your browser, the press beside it opens it in Foundation */
+.today-app-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+.today-app-open {
+  opacity: 0.55;
+}
+.today-app-pair:hover .today-app-open,
+.today-app-open:focus-visible {
+  opacity: 1;
+}
 .today-app[data-unlinked] {
   opacity: 0.62;
 }

@@ -15,6 +15,8 @@ import type { UploaderState } from "./avatars.ts";
 export * from "./characters.ts";
 export * from "./collections.ts";
 export * from "./avatars.ts";
+export * from "./chat.ts";
+export * from "./replay.ts";
 
 // ---------- board document layout ----------
 
@@ -208,7 +210,8 @@ export type PanelKind =
   | "uploader" // Foundation's avatars: the characters wired into it are avatars on every Foundation; it uploads them to main's starter set, pressed or on a timer (avatars.ts)
   | "collection" // a collector: gathers what the cards wired into it make (pictures, characters) and can lay it out in a section; tiles drag out as copies
   | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
-  | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
+  | "character" // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
+  | "replay"; // a recorded huddle session's clock (ChatForm R1): scrub it and the section it sits in is drawn as it was then (`sessionId`: the huddle session)
 
 export interface Port {
   id: string;
@@ -249,7 +252,9 @@ export interface PanelDoc extends ObjectBaseDoc {
    * huddleStateOf. Readers ignore this field.
    */
   huddle?: HuddleState;
-  /** agent session id for panel === "agent" */
+  /** a huddle card that is a view of a ChatForm channel's huddle (its id is the huddle's; it signals on /huddle/chat/:id, and `channel` is the chat channel's id) */
+  home?: "chat";
+  /** agent session id for panel === "agent"; the huddle session (hs_…) for panel === "replay" */
   sessionId?: string;
   /** for asks: who, and whether it's done */
   assignee?: string;
@@ -273,6 +278,14 @@ export interface PanelDoc extends ObjectBaseDoc {
    * state otherwise, reloaded when it runs again. Optional, so no migration.
    */
   fromMachine?: { panel: string; port: number; name: string };
+  /**
+   * How a page card ("app" or "link" with a `url`) is shown. Absent: a frame. "browser": a tab of the built-in
+   * browser on the server's computer (hostbrowser.ts), for a site that refuses framing or sits behind a sign-in
+   * (everything on HyperForm). Far away the card shows the picture last saved of it (`seenAt`); near, the live page.
+   */
+  via?: "browser";
+  /** when the picture of a `via: "browser"` page was last saved (GET /api/boards/:id/pages/:panel/picture) */
+  seenAt?: number;
 }
 
 // ---------- machines: Linux machines and containers on a local engine ----------
@@ -582,6 +595,8 @@ export interface HuddleState {
   /** someone pressed Record: every participant's own camera and mic are being archived */
   recording?: { by: string; since: number } | null;
   lastEndedAt?: number;
+  /** a channel's huddle shown on a grid whose channel isn't open: the card says whose it is, never who's in it (people stays empty, recording.by "") */
+  locked?: boolean;
 }
 
 /** one line of a huddle's transcript — spoken (each person's browser transcribes their own mic) or typed */
@@ -590,19 +605,32 @@ export interface HuddleLine {
   at: number;
   speaker: string;
   text: string;
-  source: "speech" | "typed" | "system";
+  source: "speech" | "typed" | "system" | "agent";
 }
 
 /** messages on the huddle socket (/huddle/:board/:huddle) — signalling only; media is peer to peer */
 export type HuddleWire =
-  | { t: "welcome"; you: string; peers: Array<{ id: string; name: string; color: string; sending: boolean }>; ice: unknown[] }
+  | { t: "welcome"; you: string; peers: Array<{ id: string; name: string; color: string; sending: boolean; noRec?: boolean }>; ice: unknown[] }
   | { t: "peer-joined"; id: string; name: string; color: string; sending: boolean }
   | { t: "peer-left"; id: string }
-  | { t: "peer-state"; id: string; sending: boolean; muted?: boolean; camOff?: boolean }
+  | { t: "peer-state"; id: string; sending: boolean; muted?: boolean; camOff?: boolean; /** "don't record me": their recorder never starts */ noRec?: boolean }
   | { t: "signal"; from: string; to: string; data: unknown }
   | { t: "line"; line: HuddleLine }
   | { t: "caption"; from: string; name: string; text: string }
-  | { t: "recording"; on: boolean; by: string };
+  | { t: "recording"; on: boolean; by: string }
+  // ---- ChatForm (H1): screen share, agents in the room, a channel huddle's end ----
+  /** client → server: share my screen (a second video track on the stream `stream`) or stop; one share per room */
+  | { t: "share"; on: boolean; stream?: string }
+  /** server → all: who shares now (null: nobody); `stream` is the shared MediaStream's id on that peer's connection */
+  | { t: "sharing"; id: string | null; by: string | null; stream?: string }
+  /** server → all: the agents seated in the room and what each is doing */
+  | { t: "agents"; agents: Array<{ name: string; by: string; state: "listening" | "thinking" | "talking" }> }
+  /** server → all: an agent's answer, for every client to speak aloud (speechSynthesis, locally) */
+  | { t: "agent-says"; name: string; text: string; id: string }
+  /** server → all: a person pressed Stop: stop speaking now */
+  | { t: "agent-hush" }
+  /** server → all: a channel's huddle ended (the last person left); the socket closes after */
+  | { t: "ended"; session: string | null };
 
 // ---------- design pipelines: design → CAD → simulation → release ----------
 
@@ -973,7 +1001,7 @@ export type AgentEvent =
 export type AgentRuntime = "subscription" | "api" | "script";
 
 export interface SearchHit {
-  source: "board" | "file" | "slack" | "github" | "app" | "activity" | "huddle" | "flowform";
+  source: "board" | "file" | "slack" | "github" | "app" | "activity" | "huddle" | "flowform" | "chat";
   id: string;
   title: string;
   snippet: string;

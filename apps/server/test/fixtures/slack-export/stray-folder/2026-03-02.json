@@ -1,0 +1,23 @@
+[
+    {
+        "client_msg_id": "cm-1772443800.000130",
+        "type": "message",
+        "text": "orphan",
+        "user": "U01ADA",
+        "ts": "1772443800.000130",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        }
+    }
+]

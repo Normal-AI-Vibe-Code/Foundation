@@ -1,0 +1,458 @@
+/* ChatForm's Inbox tab (tabs/Inbox.tsx) and a message's way out (tabs/DraftBar.tsx). On tokens only. */
+
+.inbox {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--color-void);
+  container-type: inline-size;
+}
+.inbox-page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.inbox-lede {
+  margin: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-14) / 1.55 var(--font-sans);
+}
+.inbox-err {
+  margin: 0;
+  color: var(--color-bad);
+  font-size: var(--text-12);
+}
+.inbox-quiet {
+  margin: 0;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+
+/* a bridge: one sheet */
+.inbox-bridge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+}
+.inbox-bridge.is-off {
+  opacity: 0.7;
+}
+.inbox-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.inbox-head h2 {
+  margin: 0;
+  font: 600 var(--text-16) / 1.25 var(--font-sans);
+}
+.inbox-state {
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-mist);
+}
+.inbox-count {
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+}
+.inbox-detail {
+  margin: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.inbox-rule {
+  margin: 0;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+
+/* which keys it reads: set or missing, never their values */
+.inbox-needs {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-line);
+}
+.inbox-need {
+  display: grid;
+  grid-template-columns: 8px 220px 56px 1fr;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+.inbox-need .f-dot {
+  align-self: center;
+}
+.inbox-need code {
+  font: 500 var(--text-12) / 1.3 var(--font-code);
+  overflow-wrap: anywhere;
+}
+.inbox-need-set {
+  color: var(--color-warn);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+}
+.inbox-need.is-set .inbox-need-set {
+  color: var(--color-ok);
+}
+.inbox-need.is-optional .inbox-need-set {
+  color: var(--color-dim);
+}
+.inbox-need-what {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.inbox-steps {
+  margin: 0;
+  padding-left: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+
+/* its conversations */
+.inbox-portals {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-line);
+}
+.inbox-portal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out-soft);
+}
+.inbox-portal:hover {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.inbox-portal:active {
+  transform: scale(0.995);
+}
+.inbox-portal:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
+.inbox-portal-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.inbox-portal-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inbox-portal-last {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inbox-portal-when {
+  flex: none;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+}
+.inbox-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+}
+.inbox-window {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-ok) 12%, transparent);
+  color: var(--color-ok);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+}
+.inbox-window.is-shut {
+  background: color-mix(in srgb, var(--color-warn) 14%, transparent);
+  color: var(--color-warn);
+}
+.inbox-unread {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+  color: var(--color-on-fill);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.inbox-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.inbox-acts:empty {
+  display: none;
+}
+
+/* mail: the mailboxes, and Connect mail */
+.inbox-mail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.inbox-account {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 220px) 1fr auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-2);
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+.inbox-account-name {
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.inbox-account-detail {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.inbox-account-acts {
+  display: flex;
+  gap: var(--space-2);
+}
+.inbox-connect {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.inbox-connect label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.inbox-connect input,
+.inbox-start input,
+.inbox-start textarea,
+.inbox-settings select,
+.chat-draft-edit textarea {
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+  transition: border-color var(--dur-quick) var(--ease-out-soft);
+}
+.inbox-start textarea,
+.chat-draft-edit textarea {
+  height: auto;
+  padding: var(--space-3) var(--space-4);
+  resize: vertical;
+}
+.inbox-connect input:focus,
+.inbox-start input:focus,
+.inbox-start textarea:focus,
+.inbox-settings select:focus,
+.chat-draft-edit textarea:focus {
+  outline: none;
+  border-color: var(--color-pulse);
+  box-shadow: 0 0 0 1px var(--color-pulse);
+}
+.inbox-start {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+}
+
+/* admins: who it goes to, on or off */
+.inbox-settings {
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-3);
+}
+.inbox-settings summary {
+  cursor: pointer;
+  color: var(--color-mist);
+  font: 600 var(--text-12) / 1.3 var(--font-sans);
+}
+.inbox-setting {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) 0;
+}
+.inbox-setting-name {
+  min-width: 220px;
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.inbox-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.inbox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+}
+.inbox-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--color-dim);
+  cursor: pointer;
+  font-size: var(--text-11);
+}
+.inbox-chip button:hover {
+  color: var(--color-bad);
+}
+.inbox-seg {
+  display: inline-flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+}
+.inbox-seg button {
+  height: 26px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.inbox-seg button.is-current {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow: var(--shadow-sheet);
+}
+
+@container (max-width: 560px) {
+  .inbox-page {
+    padding: var(--space-5) var(--space-4);
+  }
+  .inbox-need {
+    grid-template-columns: 8px 1fr auto;
+  }
+  .inbox-need-what {
+    grid-column: 2 / -1;
+  }
+  .inbox-account {
+    grid-template-columns: 8px 1fr;
+  }
+  .inbox-account-detail,
+  .inbox-account-acts {
+    grid-column: 2;
+  }
+  .inbox-portal-when,
+  .inbox-window {
+    display: none;
+  }
+}
+
+/* ---------- a message's way out (DraftBar) ---------- */
+
+.chat-draft {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.chat-draft .chat-outbound {
+  gap: var(--space-2);
+  margin: 0;
+}
+.chat-draft-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+/* a person's message on its way: quiet, never violet (violet is an agent) */
+.chat-draft .chat-outbound.is-sending {
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+.chat-draft.is-sending .chat-draft-dot {
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+.chat-draft-edit {
+  width: min(560px, 100%);
+}
+.chat-draft-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.chat-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.chat-draft-ask {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.f-pill.chat-draft-bad {
+  color: var(--color-bad);
+}
+.chat-draft-err {
+  color: var(--color-bad);
+  font-size: var(--text-12);
+}

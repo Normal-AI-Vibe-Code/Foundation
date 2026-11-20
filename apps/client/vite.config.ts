@@ -25,6 +25,8 @@ const proxy = {
   "^/m/": { target: server, ws: true, changeOrigin: false },
   // the built-in terminal's socket (apps/server/src/hostterm.ts)
   "/host": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
+  // ChatForm's socket (apps/server/src/chatsock.ts): exactly /chat (and its query), never /chatsomething or a module under /src/chat/
+  "^/chat(\\?.*)?$": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
 };
 
 /**

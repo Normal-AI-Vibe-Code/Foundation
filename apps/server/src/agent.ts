@@ -49,7 +49,8 @@ You are speaking as the Shiba — the guide people meet on Foundation's Today pa
 - Warm, calm, direct. You're a companion, not a cheerleader.`;
 
 /** what the agent is told about where it is: the board, or (the Shiba) the person's Today */
-function contextBlock(opts: { boardId: string; user: UserInfo; persona?: "shiba" }) {
+function contextBlock(opts: { boardId: string; user: UserInfo; persona?: "shiba"; chat?: ChatTurn }) {
+  if (opts.chat) return opts.chat.context;
   const access = canWrite(opts.user.id, opts.boardId) ? "" : ' access="view only — read and answer; do not try to change the board"';
   if (opts.persona === "shiba") return `<today person="${opts.user.name}"${access}>\n${todayDigest(todayFor(opts.user))}\n</today>`;
   return `<board name="${opts.boardId}" person="${opts.user.name}"${access}>\n${boardDigest(opts.boardId)}\n</board>`;
@@ -59,6 +60,15 @@ import { setHelperStarter } from "./tools.ts";
 import { runScript } from "./script.ts";
 import { CLAUDE_CODE_ENV, claudeCommand, here, type Runtime } from "./rea.ts";
 import { workFolder } from "./childenv.ts";
+
+/** a ChatForm turn (chatagents.ts): the agent's name, the chat it's in (replaces the board context) and how to speak there; no board cursor */
+export interface ChatTurn {
+  agent: string;
+  context: string;
+  system: string;
+  /** a huddle's turn (chatagents.ts huddleReply): what it writes is said aloud */
+  spoken?: boolean;
+}
 
 const SYSTEM = `You are the Foundation agent — the company brain of Form Industries, living inside Foundation, a shared grid where the team keeps its projects, files, designs, running apps and agents together.
 
@@ -198,6 +208,8 @@ export async function runAgent(opts: {
   runId?: string;
   /** the visible agent doing this run */
   crew?: CrewMember;
+  /** a ChatForm turn: speaks in a chat, not on a board */
+  chat?: ChatTurn;
   emit: (e: AgentEvent) => void;
   signal: AbortSignal;
 }) {
@@ -221,7 +233,7 @@ export async function runAgent(opts: {
   // a viewer's question isn't a change to the board, so it doesn't go in its activity;
   // a helper's brief isn't the person's ask (call_in_help logs it, signed by the lead);
   // the Shiba's talk is the person's own, not the board's
-  if (!opts.crew?.lead && opts.persona !== "shiba" && canWrite(opts.user.id, opts.boardId)) editBoard(opts.boardId, "agent", (doc) => logActivity(doc, { who: opts.user.name, role: "human", text: `asked the agent: ${opts.prompt.slice(0, 140)}` }));
+  if (!opts.crew?.lead && opts.persona !== "shiba" && !opts.chat && canWrite(opts.user.id, opts.boardId)) editBoard(opts.boardId, "agent", (doc) => logActivity(doc, { who: opts.user.name, role: "human", text: `asked the agent: ${opts.prompt.slice(0, 140)}` }));
   const transcript: AgentEvent[] = [];
   // the transcript is saved as the turn runs, so a reload mid-turn replays it
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -243,7 +255,7 @@ export async function runAgent(opts: {
   };
   try {
     if (runtime === "api") await runApi(opts, emit);
-    else if (runtime === "script") await runScript(opts, emit, { boardId: opts.boardId, actor: opts.crew?.name ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" });
+    else if (runtime === "script") await runScript(opts, emit, { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" });
     else await runSubscription(opts, emit, runId);
     finish(opts.signal.aborted ? "stopped" : "done");
   } catch (e) {
@@ -300,7 +312,7 @@ export function startRun(opts: Omit<Parameters<typeof runAgent>[0], "emit" | "si
   // every board turn is someone you can see: a name, a colour, a cursor on the board.
   // The Shiba isn't on a board (it talks to one person on their Today), so it has no cursor
   let crew: CrewMember | undefined;
-  if (opts.persona !== "shiba") {
+  if (opts.persona !== "shiba" && !opts.chat) {
     try {
       crew = joinCrew({ boardId: opts.boardId, userId: opts.user.id, userName: opts.user.name, runId: r.id, task: opts.prompt, lead: opts.lead, name: seatName(opts.as) });
     } catch (e) {
@@ -425,7 +437,7 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
     role: "user",
     content: `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`,
   });
-  const ctx: ToolCtx = { boardId: opts.boardId, actor: opts.crew?.name ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" };
+  const ctx: ToolCtx = { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" };
   const tools = apiTools();
   let usage = { input: 0, output: 0 };
 
@@ -436,7 +448,7 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
       {
         model: config.anthropic.model,
         max_tokens: 16000,
-        system: [{ type: "text", text: SYSTEM + (opts.persona === "shiba" ? SHIBA : ""), cache_control: { type: "ephemeral" } }],
+        system: [{ type: "text", text: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? ""), cache_control: { type: "ephemeral" } }],
         thinking: { type: "adaptive" },
         output_config: { effort: "medium" },
         tools,
@@ -517,7 +529,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
       mcpServers: {
         foundation: {
           type: "http",
-          url: `http://${config.host}:${config.port}/mcp?board=${encodeURIComponent(opts.boardId)}${opts.crew ? `&crew=${encodeURIComponent(opts.crew.id)}` : ""}`,
+          url: `http://${config.host}:${config.port}/mcp?board=${encodeURIComponent(opts.boardId)}${opts.crew ? `&crew=${encodeURIComponent(opts.crew.id)}` : ""}${opts.chat ? `&as=${encodeURIComponent(opts.chat.agent)}` : ""}`,
           headers: { Authorization: `Bearer ${token}` },
         },
       },
@@ -525,7 +537,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
     { mode: 0o600 },
   );
   const prompt = `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`;
-  const argv = subscriptionArgs({ prompt, mcpFile, system: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + "\nYour board tools are the mcp__foundation__* tools." });
+  const argv = subscriptionArgs({ prompt, mcpFile, system: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? "") + "\nYour board tools are the mcp__foundation__* tools." });
   // the Claude Code session to continue: this server's memory, else the last run of this tab
   const resume =
     claudeSessions.get(key) ??
@@ -621,7 +633,7 @@ export function listSessions(boardId: string, userId: string, limit = 30): Sessi
     `select session_id, board_id, count(*) as runs, max(created_at) as updated,
             (select prompt from agent_runs b where b.session_id = a.session_id order by created_at asc limit 1) as first
        from agent_runs a
-      where board_id = ? and created_by = ? and session_id is not null and session_id not like 'ses_shiba%'
+      where board_id = ? and created_by = ? and session_id is not null and session_id not like 'ses_shiba%' and session_id not like 'ses_chat%'
       group by session_id order by updated desc limit ?`,
     boardId, userId, limit,
   );
