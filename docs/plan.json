@@ -2384,12 +2384,12 @@
     },
     {
       "id": "rune-e2e-drag-link",
-      "title": "Rune: a link pressed in its middle doesn't open on a note drawn at full size; a section drag-swap check that fails now and then",
+      "title": "Rune: a link in a note opens (two causes fixed); the section drag-swap check failed twice and then stopped",
       "kind": "bug",
       "milestone": "ship",
       "area": "design",
-      "status": "backlog",
-      "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge. Done the same day: Rune's notes show a link's real host as the web's do (the check pressed where the web's link had moved to). Still open: (1) on a note framed in a wide section (drawn at 1.05) a press in the middle of a link goes to the card and opens nothing, though the pointer shows a link there; it answers on a note drawn small. Not the host mark, not the card being held on press. Look at Rune's runtime/input/hit.rs primary_target and selection/links.rs. Held as an expected failure in 'a press on a note's link says where it goes': done when that check turns red for passing and its mark comes off. (2) 'a section's tools, rename, drag…' failed twice at the drag-swap and then passed six times on the same code; cause not found.",
+      "status": "review",
+      "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge, fixed the same day. A link in a note: (1) Rune drew no host beside a link where the web note does since the security pass, so the check pressed where no link was; Rune draws it now (view.rs host_mark). (2) Rune's accessibility mirror left each link's <a> taking the pointer above the canvas, so the browser opened the address itself, round openExternal, and Rune heard nothing; rune.css keeps the pointer off the mirror. All 11 checks pass. Still unexplained: 'a section's tools, rename, drag…' failed twice at the drag-swap and then passed eight times on the same code; if it comes back, look for a cancelled pointer (the drop arrives as 'cancel'). A person checks: a link in a note under Rune in the desktop app.",
       "issue": 218
     }
   ]
