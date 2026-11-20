@@ -573,10 +573,8 @@ async function pixels(page: Page, a: Buffer, b?: Buffer) {
 const MARKDOWN = "# Paper and type\n\nThe body, with **strong**, *emphasis*, `code` and a [link](https://foundation.invalid/rune).\n\n## A list\n\n- one\n- two\n- three\n\n> A quoted line.\n\n```\nlet x = 1;\n```\n";
 
 test("a press on a note's link says where it goes", async ({ page }) => {
-  // Known to fail (plan #218): on a note framed in a wide section (drawn at its own size), a press in the middle
-  // of a link goes to the card, though Rune shows the link under the pointer. The same press answers on a note
-  // drawn smaller (the board in view, or a small section). This turns red the day it works, so the mark can come off.
-  test.fail(true, "a link pressed in its middle doesn't open under Rune (plan #218)");
+  // A press on a link's letters used to go to the <a> Rune's accessibility mirror lays over them (rune.css):
+  // the browser opened the address itself and Rune reported nothing. Only the blank rows of the line answered.
   page.context().on("page", (p) => void p.close().catch(() => {}));
   await open(page, "rune");
   await page.keyboard.press("0");
@@ -608,6 +606,8 @@ test("a press on a note's link says where it goes", async ({ page }) => {
   await settle(page, 500);
   await page.mouse.down();
   await page.mouse.up();
+  // nothing of the mirror is under the pointer: the canvas is
+  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [q.x, q.y])).toBe("CANVAS");
   await expect
     .poll(() => page.evaluate(() => ((window as unknown as { __foundationRune: { events(): Array<{ t: string; url?: string }> } }).__foundationRune.events() ?? []).filter((e) => e.t === "link").map((e) => e.url)), { timeout: 3000 })
     .toContain("https://foundation.invalid/press");
