@@ -1126,7 +1126,7 @@ export const TOOLS: BoardTool[] = [
   def({
     name: "browser_tabs",
     description:
-      "The built-in browser's tabs: lists them (id, url, title) and says which one you are on. Optionally open a new tab at an address, select a tab by id (your next browser_ calls act there), or close one. The person's own view stays where they put it. Same leave as browser_read.",
+      "The built-in browser's tabs: lists them (id, url, title) and says which one you are on. A tab with `card` is the live page of that card on a grid (an app such as PartForm, DeployForm or FactoryForm opened in Foundation): select it to read or use that app as the person sees it. Optionally open a new tab at an address, select a tab by id (your next browser_ calls act there), or close one. The person's own view stays where they put it. Same leave as browser_read.",
     schema: z.object({
       open: z.string().min(1).max(4000).optional().describe("open a new tab at this address (or search words) and move to it"),
       select: z.string().max(12).optional().describe("a tab's id: act there from now on"),

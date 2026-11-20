@@ -24,7 +24,7 @@
 
 import { randomBytes } from "node:crypto";
 import type { UserInfo } from "@foundation/protocol";
-import { boardMaps, COMPANY_APPS, noteTextOf } from "@foundation/protocol";
+import { boardMaps, COMPANY_APPS, noteTextOf, onHyperForm } from "@foundation/protocol";
 import { all, db, one, run } from "./db.ts";
 import { editBoard, getBoard, listBoards } from "./boards.ts";
 import { canWrite } from "./roles.ts";
@@ -88,12 +88,15 @@ export interface CompanyApp {
   connector?: string;
   /** a single glyph for the tile */
   glyph: string;
+  /** whose sign-in stands in front of it ("hyperform": it opens in Foundation as a page of the server's browser, not a frame) */
+  signIn?: "hyperform";
 }
 
 /**
  * The vibe-coded apps the company runs (COMPANY_APPS, shared with the Chrome
  * extension), with where each lives on this server: its env variable, else
- * the connector's address. An app with neither shows as "not linked".
+ * where it is hosted (HyperForm), else the connector's address. An app with
+ * none of them shows as "not linked".
  */
 export function companyApps(): CompanyApp[] {
   const fallback: Record<string, string> = {
@@ -110,7 +113,8 @@ export function companyApps(): CompanyApp[] {
     glyph: a.glyph,
     repo: a.repo ?? null,
     connector: a.connector,
-    url: (a.env && process.env[a.env]) || fallback[a.id] || null,
+    url: [a.env ?? []].flat().map((k) => process.env[k]).find(Boolean) || a.url || fallback[a.id] || null,
+    ...(a.signIn ? { signIn: a.signIn } : {}),
   }));
   // apps people added to the registry (⌘L, the agent) join the shelf after the company's own
   const known = new Set(base.map((a) => a.name.toLowerCase()));
@@ -122,7 +126,7 @@ export function companyApps(): CompanyApp[] {
       continue;
     }
     known.add(a.name.toLowerCase());
-    base.push({ id: a.id, name: a.name, role: a.description ?? "", url: a.url, repo: a.repo, glyph: "◳" });
+    base.push({ id: a.id, name: a.name, role: a.description ?? "", url: a.url, repo: a.repo, glyph: "◳", ...(onHyperForm(a.url) ? { signIn: "hyperform" as const } : {}) });
   }
   return base;
 }
@@ -582,7 +586,7 @@ export function todayDigest(t: TodayState) {
     `Focus today (${t.focus.length}):`,
     ...t.focus.map((f) => `- [${f.id}] (${f.kind}) ${f.title} — ${f.why} · board ${f.boardName}`),
     "",
-    `Apps: ${t.apps.map((a) => `${a.name}${a.url ? "" : " (not linked)"}`).join(", ")}`,
+    `Apps: ${t.apps.map((a) => `${a.name}${a.url ? ` <${a.url}>${a.signIn === "hyperform" ? " (behind HyperForm's sign-in)" : ""}` : " (not linked)"}`).join(", ")}`,
     t.sources.dataroom.note,
   ];
   return lines.join("\n");

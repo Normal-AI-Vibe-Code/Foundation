@@ -33,7 +33,7 @@ import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { TOOLS } from "../shell/Tools";
 import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } from "../shell/wireGeometry";
 import { tunnelGeometry } from "../shell/wireGeometry";
-import { AppChip, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
+import { AppChip, AppRow, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
 import type { CompanyApp, CompanyGoal, FocusItem, Goal, Mood } from "../today/model";
 
 const NOW = Date.now();
@@ -55,8 +55,8 @@ const SAMPLE_GOALS: Goal[] = [
 ];
 const SAMPLE_APPS: CompanyApp[] = [
   { id: "factoryform", name: "FactoryForm", role: "Inventory, stations, work orders", url: "#", glyph: "⚙" },
-  { id: "bomform", name: "BomForm", role: "BOMs, certification", url: "#", glyph: "▤" },
-  { id: "hyperform", name: "HyperForm", role: "HyperForm programme", url: null, glyph: "◈" },
+  { id: "partform", name: "PartForm", role: "Every part and BOM", url: "#", glyph: "▤", signIn: "hyperform" },
+  { id: "fleetform", name: "FleetForm", role: "The fleet", url: null, glyph: "⛬" },
 ];
 
 function TodayDemo() {
@@ -98,6 +98,13 @@ function TodayDemo() {
           ))}
           {SAMPLE_GOALS.map((g, i) => (
             <GoalRow key={g.id} goal={g} pointed={i === 0} />
+          ))}
+        </section>
+        {/* the apps as Today's panel lists them: the row opens one in your browser, ⤢ opens it in Foundation */}
+        <section className="today-group" data-design-apps>
+          <h2 className="f-eyebrow">Apps</h2>
+          {SAMPLE_APPS.map((a, i) => (
+            <AppRow key={a.id} app={a} status={i === 0 ? "ok" : i === 1 ? "warn" : undefined} />
           ))}
         </section>
       </div>

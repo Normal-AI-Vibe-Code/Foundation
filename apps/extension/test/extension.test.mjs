@@ -43,7 +43,7 @@ test("every file the manifest and pages name is in the package", () => {
 test("the popup's fallback shelf is the company's apps", async () => {
   const { FALLBACK_APPS } = await import(pathToFileURL(join(out, "apps.js")).href);
   const names = FALLBACK_APPS.map((a) => a.name);
-  for (const n of ["BomForm", "FactoryForm", "HyperForm", "Vision"]) assert.ok(names.includes(n), n);
+  for (const n of ["PartForm", "DeployForm", "FactoryForm", "HyperForm", "Vision"]) assert.ok(names.includes(n), n);
 });
 
 test("addresses: http(s) only, tidied; Today is marked as from Chrome", async () => {

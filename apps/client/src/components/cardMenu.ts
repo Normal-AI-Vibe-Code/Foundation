@@ -19,7 +19,7 @@ import { toggleFullscreen } from "../lib/cardUse";
 import { openDetail } from "../lib/detail";
 import { openAppTab } from "../lib/grids";
 import { keys } from "../lib/keys";
-import { canPin, getObject, getState, hostOf, isPanel, objectsInSection, removeObject, requestSnap, setObjectFloat, setObjectFolded, setObjectPinned, setSectionHost, type AnyObject } from "../state/store";
+import { canPin, getObject, getState, hostOf, isPanel, objectsInSection, removeObject, requestSnap, setObjectFloat, setObjectFolded, setObjectPinned, setSectionHost, updatePanel, type AnyObject } from "../state/store";
 import { getUi, toast } from "../state/ui";
 import { activeBoard } from "../sync/board";
 import type { MenuItem } from "./menuLayout";
@@ -84,6 +84,13 @@ export function cardMenuItems(id: string): MenuItem[] | null {
       label: "Open as a tab",
       action: () => void openAppTab({ url: o.url, name: o.name }).then((err) => err && toast(err, "bad")),
     });
+  // a site that shows blank in a frame (it refuses framing, or its sign-in doesn't reach a frame) runs in the built-in browser instead
+  if (isPanel(o) && o.url && (o.panel === "app" || o.panel === "link") && !o.fromMachine && !viewer)
+    more.push(
+      o.via === "browser"
+        ? { icon: "▭", label: "Show it in a frame", action: () => updatePanel(id, { via: undefined }) }
+        : { icon: "◉", label: "Show it in the real browser", action: () => updatePanel(id, { via: "browser", panel: "app" }) },
+    );
   more.push({
     icon: "⌁",
     label: "Copy a link to it",

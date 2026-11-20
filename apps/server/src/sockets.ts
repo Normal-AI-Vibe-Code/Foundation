@@ -29,7 +29,7 @@ import type { UserInfo } from "@foundation/protocol";
 import type { WebSocketServer } from "ws";
 import { hashToken, isPerson, isServiceToken, requireUser, tokenFrom, userFromRequest, userFromSessionHash } from "./auth.ts";
 import { attachHostTerminal, HOST_TERM_PATH, spendHostTerminalKey } from "./hostterm.ts";
-import { attachHostBrowser, HOST_BROWSER_PATH, spendHostBrowserKey } from "./hostbrowser.ts";
+import { attachHostBrowser, HOST_BROWSER_PATH, spendHostBrowser } from "./hostbrowser.ts";
 import { one, run } from "./db.ts";
 import { CLOSE_TOO_OLD, clientTooOld } from "./clientversion.ts";
 import { HttpError, type Req } from "./http.ts";
@@ -149,13 +149,13 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
   // the built-in browser: the same rule, its own key (POST /api/host-browser; hostbrowser.ts)
   const hb = HOST_BROWSER_PATH.exec(url.pathname);
   if (hb) {
-    const who = spendHostBrowserKey(hb[1], req.query.get("key"));
+    const who = spendHostBrowser(hb[1], req.query.get("key"));
     if (!who) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
       socket.destroy();
       return;
     }
-    wss.handleUpgrade(req, socket, head, (ws) => attachHostBrowser(hb[1], ws, who));
+    wss.handleUpgrade(req, socket, head, (ws) => attachHostBrowser(hb[1], ws, who.user, who.page));
     return;
   }
   // a socket signed in by the cookie is opened by one of our own pages (cross-site WebSocket hijacking: origins.ts)

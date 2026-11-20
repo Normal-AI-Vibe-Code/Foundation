@@ -274,6 +274,14 @@ export interface PanelDoc extends ObjectBaseDoc {
    * state otherwise, reloaded when it runs again. Optional, so no migration.
    */
   fromMachine?: { panel: string; port: number; name: string };
+  /**
+   * How a page card ("app" or "link" with a `url`) is shown. Absent: a frame. "browser": a tab of the built-in
+   * browser on the server's computer (hostbrowser.ts), for a site that refuses framing or sits behind a sign-in
+   * (everything on HyperForm). Far away the card shows the picture last saved of it (`seenAt`); near, the live page.
+   */
+  via?: "browser";
+  /** when the picture of a `via: "browser"` page was last saved (GET /api/boards/:id/pages/:panel/picture) */
+  seenAt?: number;
 }
 
 // ---------- machines: Linux machines and containers on a local engine ----------

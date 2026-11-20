@@ -15,6 +15,7 @@ import { createShiba, type OrbMood } from "@foundation/ui/shiba";
 import { listen, voiceAvailable, type Listening } from "../lib/voice";
 import { api } from "../lib/api";
 import { floorInsets, useUi } from "../state/ui";
+import { openAppOnGrid } from "../lib/openApp";
 import { ask, loadToday, restoreConversation, saveCompanyGoal, saveGoal, setHeard, stopAsking, useToday, wordsLevel, type CompanyApp, type CompanyGoal, type FocusItem, type Goal, type Mood } from "./model";
 import "./today.css";
 
@@ -124,10 +125,16 @@ export function AppRow({ app, status, pointed }: { app: CompanyApp; status?: "ok
         {body}
       </span>
     );
+  // the row opens it in the person's own browser; ⤢ opens it in Foundation, as a section of the grid in use
   return (
-    <a className="today-row today-app" href={app.url} target="_blank" rel="noreferrer" data-pointed={pointed || undefined}>
-      {body}
-    </a>
+    <span className="today-app-pair" data-app={app.id}>
+      <a className="today-row today-app" href={app.url} target="_blank" rel="noreferrer" data-pointed={pointed || undefined} data-tip={`Open ${app.name} in your browser`}>
+        {body}
+      </a>
+      <button type="button" className="top-btn today-app-open" onClick={() => openAppOnGrid(app)} aria-label={`Open ${app.name} in Foundation`} data-tip="Open in Foundation: a section of your grid, live when you're near it" data-app-open={app.id}>
+        ⤢
+      </button>
+    </span>
   );
 }
 

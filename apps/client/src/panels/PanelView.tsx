@@ -43,6 +43,7 @@ import { putInUse, modHeld } from "../lib/cardUse";
 import { useCalmAdmit } from "../lib/calm";
 import { keys } from "../lib/keys";
 import { FullscreenBar, useFullscreenCard } from "../components/Fullscreen";
+import { HostPage } from "./HostPage";
 
 interface Props {
   panel: PanelMeta;
@@ -113,6 +114,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
   const body =
     panel.panel === "machine" && panel.machine ? (
       <MachineBody panel={panel} />
+    ) : (panel.panel === "app" || panel.panel === "link") && panel.via === "browser" && panel.url && !panel.fromMachine ? (
+      <BrowserPage panel={panel} />
     ) : panel.panel === "app" || panel.panel === "link" || panel.panel === "machine" ? (
       <LiveFrame panel={panel} />
     ) : panel.panel === "file" ? (
@@ -298,6 +301,24 @@ export function useOnScreen(ref: React.RefObject<HTMLElement | null>, minScale =
     };
   }, [ref, minScale]);
   return visible && bigEnough;
+}
+
+/** a page shown by the built-in browser (HostPage.tsx): live when it's on screen, big enough to read and the camera is calm */
+function BrowserPage({ panel }: { panel: PanelMeta }) {
+  const host = useRef<HTMLDivElement>(null);
+  const on = useOnScreen(host);
+  const admitted = useCalmAdmit(on);
+  const [near, setNear] = useState(false);
+  // once near it stays near while it's on screen (a pan doesn't drop the page); it goes far when it leaves or shrinks
+  useEffect(() => {
+    if (!on) setNear(false);
+    else if (admitted) setNear(true);
+  }, [on, admitted]);
+  return (
+    <div ref={host} className={`live-frame${useUi().engaged === panel.id ? " is-engaged" : ""}`}>
+      <HostPage panel={panel} near={near} />
+    </div>
+  );
 }
 
 function LiveFrame({ panel }: { panel: PanelMeta }) {

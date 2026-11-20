@@ -22,6 +22,12 @@
  *    a person has the browser open **and** has turned on "Let agents use this browser" on their socket. That leave
  *    is in memory, for this run of the browser, and they can take it back. An agent's call never starts the browser.
  *
+ * A page card (2026-11-19; PanelDoc.via === "browser"): a card on a grid can be a page of this browser. Its ask
+ * names the board, the card and the address (`POST /api/host-browser {board, card, url}`: the same person, the same
+ * one-time key); its socket gets a tab of its own, kept for that card while the browser runs, and never turns to
+ * another card's. While someone looks, the page as it last drew is kept as the card's picture (pagepictures.ts) for
+ * the far view and for people who can't open this browser: only while the tab is at the card's own site.
+ *
  * The socket, client → server (JSON text):
  *   {t:"size", w, h, dpr}                    the page's box in CSS px (w or h 0: not looking; frames pause)
  *   {t:"tab.new", url?} · {t:"tab.close", tab} · {t:"tab.select", tab}
@@ -42,6 +48,7 @@
  *   {t:"blocked", what:"download"|"file", name?}
  *   {t:"agents", allow, by?} · {t:"agent", who, did, tab}
  *   {t:"copied", text} · {t:"note", text, bad?} · {t:"closed", why}
+ *   {t:"seen", at}                           a page card's picture was kept just now
  */
 
 import { childOptions, spawnChild, type ChildProcess, type SpawnOptions } from "./child.ts";
@@ -57,6 +64,7 @@ import { requirePerson } from "./auth.ts";
 import { config } from "./config.ts";
 import { HttpError, type Req } from "./http.ts";
 import { computerUseDefault } from "./prefs.ts";
+import { pageIdsOk, savePagePicture } from "./pagepictures.ts";
 
 const KEY_TTL_MS = 30_000;
 const DIALOG_MS = 30_000;
@@ -67,6 +75,10 @@ const SHARP_AFTER_MS = 140;
 const MAX_BUFFERED = 6_000_000;
 const READ_MAX = 12_000;
 const MAX_TABS = 24;
+/** a page card's picture is kept at most this often while the page keeps drawing */
+const PICTURE_EVERY_MS = 4000;
+/** a page card's tab nobody has looked at for this long is closed (the browser goes on for the others) */
+const CARD_TAB_IDLE_MS = 180_000;
 
 // ---------------------------------------------------------------- the address
 
@@ -153,40 +165,62 @@ export function noBrowserSentence(env: NodeJS.ProcessEnv = process.env): string 
 
 // ---------------------------------------------------------------- the one-time key
 
+/** the card a socket is for: its page, on its board */
+export interface CardPage {
+  board: string;
+  card: string;
+  url: string;
+}
 interface Opened {
   user: UserInfo;
   key: string;
   expires: number;
+  page?: CardPage;
+}
+
+/** what a page card asks for, checked: ids that are ids, an address the browser opens. Throws a sentence. */
+export function cardPageOf(body: { board?: unknown; card?: unknown; url?: unknown } | null | undefined): CardPage | undefined {
+  if (!body || (body.board === undefined && body.card === undefined && body.url === undefined)) return undefined;
+  if (!pageIdsOk(body.board, body.card)) throw new HttpError(400, "A page card's ask names its board and its card.");
+  const a = browserAddress(typeof body.url === "string" ? body.url : "");
+  if ("refused" in a) throw new HttpError(400, a.refused);
+  if (!/^https?:/i.test(a.url)) throw new HttpError(400, "A page card needs an address.");
+  return { board: body.board as string, card: body.card as string, url: a.url };
 }
 const opened = new Map<string, Opened>();
 
 export const HOST_BROWSER_PATH = /^\/host\/browser\/([A-Za-z0-9_-]{8,64})$/;
 
 /** `POST /api/host-browser`: a person, an admin, asks for the browser (an agent, a viewer or a member is refused) */
-export function requestHostBrowser(req: Req) {
+export function requestHostBrowser(req: Req, page?: CardPage) {
   const u = requirePerson(req, "Opening the browser");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can open the browser on the server's computer.");
   const found = findBrowser();
   if (!found) throw new HttpError(503, noBrowserSentence());
-  return { ...openHostBrowser(u), browser: found.name, running: hostBrowserRunning() };
+  return { ...openHostBrowser(u, page), browser: found.name, running: hostBrowserRunning() };
 }
 
 /** a person asked for the browser: a one-time key for its socket. Starts nothing. */
-export function openHostBrowser(user: UserInfo): { id: string; key: string; expiresIn: number } {
+export function openHostBrowser(user: UserInfo, page?: CardPage): { id: string; key: string; expiresIn: number } {
   const now = Date.now();
   for (const [id, o] of opened) if (o.expires <= now) opened.delete(id);
   const id = randomBytes(9).toString("base64url");
   const key = randomBytes(24).toString("base64url");
-  opened.set(id, { user, key, expires: now + KEY_TTL_MS });
+  opened.set(id, { user, key, expires: now + KEY_TTL_MS, ...(page ? { page } : {}) });
   return { id, key, expiresIn: KEY_TTL_MS / 1000 };
 }
 
 /** spend a key on its socket: the person it was minted for, or null (wrong, used, or expired) */
 export function spendHostBrowserKey(id: string, key: string | null): UserInfo | null {
+  return spendHostBrowser(id, key)?.user ?? null;
+}
+
+/** the same, with the page card the key was minted for (if it was for one) */
+export function spendHostBrowser(id: string, key: string | null): { user: UserInfo; page?: CardPage } | null {
   const o = opened.get(id);
   opened.delete(id);
   if (!o || !key || o.key !== key || o.expires <= Date.now()) return null;
-  return o.user;
+  return { user: o.user, ...(o.page ? { page: o.page } : {}) };
 }
 
 // ---------------------------------------------------------------- the protocol, on the browser's pipes
@@ -299,6 +333,13 @@ interface Tab {
   dialog?: { kind: string; message: string; value: string; timer: NodeJS.Timeout };
   /** the isolated world browser_read's refs live in */
   readCtx?: number;
+  /** the page card this tab is for (a tab a site opened from it is its too, without `home`) */
+  card?: CardPage;
+  /** the card's own tab, the one its sockets come back to */
+  home?: boolean;
+  pictureAt?: number;
+  pictureTimer?: NodeJS.Timeout;
+  idleTimer?: NodeJS.Timeout;
 }
 interface Sock {
   ws: WebSocket;
@@ -309,6 +350,8 @@ interface Sock {
   sizeTimer?: NodeJS.Timeout;
   /** the size of the frames this socket was last told about */
   view?: string;
+  /** a page card's socket: it looks at that card's tab and no other card's */
+  page?: CardPage;
 }
 interface Run {
   proc: ChildProcess;
@@ -457,7 +500,7 @@ function stop(r: Run): Promise<void> {
 const tabList = (r: Run, s: Sock) => ({
   t: "tabs",
   at: s.tab,
-  tabs: [...r.tabs.values()].map((t) => ({ id: t.id, url: t.url, title: t.title, loading: t.loading, canBack: t.canBack, canForward: t.canForward, ...(r.agentsMay && r.agentTab === t.id ? { agent: true } : {}) })),
+  tabs: [...r.tabs.values()].map((t) => ({ id: t.id, url: t.url, title: t.title, loading: t.loading, canBack: t.canBack, canForward: t.canForward, ...(r.agentsMay && r.agentTab === t.id ? { agent: true } : {}), ...(t.card ? { card: t.card.card } : {}) })),
 });
 
 /** tell every socket the tabs as they are now (once per turn of the loop, however much changed) */
@@ -487,6 +530,7 @@ function adopt(r: Run, info: { targetId: string; type: string; url: string; titl
     // a page a site opened (window.open, target=_blank): whoever was looking at the page that opened it now looks here
     const from = info.openerId ? r.byTarget.get(info.openerId) : undefined;
     if (from) {
+      if (from.card) tab.card = from.card;
       if (from.size) applySize(r, tab, from.size);
       if (r.agentBusy && r.agentTab === from.id) r.agentTab = tab.id;
       for (const s of r.socks) if (s.tab === from.id) look(r, s, tab.id);
@@ -519,8 +563,21 @@ function dropTab(r: Run, tab: Tab) {
   r.byTarget.delete(tab.target);
   if (tab.dialog) clearTimeout(tab.dialog.timer);
   clearTimeout(tab.sharpTimer);
+  clearTimeout(tab.pictureTimer);
+  clearTimeout(tab.idleTimer);
   if (r.agentTab === tab.id) r.agentTab = null;
   if (r.over) return;
+  // a page card's socket goes back to its card's own tab (a page it opened has closed), or ends with it
+  for (const s of [...r.socks]) {
+    if (s.tab !== tab.id || !s.page) continue;
+    const home = cardTab(r, s.page);
+    if (home) look(r, s, home.id);
+    else {
+      s.tab = null;
+      say(s, { t: "closed", why: "This page's tab was closed." });
+      s.ws.close();
+    }
+  }
   if (next) {
     for (const s of r.socks) if (s.tab === tab.id) look(r, s, next);
     pushTabs(r);
@@ -535,10 +592,46 @@ function dropTab(r: Run, tab: Tab) {
     .catch(() => {});
 }
 
+const sameCard = (a: CardPage | undefined, b: CardPage | undefined) => Boolean(a && b && a.board === b.board && a.card === b.card);
+/** the tab kept for a page card */
+const cardTab = (r: Run, page: CardPage): Tab | undefined => [...r.tabs.values()].find((t) => t.home && sameCard(t.card, page));
+
+/**
+ * Keep the page as it last drew as its card's picture: not more often than PICTURE_EVERY_MS, not while it loads,
+ * and only at the card's own site (a sign-in provider's page the tab passed through is nobody's to keep).
+ */
+function keepPicture(r: Run, tab: Tab) {
+  if (!tab.card || !tab.home || tab.pictureTimer) return;
+  const wait = Math.max(0, (tab.pictureAt ?? 0) + PICTURE_EVERY_MS - Date.now());
+  tab.pictureTimer = setTimeout(() => {
+    tab.pictureTimer = undefined;
+    if (r.over || !tab.card || !tab.last || !r.tabs.has(tab.id)) return;
+    if (tab.loading) return keepPicture(r, tab);
+    if (!sameSite(tab.url, tab.card.url)) return;
+    tab.pictureAt = Date.now();
+    const at = savePagePicture(tab.card, tab.last.jpeg);
+    if (at) for (const s of r.socks) if (s.tab === tab.id) say(s, { t: "seen", at });
+  }, Math.max(wait, 600));
+  tab.pictureTimer.unref();
+}
+
+/** the same site: the same scheme, host and port */
+export function sameSite(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
+
 /** a socket turns to a tab: frames of it (and only it) follow */
 function look(r: Run, s: Sock, tabId: string) {
   const tab = r.tabs.get(tabId);
   if (!tab) return;
+  // a page card's socket looks only at its own card's tabs; the Browser tool's looks at any
+  if (s.page && !sameCard(tab.card, s.page)) return;
+  clearTimeout(tab.idleTimer);
+  tab.idleTimer = undefined;
   const was = s.tab ? r.tabs.get(s.tab) : undefined;
   s.tab = tab.id;
   s.view = undefined;
@@ -626,6 +719,7 @@ function sharpenSoon(r: Run, tab: Tab) {
         const f = { jpeg: Buffer.from(shot.data, "base64"), w: of.w, h: of.h };
         tab.last = f;
         for (const s of r.socks) if (s.tab === tab.id && s.looking) sendFrame(s, tab, f);
+        keepPicture(r, tab);
       })
       .catch(() => {})
       .finally(() => {
@@ -762,6 +856,7 @@ function onEvent(r: Run, method: string, p: any, session: string | undefined) {
       tab.last = f;
       for (const s of r.socks) if (s.tab === tab.id && s.looking) sendFrame(s, tab, f);
       sharpenSoon(r, tab);
+      keepPicture(r, tab);
       break;
     }
     case "Page.frameStartedLoading":
@@ -853,8 +948,8 @@ const MAC_COMMANDS: Record<string, string> = { a: "selectAll", c: "copy", x: "cu
  * A socket that spent its key. The browser starts now if it isn't running, and stops when the last socket closes.
  * The protocol is at the top of this file.
  */
-export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo) {
-  const s: Sock = { ws, user, tab: null, size: null, looking: true };
+export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo, page?: CardPage) {
+  const s: Sock = { ws, user, tab: null, size: null, looking: true, ...(page ? { page } : {}) };
   let r: Run | null = null;
   let closed = false;
 
@@ -867,6 +962,16 @@ export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo) {
     if (r.over) return;
     const tab = s.tab ? r.tabs.get(s.tab) : undefined;
     if (tab) syncCast(r, tab);
+    // a card's tab nobody looks at any more is closed after a while (its picture stays)
+    const mine = r;
+    for (const t of mine.tabs.values()) {
+      if (!t.card || !sameCard(t.card, s.page) || t.idleTimer || [...mine.socks].some((o) => o.tab === t.id)) continue;
+      t.idleTimer = setTimeout(() => {
+        t.idleTimer = undefined;
+        if (!mine.over && mine.tabs.has(t.id) && ![...mine.socks].some((o) => o.tab === t.id)) mine.cdp.fire("Target.closeTarget", { targetId: t.target });
+      }, CARD_TAB_IDLE_MS);
+      t.idleTimer.unref();
+    }
     if (r.socks.size === 0) {
       console.log(`  browser            closed (${user.name} was the last one looking)`);
       void stop(r);
@@ -907,6 +1012,7 @@ export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo) {
         break;
       }
       case "tab.new": {
+        if (s.page) break; // a page card is one page: tabs are the Browser tool's
         const a = typeof m.url === "string" && m.url.trim() ? browserAddress(m.url) : { url: "about:blank" };
         if ("refused" in a) return fail(new Error(a.refused));
         void newTab(run, a.url).then((t) => look(run, s, t.id), fail);
@@ -918,6 +1024,7 @@ export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo) {
       }
       case "tab.close": {
         const t = typeof m.tab === "string" ? run.tabs.get(m.tab) : undefined;
+        if (s.page && !sameCard(t?.card, s.page)) break;
         if (t) run.cdp.fire("Target.closeTarget", { targetId: t.target });
         break;
       }
@@ -1031,9 +1138,31 @@ export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo) {
     }
     if (closed || mine.over) return;
     say(s, { t: "hello", browser: mine.name, agents: Boolean(mine.agentsMay), ...(mine.agentsMay ? { by: mine.agentsMay.by } : {}) });
-    const first = [...mine.tabs.keys()][0];
-    if (first) look(mine, s, first);
+    // heard from here on: a card's tab is still being made below, and the size its page sends meanwhile must not be lost
     ws.on("message", onMessage);
+    if (s.page) {
+      // the card's own tab: the one kept for it, or a new one at its address
+      const page = s.page;
+      let tab = cardTab(mine, page);
+      if (!tab) {
+        try {
+          // the browser starts with one empty tab: the first card takes it rather than leave it lying about
+          const empty = [...mine.tabs.values()].find((t) => !t.card && t.url === "about:blank" && ![...mine.socks].some((o) => o.tab === t.id));
+          tab = empty ?? (await newTab(mine, "about:blank"));
+          tab.card = page;
+          tab.home = true;
+          await navigate(mine, tab, page.url);
+        } catch (e) {
+          say(s, { t: "closed", why: (e as Error).message });
+          return ws.close();
+        }
+      }
+      if (closed || mine.over) return;
+      look(mine, s, tab.id);
+    } else {
+      const first = [...mine.tabs.values()].find((t) => !t.card) ?? [...mine.tabs.values()][0];
+      if (first) look(mine, s, first.id);
+    }
   })();
 }
 
@@ -1043,7 +1172,7 @@ const SELECTION = `(() => { const a = document.activeElement; try { if (a && typ
 // ---------------------------------------------------------------- agents
 
 /** what an agent is told when it may not use the browser: nothing was started, nothing was done */
-export const NO_LEAVE = "The browser isn't open to agents. A person (an admin) must open the Browser tool, press Start the browser, and turn on “Let agents use this browser”. Nothing was done; an agent can't start it.";
+export const NO_LEAVE = "The browser isn't open to agents. A person (an admin) must open the Browser tool (or a page card on a grid), start it, and turn on “Let agents use this browser” (“Agents” on the card). Nothing was done; an agent can't start it.";
 
 export interface BrowserAgent {
   /** the agent's display name, as the person watching sees it */
@@ -1300,7 +1429,7 @@ async function act(r: Run, agent: BrowserAgent, action: BrowserAction): Promise<
       await sleep(150);
     }
     const mine = agentTabOf(r);
-    return { current: mine.id, tabs: [...r.tabs.values()].map((t) => ({ id: t.id, url: t.url, title: t.title, loading: t.loading })) };
+    return { current: mine.id, tabs: [...r.tabs.values()].map((t) => ({ id: t.id, url: t.url, title: t.title, loading: t.loading, ...(t.card ? { card: t.card.card, board: t.card.board } : {}) })) };
   }
 
   const tab = agentTabOf(r);

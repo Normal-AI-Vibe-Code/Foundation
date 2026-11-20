@@ -268,3 +268,76 @@
   gap: var(--space-3);
   margin-top: var(--space-2);
 }
+
+/* ============ a page card shown by this browser (panels/HostPage.tsx, 2026-11-19) ============
+   Far: the picture kept of the page, under a foot that names it and says when it was seen.
+   Near: the live page. In use: the browser's bar above it. */
+.host-page {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-raise);
+}
+.host-page-bar {
+  background: var(--color-panel);
+}
+.host-page-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.host-page-live {
+  position: absolute;
+  inset: 0;
+}
+.host-page-still {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+/* the picture is the page's top left at the card's width: a page is read from its top */
+.host-page-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top left;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.host-page-foot {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+.host-page-foot > * {
+  pointer-events: auto;
+}
+.host-page-seen,
+.host-page-note {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  box-shadow: 0 0 0 1px var(--color-line);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.4 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.host-page-seen b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.host-page-note.is-bad {
+  color: var(--color-bad);
+  white-space: normal;
+}
