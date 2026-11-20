@@ -53,6 +53,8 @@ export interface CompanyApp {
   repo?: string | null;
   connector?: string;
   glyph: string;
+  /** whose sign-in stands in front of it: "hyperform" opens in Foundation as a page of the server's browser */
+  signIn?: "hyperform";
 }
 export interface TodayState {
   person: { name: string; email: string; first: string };

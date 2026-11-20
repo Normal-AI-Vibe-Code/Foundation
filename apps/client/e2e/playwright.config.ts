@@ -68,6 +68,8 @@ export default defineConfig({
         FOUNDATION_CLIENT_URL: CLIENT,
         FOUNDATION_ADMIN_EMAILS: "admin@normal.dev",
         FOUNDATION_DEV_LOGIN: "1",
+        // DeployForm here is a stand-in page (slack-standin.mjs): a check never opens the real one (pages.spec.ts)
+        DEPLOYFORM_URL: `http://127.0.0.1:${SLACK_PORT}/e2e/page.html`,
         // a stand-in Slack (e2e/slack-standin.mjs); no agent runtime, so a check never spends an agent turn
         SLACK_API_BASE: `http://127.0.0.1:${SLACK_PORT}`,
         SLACK_USER_TOKEN: "xoxp-standin",

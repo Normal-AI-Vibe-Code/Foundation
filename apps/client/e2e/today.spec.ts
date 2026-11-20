@@ -58,9 +58,12 @@ test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps
   await expect(row).toBeVisible();
   expect(await row.getAttribute("href")).toMatch(/^\/\?board=company&focus=/);
 
-  // the company's apps, in the panel; HyperForm says it isn't linked
-  for (const name of ["BomForm", "FactoryForm", "HyperForm", "Vision"]) await expect(panel.locator(".today-app", { hasText: name })).toBeVisible();
-  await expect(panel.locator(".today-app[data-unlinked]", { hasText: "HyperForm" })).toBeVisible();
+  // the company's apps, in the panel: the four on HyperForm are linked where they are hosted, FleetForm isn't linked yet
+  for (const name of ["HyperForm", "PartForm", "DeployForm", "FactoryForm", "Vision"]) await expect(panel.locator(".today-app", { hasText: name })).toBeVisible();
+  expect(await panel.locator("a.today-app", { hasText: "HyperForm" }).getAttribute("href")).toBe("https://dock.apps.normallab.co/");
+  expect(await panel.locator("a.today-app", { hasText: "PartForm" }).getAttribute("href")).toBe("https://partform.apps.normallab.co/");
+  expect(await panel.locator("a.today-app", { hasText: "FactoryForm" }).getAttribute("href")).toBe("https://factory-form-factoryform.apps.normallab.co/");
+  await expect(panel.locator(".today-app[data-unlinked]", { hasText: "FleetForm" })).toBeVisible();
 
   // a todo added here is kept
   await page.getByLabel("Add a todo").fill("Ship Today to the team");
