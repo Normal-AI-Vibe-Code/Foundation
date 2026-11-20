@@ -5,7 +5,8 @@
  */
 
 import { KIND_GLYPH, type BoardRow } from "../lib/grids";
-import { T3Glyph } from "./glyphs";
+import { LOCAL_GRID_ID } from "@foundation/protocol";
+import { ComputerGlyph, T3Glyph } from "./glyphs";
 
 export function AppGlyph({ size = 14 }: { size?: number }) {
   return (
@@ -19,6 +20,8 @@ export function AppGlyph({ size = 14 }: { size?: number }) {
 
 export function SpaceGlyph({ space }: { space: Pick<BoardRow, "id" | "kind" | "app"> }) {
   if (space.id === "company") return <>◉</>;
+  // the grid read from this computer: the computer's mark, here and in its tab
+  if (space.id === LOCAL_GRID_ID) return <ComputerGlyph size={14} />;
   if (space.kind === "app") return space.app === "t3" ? <T3Glyph size={14} /> : <AppGlyph />;
   return <>{KIND_GLYPH[space.kind ?? "grid"]}</>;
 }

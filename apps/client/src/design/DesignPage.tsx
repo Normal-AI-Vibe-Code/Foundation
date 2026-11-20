@@ -5,6 +5,7 @@
  */
 
 import { CouncilTalkView } from "../shell/CouncilTalk";
+import { VmSetupView, VmStatusView } from "../panels/LocalVm";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
 import { ShibaDot } from "../today/notices";
@@ -151,8 +152,9 @@ import { SubGridDemo } from "./SubGridDemo";
 import { PointerDemo } from "./PointerDemo";
 import { CharacterStudioDemo } from "./CharacterStudioDemo";
 import { CollectionDemo } from "./CollectionDemo";
-import { UploaderDemo } from "./UploaderDemo";
+import { LocalDemo } from "./LocalDemo";
 import { ChatFormDemo } from "../chat/ChatDesign";
+import { UploaderDemo } from "./UploaderDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -182,7 +184,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
-  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Release page", "Rune renderer"],
+  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
 const Only = createContext<Set<string> | null>(null);
@@ -1032,6 +1034,9 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <MachineAsksDemo />
         <AppToolAsksDemo />
         <MachineUseDemo />
+        <h3>Full operating systems · native QEMU</h3>
+        <div className="adapt-row">{[260, 400, 560].map((width) => <div key={width} className="frame-card live-specimen" style={{ width, height: 700 }}><VmSetupView files={[{ id: "demo-iso", name: "wildos-amd64.iso", size: 3 * 1073741824, sha256: "a2b4c6d8".repeat(8) }]} host={{ available: true, note: "Native QEMU · no WSL or Docker required", maxMemoryMB: 16384, maxCpus: 8 }} /></div>)}</div>
+        <div className="adapt-row"><div className="frame-card live-specimen" style={{ width: 560 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "stopped", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "software", bootIso: false, detail: "VM stopped. Its disk is kept." }} /></div><div className="frame-card live-specimen" style={{ width: 400 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "error", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "native", bootIso: true }} viewer error="Not enough available host memory. Close other VMs/apps or configure a smaller VM." /></div></div>
         <MachineHeadSpecimens />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
@@ -1242,6 +1247,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
 
       <Section title="Rune renderer" note="A second engine beside the web renderer (Settings → Renderer; it's this device's choice, and the web renderer is the default). While Rune draws the board, a quiet glass pill in the bottom bar says so, beside the zoom: a green dot when it's drawing, a breathing blue one while it starts, amber and Rune off when it was asked for and couldn't run (the label says why, and a toast says it once). A press opens the list of where Rune stands. In Settings the two engines are raised cards, the chosen one ringed blue; under them, whether WebGPU and the build are here, then the ledger: each part of the board with one of four words. Never violet: which engine draws is a person's choice.">
         <RuneDesign />
+      </Section>
+
+      <Section title="This computer" note="The projects being built on the computer the server runs on, as a grid of their own (Settings → Places → Connect this computer; an admin, in person). A section per git repository, its worktrees folded in, each holding three cards the server keeps: Preview (the newest screenshot a session saw, and the dev server the project declares, its port in the code face with a dot: ok when something answers, ↗ to open it), Progress (the lead session: its title 14/600, where it runs, its plan as a 4 px ok bar with n/m and its steps, done struck, the one under way 600 with a breathing agent-violet box, then its last wrap-up behind a strong hairline; the others as 24 px rows), and Changes (the branch in the code face, ↑↓ against upstream, the changed files with their status letter in warn, ok or bad, the last five commits). Every card wears the local pill: a computer, On this computer, and the watch's dot (ok while it looks, warn when it stopped). The same mark sits beside a section's council chip (Local, or n working here), on the grid's council button, on the grid's tab and its row in the side menu, with the dot at the row's right. Never violet but for a session at work: the computer isn't an agent.">
+        <LocalDemo />
       </Section>
 
       <Section title="Panels that adapt" note="Design for the narrowest width first; container queries, never the window. Check 260, 400 and 560 px.">

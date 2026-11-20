@@ -13,6 +13,7 @@
 import { JobWhat, type JobShown } from "./JobWhat";
 import { PipelineBody } from "./PipelineView";
 import { CollectionBody } from "./CollectionView";
+import { LocalBody } from "./LocalView";
 import { UploaderBody } from "./UploaderView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
@@ -76,8 +77,9 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   design: "◐",
   pipeline: "⇢",
   collection: "❖",
-  uploader: "⇪",
   replay: "◷",
+  uploader: "⇪",
+  local: "⌂",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -116,7 +118,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
   const extras = <PanelActions panel={panel} />;
 
   const body =
-    panel.panel === "machine" && panel.machine ? (
+    panel.panel === "machine" && (panel.machine || panel.vm) ? (
       <MachineBody panel={panel} />
     ) : (panel.panel === "app" || panel.panel === "link") && panel.via === "browser" && panel.url && !panel.fromMachine ? (
       <BrowserPage panel={panel} />
@@ -144,12 +146,14 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <DesignBody panel={panel} />
     ) : panel.panel === "pipeline" ? (
       <PipelineBody panel={panel} />
+    ) : panel.panel === "local" ? (
+      <LocalBody panel={panel} />
     ) : panel.panel === "collection" ? (
       <CollectionBody panel={panel} />
-    ) : panel.panel === "uploader" ? (
-      <UploaderBody panel={panel} />
     ) : panel.panel === "replay" ? (
       <ReplayBody panel={panel} />
+    ) : panel.panel === "uploader" ? (
+      <UploaderBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (

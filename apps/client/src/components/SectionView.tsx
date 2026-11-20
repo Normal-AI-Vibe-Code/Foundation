@@ -1,6 +1,7 @@
 import { keys } from "../lib/keys";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { SectionCouncilChip } from "../characters/SectionCouncilChip";
+import { LocalSectionChip } from "../panels/LocalView";
 import { openCouncil, toggleCouncil } from "../lib/councilOpen";
 import { Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,6 +12,7 @@ import {
   Section,
   addNote,
   startMachine,
+  startVm,
   addTextBox,
   addSectionAdjacent,
   getState,
@@ -194,6 +196,8 @@ export const SectionView = memo(function SectionView({
   const rect = sectionRestRect(grid, section);
   // a section that hosts an app is that app; any other cards sit over it
   const { host, objects } = view;
+  // a section of the This computer grid: the project its cards show
+  const localKey = objects.map((o) => (isPanel(o) && o.panel === "local" ? o.source : undefined)).find(Boolean);
   const hostable = !host && objects.length === 1 && isPanel(objects[0]) && isHostable(objects[0].panel) ? objects[0] : null;
   const lastLayout = useRef(new Map<string, { x: number; y: number }>());
   const layout = useMemo(
@@ -451,6 +455,7 @@ export const SectionView = memo(function SectionView({
         {/* at rest, what a section is: somewhere agents build with you, and a grid of its own to open */}
         {!mini && (
           <span className="section-rest">
+            {localKey && <LocalSectionChip projectKey={localKey} />}
             <SectionCouncilChip sectionId={section.id} sectionName={section.name} />
             {(!host || childGrid) && (
               <button
@@ -488,6 +493,7 @@ export const SectionView = memo(function SectionView({
             {tool("Add a note", "▤", () => addNote(section.id))}
             {tool("Upload an image or video", "⇪", () => fileRef.current?.click(), "", keys("mod+U"))}
             {tool("Start a machine here: Linux on Kiri or Docker", "▣", () => startMachine(section.id))}
+            {tool("Add a full operating system here: WildOS VM", "▣", () => startVm(section.id))}
           </div>
           <div className="sec-group">
             {tool("Split into two columns", "◫", () => splitSection(section.id, "h"))}

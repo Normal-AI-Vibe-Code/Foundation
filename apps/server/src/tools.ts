@@ -211,6 +211,7 @@ const PANEL_SIZES: Record<PanelKind, [number, number]> = {
   slack: [420, 520],
   crew: [380, 440],
   replay: [360, 120],
+  local: [480, 420],
 };
 
 function sectionOrCreate(doc: Y.Doc, section?: string) {

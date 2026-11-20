@@ -27,6 +27,8 @@ import { FloorEdge } from "./FloorEdge";
 import { ServerSwitch } from "../server/ServerSwitch";
 import { NightOrb } from "./NightOrb";
 import { SpaceGlyph } from "./SpaceGlyph";
+import { LOCAL_GRID_ID } from "@foundation/protocol";
+import { LocalRowDot } from "../panels/LocalView";
 import { isNight, setNight } from "@foundation/ui";
 
 interface Props {
@@ -150,6 +152,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
               <SpaceGlyph space={b} />
             </span>
             <span className="pane-label">{b.name}</span>
+            {b.id === LOCAL_GRID_ID && <LocalRowDot />}
             {!tree && parent && <span className="pane-when">{parent.name}</span>}
             {tree && kids.length > 0 && <span className="pane-when">{kids.length}</span>}
           </button>

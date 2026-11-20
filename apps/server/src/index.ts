@@ -11,6 +11,8 @@ import { createServer, type ServerResponse } from "node:http";
 import type { PanelDoc, UserInfo } from "@foundation/protocol";
 import { WebSocketServer } from "ws";
 import { config } from "./config.ts";
+import { registerVmRoutes } from "./vmroutes.ts";
+import { shutdownLocalVms } from "./localvms.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
 import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
@@ -51,6 +53,7 @@ import { bringFlowformFile, listRooms as listFlowformRooms, liveRooms, pullRoom,
 import { beginGrant, downloadsStatus, dropSession, fileThumb } from "./flowformfiles.ts";
 import { isPerson, requirePerson } from "./auth.ts";
 import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
+import { connectLocal, localStatus, resumeLocal, stopLocal } from "./localdev.ts";
 import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
@@ -86,6 +89,7 @@ startSlackLive();
 setCurator((o) => startRun(o));
 
 const r = new Router();
+registerVmRoutes(r);
 
 r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 
@@ -428,6 +432,12 @@ chatRoutes(r);
 (await import("./chatimport.ts")).chatImportRoutes(r); // history: Slack export zip and API pull in, ChatForm export out
 (await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
 (await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
+
+// ---------- this computer: the projects being built here, as a grid (localdev.ts) ----------
+
+r.get("/api/local", (req) => localStatus(requireUser(req), isPerson(req)));
+r.post("/api/local/connect", async (req) => connectLocal(requireUser(req), isPerson(req)));
+r.post("/api/local/stop", (req) => stopLocal(requireUser(req), isPerson(req)));
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
 
@@ -1370,6 +1380,7 @@ settleOrphanRuns();
 startHermes();
 startDigest();
 resumeCharacters();
+resumeLocal();
 // characters this build carries that this install hasn't had yet (a fresh install, or a studio made from an older set)
 void bringInStarter()
   .then((n) => n && console.log(`  characters         brought in ${n} from the starter set`))
@@ -1382,7 +1393,7 @@ void bringInStarter()
 // pipe closes. Stop the agents' child processes, then go.
 if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
   let leaving = false;
-  const leave = () => {
+  const leave = async () => {
     if (leaving) return;
     leaving = true;
     try {
@@ -1391,11 +1402,16 @@ if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
       /* going anyway */
     }
     server.close();
+    await shutdownLocalVms();
     setTimeout(() => process.exit(0), 150).unref();
   };
   process.stdin.on("end", leave).on("close", leave).on("error", leave);
   process.stdin.resume();
 }
+
+for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => {
+  void shutdownLocalVms().finally(() => process.exit(0));
+});
 
 server.on("error", (e: NodeJS.ErrnoException) => {
   // one plain line: the desktop app shows it to the person and keeps it in its log

@@ -377,7 +377,11 @@ export function confirm(req: Req, res: ServerResponse, answer: "yes" | "no") {
   const host = String(req.headers.host ?? "");
   const origin = req.headers.origin;
   const site = String(req.headers["sec-fetch-site"] ?? "");
-  if ((origin !== undefined && origin !== `http://${host}` && origin !== `https://${host}`) || (site && site !== "same-origin" && site !== "none")) {
+  // The page is served with Referrer-Policy: no-referrer, so a browser's press says Origin "null" (the
+  // Fetch spec hides the origin of a non-GET under that policy). It counts only when the browser also
+  // says the press came from this same origin.
+  const ownOrigin = origin === `http://${host}` || origin === `https://${host}` || (origin === "null" && site === "same-origin");
+  if ((origin !== undefined && !ownOrigin) || (site && site !== "same-origin" && site !== "none")) {
     return page(res, 403, "Nothing was done", "That answer didn't come from Foundation's own page.");
   }
   const presented = parseCookies(req.headers.cookie)[CONFIRM_COOKIE] ?? "";

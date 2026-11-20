@@ -42,6 +42,7 @@ import { desktopRecipe } from "./machineWords";
 import { AgentGlyph, DesktopGlyph, GlobeGlyph, LockGlyph, PackageGlyph, PlayGlyph, PullGlyph, ShieldGlyph, StopGlyph, TerminalGlyph } from "../shell/glyphs";
 import { HubSearch } from "./MachineHub";
 import { AddressBar, MachineTitle } from "./MachineBar";
+import { LocalVm } from "./LocalVm";
 import { Access } from "./MachineAccess";
 import { ClusterStart, ClusterView, PodWell } from "./MachineCluster";
 import { copyText, mountTerminal, readClipboard, type MachineTerminal } from "./machineTerminal";
@@ -74,6 +75,13 @@ export function machineAction(panelId: string, verb: "start" | "stop" | "restart
 }
 
 export function MachineBody({ panel }: { panel: PanelMeta }) {
+  const [kind, setKind] = useState<"container" | "vm">(panel.machine?.wantVm ? "vm" : "container");
+  if (panel.vm) return <LocalVm panel={panel} />;
+  if (panel.machine?.state === "absent") return <div className="machine-body vm-picker"><div className="vm-kind" role="tablist" aria-label="Machine type"><button className={`f-pill${kind === "container" ? " is-accent" : ""}`} role="tab" aria-selected={kind === "container"} onClick={() => setKind("container")}>Container</button><button className={`f-pill${kind === "vm" ? " is-accent" : ""}`} role="tab" aria-selected={kind === "vm"} onClick={() => setKind("vm")}>Full OS / WildOS VM</button></div>{kind === "vm" ? <LocalVm panel={panel} /> : <ContainerMachineBody panel={panel} />}</div>;
+  return <ContainerMachineBody panel={panel} />;
+}
+
+function ContainerMachineBody({ panel }: { panel: PanelMeta }) {
   const host = useRef<HTMLDivElement>(null);
   const onScreen = useOnScreen(host, 0.25);
   const ui = useUi();

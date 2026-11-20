@@ -2204,8 +2204,9 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   design: [1180, 900],
   pipeline: [1480, 330],
   collection: [360, 420],
-  uploader: [960, 1100],
   replay: [360, 120],
+  local: [480, 420],
+  uploader: [960, 1100],
 };
 
 export function addPanel(
@@ -2246,6 +2247,11 @@ export function addPanel(
  *  One way in for the section's tools, its right-click menu and ⌘K. `at` places it where the person pointed. */
 export function startMachine(sectionId: string, at: Partial<Pick<PanelMeta, "float" | "x" | "y">> = {}): PanelMeta {
   return addPanel(sectionId, { panel: "machine", name: "Machine", machine: { name: `box-${Math.random().toString(16).slice(2, 6)}`, state: "absent" }, ...at });
+}
+
+/** A full OS setup card. Adding it starts no process or installation. */
+export function startVm(sectionId: string, at: Partial<Pick<PanelMeta, "float" | "x" | "y">> = {}): PanelMeta {
+  return addPanel(sectionId, { panel: "machine", name: "WildOS VM", machine: { name: "WildOS", state: "absent", wantVm: true }, w: 800, h: 700, ...at });
 }
 
 export function updatePanel(id: string, patch: Partial<PanelMeta>) {
