@@ -78,6 +78,8 @@ export default defineConfig({
         MESHY_API_KEY: "msy-standin",
         // the checks make their own characters: no starter set (E2E_STARTER names a folder to bring one in)
         FOUNDATION_STARTER_DIR: process.env.E2E_STARTER ?? "",
+        // Foundation's avatars never push from a check: off, unless E2E_AVATARS_REPO names a throwaway checkout
+        FOUNDATION_AVATARS_REPO: process.env.E2E_AVATARS_REPO ?? "",
         FOUNDATION_MESHY_POLL_MS: "250",
         FOUNDATION_CLAUDE_CLI: "/nonexistent/claude",
         // the crew's agents run a fixed playbook through the real board tools (no model, nothing spent)

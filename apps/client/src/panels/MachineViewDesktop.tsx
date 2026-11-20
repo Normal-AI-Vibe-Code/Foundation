@@ -27,7 +27,7 @@ import type { PanelMeta } from "../state/store";
 import { SERVER_NAME, api } from "../lib/api";
 import { desktopRefusal as refusalWords, olderServer } from "./machineWords";
 import { askRestart } from "../server/desktop";
-import { AgentGlyph, DesktopGlyph, LockGlyph, PackageGlyph, PopOutGlyph, PullGlyph, WarnGlyph } from "../shell/glyphs";
+import { AgentGlyph, ClusterGlyph, DesktopGlyph, FunctionGlyph, LockGlyph, PackageGlyph, PopOutGlyph, PullGlyph, ShieldGlyph, TerminalGlyph, WarnGlyph } from "../shell/glyphs";
 import { putInUse, toggleFullscreen } from "../lib/cardUse";
 import { keys } from "../lib/keys";
 import { getUi, setUi, toast, useUi } from "../state/ui";
@@ -35,7 +35,7 @@ import { KeysLine, ago, boardId, useNow, useRingWidth } from "./MachineViewBits"
 import { copyText, readClipboard } from "./machineTerminal";
 import { MachineTools, copiedWords, openMachineWindow, useFlash } from "./MachineTools";
 
-export type MachineViewName = "terminal" | "desktop" | "io";
+export type MachineViewName = "terminal" | "desktop" | "io" | "access" | "cluster";
 
 /** which view a card shows is each person's own, kept for the tab */
 export function useMachineView(panelId: string): [MachineViewName, (v: MachineViewName) => void] {
@@ -43,7 +43,7 @@ export function useMachineView(panelId: string): [MachineViewName, (v: MachineVi
   const [view, set] = useState<MachineViewName>(() => {
     try {
       const v = sessionStorage.getItem(k);
-      return v === "desktop" || v === "io" ? v : "terminal";
+      return v === "desktop" || v === "io" || v === "access" || v === "cluster" ? v : "terminal";
     } catch {
       return "terminal";
     }
@@ -62,13 +62,22 @@ export function useMachineView(panelId: string): [MachineViewName, (v: MachineVi
 }
 
 /** the head's switch between the shell and the desktop, and (2026-11-17, Josh: "the full screen icon should be next to the desktop") full screen right beside it */
-export function ViewSwitch({ view, onView, panelId, only = ["terminal", "desktop", "io"] }: { view: MachineViewName; onView?: (v: MachineViewName) => void; panelId?: string; only?: MachineViewName[] }) {
+const VIEW_WORDS: Record<MachineViewName, { word: string; tip: string; glyph: ReactNode }> = {
+  terminal: { word: "Terminal", tip: "The machine's shell, shared by everyone here", glyph: <TerminalGlyph size={15} /> },
+  desktop: { word: "Desktop", tip: "The machine's graphical desktop", glyph: <DesktopGlyph size={15} /> },
+  io: { word: "Ins & outs", tip: "What's wired in, what comes out, where it goes, and the functions the machine offers", glyph: <FunctionGlyph size={15} /> },
+  access: { word: "Access", tip: "Who and what may use this machine: people, agents, links", glyph: <ShieldGlyph size={15} /> },
+  cluster: { word: "Cluster", tip: "The Kubernetes cluster this machine serves: its nodes and pods", glyph: <ClusterGlyph size={15} /> },
+};
+
+export function ViewSwitch({ view, onView, panelId, only = ["terminal", "desktop", "io", "access"] }: { view: MachineViewName; onView?: (v: MachineViewName) => void; panelId?: string; only?: MachineViewName[] }) {
   return (
     <>
       <span className="machine-view" role="tablist" aria-label="What this card shows">
         {only.map((v) => (
-          <button key={v} role="tab" aria-selected={view === v} className={`machine-view-tab${view === v ? " is-on" : ""}`} onClick={() => onView?.(v)} data-tip={v === "terminal" ? "The machine's shell, shared by everyone here" : v === "desktop" ? "The machine's graphical desktop" : "What's wired in, what comes out, and where it goes"} data-machine-view={v}>
-            {v === "terminal" ? "Terminal" : v === "desktop" ? "Desktop" : "Ins & outs"}
+          <button key={v} role="tab" aria-selected={view === v} className={`machine-view-tab${view === v ? " is-on" : ""}`} onClick={() => onView?.(v)} data-tip={VIEW_WORDS[v].tip} data-machine-view={v}>
+            {VIEW_WORDS[v].glyph}
+            <span>{VIEW_WORDS[v].word}</span>
           </button>
         ))}
       </span>
@@ -375,7 +384,7 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
 // ---------- agents: leave, and who is driving ----------
 
 /** agents' leave to use this desktop, and an agent's ask for it: the board's `desktopLeave`, written by the server alone */
-function useDesktopLeave(panelId: string): DesktopLeave {
+export function useDesktopLeave(panelId: string): DesktopLeave {
   const [leave, setLeave] = useState<DesktopLeave>({});
   useEffect(() => {
     const b = activeBoard();

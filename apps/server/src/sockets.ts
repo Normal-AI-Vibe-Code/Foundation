@@ -38,6 +38,7 @@ import { attachHuddle } from "./huddles.ts";
 import { attachChat, CHAT_SOCKET_PATH, chatSocketIsPerson } from "./chatsock.ts";
 import { attachTerminal } from "./machines.ts";
 import { attachDesktop } from "./machinedesktop.ts";
+import { portTarget, relayUpgrade } from "./machineshare.ts";
 import { canSeeBoard } from "./members.ts";
 import { canWrite } from "./roles.ts";
 import { cookieOriginRefusal } from "./origins.ts";
@@ -174,6 +175,17 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => attachChat(ws, who.user, who.person));
+    return;
+  }
+  // a machine's web port, relayed (machineshare.ts): its app's own sockets, for anyone who can see the board
+  if (url.pathname.startsWith("/m/")) {
+    const t = portTarget(url.pathname);
+    if (!t || !user || !canSeeBoard(user, t.board)) {
+      socket.write(`HTTP/1.1 ${t ? 401 : 404} ${t ? "Unauthorized" : "Not Found"}\r\n\r\n`);
+      socket.destroy();
+      return;
+    }
+    relayUpgrade(req, socket, head, t, url.search);
     return;
   }
   const hm = HUDDLE.exec(url.pathname);

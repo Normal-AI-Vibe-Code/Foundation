@@ -54,6 +54,14 @@
         "AirformDataRoom-foundation"
       ],
       "port": 3010
+    },
+    {
+      "name": "foundation-copy",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/JOSHLE~1/AppData/Local/Temp/claude/a8eb84b565f16392/3f2875cc-42be-469e-9a21-caf8ce818d61/scratchpad/dev-copy.mjs"
+      ],
+      "port": 15431
     }
   ]
 }

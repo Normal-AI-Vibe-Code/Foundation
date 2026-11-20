@@ -130,6 +130,15 @@ The animal set was first made as rigged 3D (Mochi, Sage) and remade as mesh avat
 
 Every install starts with the characters there are (twenty-two as of 2026-11-16: four abstract in 3D and again as mesh avatars, three shape characters, five anime and six animal mesh avatars): `apps/server/starter/characters` holds a manifest and each one's pictures and playable file, and at boot the server brings any of them this install hasn't had onto the Character studio board, making the board if there isn't one (no key, nothing spent). Each is had once (`character_starter`): pushing a bigger set to main gives every install the new ones when its server next starts, and a card a person removed isn't brought back. A character exported again with new files doesn't replace an install's existing copy. To change the set, make or retire characters on this computer's studio board and run `node scripts/characters-export.mjs` (every ready character whose card is still on the grid; or name the ones to keep). A character's expressions sheet goes with it when it has one (role `expressions`, optional in the manifest: one without it arrives with no expressions stage, finished all the same). A character whose card was removed is retired: its record and files stay, and it leaves the set. It re-encodes the pictures as JPEG when `uv` with Pillow is to hand. `FOUNDATION_STARTER_DIR` points the server at another folder; empty turns the set off (the checks run that way).
 
+## Foundation's avatars: uploading to main
+
+Added 2026-11-17. On the studio's left, in a section of its own, is the **uploader**: what's wired into it is Foundation's set of avatars, on every Foundation. Each set's *Characters* section is wired in when the studio gets it, so what's finished and approved there is in the set; take a section's wire off (select it, Delete) and its characters are archived here and leave the set at the next upload; **Wire in** on the uploader, let go over the section, brings them back. One character can be wired in from its card's own output (the dot on the card's right), from any section or grid.
+
+**Upload now** (or a timer: hourly, every 6 hours, daily, weekly) writes the set into `apps/server/starter/characters` on a worktree of `origin/main`, commits it if it changed and pushes. That publishes a desktop release (every push to main does), and every Foundation brings the new characters in, and archives the ones taken out, when its server next starts. Only the server started from this checkout can upload (it uses this computer's git and its push rights); the desktop's bundled server shows the set read-only. A file whose source in the archive hasn't changed is kept byte for byte, so an upload that adds one character changes only that character's files. New pictures go up as PNG; `node scripts/characters-export.mjs` (which re-encodes as JPEG) still works by hand, and the uploader adopts what it wrote.
+
+`FOUNDATION_AVATARS_REPO` points the uploader at another checkout (empty turns uploading off: the e2e checks run that way), `FOUNDATION_AVATARS_BRANCH` at another branch.
+
+
 ## Where things are
 
 | | |

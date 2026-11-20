@@ -131,10 +131,16 @@ test("a studio of 2026-11-16 (one flow card per set) gets the flow as nodes, onc
   const m = boardMaps(getBoard(id).doc);
   const was = new Map([...m.objects.entries()].map(([k, v]) => [k, structuredClone(v)]));
   upgradeStudio(id);
-  // every card that was there is still there, and only the flow cards changed (each is now its set's first node)
+  // every card that was there is still there, and only the flow cards changed (each is now its set's first node);
+  // a character card from before ports gains its output (to wire into Foundation's avatars), and nothing else
   for (const [k, v] of was) {
     assert.ok(m.objects.has(k), `${k} is still on the board`);
-    if (!k.startsWith("flow")) assert.deepEqual(m.objects.get(k), v, `${k} is as it was`);
+    if (k.startsWith("flow")) continue;
+    const now = m.objects.get(k) as PanelDoc;
+    if (now.kind === "panel" && now.panel === "character") {
+      assert.deepEqual(now.ports.map((p) => [p.name, p.dir, p.type]), [["character", "out", "character"]], `${k} has its output`);
+      assert.deepEqual({ ...now, ports: [] }, { ...v, ports: [] }, `${k} is otherwise as it was`);
+    } else assert.deepEqual(now, v, `${k} is as it was`);
   }
   for (const c of [0, 1]) {
     const first = m.objects.get(`flow${c}`) as PanelDoc;

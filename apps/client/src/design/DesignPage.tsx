@@ -129,6 +129,7 @@ import { RichToolbar } from "../components/RichText";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
 import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
 import { MachineTools } from "../panels/MachineTools";
+import { MachineHeadSpecimens } from "./MachineSpecimens";
 import { AgentsMayLine, AgentUseLine, DesktopWell, ViewSwitch } from "../panels/MachineViewDesktop";
 import { IoLines } from "../panels/MachineViewIo";
 import type { MachineAsk, SlackSectionState } from "@foundation/protocol";
@@ -151,6 +152,7 @@ import { PointerDemo } from "./PointerDemo";
 import { CharacterStudioDemo } from "./CharacterStudioDemo";
 import { CollectionDemo } from "./CollectionDemo";
 import { ChatFormDemo } from "../chat/ChatDesign";
+import { UploaderDemo } from "./UploaderDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -1030,6 +1032,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <MachineAsksDemo />
         <AppToolAsksDemo />
         <MachineUseDemo />
+        <MachineHeadSpecimens />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
             <div className="machine-body is-pulling">
@@ -1161,6 +1164,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
 
       <Section title="Collections" note="A collection gathers what the cards wired into it make: from the Character studio's flow, a stage's wire brings the pictures drawn there (sheets, expression sheets, portraits) and Output's brings the finished characters; another collection brings what it holds. ❖ in a section's right-click menu, and Character pipeline lays the whole flow into a section with one after Output. Folded (360 × 420) it is a stack of the five newest, fanned 9 px and 2.2° apart and opening wider on roll-over on the spring; Expand opens it to 920 × 700, a grid of tiles at least 140 wide, each on raised paper with a hairline (a character's tinted violet, as an agent's work is). A tile is pressed and pulled out as a copy, lifted as a carried card is; the tile stays, at 45 %, while its copy is out. Lay out in pipes it into a section, where each thing becomes a docked card the section arranges; its output dragged onto a section does the same. On tokens only.">
         <CollectionDemo />
+      </Section>
+
+      <Section title="Foundation's avatars" note="On the Character studio's left, in a section of its own, the uploader: what's wired into it is Foundation's set of avatars, on every Foundation. A character card's output wires in one character; a section wires in every character card in it (each set's Characters is wired when the studio gets it), the wire leaving by the section's edge facing the uploader, in the character violet (viz-8). Wire in draws a wire backwards out of its input: let go on a character card, or over a section. The head says where it uploads (owner/repo · main); Upload now is the one blue action, beside a Timer (Off, every hour, 6 hours, day, week) and when it next runs. The last upload sits on raised paper, its hairline ok green when it pushed and bad red when it failed, with its commit. The characters are tiles at least 132 wide on raised paper with a violet hairline, grouped under what brought them, each with a chip saying where it stands: In main (ok), Added at the next upload (violet), Waiting (warn: unfinished, or for a person's Approve), Leaves at the next upload (bad, the still greyed). A server that can't upload says why in the note and greys its presses. On tokens only.">
+        <UploaderDemo />
       </Section>
 
       <Section

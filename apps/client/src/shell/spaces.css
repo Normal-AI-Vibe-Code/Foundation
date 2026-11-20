@@ -667,6 +667,35 @@
   flex: 1 0 auto;
   width: auto;
 }
+/* the row is still the band's whole width under the pointer and when it's the place you're in: its wash (and the
+   2 px bar) is drawn across the band, behind the pill, and pressing beside the pill is pressing Settings (2026-11-19) */
+.side-pane .pane-low-row .pane-row::before {
+  content: "";
+  position: absolute;
+  inset: var(--space-2) 0;
+}
+.side-pane .pane-low-row .pane-row:hover,
+.side-pane .pane-low-row .pane-place.is-current,
+.side-pane .pane-low-row .pane-place.is-current:hover {
+  background: transparent;
+  box-shadow: none;
+}
+.side-pane .pane-low-row .pane-row:hover::before {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.side-pane .pane-low-row .pane-place.is-current::before {
+  background: var(--color-pulse-dim);
+  box-shadow: inset 2px 0 0 var(--color-pulse);
+}
+.side-pane .pane-low-row .pane-place.is-current:hover::before {
+  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+}
+/* the pill stays over the wash (a flex item takes a z-index without becoming what its panel is placed against) */
+.side-pane .pane-low-row .server-switch-place {
+  z-index: 1;
+  /* its padding is Settings' to press; the pill inside takes the pointer itself (server.css) */
+  pointer-events: none;
+}
 .side-pane .pane-pick {
   flex: none;
   display: flex;

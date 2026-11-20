@@ -58,10 +58,15 @@ import { answerAppToolAsk } from "./apptools.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
 import { boardHasChannel, buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
+import { avatarRoutes, startAvatars } from "./avatars.ts";
 import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, bringInStarter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter, setApproval } from "./characters.ts";
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
 import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
+import { closePublicLinks, openPublicLink, portTarget, relayHttp, signInFirst } from "./machineshare.ts";
+import { hubSearch, hubTags } from "./machinehub.ts";
+import { addWorker, clusterStatus, deletePod, kubeconfig, layCluster, openPodCard, runPod, startCluster } from "./machinecluster.ts";
+import { addMachineStep, functionWiring, installExamples, readFunctions, runFunction } from "./machinefunctions.ts";
 import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
 import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
@@ -724,6 +729,27 @@ r.get("/api/machines/images", async (req) => {
   requireUser(req);
   return engineImages(req.query.get("engine") ?? undefined);
 });
+// Docker Hub, for the image picker: its public search and a repository's tags (machinehub.ts)
+r.get("/api/machines/hub", async (req) => {
+  requireUser(req);
+  return { repos: await hubSearch(req.query.get("q") ?? "") };
+});
+r.get("/api/machines/hub/tags", async (req) => {
+  requireUser(req);
+  return { tags: await hubTags(req.query.get("repo") ?? "") };
+});
+// a machine's port shared: the Foundation link is always there (/m/…); a public link is a tunnel a person opens
+r.post("/api/boards/:id/machines/:panel/share", async (req) => {
+  const u = requirePerson(req, "Opening a public link to a machine");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ port?: number; close?: boolean }>(req);
+  if (b.close) {
+    closePublicLinks(req.params.id, req.params.panel, b.port, u.name);
+    return { closed: true };
+  }
+  if (!Number.isInteger(b.port)) throw new HttpError(400, "which port?");
+  return { share: await openPublicLink(req.params.id, req.params.panel, b.port!, u.name) };
+});
 // a card on screen asks: the server reads the engine and writes what's true to the board
 r.get("/api/boards/:id/machines/:panel", async (req) => {
   requireBoard(requireUser(req), req.params.id);
@@ -781,6 +807,78 @@ r.post("/api/boards/:id/machines/:panel/asks/:ask/:verdict", async (req) => {
   const u = requirePerson(req, verdict === "run" ? "Running an agent's command" : "Declining an agent's command");
   requireBoard(u, req.params.id);
   return { ask: answerAsk(req.params.id, req.params.panel, req.params.ask, u, verdict) };
+});
+// Kubernetes (machinecluster.ts): a cluster's cards laid, started (privileged nodes: a person), read, pods run,
+// deleted and opened as cards, a worker added, and the kubeconfig (admin to the cluster: a person who can edit)
+r.post("/api/boards/:id/clusters", async (req) => {
+  const u = requirePerson(req, "Laying a Kubernetes cluster");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ section?: string; name?: string; workers?: number }>(req);
+  if (!b.section) throw new HttpError(400, "which section?");
+  return layCluster(req.params.id, b.section, { name: b.name, workers: b.workers }, u.name);
+});
+r.post("/api/boards/:id/clusters/:cluster/start", async (req) => {
+  const u = requirePerson(req, "Starting a Kubernetes cluster");
+  requireWriter(u, req.params.id);
+  return startCluster(req.params.id, req.params.cluster, u.name);
+});
+r.get("/api/boards/:id/clusters/:panel", async (req) => {
+  requireBoard(requireUser(req), req.params.id);
+  return clusterStatus(req.params.id, req.params.panel);
+});
+r.get("/api/boards/:id/clusters/:panel/kubeconfig", async (req) => {
+  const u = requirePerson(req, "Reading a cluster's kubeconfig");
+  requireWriter(u, req.params.id);
+  return { kubeconfig: await kubeconfig(req.params.id, req.params.panel) };
+});
+r.post("/api/boards/:id/clusters/:panel/workers", async (req) => {
+  const u = requirePerson(req, "Adding a worker to a cluster");
+  requireWriter(u, req.params.id);
+  return addWorker(req.params.id, req.params.panel, u.name);
+});
+r.post("/api/boards/:id/clusters/:panel/pods", async (req) => {
+  const u = requirePerson(req, "Running a pod");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ name?: string; image?: string; keep?: boolean }>(req);
+  if (!b.image) throw new HttpError(400, "which image?");
+  return runPod(req.params.id, req.params.panel, { name: b.name, image: b.image, keep: b.keep === true }, u.name);
+});
+r.post("/api/boards/:id/clusters/:panel/pods/delete", async (req) => {
+  const u = requirePerson(req, "Deleting a pod");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ ns?: string; name?: string; confirm?: boolean }>(req);
+  return deletePod(req.params.id, req.params.panel, b.ns ?? "default", b.name ?? "", u.name, b.confirm === true);
+});
+r.post("/api/boards/:id/clusters/:panel/pods/open", async (req) => {
+  const u = requireUser(req);
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ ns?: string; name?: string; section?: string }>(req);
+  if (!b.name) throw new HttpError(400, "which pod?");
+  return openPodCard(req.params.id, req.params.panel, b.ns ?? "default", b.name, b.section, u.name);
+});
+// a machine's functions (machinefunctions.ts): reading them, running one on what's wired in (code runs in the
+// machine: a person), and the example's ImageMagick and picture functions (packages go in: a person)
+r.get("/api/boards/:id/machines/:panel/functions", async (req) => {
+  requireBoard(requireUser(req), req.params.id);
+  const functions = await readFunctions(req.params.id, req.params.panel, req.query.get("fresh") === "1");
+  return { functions, wiring: functionWiring(req.params.id, req.params.panel) };
+});
+r.post("/api/boards/:id/machines/:panel/functions/examples", async (req) => {
+  const u = requirePerson(req, "Putting functions into a machine");
+  requireWriter(u, req.params.id);
+  return installExamples(req.params.id, req.params.panel, u.name);
+});
+r.post("/api/boards/:id/machines/:panel/functions/:name/run", async (req) => {
+  const u = requirePerson(req, "Running a function in a machine");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ all?: boolean; text?: string }>(req);
+  return { run: await runFunction(req.params.id, req.params.panel, req.params.name, { all: b.all === true, text: typeof b.text === "string" ? b.text : undefined }, { name: u.name, id: u.id }) };
+});
+// the studio's example: a machine and a second collection after a collection, wired through fn:trim-resize
+r.post("/api/boards/:id/collections/:panel/machine", async (req) => {
+  const u = requirePerson(req, "Laying a machine after a collection");
+  requireWriter(u, req.params.id);
+  return addMachineStep(req.params.id, req.params.panel, u.name);
 });
 // an agent's ask to use an app's tool, on the app's card: the same gate (a person at their browser who can edit the board).
 // Allow lets agents call that tool of that saved app until its definition changes; it calls nothing itself (apptools.ts)
@@ -856,6 +954,8 @@ r.post("/api/system-grids/:key", (req) => {
   if (!isSystemGridKey(req.params.key)) throw new HttpError(404, "No such grid");
   return openSystemGrid(req.params.key);
 });
+
+avatarRoutes(r);
 
 /** make the Character studio board (or say where the one there is) */
 r.post("/api/characters/studio", (req) => {
@@ -1203,6 +1303,20 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     res.writeHead(204);
     return res.end();
   }
+  // a machine's web port, relayed for anyone signed in here who can see its board (machineshare.ts): a viewer
+  // may read it, writing to it (any other method) needs someone who can edit
+  if (url.pathname.startsWith("/m/")) {
+    const t = portTarget(url.pathname);
+    if (!t) return json(res, { error: "no such machine port here (is the machine running, with that port published?)" }, 404);
+    const user = userFromRequest(req);
+    if (!user) return signInFirst(res, config.publicUrl);
+    if (!canSeeBoard(user, t.board)) return json(res, { error: "not your board" }, 403);
+    if (req.method !== "GET" && req.method !== "HEAD" && !canWrite(user.id, t.board)) return json(res, { error: "View only: someone who can edit this board uses it" }, 403);
+    // a write signed in by the cookie comes from one of our own pages here too (origins.ts): the machine's own page is one
+    const forgedRelay = cookieOriginRefusal(req);
+    if (forgedRelay) return json(res, { error: forgedRelay }, 403);
+    return relayHttp(req, res, t, url.search);
+  }
   try {
     // a change signed in by the cookie comes from one of our own pages (cross-site request forgery: origins.ts)
     // (the desktop sign-in's press page posts from this server's own origin and uses no Foundation session: it checks its own origin and cookie)
@@ -1259,7 +1373,9 @@ resumeCharacters();
 // characters this build carries that this install hasn't had yet (a fresh install, or a studio made from an older set)
 void bringInStarter()
   .then((n) => n && console.log(`  characters         brought in ${n} from the starter set`))
-  .catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`));
+  .catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`))
+  // Foundation's avatars on the studio, and their timers (avatars.ts)
+  .finally(() => startAvatars());
 
 // Started by the desktop app (src-tauri/src/server.rs), the server lives exactly as long as the app:
 // the app holds the other end of stdin, and however the app ends (quit, crash, Task Manager) that

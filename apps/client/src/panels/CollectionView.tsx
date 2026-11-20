@@ -22,6 +22,8 @@ import { toast, useUi } from "../state/ui";
 import { useFileSrc } from "../lib/fileSrc";
 import { boardTool, pressTile } from "../lib/collectionDrag";
 import "./collection.css";
+import { api } from "../lib/api";
+import { FunctionGlyph } from "../shell/glyphs";
 
 const EMPTY: CollectionState = { items: [] };
 /** a collection's size folded (the store's PANEL_SIZE) and opened */
@@ -137,10 +139,12 @@ export interface CardProps {
   onToggle?(): void;
   onInto?(value: string): void;
   onGo?(section: string): void;
+  /** lays a machine after it that processes its pictures (2026-11-17: the Character studio's example of a machine's functions) */
+  onMachine?(): void;
 }
 
 /** a collection's card from what it's given: the grid's (CollectionBody) and the design page's */
-export function CollectionCard({ name, state: st, sections, home, open, viewer, id, onToggle, onInto, onGo }: CardProps) {
+export function CollectionCard({ name, state: st, sections, home, open, viewer, id, onToggle, onInto, onGo, onMachine }: CardProps) {
   const into = st.into ? sections.find((s) => s.id === st.into) : undefined;
   const items = st.items;
   const sources = useMemo(() => [...new Set(items.map((i) => i.from).filter(Boolean))], [items]);
@@ -201,6 +205,11 @@ export function CollectionCard({ name, state: st, sections, home, open, viewer, 
             {Object.keys(st.laid ?? {}).length} laid ›
           </button>
         )}
+        {onMachine && !viewer && (
+          <button type="button" className="coll-machine" onClick={onMachine} data-coll-machine data-tip="Lays a machine after this collection with picture functions in it (trim-resize, sprite-sheet, describe), and a collection for what it makes. Nothing runs until you press Start on it.">
+            <FunctionGlyph size={14} /> Process in a machine
+          </button>
+        )}
       </footer>
     </div>
   );
@@ -242,5 +251,13 @@ export function CollectionBody({ panel }: { panel: PanelMeta }) {
     }
     layIn(v);
   };
-  return <CollectionCard name={panel.name} state={st} sections={sections} home={panel.sectionId} open={open} viewer={ui.role === "viewer"} id={panel.id} onToggle={toggle} onInto={choose} onGo={(id) => requestSnap({ kind: "section", id })} />;
+  const machine = () =>
+    void api<{ machine: string }>(`/api/boards/${encodeURIComponent(activeBoard()?.boardId ?? "")}/collections/${encodeURIComponent(panel.id)}/machine`, { method: "POST", json: {} })
+      .then((r) => {
+        toast("A machine is laid after it: press Start on it", "ok");
+        // the machine is laid to its right, maybe past the window: shown
+        setTimeout(() => requestSnap({ kind: "object", id: r.machine }), 250);
+      })
+      .catch((e: Error) => toast(e.message, "bad"));
+  return <CollectionCard name={panel.name} state={st} sections={sections} home={panel.sectionId} open={open} viewer={ui.role === "viewer"} id={panel.id} onToggle={toggle} onInto={choose} onGo={(id) => requestSnap({ kind: "section", id })} onMachine={machine} />;
 }

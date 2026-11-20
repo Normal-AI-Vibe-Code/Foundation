@@ -104,6 +104,7 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     { icon: "◐", label: "Huddle", action: () => addPanel(section.id, { panel: "huddle", name: "Huddle", ...at(560, 420) }) },
     { icon: "#", label: "Slack channel", action: () => addPanel(section.id, { panel: "slack", name: "Slack", ...at(420, 520) }) },
     { icon: "▣", label: "Machine", action: () => startMachine(section.id, at(760, 520)) },
+    { icon: "⎈", label: "Kubernetes cluster", action: () => void layCluster(section.id) },
     ...tellSlack,
     { icon: "☺", label: "Character: 3D", action: () => void newCharacter(section.id, "model") },
     { icon: "☺", label: "Character: mesh avatar", action: () => void newCharacter(section.id, "mesh") },
@@ -137,4 +138,13 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     },
     ]),
   ];
+}
+
+/** a Kubernetes cluster's cards laid in a section: a server and two workers, nothing running until a person starts it */
+function layCluster(sectionId: string) {
+  const board = activeBoard()?.boardId;
+  if (!board) return;
+  void api<{ cluster: string }>(`/api/boards/${encodeURIComponent(board)}/clusters`, { method: "POST", json: { section: sectionId, workers: 2 } })
+    .then(() => toast("A Kubernetes cluster is laid: a server and two workers. Start the cluster on any of them.", "ok"))
+    .catch((e: Error) => toast(e.message, "bad"));
 }

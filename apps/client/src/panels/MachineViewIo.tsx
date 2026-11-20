@@ -22,6 +22,8 @@ import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { toast } from "../state/ui";
 import { ago, useNow } from "./MachineViewBits";
+import { Functions } from "./MachineFunctions";
+import { InGlyph, OutGlyph } from "../shell/glyphs";
 
 interface End {
   /** the wire */
@@ -226,6 +228,16 @@ export function IoView({ panel, viewer }: { panel: PanelMeta; viewer: boolean })
   };
   return (
     <div className="machine-io-view" data-machine-io-view>
+      {/* 2026-11-17: the pipes under a heading of their own, and the machine's functions after them (MachineFunctions.tsx) */}
+      <div className="machine-io-head">
+        <span className="machine-io-title">
+          <InGlyph size={18} />
+          <OutGlyph size={18} /> Pipes
+        </span>
+        <span className="machine-io-what">
+          What's wired in is written to <code>{MACHINE_IN_PATH}</code>; what the machine writes to <code>{MACHINE_OUT_PATH}</code> goes out
+        </span>
+      </div>
       <IoStrip panel={panel} viewer={viewer} />
       {io?.outAt && (
         <div className="machine-io-last" data-machine-io-last>
@@ -246,6 +258,7 @@ export function IoView({ panel, viewer }: { panel: PanelMeta; viewer: boolean })
           </button>
         </div>
       )}
+      {panel.machine && <Functions panelId={panel.id} m={panel.machine} viewer={viewer} />}
     </div>
   );
 }

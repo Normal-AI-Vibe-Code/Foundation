@@ -38,8 +38,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  avatarKey,
   boardMaps,
+  CHARACTER_OUT,
   CHARACTER_STAGES,
+  CHARACTER_TYPE,
   DEFAULT_COL_W,
   DEFAULT_ROW_H,
   logActivity,
@@ -107,6 +110,14 @@ create table if not exists crew_avatars (name text primary key, character_id tex
 -- which of the starter set's characters this install has had (form:set:name), so a newer build brings in only the new ones and never one a person retired
 create table if not exists character_starter (key text primary key, character_id text, board_id text, at integer not null);
 `);
+// listed: the key was in a starter set this install read (so leaving the set withdraws it); withdrawn: the set took it out here
+for (const col of ["listed integer", "withdrawn integer not null default 0"]) {
+  try {
+    db.exec(`alter table character_starter add column ${col}`);
+  } catch {
+    /* there already */
+  }
+}
 
 // ---------- what each stage asks for ----------
 
@@ -429,6 +440,27 @@ const PIPELINE_ROW_H = NODE_TALL + CARD_H + 150;
 const outputPort = () => ({ id: uid("port"), name: OUTPUT_PORT, dir: "out" as const, type: "data" });
 
 /** Output nodes from before it had an output of its own (2026-11-17) get one, once */
+/** a character card's one port: the character itself, to wire into Foundation's avatars (avatars.ts) or a collection */
+export const characterPorts = (): PanelDoc["ports"] => [{ id: uid("port"), name: CHARACTER_OUT, dir: "out", type: CHARACTER_TYPE }];
+
+/** character cards from before they had a port get one (any board); returns how many */
+export function giveCharactersAPort(doc: import("yjs").Doc): number {
+  const m = boardMaps(doc);
+  let n = 0;
+  for (const o of [...m.objects.values()]) {
+    if (o.kind !== "panel" || o.panel !== "character" || o.ports.some((p) => p.dir === "out")) continue;
+    m.objects.set(o.id, { ...o, ports: [...o.ports, ...characterPorts()] });
+    n++;
+  }
+  return n;
+}
+
+/**
+ * What else the studio lays out, run when it's made and each time it's upgraded (inside the board's edit):
+ * avatars.ts adds Foundation's avatars on the left this way. Each returns a line for the activity, or null.
+ */
+export const studioLayers: Array<(doc: import("yjs").Doc) => string | null> = [];
+
 export function giveOutputsAPort(doc: import("yjs").Doc): number {
   const m = boardMaps(doc);
   let n = 0;
@@ -562,6 +594,11 @@ export function upgradeStudio(boardId: string) {
       if (!said.length) said.push("drew the pipeline as nodes: a card for each stage, wired in order, each with the characters that are at it");
     }
     if (giveOutputsAPort(doc)) said.push("gave each Output node an output of its own: wire it to a collection to gather the finished characters");
+    if (giveCharactersAPort(doc)) said.push("gave each character card an output: wire it into Foundation's avatars, or a collection");
+    for (const layer of studioLayers) {
+      const text = layer(doc);
+      if (text) said.push(text);
+    }
     for (const text of said) logActivity(doc, { who: "Foundation", role: "agent", text });
   });
 }
@@ -621,6 +658,7 @@ export function openStudio(user: UserInfo, o: { seed?: boolean } = {}): { id: st
       addPipeline(doc, set, c, 1);
       if (c === 0) putNote(doc, { id: uid("note"), kind: "note", sectionId: insp.id, name: "How it works", x: 0, y: 0, float: false, bornAt: Date.now(), w: 460, h: 520, text: HOW });
     });
+    for (const layer of studioLayers) layer(doc);
     logActivity(doc, { who: user.name, role: user.id === FOUNDATION.id ? "system" : "human", text: "made the Character studio: inspiration, the pipeline and characters, a column for each set" });
   });
   // the board opens at once; the starter set walks on a moment later
@@ -630,7 +668,7 @@ export function openStudio(user: UserInfo, o: { seed?: boolean } = {}): { id: st
 
 // ---------- the starter set ----------
 
-interface StarterCharacter {
+export interface StarterCharacter {
   name: string;
   set: string;
   form: CharacterForm;
@@ -645,15 +683,15 @@ interface StarterCharacter {
  * council to seat without spending anything. Beside the bundled server in the desktop app, beside
  * `src` from source. FOUNDATION_STARTER_DIR names another folder; empty turns it off.
  */
-function starterDir(): string | null {
+export function starterDir(): string | null {
   const named = process.env.FOUNDATION_STARTER_DIR;
   const tries = named !== undefined ? [named] : [join(import.meta.dirname, "starter", "characters"), join(import.meta.dirname, "..", "starter", "characters")];
   return tries.find((d) => d && existsSync(join(d, "manifest.json"))) ?? null;
 }
 
-const starterKey = (s: { form: string; set: string; name: string }) => `${s.form}:${s.set.trim().toLowerCase()}:${s.name.trim().toLowerCase()}`;
+const starterKey = avatarKey;
 
-function readStarter(dir: string): StarterCharacter[] {
+export function readStarter(dir: string): StarterCharacter[] {
   const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")) as { characters?: StarterCharacter[] };
   return (manifest.characters ?? []).filter((s) => s && typeof s.name === "string" && typeof s.set === "string" && (s.form === "model" || s.form === "mesh"));
 }
@@ -683,20 +721,23 @@ export function seedStarter(boardId: string, user: UserInfo): Promise<number> {
 async function seedStarterNow(boardId: string, user: UserInfo): Promise<number> {
   const dir = starterDir();
   if (!dir) return 0;
+  const set = readStarter(dir);
+  const listed = new Set(set.map(starterKey));
   const had = new Set(all<{ key: string }>("select key from character_starter").map((r) => r.key));
-  for (const r of all<CharRow>("select * from characters where board_id = ?", boardId)) {
-    const key = starterKey(stateOf(r));
-    if (had.has(key)) continue;
-    run("insert or ignore into character_starter (key, character_id, board_id, at) values (?, ?, ?, ?)", key, stateOf(r).id, boardId, Date.now());
+  for (const r of all<CharRow>("select * from characters order by created_at")) {
+    const c = stateOf(r);
+    const key = starterKey(c);
+    if (had.has(key) || c.copyOf) continue;
+    run("insert or ignore into character_starter (key, character_id, board_id, at, listed) values (?, ?, ?, ?, ?)", key, c.id, boardId, Date.now(), listed.has(key) ? 1 : 0);
     had.add(key);
   }
   let n = 0;
-  for (const s of readStarter(dir)) {
+  for (const s of set) {
     const key = starterKey(s);
     if (had.has(key)) continue;
     had.add(key);
     const made = createCharacter(boardId, { name: "Foundation", id: user.id, human: false }, { name: s.name, set: s.set, form: s.form, identity: s.identity, height: s.height });
-    run("insert or ignore into character_starter (key, character_id, board_id, at) values (?, ?, ?, ?)", key, made.id, boardId, Date.now());
+    run("insert or ignore into character_starter (key, character_id, board_id, at, listed) values (?, ?, ?, ?, 1)", key, made.id, boardId, Date.now());
     const files: CharacterFiles = {};
     for (const [role, f] of Object.entries(s.files) as Array<[keyof CharacterFiles, { file: string; mime: string }]>) {
       // only a plain file name from the manifest's own folder
@@ -727,10 +768,39 @@ async function seedStarterNow(boardId: string, user: UserInfo): Promise<number> 
 export async function bringInStarter(): Promise<number> {
   const dir = starterDir();
   if (!dir) return 0;
+  const set = readStarter(dir);
+  withdrawFromStarter(set);
   const had = new Set(all<{ key: string }>("select key from character_starter").map((r) => r.key));
-  if (readStarter(dir).every((s) => had.has(starterKey(s)))) return 0;
+  if (set.every((s) => had.has(starterKey(s)))) return 0;
   const studio = openStudio(FOUNDATION, { seed: false });
   return seedStarter(studio.id, FOUNDATION);
+}
+
+/**
+ * Foundation's avatars are uploaded to main's starter set (avatars.ts), and one taken out of it there is
+ * withdrawn here: archived (kept, with its files, not offered as an avatar). One the set brings back is
+ * approved again, if it was the set that took it out. A character only this install has is never touched.
+ * Rows from before `listed` was kept count as listed when the set has them now (the set those installs read).
+ */
+export function withdrawFromStarter(set: StarterCharacter[]): { withdrawn: number; back: number } {
+  const listed = new Set(set.map(starterKey));
+  const rows = all<{ key: string; character_id: string | null; listed: number | null; withdrawn: number }>("select key, character_id, listed, withdrawn from character_starter");
+  let withdrawn = 0;
+  let back = 0;
+  for (const r of rows) {
+    if (r.listed === null) {
+      run("update character_starter set listed = ? where key = ?", listed.has(r.key) ? 1 : 0, r.key);
+      continue;
+    }
+    if (r.listed && !r.withdrawn && !listed.has(r.key)) {
+      run("update character_starter set withdrawn = 1 where key = ?", r.key);
+      if (r.character_id && setApprovalOf(r.character_id, "archived", "Foundation", "it was taken out of Foundation's avatars")) withdrawn++;
+    } else if (r.withdrawn && listed.has(r.key)) {
+      run("update character_starter set withdrawn = 0 where key = ?", r.key);
+      if (r.character_id && setApprovalOf(r.character_id, "approved", "Foundation", "it is one of Foundation's avatars again")) back++;
+    } else if (!r.listed && listed.has(r.key)) run("update character_starter set listed = 1 where key = ?", r.key);
+  }
+  return { withdrawn, back };
 }
 
 /** an image for a set's Inspiration section: into the archive, and onto the board as a picture */
@@ -793,7 +863,7 @@ export function createCharacter(boardId: string, actor: { name: string; id: stri
   editBoard(boardId, "characters", (doc) => {
     const m = boardMaps(doc);
     const sec = (n.section && ([...m.sections.values()].find((s) => s.id === n.section || s.name.trim().toLowerCase() === n.section!.trim().toLowerCase()))) || sectionNamed(doc, charactersName(set));
-    const panel: PanelDoc = { id: panelId, kind: "panel", panel: "character", sectionId: sec.id, name, x: 0, y: 0, float: false, bornAt: Date.now(), w: CARD_W, h: CARD_H, ports: [], createdBy: actor.name };
+    const panel: PanelDoc = { id: panelId, kind: "panel", panel: "character", sectionId: sec.id, name, x: 0, y: 0, float: false, bornAt: Date.now(), w: CARD_W, h: CARD_H, ports: characterPorts(), createdBy: actor.name };
     m.objects.set(panelId, panel);
     m.characters.set(panelId, c);
     logActivity(doc, { who: actor.name, role: actor.human ? "human" : "agent", text: `added a character, “${name}” (${form === "model" ? "3D" : "mesh avatar"}, ${set})`, objectId: panelId });
@@ -811,6 +881,23 @@ export function setApproval(boardId: string, panelId: string, approval: "pending
   keep(row, c);
   editBoard(boardId, "characters", (doc) => logActivity(doc, { who: user.name, role: "human", text: approval === "approved" ? `approved ${c.name} for the council` : approval === "archived" ? `archived ${c.name}` : `put ${c.name} back in the pipeline`, objectId: panelId }));
   return c;
+}
+
+/**
+ * The server's own word on a character (Foundation's avatars: a wire taken off archives it, wired back it's
+ * approved; a starter set that dropped it withdraws it). By its id, on whatever board its card is. Returns
+ * false when there's nothing to change (gone, unfinished, or already so).
+ */
+export function setApprovalOf(id: string, approval: "approved" | "archived", who: string, why: string): boolean {
+  const row = rowById(id);
+  if (!row) return false;
+  const c = stateOf(row);
+  const now = c.approval ?? "approved";
+  if (now === approval || (approval === "approved" && !c.ready)) return false;
+  c.approval = approval;
+  keep(row, c);
+  editBoard(row.board_id, "characters", (doc) => logActivity(doc, { who, role: "system", text: `${approval === "approved" ? "made" : "archived"} ${c.name}${approval === "approved" ? " an avatar again" : ""}: ${why}`, objectId: row.panel_id }));
+  return true;
 }
 
 /** change a character's words: its name, what it is, what it's drawn from, how tall. Stages already made stay as they are. */
@@ -1167,7 +1254,7 @@ export function copyCharacter(boardId: string, from: string, place: { sectionId:
   run("insert into characters (id, board_id, panel_id, state, created_by, created_at, updated_at) values (?, ?, ?, ?, ?, ?, ?)", c.id, boardId, panelId, JSON.stringify(c), actor.id, Date.now(), Date.now());
   editBoard(boardId, "characters", (doc) => {
     const m = boardMaps(doc);
-    const panel: PanelDoc = { id: panelId, kind: "panel", panel: "character", sectionId: place.sectionId, name: c.name, x: Math.max(0, Math.round(place.x ?? 0)), y: Math.max(0, Math.round(place.y ?? 0)), float: place.float ?? false, bornAt: Date.now(), w: CARD_W, h: CARD_H, ports: [], createdBy: actor.name };
+    const panel: PanelDoc = { id: panelId, kind: "panel", panel: "character", sectionId: place.sectionId, name: c.name, x: Math.max(0, Math.round(place.x ?? 0)), y: Math.max(0, Math.round(place.y ?? 0)), float: place.float ?? false, bornAt: Date.now(), w: CARD_W, h: CARD_H, ports: characterPorts(), createdBy: actor.name };
     m.objects.set(panelId, panel);
     m.characters.set(panelId, c);
   });
