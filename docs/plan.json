@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-20T11:31:53.621Z",
+  "syncedAt": "2026-11-20T21:12:41.429Z",
   "columns": [
     {
       "id": "needs-you",
@@ -2369,7 +2369,8 @@
       "milestone": "apps",
       "area": "grid",
       "status": "review",
-      "body": "Connect this computer (Settings → Places, an admin in person) and Foundation keeps a members-only grid of the projects being built on it: a section per git repository with Preview (newest screenshot, dev server), Progress (Claude Code and T3 sessions, their plans and wrap-ups) and Changes (git) cards, read from Claude Code's transcripts, T3 and git and never written. Cards, the grid's tab and side-menu row, section headers and the grid's council wear the computer mark. Built 2026-11-20 (apps/server/src/localdev.ts, apps/client/src/panels/LocalView.tsx; tests in apps/server/test/localdev.test.ts). Waits in Review for a person to try it in the packaged desktop app."
+      "body": "Connect this computer (Settings → Places, an admin in person) and Foundation keeps a members-only grid of the projects being built on it: a section per git repository with Preview (newest screenshot, dev server), Progress (Claude Code and T3 sessions, their plans and wrap-ups) and Changes (git) cards, read from Claude Code's transcripts, T3 and git and never written. Cards, the grid's tab and side-menu row, section headers and the grid's council wear the computer mark. Built 2026-11-20 (apps/server/src/localdev.ts, apps/client/src/panels/LocalView.tsx; tests in apps/server/test/localdev.test.ts). Waits in Review for a person to try it in the packaged desktop app.",
+      "issue": 234
     }
   ]
 }
