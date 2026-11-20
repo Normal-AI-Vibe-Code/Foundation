@@ -1,9 +1,9 @@
 # Foundation app icon
 
-**Four panels on a grid**: two full-width rows over a row split in two, as Josh drew it (2026-11-10). It is Foundation's own floor in miniature: sections laid on a grid, one of them split.
+**Two leaves, one over the other**: a low leaf over one twice its height, each rounded at its top left and bottom right, as Josh drew it (2026-11-19). It replaced the four panels on a grid (2026-11-10), which read small in a taskbar.
 
-- `foundation-mark.svg` is the drawing itself: 451×418, white panels, corners 5, 23 between rows and 19 between the two bottom panels. Use it as it is on a solid fill or dark ground.
-- `foundation-icon.svg` is the app icon: the white panels (560 wide, rows 154 tall, 28 between rows, 24 between the bottom pair, corners 6) centred on a **glass squircle**, a superellipse (n = 5) filling 896 of the 1024 canvas. A still icon can't blur what is behind it, so the glass is drawn: night navy (`#111a2c`) at 62 %, a white sheen fading from 20 % at the top, and a rim lit from above. The backing is there because a taskbar, dock or desktop can be light or dark and the white mark alone would vanish on a light one; it lets some of whatever is behind show through. No blue.
+- `foundation-mark.svg` is the drawing itself, traced from Josh's image: 1240×1240, white. The low leaf is 396 tall, the tall one 792, 52 between them; every round corner is a quarter circle of radius 396 (the low leaf's whole height). Use it as it is on a solid fill or dark ground.
+- `foundation-icon.svg` is the app icon, drawn the way the company's other apps' are (a white mark filling a solid tile): the white mark 704 wide, centred on a **full-bleed tile** (the whole 1024 canvas, corners 230) in night navy (`#111a2c`). Nothing see-through: the glass squircle before it stopped at 896 of the canvas with a 560 mark, and went grey on a light taskbar.
 - `public/foundation.svg` is the browser tab's icon: the same file.
 - In the app it is `src/brand/Mark.tsx`, drawn in `currentColor`: `tone="pulse"` on paper and glass, `tone="on-fill"` (white) on a solid fill.
 

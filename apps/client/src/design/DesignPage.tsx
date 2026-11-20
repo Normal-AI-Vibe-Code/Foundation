@@ -224,7 +224,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       </>
       )}
 
-      <Section title="The mark" note="Four panels on a grid: two full rows over a row split in two. Blue on paper and glass; the white original on a solid fill or dark ground.">
+      <Section title="The mark" note="Two leaves, one over the other: a low one over one twice its height, each rounded at its top left and bottom right. Blue on paper and glass; the white original on a solid fill or dark ground.">
         <div className="mark-specimens">
           {[64, 32, 20, 16].map((n) => (
             <span key={n} className="mark-specimen">
@@ -2422,7 +2422,7 @@ function HeldPageDemo(p: { width: number; word: string; tone: "ok" | "warn" | "b
   );
 }
 
-const UPDATE_NOTES = ["## Foundation 0.3.0", "- Desktop updates: this card", "- A new icon: four panels on a grid", "- Signed installers, checked before they run"].join("\n");
+const UPDATE_NOTES = ["## Foundation 0.3.0", "- Desktop updates: this card", "- A new icon: two leaves on a night tile", "- Signed installers, checked before they run"].join("\n");
 const UPDATE_PHASES: Array<{ phase: UpdatePhase; width: number; layout?: "floating" | "inline"; extra?: Record<string, unknown> }> = [
   { phase: "available", width: 400 },
   { phase: "available", width: 260 },

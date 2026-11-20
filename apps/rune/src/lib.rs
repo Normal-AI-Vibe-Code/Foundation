@@ -14,7 +14,7 @@ pub mod view;
 mod web {
     use std::cell::RefCell;
 
-    use rune::{App, AppHandle, AppSpec, ImageCache, Live, Waker, WindowOptions};
+    use rune::{App, AppHandle, AppSpec, ImageCache, Live, Tx, Waker, WindowOptions};
     use wasm_bindgen::prelude::*;
 
     use crate::bridge;
@@ -44,9 +44,13 @@ mod web {
     }
 
     fn update(f: impl FnOnce(&mut Board) + Send + 'static) {
+        update_tx(move |board, _| f(board));
+    }
+
+    fn update_tx(f: impl FnOnce(&mut Board, &mut Tx) + Send + 'static) {
         HANDLE.with(|h| {
             if let Some(handle) = h.borrow().as_ref() {
-                handle.update(move |board, _| f(board));
+                handle.update(f);
             }
         });
     }
@@ -83,11 +87,17 @@ mod web {
         app.try_run()
     }
 
-    /// The board as the store has it now (`scene::Scene`, as JSON).
+    /// The board as the store has it now (`scene::Scene`, as JSON), and how it arrives. The client
+    /// decides (`apps/client/src/rune/transitions.ts`: another board, the floor and places from the
+    /// store land; a let-go and a change of look ease), and every scene says one or the other:
+    /// left unsaid, Rune eases whatever arrives while the pointer happens to be moving.
     #[wasm_bindgen(js_name = setScene)]
-    pub fn set_scene(json: String) -> Result<(), String> {
+    pub fn set_scene(json: String, animated: bool) -> Result<(), String> {
         let scene: Scene = serde_json::from_str(&json).map_err(|e| e.to_string())?;
-        update(move |board| board.set_scene(scene));
+        update_tx(move |board, tx| {
+            board.set_scene(scene);
+            if animated { tx.animated() } else { tx.instant() }
+        });
         Ok(())
     }
 

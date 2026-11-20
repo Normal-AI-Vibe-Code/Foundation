@@ -8,7 +8,7 @@
  * invariants all live behind it, and Rune never touches them.
  */
 
-import { isNight, onNight } from "@foundation/ui";
+import { isNight, onNight, setNight } from "@foundation/ui";
 import { workbook } from "../engine/workbook";
 import { camera, onCamera, toWorld } from "../state/camera";
 import {
@@ -41,14 +41,16 @@ import {
   subscribe,
   updateNoteText,
 } from "../state/store";
-import { floorInsets, getUi } from "../state/ui";
+import { floorInsets, getUi, setUi } from "../state/ui";
 import { getRuneStatus, setRuneStatus, type RuneBuild } from "./engine";
 import { runeImageSrc } from "./imageSrc";
 import { openExternal } from "../utils/media";
 import { runCardTool, runSectionTool, sectionContext } from "./tools";
 import { openContextMenu } from "../components/ContextMenu";
 import { sectionMenuItems } from "../components/sectionMenu";
-import { SCENE_VERSION, TOKEN_VARS, buildScene, type Rgba, type SceneTokens } from "./scene";
+import { SCENE_VERSION, TOKEN_VARS, buildScene, type Rgba, type Scene, type SceneTokens } from "./scene";
+import { HAND_WINDOW_MS, sceneMotion, still, type Decided } from "./transitions";
+import { activeBoard } from "../sync/board";
 
 const BASE = `${import.meta.env.BASE_URL}rune/`;
 
@@ -64,7 +66,8 @@ interface RuneModule {
   tick(seconds: number): void;
   /** the paper as the last frame drew it: [presence, night, pointer x, y, frames so far, view runs so far] */
   paperDrew(): Float32Array;
-  setScene(json: string): void;
+  /** the board, and whether this change eases or lands (transitions.ts decides) */
+  setScene(json: string, animated: boolean): void;
   setCamera(x: number, y: number, scale: number): void;
   beginEdit(id: string): void;
   endEdit(): void;
@@ -89,6 +92,8 @@ type RuneEvent =
 
 /** dev and e2e builds keep the last events Rune reported, for checks */
 const seen: RuneEvent[] | null = import.meta.env?.DEV || import.meta.env?.VITE_E2E_HOOKS ? [] : null;
+/** and how each board it was handed was to arrive, with the rule that said so */
+const decided: Decided[] | null = seen ? [] : null;
 
 let loading: Promise<RuneModule> | null = null;
 
@@ -159,6 +164,10 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
   let editing: string | null = null;
   let frame = 0;
   let last = "";
+  // what Rune was last handed, to tell what kind of change the next board is (transitions.ts)
+  let prev: { scene: Scene; board: string; still: string } | null = null;
+  // when the person last did something through Rune that the next board answers
+  let hand = -Infinity;
   const offs: Array<() => void> = [];
   // the right button, as the page sees it: Rune may report a right-click on the press or on the release
   const right = { down: false, downX: 0, downY: 0, x: 0, y: 0, onUp: null as null | (() => void) };
@@ -182,7 +191,8 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
     if (!mod || disposed) return;
     const ui = getUi();
     const f = floorInsets(ui);
-    const scene = buildScene(getState(), {
+    const st = getState();
+    const scene = buildScene(st, {
       insets: { left: f.left, top: f.top, right: f.right },
       readOnly: ui.role === "viewer",
       tokens: readTokens(canvas.parentElement ?? document.body),
@@ -192,8 +202,14 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
     const json = JSON.stringify(scene);
     if (json === last) return;
     last = json;
+    const cause = { board: `${activeBoard()?.boardId ?? ""}/${st.level ?? ""}`, byHand: performance.now() - hand < HAND_WINDOW_MS };
+    hand = -Infinity;
+    const rest = still(scene);
+    const how = sceneMotion(prev, scene, cause, rest);
+    prev = { scene, board: cause.board, still: rest };
+    if (decided) decided.push(how), decided.length > 50 && decided.shift();
     try {
-      mod.setScene(json);
+      mod.setScene(json, how.motion === "animated");
     } catch (e) {
       console.error("rune: scene refused", e);
     }
@@ -210,6 +226,8 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
       return;
     }
     if (seen) seen.push(e), seen.length > 50 && seen.shift();
+    // a let-go, a tool, a new section, an answer: the board that comes back settles (transitions.ts, rule 3)
+    if (e.t === "move" || e.t === "section-tool" || e.t === "card-tool" || e.t === "create-section" || e.t === "confirm" || (e.t === "section-drag" && e.phase !== "move")) hand = performance.now();
     const st = getState();
     if (e.t === "section") setActiveSection(e.id);
     else if (e.t === "object") setActiveObject(e.id);
@@ -331,7 +349,7 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
         subscribe(schedule),
         // a table at rest is Rune's: its cells are the workbook's, which recalculates apart from the store
         workbook.subscribeAll(schedule),
-        // the night fade mixes every token over 1.4 s: Rune springs between what it's handed
+        // the night fade mixes every token over 1.4 s: Rune springs between what it's handed (a change of look)
         onNight((n) => {
           m.setNight(n);
           [0, 500, 1500].forEach((ms) => setTimeout(schedule, ms));
@@ -377,6 +395,10 @@ if ((import.meta.env?.DEV || import.meta.env?.VITE_E2E_HOOKS) && typeof window !
     addNote,
     createTable,
     events: () => seen,
+    motions: () => decided,
+    // a pane and the night, for the checks that hold the motion rules in a browser
+    setUi,
+    setNight: (on: boolean) => setNight(on, false),
     paper: () => (current as (RuneHost & { paper?(): number[] }) | null)?.paper?.() ?? null,
   };
 }

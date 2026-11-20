@@ -32,7 +32,8 @@ type Scene = {
   cards: Array<{ id: string; kind: string; x: number; y: number; w: number; h: number; s: number; text: string }>;
 };
 type Camera = { x: number; y: number; scale: number; left: number; top: number };
-type Hook = { camera: Camera; status(): { state: string; reason?: string }; scene(): Scene; addNote(section: string, text: string): { id: string }; createTable(section: string): { id: string } };
+type Motion = { motion: "instant" | "animated"; rule: string };
+type Hook = { motions(): Motion[]; setUi(patch: { pane?: boolean }): void; setNight(on: boolean): void; camera: Camera; status(): { state: string; reason?: string }; scene(): Scene; addNote(section: string, text: string): { id: string }; createTable(section: string): { id: string } };
 type Note = { id: string; x: number; y: number; float: boolean; text: string };
 type Store = { workbook: { setCell(t: string, c: number, r: number, raw: string): void; getCell(t: string, c: number, r: number): { value: unknown } | undefined }; getState(): { activeSectionId: string; activeObjectId: string | null; notes: Record<string, Note> } };
 
@@ -98,6 +99,88 @@ test("Rune draws the board, marked as Rune's, and its pictures sit beside the we
     await settle(page, 1400);
     await page.screenshot({ path: `${OUT}/board-rune-${night ? "night" : "day"}.png` });
   }
+  expect(errors.filter((e) => /rune|wgpu|webgpu|panicked/i.test(e))).toEqual([]);
+});
+
+test("motion has an owner: a pane and another board land, a look eases, a let-go settles", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await open(page, "rune");
+  await page.keyboard.press("0");
+  await settle(page, 1400);
+  const motions = () => page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.motions());
+  /** what the boards handed over since `from` were told */
+  const since = async (from: number) => (await motions()).slice(from);
+  // the first board landed
+  expect((await motions())[0]).toEqual({ motion: "instant", rule: "first" });
+
+  // a pane opens with the pointer moving over the board (what made Rune ease it before): the floor lands
+  let n = (await motions()).length;
+  await page.mouse.move(700, 500);
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setUi({ pane: true }));
+  for (let i = 0; i < 12; i++) await page.mouse.move(700 + i * 6, 500 + i * 3);
+  await settle(page, 300);
+  await page.screenshot({ path: `${OUT}/motion-pane-300ms.png` });
+  await settle(page, 600);
+  let got = await since(n);
+  expect(got.length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule === "floor").length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule === "floor" && m.motion !== "instant")).toEqual([]);
+  // and closing it
+  n = (await motions()).length;
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setUi({ pane: false }));
+  await settle(page, 900);
+  got = await since(n);
+  expect(got.some((m) => m.rule === "floor" && m.motion === "instant")).toBe(true);
+
+  // the selection is a look: it eases
+  n = (await motions()).length;
+  const sc = await scene(page);
+  const other = sc.sections.find((s) => !s.active)!;
+  const c = await camera(page);
+  await page.mouse.click(c.left + c.x + (other.x + other.w - 60) * c.scale, c.top + c.y + (other.y + other.h - 40) * c.scale);
+  await expect.poll(async () => (await state(page)).activeSectionId).toBe(other.id);
+  await settle(page, 300);
+  expect(await since(n)).toContainEqual({ motion: "animated", rule: "look" });
+
+  // day: every token changes and nothing moves, so it eases (the fade is sent three times)
+  n = (await motions()).length;
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setNight(false));
+  await settle(page, 2000);
+  got = await since(n);
+  expect(got.length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule !== "look")).toEqual([]);
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setNight(true));
+  await settle(page, 2000);
+
+  // a card let go settles; one that arrives from the store lands
+  const sec = (await scene(page)).sections.find((s) => s.active)!;
+  const made = await page.evaluate((id) => (window as unknown as { __foundationRune: Hook }).__foundationRune.addNote(id, "# Moves").id, sec.id);
+  await settle(page, 500);
+  n = (await motions()).length;
+  const at = await cardPoint(page, made);
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 60, at.y + 40, { steps: 8 });
+  await page.mouse.up();
+  await settle(page, 600);
+  expect(await since(n)).toContainEqual({ motion: "animated", rule: "hand" });
+  n = (await motions()).length;
+  await page.evaluate((id) => (window as unknown as { __foundationRune: Hook }).__foundationRune.addNote(id, "# Arrives"), sec.id);
+  await settle(page, 500);
+  got = await since(n);
+  expect(got.length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.motion !== "instant")).toEqual([]);
+
+  // another board (a section opened as its own grid) lands
+  n = (await motions()).length;
+  await page.evaluate((id) => (window as unknown as { __foundation: { expandSection(id: string | null): void } }).__foundation.expandSection(id), sec.id);
+  await settle(page, 900);
+  got = await since(n);
+  expect(got.filter((m) => m.rule === "board").length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule === "board" && m.motion !== "instant")).toEqual([]);
+  await page.screenshot({ path: `${OUT}/motion-after.png` });
   expect(errors.filter((e) => /rune|wgpu|webgpu|panicked/i.test(e))).toEqual([]);
 });
 
