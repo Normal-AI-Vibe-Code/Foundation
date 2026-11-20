@@ -11,6 +11,14 @@
       "port": 1430
     },
     {
+      "name": "chatform-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "scripts/chatform-demo.mjs"
+      ],
+      "port": 15431
+    },
+    {
       "name": "factoryform",
       "runtimeExecutable": "node",
       "runtimeArgs": [
