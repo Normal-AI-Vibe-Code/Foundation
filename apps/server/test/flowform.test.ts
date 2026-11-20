@@ -429,11 +429,15 @@ test("desktop: the poll gets a session only after the person presses This is me,
   // a press from another page, or with no press cookie, does nothing
   assert.equal(answer(ff, press, true, { origin: "https://evil.example" }).status, 403);
   assert.equal(answer(ff, press, true, { "sec-fetch-site": "cross-site" }).status, 403);
+  // Origin "null" (a sandboxed frame, a data: page) counts only when the browser also says same-origin
+  assert.equal(answer(ff, press, true, { origin: "null", "sec-fetch-site": "cross-site" }).status, 403);
+  assert.equal(answer(ff, press, true, { origin: "null", "sec-fetch-site": "" }).status, 403);
   assert.equal(answer(ff, "foundation_ff_confirm=guess", true).status, 400);
   assert.deepEqual(ask(), { status: "pending" });
 
-  // the press: the next poll gets the app's session, and only that poll
-  assert.equal(answer(ff, press, true).status, 200);
+  // the press, as a real browser sends it from the page (no-referrer makes its Origin "null"): the next
+  // poll gets the app's session, and only that poll
+  assert.equal(answer(ff, press, true, { origin: "null" }).status, 200);
   assert.equal(answer(ff, press, true).status, 400, "a press is spent");
   const got = res();
   const out = ff.poll(req("/auth/flowform/poll?bearer=1", { authorization: `Bearer ${begun.poll}` }), got.r) as { status: string; session?: string; user: { email: string } };
