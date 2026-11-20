@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-20T03:23:26.127Z",
+  "syncedAt": "2026-11-20T11:31:53.621Z",
   "columns": [
     {
       "id": "needs-you",
@@ -99,7 +99,8 @@
       "milestone": "hosted",
       "area": "auth",
       "status": "needs-you",
-      "body": "The blocker for a hosted Foundation (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Sign-in goes through Flowform, whose callback rule takes only a loopback address (http, 127.0.0.1 or localhost, a port), so a server at an https address can't finish a sign-in: `loopbackOrigin()` in apps/server/src/flowform.ts refuses one. Two ways, a person's choice: (a) Flowform widens `native_loopback_callback` to accept the hosted address (a change on Flowform's side; Foundation keeps one sign-in for the company), or (b) Foundation gets its own Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, an internal consent screen on the Form Industries Google Workspace). SPEC §6 #2. *hosted-signin* builds whichever is chosen."
+      "body": "The blocker for a hosted Foundation (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Sign-in goes through Flowform, whose callback rule takes only a loopback address (http, 127.0.0.1 or localhost, a port), so a server at an https address can't finish a sign-in: `loopbackOrigin()` in apps/server/src/flowform.ts refuses one. Two ways, a person's choice: (a) Flowform widens `native_loopback_callback` to accept the hosted address (a change on Flowform's side; Foundation keeps one sign-in for the company), or (b) Foundation gets its own Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, an internal consent screen on the Form Industries Google Workspace). SPEC §6 #2. *hosted-signin* builds whichever is chosen.",
+      "issue": 223
     },
     {
       "id": "hosted-where",
@@ -108,7 +109,8 @@
       "milestone": "hosted",
       "area": "ship",
       "status": "needs-you",
-      "body": "A person's choice and accounts (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Where: a small cloud VM (simplest, always on) or an always-on computer in the office. Its name: for example foundation.formindustries.com, with DNS pointed at it. Who pays, and who holds the machine's keys. Whether it's open to the internet (Google sign-in is the fence) or only reachable on the company's private network (Tailscale in front). *hosted-deploy* makes it runnable; this card says where."
+      "body": "A person's choice and accounts (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Where: a small cloud VM (simplest, always on) or an always-on computer in the office. Its name: for example foundation.formindustries.com, with DNS pointed at it. Who pays, and who holds the machine's keys. Whether it's open to the internet (Google sign-in is the fence) or only reachable on the company's private network (Tailscale in front). *hosted-deploy* makes it runnable; this card says where.",
+      "issue": 224
     },
     {
       "id": "tailnet-stopgap",
@@ -117,7 +119,8 @@
       "milestone": "hosted",
       "area": "desktop",
       "status": "needs-you",
-      "body": "A stopgap for Josh's home and work computers, not the company's way in (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) The home computer runs the app's built-in server (it stays up while the app is open); the work computer forwards its own localhost:4410 to it, so the work app finds a server on :4410, uses it, and the Flowform sign-in returns through the tunnel. Nothing in Foundation changes and nothing is on the open internet. Home (admin PowerShell): `winget install --id Tailscale.Tailscale`, `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`, `Start-Service sshd; Set-Service sshd -StartupType Automatic`; keep Foundation open and the PC awake. Work: Tailscale on the same account, quit Foundation, then `ssh -N -L 4410:127.0.0.1:4410 <you>@<home-pc>` and open Foundation. Not run yet. Work IT may not allow Tailscale; huddles connect directly and may fail on a strict network."
+      "body": "A stopgap for Josh's home and work computers, not the company's way in (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) The home computer runs the app's built-in server (it stays up while the app is open); the work computer forwards its own localhost:4410 to it, so the work app finds a server on :4410, uses it, and the Flowform sign-in returns through the tunnel. Nothing in Foundation changes and nothing is on the open internet. Home (admin PowerShell): `winget install --id Tailscale.Tailscale`, `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`, `Start-Service sshd; Set-Service sshd -StartupType Automatic`; keep Foundation open and the PC awake. Work: Tailscale on the same account, quit Foundation, then `ssh -N -L 4410:127.0.0.1:4410 <you>@<home-pc>` and open Foundation. Not run yet. Work IT may not allow Tailscale; huddles connect directly and may fail on a strict network.",
+      "issue": 225
     },
     {
       "id": "wildos-wsl-host",
@@ -126,7 +129,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "needs-you",
-      "body": "Host helper and guide prepared: npm run wildos diagnoses WSL/virtualization/Docker/Kiri; explicit RepairWsl, BuildIso and native-QEMU StartVm actions support -WhatIf. Diagnostic run and dry runs checked; typecheck passed. WSL 3.0.5 is installed, but this session cannot query its status/distributions (E_ACCESSDENIED) or access CIM/host features; Docker UI launch timed out and shell network is restricted. Josh: run npm run wildos in host PowerShell 7 and inspect its actual error. No host repair, ISO build, WildOS boot or embedded console verified. Foundation test baseline also has route-performance and local-Git-fixture failures. docs/wildos.md and docs/evidence/2026-11-19_wildos-host/."
+      "body": "Host helper and guide prepared: npm run wildos diagnoses WSL/virtualization/Docker/Kiri; explicit RepairWsl, BuildIso and native-QEMU StartVm actions support -WhatIf. Diagnostic run and dry runs checked; typecheck passed. WSL 3.0.5 is installed, but this session cannot query its status/distributions (E_ACCESSDENIED) or access CIM/host features; Docker UI launch timed out and shell network is restricted. Josh: run npm run wildos in host PowerShell 7 and inspect its actual error. No host repair, ISO build, WildOS boot or embedded console verified. Foundation test baseline also has route-performance and local-Git-fixture failures. docs/wildos.md and docs/evidence/2026-11-19_wildos-host/.",
+      "issue": 226
     },
     {
       "id": "chatform-slack-export",
@@ -245,7 +249,8 @@
       "milestone": "hosted",
       "area": "auth",
       "status": "next",
-      "body": "Foundation's side of *hosted-signin-decision* (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) When FOUNDATION_PUBLIC_URL is an https address that isn't this computer: the web sign-in and the desktop app's device sign-in (code and \"This is me\") finish on that address, not a loopback one; the session cookie is Secure on https; the desktop app on a remote server signs in for a bearer (it already does, SPEC §7) and the server switch's Remote server connects to it. Who may join: a person new to a hosted server gets a sensible default role, and an admin can see and change it (no one from outside the company's Google domain by default). Build it against a stand-in Flowform (and a stand-in Google client if (b) is chosen) so it doesn't wait on the decision; the invariants hold (tokens hashed and never in URLs, viewers can't write). Tests in apps/server/test; check in a browser against a server run behind an https proxy."
+      "body": "Foundation's side of *hosted-signin-decision* (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) When FOUNDATION_PUBLIC_URL is an https address that isn't this computer: the web sign-in and the desktop app's device sign-in (code and \"This is me\") finish on that address, not a loopback one; the session cookie is Secure on https; the desktop app on a remote server signs in for a bearer (it already does, SPEC §7) and the server switch's Remote server connects to it. Who may join: a person new to a hosted server gets a sensible default role, and an admin can see and change it (no one from outside the company's Google domain by default). Build it against a stand-in Flowform (and a stand-in Google client if (b) is chosen) so it doesn't wait on the decision; the invariants hold (tokens hashed and never in URLs, viewers can't write). Tests in apps/server/test; check in a browser against a server run behind an https proxy.",
+      "issue": 227
     },
     {
       "id": "hosted-deploy",
@@ -254,7 +259,8 @@
       "milestone": "hosted",
       "area": "ship",
       "status": "next",
-      "body": "Make Foundation's server runnable on a machine that isn't a person's computer (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) A container (or the desktop app's bundled server, scripts/desktop-server.mjs, as a service) with the client built in; HTTPS in front (Caddy or similar); the data folder (SQLite and the file archive) on a kept volume, with a nightly backup and a written restore; health and a version on a page; every setting a hosted server needs in one place (docs/hosting.md: FOUNDATION_PUBLIC_URL, FOUNDATION_HOSTS, FOUNDATION_CORS_ORIGINS, sign-in keys, FOUNDATION_ICE_SERVERS). Uploaded files stay archived, never deleted. SQLite is fine to start; S3 and Postgres or libsql stay on *hosted-server*. Checked by deploying to a scratch VM or a local container with a real certificate."
+      "body": "Make Foundation's server runnable on a machine that isn't a person's computer (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) A container (or the desktop app's bundled server, scripts/desktop-server.mjs, as a service) with the client built in; HTTPS in front (Caddy or similar); the data folder (SQLite and the file archive) on a kept volume, with a nightly backup and a written restore; health and a version on a page; every setting a hosted server needs in one place (docs/hosting.md: FOUNDATION_PUBLIC_URL, FOUNDATION_HOSTS, FOUNDATION_CORS_ORIGINS, sign-in keys, FOUNDATION_ICE_SERVERS). Uploaded files stay archived, never deleted. SQLite is fine to start; S3 and Postgres or libsql stay on *hosted-server*. Checked by deploying to a scratch VM or a local container with a real certificate.",
+      "issue": 228
     },
     {
       "id": "hosted-local-features",
@@ -263,7 +269,8 @@
       "milestone": "hosted",
       "area": "machines",
       "status": "next",
-      "body": "These run on the server's own computer, which on a hosted server is the cloud box, not the person's (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Until a person decides otherwise, a hosted server says so plainly and doesn't offer them (machines, the built-in browser in work/host-browser, Kiri, T3 and Vision Code hand-offs), and chat, boards, files and agents work without them. Write down the choice to make later (who may start what on whose hardware) as a needs-you card; Vision's half is *vision-pairing*. Nothing that spends money or runs third-party code starts without a person."
+      "body": "These run on the server's own computer, which on a hosted server is the cloud box, not the person's (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Until a person decides otherwise, a hosted server says so plainly and doesn't offer them (machines, the built-in browser in work/host-browser, Kiri, T3 and Vision Code hand-offs), and chat, boards, files and agents work without them. Write down the choice to make later (who may start what on whose hardware) as a needs-you card; Vision's half is *vision-pairing*. Nothing that spends money or runs third-party code starts without a person.",
+      "issue": 229
     },
     {
       "id": "hosted-chat-check",
@@ -272,7 +279,8 @@
       "milestone": "hosted",
       "area": "chatform",
       "status": "next",
-      "body": "The check that says company chat works (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) An e2e run (apps/client/e2e) against a server set up as hosted (an https address, not loopback, through a proxy): two people sign in, one from a browser and one as the desktop app's page, and share a channel, a DM, a thread, a reaction, a file and unread; a reconnect after the network drops. Then the real one, a person's check once *hosted-deploy* is up: Josh at home and at work, and a third person. Huddles across networks need TURN (*huddle-sfu*). Evidence in docs/evidence/<date>_hosted-chat/."
+      "body": "The check that says company chat works (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) An e2e run (apps/client/e2e) against a server set up as hosted (an https address, not loopback, through a proxy): two people sign in, one from a browser and one as the desktop app's page, and share a channel, a DM, a thread, a reaction, a file and unread; a reconnect after the network drops. Then the real one, a person's check once *hosted-deploy* is up: Josh at home and at work, and a third person. Huddles across networks need TURN (*huddle-sfu*). Evidence in docs/evidence/<date>_hosted-chat/.",
+      "issue": 230
     },
     {
       "id": "hyperform-projects",
@@ -2121,7 +2129,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "review",
-      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-card/NOTES.md`). Josh: \"we can do a lot better with this Kiri interface …\". The head in two rows with Start/Stop, Restart, Remove at the top and the address bar with Share (a Foundation link relayed at /m/…, a public cloudflared link); Docker Hub in Start; Access as a panel of its own; functions in /foundation/functions as wired ports, with Process in a machine on a collection (ImageMagick trim-resize, sprite-sheet, describe); k3s clusters across machine cards with pods as cards; a mouse wheel zooms, a trackpad pans; Today's window buttons white. Checked: `e2e/machines-kiri.spec.ts` on Kiri (4), unit tests (19). Not done: the Tauri window not driven; a real cloudflared tunnel not opened; a function runs only on a press."
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-card/NOTES.md`). Josh: \"we can do a lot better with this Kiri interface …\". The head in two rows with Start/Stop, Restart, Remove at the top and the address bar with Share (a Foundation link relayed at /m/…, a public cloudflared link); Docker Hub in Start; Access as a panel of its own; functions in /foundation/functions as wired ports, with Process in a machine on a collection (ImageMagick trim-resize, sprite-sheet, describe); k3s clusters across machine cards with pods as cards; a mouse wheel zooms, a trackpad pans; Today's window buttons white. Checked: `e2e/machines-kiri.spec.ts` on Kiri (4), unit tests (19). Not done: the Tauri window not driven; a real cloudflared tunnel not opened; a function runs only on a press.",
+      "issue": 231
     },
     {
       "id": "cloudflared-install",
@@ -2130,7 +2139,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "needs-you",
-      "body": "Public links to a machine's port go through Cloudflare's free quick tunnels, which need cloudflared on this computer: `winget install --id Cloudflare.cloudflared`. Foundation doesn't install it. Without it Share says so and the Foundation link still works."
+      "body": "Public links to a machine's port go through Cloudflare's free quick tunnels, which need cloudflared on this computer: `winget install --id Cloudflare.cloudflared`. Foundation doesn't install it. Without it Share says so and the Foundation link still works.",
+      "issue": 232
     },
     {
       "id": "functions-auto-and-agents",
@@ -2139,7 +2149,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "backlog",
-      "body": "A machine's function runs only on a person's press (2026-11-17). Next: an Auto switch per function (runs when what's wired in gains items), and a tool for agents to call one, behind a person's leave like the desktop's."
+      "body": "A machine's function runs only on a person's press (2026-11-17). Next: an Auto switch per function (runs when what's wired in gains items), and a tool for agents to call one, behind a person's leave like the desktop's.",
+      "issue": 233
     },
     {
       "id": "pipes-older-server",
