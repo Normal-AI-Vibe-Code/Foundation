@@ -28,7 +28,7 @@ function stepMs() {
 
 const quoted = (s: string) => /[“"]([^”"]{1,60})[”"]/.exec(s)?.[1]?.trim();
 
-export async function runScript(opts: { prompt: string; signal: AbortSignal; persona?: "shiba"; chat?: { agent: string } }, emit: (e: AgentEvent) => void, ctx: ToolCtx) {
+export async function runScript(opts: { prompt: string; signal: AbortSignal; persona?: "shiba"; chat?: { agent: string; spoken?: boolean } }, emit: (e: AgentEvent) => void, ctx: ToolCtx) {
   const wait = () => new Promise((r) => setTimeout(r, stepMs()));
   const step = async (name: string, input: Record<string, unknown>) => {
     if (opts.signal.aborted) throw new Error("stopped");
@@ -49,6 +49,13 @@ export async function runScript(opts: { prompt: string; signal: AbortSignal; per
 
   // a ChatForm turn (chatagents.ts): look at the person's channels, then answer in a few streamed pieces.
   // "slowly" in the ask: many pieces (so a Stop lands mid-answer); "fail" in the ask: an error after the first piece
+  // a huddle's turn (chatagents.ts huddleReply): one spoken sentence back, saying what it heard
+  if (opts.chat?.spoken) {
+    const heard = opts.prompt.replace(/ said to you:/, ":").replace(/\s+/g, " ").trim().slice(0, 200);
+    emit({ type: "text", text: `${opts.chat.agent} here. I heard ${heard}.` });
+    emit({ type: "done", runtime: "script" });
+    return;
+  }
   if (opts.chat) {
     const seen = String(await step("chat_channels", { limit: 5 }));
     const n = seen === "no channels" ? 0 : seen.split("\n").length;

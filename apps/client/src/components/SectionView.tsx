@@ -56,6 +56,7 @@ import { isHostable } from "@foundation/protocol";
 import { isPanel } from "../state/store";
 import { ingest, ingestDrop } from "../lib/ingest";
 import { SectionEmpty } from "../panels/SectionEmpty";
+import { SectionRewind } from "../panels/ReplayView";
 import { setUi } from "../state/ui";
 import { openContextMenu } from "./ContextMenu";
 import { sectionMenuItems } from "./sectionMenu";
@@ -579,6 +580,8 @@ export const SectionView = memo(function SectionView({
           />
         )}
         <div ref={contentRef} className="section-content">
+          {/* a clock card off "now": this section as it was, for this viewer only (ReplayView.tsx) */}
+          {!mini && <SectionRewind sectionId={section.id} />}
           {objects.map((o) => {
             const pos = layout.get(o.id) ?? { x: o.x, y: o.y };
             const isObjActive = view.activeObjectId === o.id;

@@ -19,6 +19,7 @@ import { toast } from "../state/ui";
 import { CallControls, CallStage, goToCard, PlacePicker, Portrait } from "../panels/HuddleCall";
 import { Transcript } from "../panels/HuddleView";
 import { getChat, useChat } from "./model";
+import { BringFileToGrid } from "./CadAttachment";
 import "../panels/huddlecall.css";
 
 export interface HuddleCardProps {
@@ -312,7 +313,7 @@ export function ChannelHuddleDock({ channel }: { channel: ChatChannelView }) {
           )}
         </div>
       </div>
-      {mine && <CallControls room={mine} view={view} agentChoices={chat.agents.map((a) => a.name)} onPlace={() => setPlacing((p) => !p)} />}
+      {mine && <CallControls room={mine} view={view} agentChoices={chat.agents.map((a) => a.name)} onPlace={() => setPlacing((p) => !p)} extra={live?.board && live.board !== "chat" ? <BringFileToGrid files={(chat.timelines[channel.id]?.messages ?? []).flatMap((m) => m.files).reverse()} board={live.board} section={live.section} /> : undefined} />}
       {placing && mine && <PlacePicker huddleId={mine.huddleId} onClose={() => setPlacing(false)} />}
     </section>
   );

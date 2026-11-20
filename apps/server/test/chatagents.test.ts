@@ -296,7 +296,7 @@ test("a person's conversation with an agent is made once and answered at its top
   const hi = await say(C.ada, one.channel.id, "hello, no mention needed");
   await until("an answer", () => chat.pageMessages(one.channel.id, {}).messages.some((m) => m.author.kind === "agent" && m.root === null && m.seq > hi.seq));
   await quiet();
-  assert.match(chat.getChannel(one.channel.id)!.lastText ?? "", /^Claude: \*\*Claude\*\* here\. You asked: “hello, no mention needed”/, "the list line is the whole reply, not its first words");
+  assert.match(chat.getChannel(one.channel.id)!.lastText ?? "", /^Claude: Claude here\. You asked: “hello, no mention needed”/, "the list line is the whole reply, not its first words");
   const listed = await ok<{ conversations: ChatChannelView[] }>(C.ada, "GET", "/api/chat/agents");
   assert.ok(listed.conversations.some((c) => c.id === one.channel.id));
   assert.ok(!listed.conversations.some((c) => c.id === kais.channel.id), "not Kai's");

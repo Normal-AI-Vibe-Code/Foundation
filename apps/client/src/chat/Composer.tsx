@@ -13,6 +13,7 @@ import { uploadFile, type UploadedFile } from "../lib/api";
 import { keys } from "../lib/keys";
 import { PartyAvatar } from "./Avatar";
 import { EmojiPicker } from "./EmojiPicker";
+import { AttachFrom } from "./AttachFrom";
 import { matchEmoji } from "./emoji";
 import { applyCompletion, applyFormat, bytes, findTrigger, matchChannels, matchMentions, readDraft, writeDraft, type Format, type MentionOption, type Trigger } from "./logic";
 import { IconClip, IconCode, IconHash, IconLink, IconList, IconLock, IconQuote, IconReact, IconSend } from "./Icons";
@@ -82,6 +83,7 @@ export function Composer(p: ComposerProps) {
   const [pick, setPick] = useState(0);
   const [emoji, setEmoji] = useState(false);
   const [drag, setDrag] = useState(false);
+  const [from, setFrom] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const filePick = useRef<HTMLInputElement>(null);
   const draftFor = useRef({ channel: p.channel, root: p.root });
@@ -126,6 +128,12 @@ export function Composer(p: ComposerProps) {
         .then((u) => setChips((cs) => cs.map((c) => (c.key === key ? { ...c, id: u.id, progress: 1, mime: u.mime || c.mime, size: u.size || c.size, name: u.name || c.name } : c))))
         .catch((e: Error) => setChips((cs) => cs.map((c) => (c.key === key ? { ...c, error: e.message } : c))));
     }
+    field.current?.focus();
+  };
+
+  // a file already in the archive (from Vision, from an approved place): a chip that's ready
+  const addUploaded = (u: UploadedFile) => {
+    setChips((cs) => [...cs, { key: `c${++chipN}`, name: u.name, size: u.size, mime: u.mime || "application/octet-stream", progress: 1, id: u.id }]);
     field.current?.focus();
   };
 
@@ -368,6 +376,11 @@ export function Composer(p: ComposerProps) {
         <ToolBtn tip="Attach files" kbd={keys("mod+U")} onClick={() => filePick.current?.click()} label="Attach files">
           <IconClip />
         </ToolBtn>
+        <ToolBtn tip="Attach from Vision or this computer's approved folders" onClick={() => setFrom((x) => !x)} on={from} label="Attach from…">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M2.5 9.5v3a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3M8 2.5v7M5 6.5l3 3 3-3" />
+          </svg>
+        </ToolBtn>
         <div className="chat-compose-emoji">
           <ToolBtn tip="Emoji" onClick={() => setEmoji((x) => !x)} on={emoji} label="Emoji">
             <IconReact />
@@ -398,6 +411,7 @@ export function Composer(p: ComposerProps) {
         }}
       />
       {drag && <div className="chat-drop-hint">Drop to attach</div>}
+      {from && <AttachFrom onPicked={addUploaded} onClose={() => setFrom(false)} />}
     </div>
   );
 }

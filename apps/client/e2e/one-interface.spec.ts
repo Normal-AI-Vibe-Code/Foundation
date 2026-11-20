@@ -97,7 +97,7 @@ test("the plan is a kanban card on a grid, the design language a grid of chapter
   await expect.poll(() => boardId(ada)).toBe("foundation-design");
   await waitLive(ada);
   const chapters = await state(ada, (s) => Object.values(s.panels).filter((p) => p.panel === "design").map((p) => p.source));
-  expect(chapters).toHaveLength(12);
+  expect(chapters).toHaveLength(13);
   expect(await state(ada, (s) => Object.values(s.sections).every((x) => !!x.host))).toBe(true);
   await expect(ada.locator("[data-design-chapter]").first()).toBeVisible({ timeout: 15_000 });
   await settle(ada, 2500);

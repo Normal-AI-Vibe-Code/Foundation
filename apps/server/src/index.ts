@@ -494,6 +494,7 @@ function huddleOn(boardId: string, id: string) {
 }
 // a grid's huddle and a channel's (ChatForm H1): start, lines, recordings, take to a grid, agents, live list, archive
 huddleRoutes(r);
+(await import("./replay.ts")).replayRoutes(r); // replay: a recorded session's timeline and takes (the grid as it was); attaching from Vision and approved places in chat
 
 // ---------- Slack channels (bot token; posts go out under the person's name) ----------
 

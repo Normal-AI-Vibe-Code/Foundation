@@ -64,6 +64,8 @@ export interface ChatTurn {
   agent: string;
   context: string;
   system: string;
+  /** a huddle's turn (chatagents.ts huddleReply): what it writes is said aloud */
+  spoken?: boolean;
 }
 
 const SYSTEM = `You are the Foundation agent — the company brain of Form Industries, living inside Foundation, a shared grid where the team keeps its projects, files, designs, running apps and agents together.

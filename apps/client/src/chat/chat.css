@@ -2607,3 +2607,130 @@
   box-shadow: 0 0 0 1px var(--color-line);
   background: var(--color-void);
 }
+
+/* a CAD file in a message (CadAttachment.tsx, R1): the part, its facts, Download and Open on a grid */
+.chat-cad {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+}
+.chat-cad-view {
+  height: 240px;
+  border-radius: calc(var(--radius-card) - 2px);
+  overflow: hidden;
+  background: var(--color-panel);
+}
+.chat-cad-view .cad-view {
+  height: 100%;
+}
+.chat-cad-wait {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-dim);
+  font-size: var(--text-13);
+  cursor: pointer;
+}
+.chat-cad-ext {
+  font: 700 var(--text-20) / 1 var(--font-code);
+  color: var(--color-mist);
+}
+.chat-cad-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 var(--space-1);
+}
+.chat-cad-facts .chat-file-name,
+.chat-cad-facts .chat-file-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-cad-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.chat-cad-actions .f-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-cad-place.huddle-place {
+  left: 0;
+  right: auto;
+  bottom: calc(100% + 6px);
+}
+.chat-cad-actions a.f-pill {
+  text-decoration: none;
+}
+.chat-attach-from {
+  position: absolute;
+  right: var(--space-3);
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  width: min(420px, calc(100vw - 32px));
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  color: var(--color-frost);
+}
+.chat-attach-tabs {
+  display: flex;
+  gap: var(--space-1);
+}
+.chat-attach-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 60px;
+}
+.chat-attach-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-mist);
+  text-align: left;
+  font-size: var(--text-13);
+  cursor: pointer;
+}
+.chat-attach-row:hover {
+  background: var(--color-highlight);
+}
+.chat-attach-row .chat-file-meta {
+  margin-left: auto;
+  flex: none;
+}
+.chat-attach-head {
+  padding: var(--space-1) var(--space-2) 0;
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.4 var(--font-sans);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+}
+.chat-attach-note {
+  margin: 0;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  line-height: 1.5;
+}

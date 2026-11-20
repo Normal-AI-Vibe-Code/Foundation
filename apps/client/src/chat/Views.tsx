@@ -130,9 +130,9 @@ export function ChannelIntro({ c, meId }: { c: ChatChannelView; meId?: string })
   return (
     <div className="chat-intro">
       <span className="chat-intro-mark">{channelMark(c, meId, undefined, 40)}</span>
-      <h3>{direct ? chatTitle(c, meId) : `#${c.name}`}</h3>
+      <h3>{direct || c.kind === "portal" ? chatTitle(c, meId) : `#${c.name}`}</h3>
       <p>
-        {direct ? (c.kind === "agent" ? `A conversation with ${chatTitle(c, meId)}, an agent. What it says is marked as an agent's.` : `The start of your conversation with ${chatTitle(c, meId)}. Only the people in it can read it.`) : c.purpose || `The very start of #${c.name}.`}
+        {direct ? (c.kind === "agent" ? `A conversation with ${chatTitle(c, meId)}, an agent. What it says is marked as an agent's.` : `The start of your conversation with ${chatTitle(c, meId)}. Only the people in it can read it.`) : c.purpose || (c.kind === "portal" ? `The start of this conversation with ${c.name}${c.origin ? `, on ${c.origin.service}` : ""}.` : `The very start of #${c.name}.`)}
       </p>
     </div>
   );

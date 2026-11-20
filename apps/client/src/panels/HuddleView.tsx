@@ -21,6 +21,7 @@ import { activeBoard } from "../sync/board";
 import { askAgent, toast } from "../state/ui";
 import { useOnScreen } from "./PanelView";
 import { CallControls, CallStage, MicGlyph, MicOffGlyph } from "./HuddleCall";
+import { ReplayHere } from "./ReplayView";
 
 type Tab = "room" | "notes" | "archive";
 
@@ -179,6 +180,7 @@ export function HuddleBody({ panel }: { panel: PanelMeta }) {
               <span className="huddle-ctl-note">{people.length ? `${people.join(", ")}` : joined ? `You're in another huddle` : "Camera and mic stay off until you join"}</span>
             </>
           )}
+          <ReplayHere panel={panel} boardId={boardId} live={isLive} />
           {tabs}
         </div>
       )}

@@ -431,7 +431,7 @@ function toChannel(row: ChannelRow): ChatChannel {
     pinned,
     huddle: parse<ChatHuddleState | null>(row.huddle_json, null),
   };
-  if (row.last_text) c.lastText = row.last_text;
+  if (row.last_text) c.lastText = plainLine(row.last_text);
   if (row.origin_service && row.origin_id) c.origin = { service: row.origin_service as ChatOrigin["service"], externalId: row.origin_id, ...(row.origin_account ? { account: row.origin_account } : {}) };
   if (row.agent_json) c.agent = parse<ChatAgentRef | undefined>(row.agent_json, undefined);
   if (row.kind !== "open") c.members = members.map(partyOfMember);
@@ -542,6 +542,15 @@ export function openDirect(parties: ChatParty[], opts: { createdAt?: number } = 
 }
 
 /** join someone to a channel; their read mark starts at its newest message. Not silent: a system line, and events */
+/** a list line reads as words: the markdown marks of the message it came from are dropped */
+function plainLine(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/(\*\*|__|~~|`)/g, "")
+    .replace(/(^|\s)[*_]([^*_\s][^*_]*)[*_](?=\s|$|[.,!?])/g, "$1$2")
+    .replace(/(^|: )(?:>|#{1,6}|[-*])\s+/g, "$1");
+}
+
 export function addMember(channelId: string, party: ChatParty, opts: { silent?: boolean } = {}) {
   const ch = channelRow(channelId);
   if (!ch) throw new HttpError(404, "no such channel");

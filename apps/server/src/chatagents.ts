@@ -866,3 +866,72 @@ export function chatAgentRoutes(r: Router) {
     }
   });
 }
+
+// ---------- an agent's voice in a huddle (huddles.ts answer() looks for this) ----------
+
+/** a reply as it's said aloud: no markdown marks, no links, one line */
+export function spoken(text: string): string {
+  return text
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/(\*\*|__|~~|`)/g, "")
+    .replace(/(^|\s)[*_]([^*_\s][^*_]*)[*_](?=\s|$|[.,!?])/g, "$1$2")
+    .replace(/^\s*(?:#{1,6}|[-*•]|\d+\.)\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** the session a huddle is in now (its memory), else the huddle itself */
+function huddleMemory(huddleId: string, agent: string): string {
+  const live = one<{ id: string }>("select id from huddle_sessions where huddle_id = ? and ended_at is null order by started_at desc limit 1", huddleId)?.id;
+  return `ses_huddle${createHash("sha1").update(`${live ?? huddleId}|${agent.toLowerCase()}`).digest("hex").slice(0, 16)}`;
+}
+
+/**
+ * What an agent seated in a huddle says when it's addressed: a ChatForm turn (startRun with a `chat`
+ * context, so no board cursor and the chat's tools), told the transcript so far and to answer in two or
+ * three spoken sentences, no markdown. One memory per (huddle session, agent). Plain text comes back;
+ * huddles.ts puts it in the transcript and every client speaks it.
+ */
+export async function huddleReply(ask: import("./huddles.ts").HuddleAgentAsk): Promise<string> {
+  const ch = ask.channel ? getChannel(ask.channel) : undefined;
+  const where = ch ? whereOf(ch, ask.user) : ask.board ? `a huddle on the grid ${listBoards().find((b) => b.id === ask.board)?.name ?? ask.board}` : "a huddle";
+  const transcript = ask.lines.map((l) => `[${new Date(l.at).toISOString().slice(11, 19)}] ${l.speaker}${l.source === "agent" ? " (agent)" : l.source === "system" ? " (Foundation)" : ""}: ${l.text}`).join("\n");
+  const context = `<huddle where="${attr(where)}" huddle_id="${ask.huddleId}"${ask.board ? ` grid="${attr(ask.board)}"` : ""} person="${attr(ask.user.name)}" you="${attr(ask.agent)}">\n${transcript}\n</huddle>`;
+  const system = `
+
+You're ${ask.agent}, an agent seated in a live video huddle (${where}) by ${ask.user.name}. Everything you write is spoken aloud to the people in the call by a voice, so:
+- Answer in two or three short spoken sentences. No markdown, no lists, no headings, no links, no ids.
+- What was said so far is in <huddle>, speaker by speaker. Answer the last thing said to you.
+- Don't change anything on a board from here; if something should be done, say so and who might do it.`;
+  const r = startRun({
+    boardId: ask.board && listBoards().some((b) => b.id === ask.board) ? ask.board : COMPANY_BOARD,
+    user: ask.user,
+    prompt: `${ask.line.speaker} said to you: “${ask.line.text}”`,
+    session: huddleMemory(ask.huddleId, ask.agent),
+    chat: { agent: ask.agent, context, system, spoken: true },
+  });
+  return new Promise<string>((resolve, reject) => {
+    let text = "";
+    let failed = "";
+    const onAbort = () => stopRun(r.id, ask.user.id);
+    ask.signal.addEventListener("abort", onAbort, { once: true });
+    const done = () => {
+      ask.signal.removeEventListener("abort", onAbort);
+      if (ask.signal.aborted) return reject(new Error("stopped"));
+      const said = spoken(text);
+      if (!said && failed) return reject(new Error(failed));
+      resolve(said);
+    };
+    const detach = followRun(
+      r.id,
+      ask.user.id,
+      (e: AgentEvent) => {
+        if (e.type === "text") text += e.text;
+        else if (e.type === "error") failed = e.message;
+      },
+      done,
+    );
+    if (!detach) done();
+  });
+}

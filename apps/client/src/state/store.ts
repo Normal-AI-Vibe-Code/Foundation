@@ -2070,6 +2070,7 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   design: [1180, 900],
   pipeline: [1480, 330],
   collection: [360, 420],
+  replay: [360, 120],
 };
 
 export function addPanel(

@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import type { ChatFile, ChatLinkPreview } from "@foundation/protocol";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
-import { CadPreview } from "../cad/CadPreview";
+import { CadAttachment } from "./CadAttachment";
 import { bytes, fileKind } from "./logic";
 import { IconDownload, IconFile } from "./Icons";
 
@@ -66,13 +66,7 @@ function FileBody({ file, src }: { file: ChatFile; src: string }) {
         <audio src={shown} controls preload="metadata" />
       </div>
     );
-  if (kind === "cad")
-    return (
-      <div className="chat-cad">
-        <CadPreview url={src} name={file.name} />
-        <FileRow file={file} src={src} quiet />
-      </div>
-    );
+  if (kind === "cad") return <CadAttachment file={file} src={src} />;
   return <FileRow file={file} src={src} />;
 }
 

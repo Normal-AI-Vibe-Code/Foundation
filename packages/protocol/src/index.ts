@@ -14,6 +14,7 @@ import type { CollectionState } from "./collections.ts";
 export * from "./characters.ts";
 export * from "./collections.ts";
 export * from "./chat.ts";
+export * from "./replay.ts";
 
 // ---------- board document layout ----------
 
@@ -196,7 +197,8 @@ export type PanelKind =
   | "design" // a chapter of the design language, live on its tokens
   | "collection" // a collector: gathers what the cards wired into it make (pictures, characters) and can lay it out in a section; tiles drag out as copies
   | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
-  | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
+  | "character" // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
+  | "replay"; // a recorded huddle session's clock (ChatForm R1): scrub it and the section it sits in is drawn as it was then (`sessionId`: the huddle session)
 
 export interface Port {
   id: string;
@@ -239,7 +241,7 @@ export interface PanelDoc extends ObjectBaseDoc {
   huddle?: HuddleState;
   /** a huddle card that is a view of a ChatForm channel's huddle (its id is the huddle's; it signals on /huddle/chat/:id, and `channel` is the chat channel's id) */
   home?: "chat";
-  /** agent session id for panel === "agent" */
+  /** agent session id for panel === "agent"; the huddle session (hs_…) for panel === "replay" */
   sessionId?: string;
   /** for asks: who, and whether it's done */
   assignee?: string;

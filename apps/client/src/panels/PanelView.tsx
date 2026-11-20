@@ -29,6 +29,7 @@ import { activeBoard } from "../sync/board";
 import { StageBody } from "./StageView";
 import { onConnectorChange } from "../lib/connectorEvents";
 import { HuddleBody } from "./HuddleView";
+import { ReplayBody } from "./ReplayView";
 import { SlackBody } from "./SlackView";
 import { CrewCardBody } from "../components/SectionAgents";
 import { MachineBody, machineAction } from "./MachineView";
@@ -70,6 +71,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   design: "◐",
   pipeline: "⇢",
   collection: "❖",
+  replay: "◷",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -136,6 +138,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <PipelineBody panel={panel} />
     ) : panel.panel === "collection" ? (
       <CollectionBody panel={panel} />
+    ) : panel.panel === "replay" ? (
+      <ReplayBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (
