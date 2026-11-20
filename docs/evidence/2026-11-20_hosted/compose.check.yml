@@ -1,0 +1,23 @@
+# The local check of deploy/compose.yml: the same three services, a local certificate, and a stand-in
+# Google on this computer's :15700 (standin-google.mjs). From the repo's root:
+#   docker compose -p foundation-check --env-file docs/evidence/2026-11-20_hosted/check.env \
+#     -f deploy/compose.yml -f docs/evidence/2026-11-20_hosted/compose.check.yml up -d --build
+services:
+  foundation:
+    env_file: !override
+      - ../docs/evidence/2026-11-20_hosted/check.env
+    environment:
+      # the browser reaches the stand-in on this computer; the server reaches it from inside its container
+      GOOGLE_ACCOUNTS_BASE: http://localhost:15700
+      GOOGLE_OAUTH_BASE: http://host.docker.internal:15700
+      GOOGLE_USERINFO_URL: http://host.docker.internal:15700/userinfo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  caddy:
+    volumes: !override
+      - ../docs/evidence/2026-11-20_hosted/Caddyfile.check:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+  backup:
+    # a copy a minute after start is enough to look at
+    command: ["node", "--no-warnings", "/app/backup.mjs", "--every", "24"]

@@ -15,7 +15,7 @@ import { registerVmRoutes } from "./vmroutes.ts";
 import { shutdownLocalVms } from "./localvms.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
-import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
+import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleSignIn, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
 import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
@@ -74,6 +74,7 @@ import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.t
 import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
+import { serveClient } from "./clientfiles.ts";
 import { gridOutline } from "./subgrids.ts";
 import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
@@ -96,7 +97,8 @@ r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 // ---------- auth ----------
 
 // public: also what this server is, and the oldest client it still works with (clientversion.ts)
-r.get("/auth/config", () => ({ google: Boolean(config.google.clientId), devLogin: config.devLogin, flowform: { url: flowform.flowformUrl() }, version: SERVER_VERSION, minClient: minClient() || null }));
+// (`flowform` stays for the clients that read it to find the Google button: its routes sign in with this server's own Google client when it has one)
+r.get("/auth/config", () => ({ google: Boolean(config.google.clientId), devLogin: config.devLogin, flowform: { url: flowform.flowformUrl() }, provider: googleSignIn() ? "google" : "flowform", hosted: flowform.hostedServer(), version: SERVER_VERSION, minClient: minClient() || null }));
 r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
 /** what on this computer has a shell now, if anything: dev sign-in waits until it stops (auth.ts devSignInRefusal) */
 function shellRunning(): string | false {
@@ -128,9 +130,21 @@ r.get("/auth/google/start", (_req, res) => {
   res.end();
 });
 r.get("/auth/google/callback", async (req, res) => {
-  const user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "", parseCookies(req.headers.cookie)[GOOGLE_STATE_COOKIE] ?? "");
+  // an app's sign-in (it began one and is polling): the code and the press, as with Flowform (flowform.ts)
+  if (await flowform.googleDesktopDone(req, res)) return;
+  let user: UserInfo;
+  try {
+    if (req.query.get("error")) throw new HttpError(400, req.query.get("error") === "access_denied" ? "The sign-in was cancelled at Google." : "Google didn't finish the sign-in.");
+    user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "", parseCookies(req.headers.cookie)[GOOGLE_STATE_COOKIE] ?? "");
+  } catch (e) {
+    // a person is looking at this in their browser: a page that says why, not JSON
+    if (!(e instanceof HttpError)) console.error("google sign-in:", (e as Error).message);
+    return flowform.page(res, e instanceof HttpError ? e.status : 500, "Sign-in didn't finish", e instanceof HttpError ? e.message : "Something went wrong finishing the sign-in. Try again.");
+  }
+  audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, door: "route", action: "sign_in.google", target: "browser session", decision: "allowed", result: "ok" });
   setSessionCookie(res, createSession(user.id));
-  res.writeHead(302, { location: config.clientUrl });
+  // `?arrive`: the sign-in page knows it is back from Google and goes straight through
+  res.writeHead(302, { location: `${config.clientUrl.replace(/\/$/, "")}/?arrive`, "cache-control": "no-store" });
   res.end();
 });
 // Google through flowform-server — the flowform client's sign-in (flowform.ts)
@@ -1339,6 +1353,8 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
       return await handleMcp(req, res, user);
     }
     const m = r.match(req.method ?? "GET", url.pathname);
+    // a hosted server serves the web client itself (FOUNDATION_CLIENT_DIR; clientfiles.ts): anything that isn't the server's own
+    if (!m && serveClient(req, res, url.pathname)) return;
     if (!m) throw new HttpError(404, "not found");
     req.params = m.params;
     gateWrites(req, url.pathname);
@@ -1427,6 +1443,8 @@ server.listen(config.port, config.host, () => {
   const doors = [config.google.clientId ? "Google" : `Google through Flowform (${flowform.flowformUrl()})`, config.devLogin ? "dev login (this computer only)" : ""].filter(Boolean);
   console.log(`  sign-in            ${doors.join(" + ")}`);
   // never locked out without being told why: dev login is off unless asked for
+  if (flowform.hostedServer() && !googleSignIn()) console.log("  sign-in            NOT SET UP for this address: a hosted server needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (docs/hosting.md)");
+  if (config.clientDir) console.log(`  web client         ${config.clientDir}`);
   if (!config.devLogin && !config.google.clientId) console.log("  dev login          off. To sign in by email on this computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart");
   console.log(`  agent              ${rt.subscription ? "Claude Code (subscription)" : rt.subscriptionNote ? `— (${rt.subscriptionNote.split("\n")[0]})` : "—"}${rt.api ? ` · API (${rt.model})` : ""}`);
   console.log(`  MCP                ${config.publicUrl}/mcp?board=company\n`);
