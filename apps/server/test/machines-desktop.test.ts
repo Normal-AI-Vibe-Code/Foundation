@@ -452,7 +452,8 @@ test("agents use a desktop only with a person's leave: asked for on the card, gi
   await assert.rejects(() => runTool(agentCtx, "desktop_screenshot", { machine: "desk-box" }), /hasn't let agents use desk-box's desktop.*Nothing was done/s);
   await assert.rejects(() => runTool(agentCtx, "desktop_mouse", { machine: box, action: "click", x: 5, y: 5 }), /hasn't let agents use/);
   assert.equal(engine.xdo.length + engine.shots, before, "nothing reached the machine");
-  assert.deepEqual([panelOf(box).machine?.agentAsked?.by, panelOf(box).machine?.agentAsked?.for], ["Ada's agent", "Ada"]);
+  assert.deepEqual([desk.desktopLeave(BOARD, box).agentAsked?.by, desk.desktopLeave(BOARD, box).agentAsked?.for], ["Ada's agent", "Ada"]);
+  assert.equal((panelOf(box).machine as unknown as Record<string, unknown>).agentAsked, undefined, "the ask is off the card (a server-only map)");
   assert.equal(activity().filter((a) => a.text === "asked to use desk-box's desktop").length, 1, "said once, not per attempt");
   // a viewer can't give it; a viewer's agent can't even ask
   assert.throws(() => desk.setAgentsMay(BOARD, box, vic, true), /View only/);
@@ -462,12 +463,25 @@ test("agents use a desktop only with a person's leave: asked for on the card, gi
   prefs.setPref(noa.id, "computer_use", "never");
   assert.equal(prefs.computerUseDefault(noa.id), "never");
   assert.throws(() => desk.setAgentsMay(BOARD, box, noa, true), /Never/);
-  assert.equal(panelOf(box).machine?.agentsMay, undefined);
+  assert.equal(desk.desktopLeave(BOARD, box).agentsMay, undefined);
+  // a writer's sync socket can't give it: not on the card (nothing reads it there), and not in the server's map
+  const board = getBoard(BOARD);
+  const sock = { readyState: 1, send() {}, close() {} } as never;
+  board.conns.set(sock, new Set());
+  const cardNow = panelOf(box);
+  board.doc.transact(() => {
+    boardMaps(board.doc).objects.set(box, { ...cardNow, machine: { ...cardNow.machine!, agentsMay: { by: "Mallory", at: Date.now() } } } as never);
+    boardMaps(board.doc).desktopLeave.set(box, { agentsMay: { by: "Mallory", at: Date.now() } });
+  }, sock);
+  board.conns.delete(sock);
+  assert.equal(desk.desktopLeave(BOARD, box).agentsMay, undefined, "the socket's write to the leave was put back");
+  await assert.rejects(() => runTool(agentCtx, "desktop_screenshot", { machine: box }), /hasn't let agents use/, "a leave written on the card counts for nothing");
   // a person does
   const m = desk.setAgentsMay(BOARD, box, ada, true);
-  assert.equal(m.agentsMay?.by, "Ada");
-  assert.ok(Math.abs((m.agentsMay?.at ?? 0) - Date.now()) < 2000);
-  assert.equal(m.agentAsked, undefined);
+  assert.equal(desk.desktopLeave(BOARD, box).agentsMay?.by, "Ada");
+  assert.ok(Math.abs((desk.desktopLeave(BOARD, box).agentsMay?.at ?? 0) - Date.now()) < 2000);
+  assert.equal(desk.desktopLeave(BOARD, box).agentAsked, undefined);
+  assert.equal(m.name, "desk-box");
   assert.equal(activity().at(-1)!.text, "let agents use desk-box's desktop");
   await assert.rejects(() => runTool({ boardId: BOARD, actor: "Noa's agent", userId: noa.id }, "desktop_screenshot", { machine: box }), /set to Never/);
 
@@ -524,7 +538,7 @@ test("agents use a desktop only with a person's leave: asked for on the card, gi
   // taken back (by anyone who can edit): refused again, and it says so on the card once more
   assert.throws(() => desk.setAgentsMay(BOARD, box, vic, false), /View only/);
   desk.setAgentsMay(BOARD, box, ada, false);
-  assert.equal(panelOf(box).machine?.agentsMay, undefined);
+  assert.equal(desk.desktopLeave(BOARD, box).agentsMay, undefined);
   assert.equal(activity().at(-1)!.text, "stopped agents using desk-box's desktop");
   const k = engine.xdo.length;
   await assert.rejects(() => runTool(agentCtx, "desktop_type", { machine: box, text: "x" }), /hasn't let agents use/);
@@ -656,7 +670,8 @@ test("Remove takes the desktop, the leave and the pipes' last values with the di
   desk.setAgentsMay(BOARD, box, ada, true);
   await machines.removeMachine(BOARD, box, "Ada", true);
   const p = panelOf(box);
-  assert.deepEqual([p.machine?.state, p.machine?.desktop, p.machine?.agentsMay, p.machine?.agentActs, p.machine?.io], ["absent", undefined, undefined, undefined, undefined]);
+  assert.deepEqual([p.machine?.state, p.machine?.desktop, desk.desktopLeave(BOARD, box).agentsMay, p.machine?.agentActs, p.machine?.io], ["absent", undefined, undefined, undefined, undefined]);
+  assert.deepEqual(desk.desktopLeave(BOARD, box), {}, "nothing left of the leave");
   assert.equal(p.outputs?.[p.ports.find((x) => x.name === "out")!.id], undefined);
   await assert.rejects(() => runTool(agentCtx, "desktop_screenshot", { machine: box }), /isn't running/);
 });

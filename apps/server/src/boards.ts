@@ -44,9 +44,19 @@ export function onBoardOpen(fn: (board: Board) => void) {
   openListeners.add(fn);
 }
 
-/** what a space's canvas is: the grid, a deck of slides (a grid whose sections are the slides), or a web page */
-export type SpaceKind = "grid" | "deck" | "page";
-export const SPACE_KINDS: SpaceKind[] = ["grid", "deck", "page"];
+/**
+ * what a space's canvas is: the grid, a deck of slides (a grid whose sections are the slides), a web page,
+ * or an app opened as a tab of its own (T3, Vision, anything that was a card or a tool and was expanded)
+ */
+export type SpaceKind = "grid" | "deck" | "page" | "app";
+export const SPACE_KINDS: SpaceKind[] = ["grid", "deck", "page", "app"];
+/** a space with no grid to look at: its canvas is a page */
+export const isPageKind = (k: SpaceKind) => k === "page" || k === "app";
+/** the look a grid pins for itself; anything else is paper, which follows the orb */
+export type SpaceTheme = "day" | "night";
+export const cleanTheme = (v: unknown): SpaceTheme | null => (v === "day" || v === "night" ? v : null);
+/** the apps Foundation itself knows how to open as a tab (their address is minted when they open) */
+export const BUILT_IN_APPS = ["t3"] as const;
 
 export interface BoardRow {
   id: string;
@@ -59,12 +69,18 @@ export interface BoardRow {
   url: string | null;
   /** the grid this one sits inside (a grid of grids); null at the top */
   parent: string | null;
+  /** the look it pins ('day' | 'night'); null: paper, following the orb */
+  theme: SpaceTheme | null;
+  /** an app space's built-in app ('t3'); null for an app at its url, and for everything else */
+  app: string | null;
 }
 
 export function listBoards(): BoardRow[] {
-  return all<Omit<BoardRow, "kind"> & { kind: string | null }>("select id, name, updated_at, kind, folder, url, parent from boards order by updated_at desc").map((b) => ({
+  return all<Omit<BoardRow, "kind"> & { kind: string | null }>("select id, name, updated_at, kind, folder, url, parent, theme, app from boards order by updated_at desc").map((b) => ({
     ...b,
     kind: SPACE_KINDS.includes(b.kind as SpaceKind) ? (b.kind as SpaceKind) : "grid",
+    theme: cleanTheme(b.theme),
+    app: b.app ?? null,
   }));
 }
 
@@ -97,17 +113,18 @@ export function cleanPageUrl(url: unknown): string | null {
 }
 
 /** make a space's row; the id comes from its name and never lands on one that exists */
-export function createBoardRow(name: string, opts: { kind?: SpaceKind; folder?: string | null; url?: string | null } = {}): string {
+export function createBoardRow(name: string, opts: { kind?: SpaceKind; folder?: string | null; url?: string | null; app?: string | null } = {}): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48) || "space";
   let id = base;
   for (let n = 2; one("select id from boards where id = ?", id); n++) id = `${base}-${n}`;
   const now = Date.now();
-  run("insert into boards (id, name, created_at, updated_at, kind, folder, url) values (?, ?, ?, ?, ?, ?, ?)", id, name, now, now, opts.kind ?? "grid", opts.folder ?? null, opts.url ?? null);
+  run("insert into boards (id, name, created_at, updated_at, kind, folder, url, app) values (?, ?, ?, ?, ?, ?, ?, ?)", id, name, now, now, opts.kind ?? "grid", opts.folder ?? null, opts.url ?? null, opts.app ?? null);
   return id;
 }
 
 /** rename a space, move it to a folder (null: out of any), or point a page space somewhere else */
-export function updateBoardRow(id: string, patch: { name?: string; folder?: string | null; url?: string }) {
+export function updateBoardRow(id: string, patch: { name?: string; folder?: string | null; url?: string; theme?: SpaceTheme | null }) {
+  if (patch.theme !== undefined) run("update boards set theme = ? where id = ?", patch.theme, id);
   if (patch.name !== undefined) {
     run("update boards set name = ? where id = ?", patch.name, id);
     // the section that stands for it in its parent grid wears its name
@@ -294,7 +311,7 @@ export function attachConnection(boardId: string, ws: WebSocket, readOnly = fals
  * everyone, the sender included, gets the correction. Without this, someone with edit rights could
  * make a fake ask appear on a machine card or rewrite who is in a huddle.
  */
-export const SERVER_MAPS = ["huddles", "machineAsks", "slack", "characters", "agents", "collections", "uploaders"] as const;
+export const SERVER_MAPS = ["huddles", "machineAsks", "slack", "characters", "agents", "collections", "desktopLeave", "uploaders"] as const;
 function guardServerMaps(board: Board) {
   for (const name of SERVER_MAPS) {
     const map = board.doc.getMap<unknown>(name);
@@ -462,7 +479,7 @@ export function setBoardParent(id: string, parent: string | null): { ok: true } 
   if (parent !== null) {
     const p = rows.get(parent);
     if (!p) return { error: "No such grid to put it in" };
-    if (p.kind === "page") return { error: "A web page can't hold grids" };
+    if (isPageKind(p.kind)) return { error: p.kind === "app" ? "An app can't hold grids" : "A web page can't hold grids" };
     for (let at: string | null = parent, n = 0; at && n < 64; at = rows.get(at)?.parent ?? null, n++) {
       if (at === id) return { error: parent === id ? "A grid can't go inside itself" : `${p.name} is inside ${me.name} already` };
     }

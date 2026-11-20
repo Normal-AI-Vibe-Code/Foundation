@@ -41,7 +41,7 @@ export function Privacy() {
         <h2>What it reads, and where it goes</h2>
         <p>
           A new tab opens Foundation's Today page, as if you'd typed its address. When you open the toolbar summary, the extension asks the company's Foundation for your Today (your name, what's asked of you
-          and where you're tagged, your goals, and the company's apps), using the Foundation sign-in your browser already has. That goes only between your browser and Foundation. The extension runs no code
+          and where you're tagged, the company's goals and yours, and the company's apps), using the Foundation sign-in your browser already has. That goes only between your browser and Foundation. The extension runs no code
           from anywhere else.
         </p>
 

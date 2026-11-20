@@ -1,23 +1,93 @@
 /**
- * The sandbox a live page runs in (#80). A page from somewhere else keeps its
- * own origin (allow-same-origin), so its sign-in and storage work: that origin
- * is its own, not ours, and it can't reach the board. A page served from
- * Foundation's own origin (the app's, or its server's, where uploaded files
- * live) runs as an opaque origin instead: with scripts and same-origin
- * together it could lift its own sandbox and act with the person's session.
- * The postMessage bridge checks the sending window, not its origin, so ports
- * work either way.
+ * What a frame that shows an address from a card, an app or a person's typing may be (#80; 2026-11-18).
+ * One decision for every such frame: an app card, a web page space, the built-in browser and T3's frame.
+ *
+ * - **Never Foundation itself.** Not the client's origin, not the server's (nor the dev proxy's target), and not
+ *   a loopback address on either one's port under another name (127.0.0.1 for localhost): framed, our own page
+ *   would run with the person's session under a frame someone else chose. Refused, with a sentence in its place.
+ *   Only http(s) addresses are framed at all (no data:, blob:, javascript:, about:, file:).
+ * - **Always sandboxed.** Scripts, forms, popups, modals and downloads.
+ * - **Its own origin unless it is on this computer and unknown.** `allow-same-origin` (its sign-in and storage
+ *   work) is kept by a web site that is not on this computer: its origin is its own, never Foundation's. An address
+ *   on this computer (a loopback name, any port) keeps its origin only if it is a saved app (the apps registry) or,
+ *   for T3's frame, the configured T3 address: any other local port, with scripts and same-origin together, would
+ *   be same-site with Foundation, so it runs as an opaque origin.
+ * - **Trusted** (the bridge sends to it; camera, microphone and clipboard reading) is only a saved app or T3.
+ * - **The bridge** (app ↔ grid postMessage) names the frame's own origin when it sends, never "*", so it sends
+ *   only to a frame that has one; it accepts a message only from that frame's window and from its origin ("null"
+ *   for an opaque one).
  */
 export const SANDBOX = "allow-scripts allow-forms allow-popups allow-modals allow-downloads";
 
-/** `ours`: the origins that are Foundation (the page's, and the server's when it's elsewhere) */
-export function sandboxFor(url: string, ours: string[]): string {
-  let origin: string;
+export interface FrameContext {
+  /** Foundation's own origins: the page's, the server's, the dev proxy's target */
+  ours: string[];
+  /** the ports Foundation answers on: a loopback address on one of them is Foundation, whatever it's called */
+  ports: string[];
+  /** origins of saved apps (the apps registry) */
+  saved: string[];
+  /** the configured T3 address's origin, for T3's own frame only */
+  t3?: string | null;
+}
+
+export type FrameDecision =
+  | { ok: true; url: string; origin: string; sandbox: string; trusted: boolean; /** runs without an origin of its own (an unknown address on this computer) */ opaque: boolean }
+  | { ok: false; reason: string };
+
+/** localhost and its subdomains, 127.0.0.0/8, ::1 (and its IPv4-mapped form), and the any-address */
+export function isLoopbackHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  return h === "localhost" || h.endsWith(".localhost") || /^127(?:\.\d{1,3}){3}$/.test(h) || h === "::1" || h === "0.0.0.0" || h === "::" || /^::ffff:(127\.|7f)/.test(h);
+}
+
+const portOf = (u: URL) => u.port || (u.protocol === "https:" ? "443" : "80");
+
+export const OWN_PAGE = "Foundation doesn't show its own pages inside a frame. Open it in a tab of its own.";
+
+export function frameFor(url: string, ctx: FrameContext): FrameDecision {
+  let u: URL;
   try {
-    origin = new URL(url, ours[0]).origin;
+    u = new URL(url, ctx.ours[0]);
   } catch {
-    return SANDBOX;
+    return { ok: false, reason: "This address can't be opened here." };
   }
-  // an address that doesn't parse to a real origin ("null": data:, blob:, about:) gets the strict one too
-  return origin === "null" || ours.includes(origin) ? SANDBOX : `${SANDBOX} allow-same-origin`;
+  if (u.protocol !== "http:" && u.protocol !== "https:") return { ok: false, reason: "Only web pages (http or https) open here." };
+  if (ctx.ours.includes(u.origin) || (isLoopbackHost(u.hostname) && ctx.ports.includes(portOf(u)))) return { ok: false, reason: OWN_PAGE };
+  const trusted = ctx.saved.includes(u.origin) || Boolean(ctx.t3 && ctx.t3 === u.origin);
+  const opaque = !trusted && isLoopbackHost(u.hostname);
+  return { ok: true, url: u.href, origin: u.origin, sandbox: opaque ? SANDBOX : `${SANDBOX} allow-same-origin`, trusted, opaque };
+}
+
+/** what the bridge sends to: the frame's own origin, or nothing (an opaque frame can't be named, and "*" is never used) */
+export function bridgeTarget(d: FrameDecision): string | null {
+  return d.ok && d.trusted ? d.origin : null;
+}
+
+/** a message is the frame's own: from its window, and from its origin ("null" when it runs opaque) */
+export function bridgeAccepts(d: FrameDecision, e: { origin: string; source: unknown }, frameWindow: unknown): boolean {
+  if (!d.ok || !frameWindow || e.source !== frameWindow) return false;
+  return e.origin === (d.opaque ? "null" : d.origin);
+}
+
+/** what a frame may ask the browser for: camera and microphone, and reading the clipboard, only for a trusted one */
+export function frameAllow(d: FrameDecision, extra = ""): string {
+  const base = d.ok && d.trusted ? "clipboard-read; clipboard-write; camera; microphone" : "clipboard-write";
+  return extra ? `${base}; ${extra}` : base;
+}
+
+/** Foundation's own origins and ports, from where this page is and the server it talks to */
+export function foundationOrigins(here: string, servers: string[]): Pick<FrameContext, "ours" | "ports"> {
+  const ours = new Set<string>();
+  const ports = new Set<string>();
+  for (const s of [here, ...servers]) {
+    if (!s) continue;
+    try {
+      const u = new URL(s);
+      if (u.origin !== "null") ours.add(u.origin);
+      if ((u.protocol === "http:" || u.protocol === "https:") && isLoopbackHost(u.hostname)) ports.add(portOf(u));
+    } catch {
+      /* not an address */
+    }
+  }
+  return { ours: [...ours], ports: [...ports] };
 }

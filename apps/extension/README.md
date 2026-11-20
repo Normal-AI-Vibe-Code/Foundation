@@ -1,6 +1,6 @@
 # Foundation for Chrome
 
-Every new tab opens **Today** at the company's Foundation: the Shiba, what wants you, your goals, every company app. The toolbar button shows the same at a glance. It keeps nothing but Foundation's address; your Foundation sign-in does the rest.
+Every new tab opens **Today** at the company's Foundation: the company's goals, what wants you, your own goals, the Shiba, every company app. The toolbar button shows the same at a glance. It keeps nothing but Foundation's address; your Foundation sign-in does the rest.
 
 ```
 src/                 the extension (MV3): newtab, popup, options, managed_schema.json (the admin's setting)

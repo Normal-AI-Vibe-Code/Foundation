@@ -1,0 +1,38 @@
+Audit log and explicit sending outside (SECURITY.md rule 8), 2026-11-18
+
+Feature tests
+  test/audit.test.ts          4 pass  (arguments stored only as hash and size; doors and actors;
+                                       person-gate refusals recorded, isPerson records nothing;
+                                       UPDATE/DELETE refused by triggers; tampered and removed rows
+                                       found by verifyAudit)
+  test/egress.test.ts         6 pass  (nothing allowed: no seam reached, a sentence, asked rows;
+                                       Slack searches allowed: Slack reached, GitHub not; board A
+                                       doesn't open board B; revoke; a person's own call approves
+                                       itself; who may set; private content refused whole)
+  test/egress-sends.test.ts   3 pass  (static read of tools.ts: every tool that calls a network
+                                       helper has `sends`; every import from a network module is
+                                       listed; metadata well formed)
+  test/egress-doors.test.ts   4 pass  (HTTP: reading and setting allowances, agent bearer /
+                                       service token / viewer refused; read routes held for an
+                                       agent; the audit log for an admin in person only)
+
+Suites
+  npm test -w @foundation/server   tests 371, pass 365, fail 0, skipped 6
+    (one earlier full run had hardening.test.ts's server drop a connection mid-upload under load;
+     the file passed 18/18 alone and in the next full run, unchanged)
+  npm test -w @foundation/client   tests 184, pass 183, fail 0
+  npm run typecheck                clean (server and client)
+  node scripts/check-security.mjs --summary
+    check-security: clean (6 waived by the allowlist).
+
+Tests whose setup changed (the rule didn't)
+  test/github-repos.test.ts  Ada allows GitHub reads and searches on the board first
+  test/huddle.test.ts        a person allows Slack reads on the board before the agent reads a channel
+
+Browser (#/design, client on a spare port, ?rafshim)
+  01-design-day.jpg    the section at 272 (editor), 272 (viewer, switches held), 220 (narrowest pane)
+  02-design-night.jpg  the same at night
+  A switch in the live demo flips on press; every viewer switch is disabled; no horizontal
+  overflow at 220.
+  Not checked in a browser: the section inside a real grid's pane against a running server
+  (the server routes are covered by egress-doors.test.ts).

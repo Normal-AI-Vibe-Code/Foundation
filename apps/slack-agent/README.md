@@ -215,12 +215,14 @@ slack install -E local
    - Run `slack app settings` to open App Settings
    - Copy **Client ID**, **Client Secret**, and **Signing Secret**
    - Update `SLACK_REDIRECT_URI` in `.env` with your ngrok domain
+   - Set `SLACK_STATE_SECRET` to a random value of at least 32 characters (for example `node -e "console.log(crypto.randomBytes(32).toString('hex'))"`); `app-oauth.js` refuses to start without it
 
 ```sh
 SLACK_CLIENT_ID=YOUR_CLIENT_ID
 SLACK_CLIENT_SECRET=YOUR_CLIENT_SECRET
 SLACK_SIGNING_SECRET=YOUR_SIGNING_SECRET
 SLACK_REDIRECT_URI=https://YOUR_NGROK_SUBDOMAIN.ngrok-free.app/slack/oauth_redirect
+SLACK_STATE_SECRET=
 ```
 
 7. Start the app:
@@ -250,9 +252,10 @@ SLACK_CLIENT_ID=YOUR_CLIENT_ID
 SLACK_CLIENT_SECRET=YOUR_CLIENT_SECRET
 SLACK_SIGNING_SECRET=YOUR_SIGNING_SECRET
 SLACK_REDIRECT_URI=https://YOUR_NGROK_SUBDOMAIN.ngrok-free.app/slack/oauth_redirect
+SLACK_STATE_SECRET=
 ```
 
-Replace `your-subdomain` in `SLACK_REDIRECT_URI` with your ngrok subdomain.
+Replace `your-subdomain` in `SLACK_REDIRECT_URI` with your ngrok subdomain, and set `SLACK_STATE_SECRET` to a random value of at least 32 characters.
 
 5. Start the app:
 

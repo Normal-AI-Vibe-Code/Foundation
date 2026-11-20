@@ -3,6 +3,7 @@
 // For the Slack board it also has channels with top-level messages (some with
 // those pictures), a channel the app isn't in, and POST /_post, which says
 // something in a channel (with a new picture when file=1), as a person would.
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { deflateSync } from "node:zlib";
 
@@ -87,6 +88,11 @@ const TINTS = [[[143, 118, 238], [50, 91, 180]], [[228, 87, 78], [200, 122, 28]]
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", base);
+  // the stand-in live app the checks put on cards (helpers.ts FRAME): a page on another origin than Foundation's
+  if (url.pathname === "/e2e/frame.html") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    return res.end(readFileSync(new URL("./frame.html", import.meta.url)));
+  }
   // the stand-in's own door, for checks: someone says something in a channel
   if (url.pathname === "/_post") {
     const ch = CHANNELS.find((c) => c.id === url.searchParams.get("channel") || c.name === url.searchParams.get("channel"));

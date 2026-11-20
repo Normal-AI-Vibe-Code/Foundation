@@ -3,7 +3,9 @@
  * Shiba's room draws, what's asked of you shows and opens its place on the
  * board, a goal added on the page sticks, the apps are in reach, and Boards
  * and back work. Asked what's first, the Shiba (the script runtime here)
- * says it and points at it on the page.
+ * says it and points at it on the page. The company's goals come first: a
+ * member sets one on the page, the person who carries it has it in focus, and
+ * the server refuses a viewer who tries to set one.
  */
 import { expect, test } from "@playwright/test";
 import { CLIENT, settle } from "./helpers";
@@ -91,4 +93,55 @@ test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps
   await page.goto("/?board=company");
   await expect(page.locator(".today")).toHaveCount(0);
   await context.close();
+});
+
+test("the company's goals open Today: set on the page by a member, in focus for who carries them, refused for a viewer", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "light" });
+  expect((await context.request.post(`${CLIENT}/auth/dev`, { data: { name: "Gale Goals", email: "gale@normal.dev" } })).ok()).toBeTruthy();
+  await context.addInitScript(() => localStorage.setItem("foundation-floor", JSON.stringify({ pane: false, tabs: [], tab: null, search: false })));
+  const page = await context.newPage();
+  await page.goto("/?rafshim#/today");
+  const company = page.getByRole("region", { name: "Company goals" });
+  await expect(company).toBeVisible();
+
+  // a member sets one on the page; it's the first group, above what wants them
+  await page.getByLabel("Set a company goal").fill("Certify the rim drive for flight");
+  await page.getByLabel("Set a company goal").press("Enter");
+  const row = company.locator(".today-goal", { hasText: "Certify the rim drive for flight" });
+  await expect(row).toBeVisible();
+  expect(await page.locator(".today-state .today-group").first().getAttribute("aria-label")).toBe("Company goals");
+  const { company: c } = (await (await context.request.get(`${CLIENT}/api/today`)).json()) as { company: { goals: Array<{ id: string; title: string }> } };
+  const id = c.goals.find((g) => g.title === "Certify the rim drive for flight")!.id;
+
+  // handed to someone, it's in their focus (and says who carries it on everyone's Today)
+  expect((await context.request.post(`${CLIENT}/api/today/company-goals`, { data: { id, owner: "Gale", progress: 0.3, request_id: "e2e-own" } })).ok()).toBeTruthy();
+  await page.reload();
+  await expect(row).toContainText("Carried by Gale");
+  await expect(page.locator(".today-row[data-kind=goal]", { hasText: "Certify the rim drive for flight" })).toBeVisible();
+  await settle(page);
+  await page.screenshot({ path: "../../docs/evidence/2026-11-14_company-goals/01_today-company-goals_day.png" });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.reload();
+  await expect(row).toBeVisible();
+  await settle(page);
+  await page.screenshot({ path: "../../docs/evidence/2026-11-14_company-goals/02_today-company-goals_night.png" });
+
+  // a viewer of the company board reads them, can't set them (no box, and the server says no)
+  const vee = await browser.newContext();
+  expect((await vee.request.post(`${CLIENT}/auth/dev`, { data: { name: "Vee Viewer", email: "vee@normal.dev" } })).ok()).toBeTruthy();
+  const veeId = ((await (await vee.request.get(`${CLIENT}/api/me`)).json()) as { user: { id: string } }).user.id;
+  const admin = await browser.newContext();
+  expect((await admin.request.post(`${CLIENT}/auth/dev`, { data: { name: "Admin", email: "admin@normal.dev" } })).ok()).toBeTruthy();
+  expect((await admin.request.post(`${CLIENT}/api/boards/company/people`, { data: { userId: veeId, role: "viewer" } })).ok()).toBeTruthy();
+  const veeToday = (await (await vee.request.get(`${CLIENT}/api/today`)).json()) as { company: { canSet: boolean; goals: Array<{ id: string }> } };
+  expect(veeToday.company.canSet).toBe(false);
+  expect(veeToday.company.goals.map((g) => g.id)).toContain(id);
+  const refused = await vee.request.post(`${CLIENT}/api/today/company-goals`, { data: { id, status: "done" } });
+  expect(refused.status()).toBe(403);
+  const veePage = await vee.newPage();
+  await veePage.goto("/?rafshim#/today");
+  await expect(veePage.getByRole("region", { name: "Company goals" }).locator(".today-goal", { hasText: "Certify the rim drive for flight" })).toBeVisible();
+  await expect(veePage.getByLabel("Set a company goal")).toHaveCount(0);
+  await expect(veePage.getByRole("button", { name: "Mark “Certify the rim drive for flight” done" })).toBeDisabled();
+  for (const c of [vee, admin, context]) await c.close();
 });

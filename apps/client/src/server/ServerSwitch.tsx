@@ -226,7 +226,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
           {p.open && (
             <motion.div
               key="panel"
-              className="server-switch-lift"
+              className="server-switch-lift f-paper"
               initial={{ opacity: 0, y: p.drop ? -8 : 10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.14 } }}
@@ -274,7 +274,7 @@ const keep = (k: string, v: string) => {
 let launchChecked = false;
 
 /**
- * The switch itself. Signed in, it sits in the side menu's foot above Settings (`where="pane"`, 2026-11-17;
+ * The switch itself. Signed in, it is a small pill right of Settings in the side menu's foot (`where="pane"`, 2026-11-17;
  * from 2026-11-15 it was in the top bar, `where="bar"`: always there, so the server this app talks to is
  * never a mystery); before that there is no bar, and it keeps the bottom-right
  * corner wherever the app can point at another server. `day` pins day tokens over the sign-in page.

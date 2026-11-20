@@ -14,7 +14,7 @@
  * (the desktop's bundled server says so on the card), and only a person presses Upload now or sets a timer.
  */
 
-import { execFile, execFileSync } from "node:child_process";
+import { childOptions, execFileSyncChild, execFileText, type ExecFileOptions, type ExecFileSyncOptions } from "./child.ts";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -50,7 +50,7 @@ import { requirePerson } from "./auth.ts";
 import { requireWriter } from "./roles.ts";
 
 const ORIGIN = "avatars";
-const execFileP = promisify(execFile);
+// git gets the allowlisted environment (child.ts), no extras: its own sign-in is in this computer's credential store, not the server's keys
 
 db.exec(`
 create table if not exists avatar_timers (panel_id text primary key, board_id text not null, every integer not null, next_at integer not null, by_id text, by_name text);
@@ -333,7 +333,7 @@ export function repoInfo(): RepoInfo {
   }
   let target = `origin · ${branch}`;
   try {
-    const url = execFileSync("git", ["config", "--get", "remote.origin.url"], { cwd: dir, encoding: "utf8", timeout: 5000, windowsHide: true }).trim();
+    const url = String(execFileSyncChild("git", ["config", "--get", "remote.origin.url"], childOptions<ExecFileSyncOptions>({ extras: [] }, { cwd: dir, encoding: "utf8", timeout: 5000, windowsHide: true }))).trim();
     const gh = /github\.com[:/]([^/]+\/[^/]+?)(\.git)?$/.exec(url);
     target = `${gh ? gh[1] : url.replace(/^.*[\\/]/, "")} · ${branch}`;
   } catch {
@@ -348,7 +348,7 @@ export function mainKeys(): string[] {
   const repo = repoInfo();
   if (repo.dir && !repo.cannot) {
     try {
-      const text = execFileSync("git", ["show", `origin/${repo.branch}:${STARTER_REL}/manifest.json`], { cwd: repo.dir, encoding: "utf8", timeout: 5000, windowsHide: true, maxBuffer: 8 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+      const text = String(execFileSyncChild("git", ["show", `origin/${repo.branch}:${STARTER_REL}/manifest.json`], childOptions<ExecFileSyncOptions>({ extras: [] }, { cwd: repo.dir, encoding: "utf8", timeout: 5000, windowsHide: true, maxBuffer: 8 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] })));
       return (mainCache = keysOf(JSON.parse(text) as { characters?: StarterCharacter[] }));
     } catch {
       /* no set on main yet: this build's */
@@ -451,7 +451,7 @@ export function exportSet(ids: string[], out: string): { added: string[]; remove
 
 const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 
-const git = (args: string[], cwd: string) => execFileP("git", args, { cwd, timeout: 180_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true });
+const git = (args: string[], cwd: string) => execFileText("git", args, childOptions<ExecFileOptions>({ extras: [] }, { cwd, timeout: 180_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true }));
 
 const list = (names: string[]) => (names.length <= 6 ? names.join(", ") : `${names.slice(0, 5).join(", ")} and ${names.length - 5} more`);
 

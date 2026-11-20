@@ -1483,6 +1483,32 @@
   color: var(--color-frost);
   font: 400 var(--text-12) / 1.3 var(--font-code);
 }
+/* an app tool's ask: the address Foundation would connect to (the saved app's), as code, one line */
+.machine-ask-where {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-code);
+}
+/* on an app's card the asks sit over the page's foot, on the card's own paper */
+.app-asks {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: var(--space-2);
+  max-height: calc(100% - var(--space-4));
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-lift);
+}
+.app-asks .machine-asks {
+  max-height: none;
+}
 .machine-ask.is-declined .machine-ask-line,
 .machine-ask.is-timed-out .machine-ask-line {
   color: var(--color-dim);

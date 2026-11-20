@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Foundation — Today",
   "short_name": "Foundation",
-  "description": "Form Industries' first stop: each new tab opens Today — the Shiba, what wants you, your goals, and every company app.",
+  "description": "Form Industries' first stop: each new tab opens Today — the company's goals, what wants you, the Shiba, and every company app.",
   "version": "0.1.0",
   "icons": {
     "16": "icons/16.png",

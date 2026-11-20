@@ -26,7 +26,8 @@
  * read defensively: an unknown shape is skipped, never a crash.
  */
 
-import { spawn, execFile, type ChildProcess } from "node:child_process";
+import { childOptions, execFileChild, spawnChild, type ChildProcess, type ExecFileOptions, type SpawnOptions } from "./child.ts";
+import { CLAUDE_CODE_ENV } from "./rea.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -88,6 +89,8 @@ export interface T3HostStatus {
 }
 
 const HOME = () => join(config.dataDir, "t3");
+/** what Foundation's T3 gets beyond the allowlist: where the agents it runs keep their sign-ins (why: at the start, below) */
+export const T3_ENV = [...CLAUDE_CODE_ENV, "CODEX_HOME"] as const;
 const FIRST_PORT = () => {
   const v = Number(process.env.FOUNDATION_T3_PORT ?? "15783");
   return Number.isInteger(v) && v > 0 ? v : 15783;
@@ -142,6 +145,11 @@ const tellWork = (id: string, w: T3Work | null) => workSubs.forEach((f) => {
     f(id, w);
   } catch { /* a listener's own trouble */ }
 });
+
+/** T3's program is up or coming up here (its agents can have a shell on this computer): starting, running, or a child still alive */
+export function t3HostRunning(): boolean {
+  return status.state === "running" || status.state === "starting" || child !== null;
+}
 
 export function t3Host(): T3HostStatus {
   return { ...status, agents: status.agents, work: [...threads.values()].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)) };
@@ -369,7 +377,7 @@ async function connect(base: string, gen: number) {
 }
 
 function killTree(c: ChildProcess) {
-  if (c.pid && process.platform === "win32") execFile("taskkill", ["/pid", String(c.pid), "/T", "/F"], { windowsHide: true }, () => {});
+  if (c.pid && process.platform === "win32") execFileChild("taskkill", ["/pid", String(c.pid), "/T", "/F"], childOptions<ExecFileOptions>({ extras: [] }, { windowsHide: true }));
   else c.kill();
 }
 
@@ -397,10 +405,15 @@ async function run(by: string): Promise<T3HostStatus> {
     seedHome(home);
     const port = await pickPort();
     const token = randomBytes(24).toString("hex");
-    const env: NodeJS.ProcessEnv = { ...process.env, T3CODE_HOME: home };
-    for (const k of ["T3CODE_PORT", "T3CODE_MODE", "T3CODE_HOST", "T3CODE_DEV_AUTH_TOKEN"]) delete env[k];
     set({ detail: `Starting T3 on port ${port}`, port });
-    const c = spawn(cmd, [...pre, "--bootstrap-fd", "0"], { cwd: home, env, stdio: ["pipe", "ignore", "pipe"], windowsHide: true });
+    // T3 and every agent it runs get the allowlist (child.ts), never the server's keys: a vendor key reaches
+    // an agent only through T3's own settings, per agent (addT3Agent: a provider instance's `environment`,
+    // marked sensitive, kept by T3). Beyond that: its home (T3CODE_HOME, Foundation's; the port, mode, host
+    // and a dev token come only on the bootstrap line, so none of the server's T3CODE_* ride along), and what
+    // the agents it starts need to find their own sign-ins when a person moved them: Claude Code's
+    // (CLAUDE_CODE_ENV, and Git Bash on Windows) and Codex's (CODEX_HOME). Its home, and its working folder,
+    // are still under data/ (`<data>/t3`: T3's database, the added agents' homes and foundation-agents.json).
+    const c = spawnChild(cmd, [...pre, "--bootstrap-fd", "0"], childOptions<SpawnOptions>({ extras: T3_ENV, set: { T3CODE_HOME: home } }, { cwd: home, stdio: ["pipe", "ignore", "pipe"], windowsHide: true }));
     child = c;
     let err = "";
     c.stderr?.on("data", (b: Buffer) => (err = (err + b).slice(-600)));
@@ -681,11 +694,32 @@ export async function removeT3Agent(id: string): Promise<T3Agent[]> {
   return status.agents;
 }
 
+/**
+ * An address that is exactly a loopback origin: http(s), localhost / 127.0.0.1 / [::1], an explicit port,
+ * and nothing else (no user, path, query or fragment). The origin, or null.
+ */
+export function loopbackOrigin(base: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(base.trim());
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(u.hostname)) return null;
+  if (!u.port || u.username || u.password || u.search || u.hash || (u.pathname !== "/" && u.pathname !== "")) return null;
+  // what was written is the origin itself (a trailing slash at most): nothing the parser tidied away
+  const raw = base.trim().replace(/\/$/, "");
+  return raw.toLowerCase() === u.origin.toLowerCase() ? u.origin : null;
+}
+
 /** model servers on this computer that a local agent could use (Ollama's address; asked when the form opens) */
 export async function localModels(base = T3_PRESETS.kimi.local.baseUrl): Promise<{ baseUrl: string; up: boolean; models: string[] }> {
-  if (!isLoopback(base)) throw new Error("Only an address on this computer can be asked.");
+  const origin = loopbackOrigin(base);
+  if (!origin) throw new Error("Only a model server on this computer can be asked: an address like http://127.0.0.1:11434 (http or https, localhost, 127.0.0.1 or [::1], a port, and nothing after it).");
   try {
-    const r = await fetch(`${base.replace(/\/+$/, "")}/api/tags`, { signal: AbortSignal.timeout(1500) });
+    // the list is asked of that origin's /api/tags and nowhere else (a redirect isn't followed)
+    const r = await fetch(`${origin}/api/tags`, { signal: AbortSignal.timeout(1500), redirect: "manual" });
     const j = (await r.json()) as { models?: Array<{ name?: string }> };
     return { baseUrl: base, up: r.ok, models: (j.models ?? []).map((m) => m.name ?? "").filter(Boolean) };
   } catch {
@@ -743,7 +777,7 @@ async function ensureBoardTools() {
 process.once("exit", () => {
   if (child?.pid) {
     try {
-      if (process.platform === "win32") spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, detached: true, stdio: "ignore" }).unref();
+      if (process.platform === "win32") spawnChild("taskkill", ["/pid", String(child.pid), "/T", "/F"], childOptions<SpawnOptions>({ extras: [] }, { windowsHide: true, detached: true, stdio: "ignore" })).unref();
       else child.kill();
     } catch { /* already gone */ }
   }

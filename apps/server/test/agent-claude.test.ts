@@ -12,14 +12,16 @@
 
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { AgentEvent } from "@foundation/protocol";
 import type { Runtime } from "../src/rea.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "foundation-test-"));
-process.env.FOUNDATION_DATA_DIR = dir;
+process.env.FOUNDATION_DATA_DIR = join(dir, "data");
+const work = join(dir, "work");
+process.env.FOUNDATION_WORK_DIR = work;
 delete process.env.FOUNDATION_AGENT_SCRIPT;
 const log = join(dir, "claude.log");
 const win = process.platform === "win32";
@@ -32,6 +34,9 @@ writeFileSync(
 const fs = require("node:fs");
 const a = process.argv.slice(2);
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(a) + "\\n");
+// where it ran, what it was given, and whether its MCP config was there to read
+const m = a.indexOf("--mcp-config");
+fs.appendFileSync(${JSON.stringify(join(dir, "claude-env.log"))}, JSON.stringify({ cwd: process.cwd(), env: process.env, mcp: m >= 0 ? a[m + 1] : null, mcpThere: m >= 0 && fs.existsSync(a[m + 1]) }) + "\\n");
 if (a[0] === "--version") { console.log("9.9.9 (stand-in Claude Code)"); process.exit(0); }
 const out = (o) => process.stdout.write(JSON.stringify(o) + "\\n");
 out({ type: "system", subtype: "init", session_id: "stand-in-1" });
@@ -80,6 +85,77 @@ test("a subscription turn reaches the stand-in with its prompt as one argument",
   assert.ok(turn[1].startsWith(prompt), "the prompt arrived whole: quotes, &, |, %PATH% and the line break untouched");
   assert.deepEqual(turn.slice(2, 5), ["--output-format", "stream-json", "--verbose"]);
   assert.ok(turn.includes("--mcp-config") && turn.includes("--allowedTools"));
+  // Foundation's tools only: its own MCP config, strictly, and none of the person's settings files
+  assert.ok(turn.includes("--strict-mcp-config"), "only the MCP servers in Foundation's config");
+  assert.equal(turn[turn.indexOf("--setting-sources") + 1], "", "no user, project or local settings: the empty value arrived as one argument");
+});
+
+test("the argument builder: Foundation's MCP config, strictly; no setting sources; no built-in tools; only the board's tools pre-approved", async () => {
+  const { subscriptionArgs, CLAUDE_BUILT_IN_TOOLS } = await import("../src/agent.ts");
+  const a = subscriptionArgs({ prompt: "hi --strict-mcp-config", mcpFile: "/w/runs/r1/mcp.json", system: "sys" });
+  assert.deepEqual(a, [
+    "-p",
+    "hi --strict-mcp-config",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--mcp-config",
+    "/w/runs/r1/mcp.json",
+    "--strict-mcp-config",
+    "--setting-sources",
+    "",
+    "--append-system-prompt",
+    "sys",
+    "--allowedTools",
+    "mcp__foundation__*",
+    "--tools=",
+    `--disallowedTools=${CLAUDE_BUILT_IN_TOOLS.join(",")}`,
+  ]);
+  // the prompt is one argument and never read as a flag: the flags stand on their own after it
+  assert.equal(a.filter((x) => x === "--strict-mcp-config").length, 1);
+  assert.equal(a.indexOf("--mcp-config") + 1, a.indexOf("/w/runs/r1/mcp.json"));
+});
+
+test("a board run has no built-in tools: an empty set (as the Agent SDK passes tools: []), and every built-in denied besides", async () => {
+  const { subscriptionArgs, CLAUDE_BUILT_IN_TOOLS } = await import("../src/agent.ts");
+  const a = subscriptionArgs({ prompt: "p", mcpFile: "/m.json", system: "s" });
+  // one argument each, in the SDK's own form (`--tools=` for tools: [], `--disallowedTools=a,b` for a list)
+  assert.equal(a.filter((x) => x === "--tools=").length, 1);
+  assert.ok(!a.some((x) => /^--tools=./.test(x) || x === "--tools"), "no built-in is named as available");
+  const deny = a.find((x) => x.startsWith("--disallowedTools="))!.slice("--disallowedTools=".length).split(",");
+  for (const t of ["Bash", "PowerShell", "Read", "Write", "Edit", "Glob", "Grep", "WebFetch", "WebSearch", "Agent", "Task", "Skill", "NotebookEdit"]) assert.ok(deny.includes(t), `${t} is denied`);
+  assert.ok(!deny.some((t) => t.startsWith("mcp__")), "Foundation's own tools are not denied");
+  assert.deepEqual(deny, [...CLAUDE_BUILT_IN_TOOLS]);
+  // Foundation's tools stay the only ones pre-approved
+  assert.equal(a[a.indexOf("--allowedTools") + 1], "mcp__foundation__*");
+});
+
+test("Claude Code gets no keys, works outside data/, and its pass to the board is in a run folder that goes with the run (ADR-001 G13)", async () => {
+  const secrets = { ANTHROPIC_API_KEY: "sk-ant-not-real", SLACK_BOT_TOKEN: "xoxb-not-real", GITHUB_TOKEN: "ghp-not-real", FOUNDATION_SERVICE_TOKEN: "s".repeat(40), MESHY_API_KEY: "msy-not-real", GOOGLE_CLIENT_SECRET: "g-not-real", FOO_PASSWORD: "hunter2" };
+  Object.assign(process.env, secrets, { CLAUDE_CONFIG_DIR: join(dir, "claude-home") });
+  try {
+    const ada = upsertUser("ada@formindustries.com", "Ada Lovelace");
+    const events: AgentEvent[] = [];
+    await runAgent({ boardId: "claude-board", user: ada, prompt: "hello", runtime: "subscription", emit: (e) => events.push(e), signal: new AbortController().signal });
+    assert.ok(!events.some((e) => e.type === "error"), JSON.stringify(events));
+  } finally {
+    for (const k of Object.keys(secrets)) delete process.env[k];
+    delete process.env.CLAUDE_CONFIG_DIR;
+  }
+  const seen = readFileSync(join(dir, "claude-env.log"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as { cwd: string; env: Record<string, string>; mcp: string | null; mcpThere: boolean }).at(-1)!;
+  for (const k of Object.keys(seen.env)) if (/KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i.test(k)) assert.fail(`Claude Code was given ${k}`);
+  assert.ok(Object.keys(seen.env).some((k) => k.toUpperCase() === "PATH"), "it can find programs");
+  assert.equal(seen.env.CLAUDE_CONFIG_DIR, join(dir, "claude-home"), "it finds the person's login where they moved it");
+  const data = resolve(process.env.FOUNDATION_DATA_DIR!);
+  const inData = (p: string) => !relative(data, resolve(p)).startsWith("..") && !isAbsolute(relative(data, resolve(p)));
+  assert.equal(realpathSync(seen.cwd), realpathSync(resolve(work, "agent")), "the same folder every turn, so --resume finds its session");
+  assert.ok(!inData(seen.cwd), "not in data/");
+  assert.ok(seen.mcp && seen.mcpThere, "its MCP config was there while it ran");
+  assert.ok(!inData(seen.mcp!), "the MCP config isn't in data/");
+  assert.ok(resolve(seen.mcp!).startsWith(resolve(work, "runs")), seen.mcp!);
+  assert.ok(!existsSync(seen.mcp!) && !existsSync(dirname(seen.mcp!)), "the run's folder (and the bearer in it) is gone once the run ends");
+  const { subscriptionSpawnOptions } = await import("../src/agent.ts");
+  assert.equal(subscriptionSpawnOptions().cwd, resolve(work, "agent"));
 });
 
 /** a made-up Windows file system for resolveClaude */
@@ -92,6 +168,9 @@ function winRt(files: Record<string, string>): Runtime {
     exists: (f) => f in files,
     isDir: () => false,
     read: (f) => files[f] ?? "",
+    real: (f) => f,
+    home: "C:\\Users\\Ada",
+    places: [],
   };
 }
 

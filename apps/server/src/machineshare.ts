@@ -18,7 +18,7 @@
 
 import { request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
 import { connect, type Socket } from "node:net";
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { childOptions, execFileSyncChild, spawnChild, type ChildProcess, type ExecFileSyncOptions, type SpawnOptions } from "./child.ts";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Duplex } from "node:stream";
@@ -151,8 +151,13 @@ const key = (board: string, panel: string, port: number) => `${board}/${panel}/$
 export function findCloudflared(env = process.env): string | null {
   // a stand-in for checks (a script that prints a link as cloudflared does): FOUNDATION_CLOUDFLARED
   if (env.FOUNDATION_CLOUDFLARED) return env.FOUNDATION_CLOUDFLARED;
-  const where = spawnSync(process.platform === "win32" ? "where" : "which", ["cloudflared"], { encoding: "utf8", windowsHide: true });
-  const found = where.status === 0 ? where.stdout.split(/\r?\n/).find(Boolean)?.trim() : undefined;
+  let found: string | undefined;
+  try {
+    const out = String(execFileSyncChild(process.platform === "win32" ? "where" : "which", ["cloudflared"], childOptions<ExecFileSyncOptions>({ extras: [] }, { encoding: "utf8", windowsHide: true, stdio: ["ignore", "pipe", "ignore"] })));
+    found = out.split(/\r?\n/).find(Boolean)?.trim();
+  } catch {
+    // not on the PATH: the guesses below
+  }
   if (found) return found;
   const guesses =
     process.platform === "win32"
@@ -181,7 +186,7 @@ export async function openPublicLink(board: string, panel: string, port: number,
   if (!exe) throw new HttpError(409, "Public links go through Cloudflare's free quick tunnels, and cloudflared isn't on this computer. Install it (winget install --id Cloudflare.cloudflared on Windows, brew install cloudflared on a Mac), then press again.");
   const args = ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${host}`];
   // a script stand-in runs under this Node
-  const child = /.(m?js)$/i.test(exe) ? spawn(process.execPath, [exe, ...args], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] }) : spawn(exe, args, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+  const child = /.(m?js)$/i.test(exe) ? spawnChild(process.execPath, [exe, ...args], childOptions<SpawnOptions>({ extras: [] }, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] })) : spawnChild(exe, args, childOptions<SpawnOptions>({ extras: [] }, { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] }));
   const url = await new Promise<string>((ok, bad) => {
     let seen = "";
     const t = setTimeout(() => bad(new HttpError(504, `cloudflared didn't give a link within 40 s. Its last words: ${seen.trim().split("\n").slice(-2).join(" ").slice(0, 300)}`)), 40_000);

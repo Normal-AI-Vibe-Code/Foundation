@@ -25,6 +25,9 @@ before(async () => {
   slack = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
     if (req.headers.authorization !== "Bearer xoxp-test" && req.headers.authorization !== "Bearer xoxb-test") return res.writeHead(401).end();
+    // the user token is the test person's own Slack (slackuser.ts asks whose it is), so their search may use it
+    if (url.pathname === "/auth.test") return res.end(JSON.stringify(req.headers.authorization === "Bearer xoxp-test" ? { ok: true, user_id: "UTESTER" } : { ok: true, user_id: "UBOT" }));
+    if (url.pathname === "/users.info") return res.end(JSON.stringify(url.searchParams.get("user") === "UTESTER" ? { ok: true, user: { profile: { email: "u@formindustries.com" } } } : { ok: false, error: "user_not_found" }));
     const meta = (f: (typeof FILES)[number]) => ({ id: f.id, name: f.name, title: f.title, mimetype: "image/png", timestamp: f.ts, username: "noa", channels: ["airform-pthp"], permalink: `https://slack.example/${f.id}`, url_private_download: `${base}/download/${f.id}` });
     if (url.pathname === "/search.files") {
       const q = (url.searchParams.get("query") ?? "").toLowerCase();
@@ -68,7 +71,7 @@ test("without Slack keys, find_images says Slack wasn't searched", async () => {
   delete process.env.SLACK_BOT_TOKEN;
   const doc = getBoard("build").doc;
   doc.transact(() => appendSection(doc, "Main"));
-  const r = await findImages(doc, "build", "Airform PTHP");
+  const r = await findImages(doc, "build", "Airform PTHP", "u");
   assert.equal(r.count, 0);
   assert.match(r.notes.join(" "), /Slack isn't connected/);
 });
@@ -77,10 +80,10 @@ test("with Slack connected: find the PTHP images, then lay them out as a grid wi
   process.env.SLACK_USER_TOKEN = "xoxp-test";
   process.env.SLACK_BOT_TOKEN = "xoxb-test";
   const doc = getBoard("build").doc;
-  const found = await findImages(doc, "build", "pthp", ["slack"]);
+  const found = await findImages(doc, "build", "pthp", "u", ["slack"]);
   assert.deepEqual(found.images.map((i) => i.ref).sort(), ["slack:F1", "slack:F2"]); // not the lunch photo
   // a phrase finds what names only part of it too, best matches first ("PTHP stack" lacks "Airform")
-  const phrase = await findImages(doc, "build", "Airform PTHP", ["slack"]);
+  const phrase = await findImages(doc, "build", "Airform PTHP", "u", ["slack"]);
   assert.deepEqual(phrase.images.map((i) => i.ref), ["slack:F2", "slack:F1"]);
   assert.match(found.images[0].from!, /#airform-pthp · noa/);
 
@@ -108,7 +111,7 @@ test("with Slack connected: find the PTHP images, then lay them out as a grid wi
     }
   // captions say where each came from; the imported files are searchable by it
   assert.ok(cards.some((o) => o.kind === "note" && /\*\*PTHP stack, rev 3\*\*\s+Slack · #airform-pthp · noa · \d+ \w+ 2026/.test(noteTextOf(doc, o))), "captions carry the Slack title, where and when");
-  const again = await findImages(doc, "build", "airform-pthp", ["files"]);
+  const again = await findImages(doc, "build", "airform-pthp", "u", ["files"]);
   assert.equal(again.count, 2, "imported images are found in the archive by where they came from");
 });
 

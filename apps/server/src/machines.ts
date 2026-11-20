@@ -37,7 +37,7 @@
 
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import type { Socket } from "node:net";
-import { spawn } from "node:child_process";
+import { childOptions, spawnChild, type SpawnOptions } from "./child.ts";
 import { createReadStream, existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, posix } from "node:path";
@@ -209,10 +209,12 @@ export async function engineStatus(fresh = false): Promise<EngineStatus[]> {
     engineCandidates().map(async (e): Promise<EngineStatus> => {
       if (!/^https?:/.test(e.at) && !e.at.startsWith("\\\\") && !existsSync(e.at)) return { ...e, up: false, error: `${e.name} isn't running here (no socket at ${e.at})` };
       try {
-        const v = await engineJson<{ Version?: string; ApiVersion?: string; Os?: string; Platform?: { Name?: string } }>(e, "GET", "/version", undefined, 2500);
+        const v = await engineJson<{ Version?: string; ApiVersion?: string; Os?: string; Platform?: { Name?: string }; Components?: { Name?: string; Version?: string }[] }>(e, "GET", "/version", undefined, 2500);
         // a docker.sock that is really Kiri (Kiri links /var/run/docker.sock to itself) says so
         const isKiri = e.id === "kiri" || /kiri/i.test(v.Platform?.Name ?? "");
-        return { ...e, ...(isKiri ? { id: "kiri" as const, name: "Kiri" } : {}), up: true, version: v.Version, api: v.ApiVersion, os: v.Os };
+        // Kiri from 0.2.0 answers Version with the Docker version it matches (27.5.1); its own is the "Kiri" component
+        const version = (isKiri ? v.Components?.find((c) => c.Name === "Kiri")?.Version : undefined) ?? v.Version;
+        return { ...e, ...(isKiri ? { id: "kiri" as const, name: "Kiri" } : {}), up: true, version, api: v.ApiVersion, os: v.Os };
       } catch (err) {
         return { ...e, up: false, error: (err as Error).message };
       }
@@ -264,13 +266,15 @@ export function kiriApp(env = process.env, platform = process.platform): { exe: 
  * Start a program outside this server's process tree, so stopping Foundation
  * (npm run dev stops its children with `taskkill /T`) leaves Kiri running.
  * On Windows `start` launches it and exits, which cuts the parent link.
+ * Kiri's app (and `open` on macOS) needs nothing of the server's: the allowlist only (child.ts), no extras.
+ * Exported for tests (what it would start with); only wakeKiri calls it.
  */
-function launchApart(exe: string, args: string[]) {
-  if (process.platform === "win32") {
+export function launchApart(exe: string, args: string[], platform: NodeJS.Platform = process.platform) {
+  if (platform === "win32") {
     const q = (s: string) => `"${s.replace(/"/g, "")}"`;
-    spawn("cmd.exe", ["/d", "/s", "/c", `start "" /b ${[exe, ...args].map(q).join(" ")}`], { detached: true, stdio: "ignore", windowsHide: true, windowsVerbatimArguments: true }).unref();
+    spawnChild("cmd.exe", ["/d", "/s", "/c", `start "" /b ${[exe, ...args].map(q).join(" ")}`], childOptions<SpawnOptions>({ extras: [] }, { detached: true, stdio: "ignore", windowsHide: true, windowsVerbatimArguments: true })).unref();
   } else {
-    spawn(exe, args, { detached: true, stdio: "ignore" }).unref();
+    spawnChild(exe, args, childOptions<SpawnOptions>({ extras: [] }, { detached: true, stdio: "ignore" })).unref();
   }
 }
 
@@ -666,8 +670,9 @@ export async function removeMachine(boardId: string, panelId: string, person: st
   endTerminal(boardId, panelId, "The machine was removed.");
   fire(machineHooks.ended, boardId, panelId, "removed");
   await engineJson(engine, "DELETE", `/containers/${c.Id}?force=1&v=1`, undefined, 30_000);
-  // its disk is gone, and with it the desktop installed there, the leave agents had to use it, and its pipes' files
-  const gone = { desktop: undefined, wantDesktop: undefined, agentsMay: undefined, agentAsked: undefined, agentActs: undefined, io: undefined, functions: undefined, fnDone: undefined, fnSetup: undefined, shares: undefined, pull: undefined };
+  // its disk is gone, and with it the desktop installed there and its pipes' files (the leave agents had to use
+  // the desktop goes too: machinedesktop.ts clears it on the "removed" hook)
+  const gone = { desktop: undefined, wantDesktop: undefined, agentActs: undefined, io: undefined, functions: undefined, fnDone: undefined, fnSetup: undefined, shares: undefined, pull: undefined };
   writeMachine(boardId, panelId, { ...gone, state: "absent", containerId: undefined, ports: undefined, detail: `Removed by ${person}, with its disk. Start makes a fresh one.` }, { who: person, role: "human", text: `removed the machine ${panel.machine?.name ?? panel.name}` });
   return machinePanel(boardId, panelId).machine!;
 }

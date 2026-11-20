@@ -15,7 +15,7 @@ import { createShiba, type OrbMood } from "@foundation/ui/shiba";
 import { listen, voiceAvailable, type Listening } from "../lib/voice";
 import { api } from "../lib/api";
 import { floorInsets, useUi } from "../state/ui";
-import { ask, loadToday, restoreConversation, saveGoal, setHeard, stopAsking, useToday, wordsLevel, type CompanyApp, type FocusItem, type Goal, type Mood } from "./model";
+import { ask, loadToday, restoreConversation, saveCompanyGoal, saveGoal, setHeard, stopAsking, useToday, wordsLevel, type CompanyApp, type CompanyGoal, type FocusItem, type Goal, type Mood } from "./model";
 import "./today.css";
 
 // ---------- the Shiba ----------
@@ -48,12 +48,12 @@ export function ShibaRoom({ mood, maxFps = 30, levels }: { mood: Mood; maxFps?: 
 
 // ---------- the state beside it ----------
 
-const KIND_GLYPH: Record<FocusItem["kind"], string> = { ask: "?", stage: "◆", mention: "@", file: "⇪", changes: "↻", related: "∿" };
-const KIND_LABEL: Record<FocusItem["kind"], string> = { ask: "Asked of you", stage: "Your stage", mention: "Tagged", file: "New file", changes: "Changed", related: "Your work" };
+const KIND_GLYPH: Record<FocusItem["kind"], string> = { ask: "?", goal: "◎", stage: "◆", mention: "@", file: "⇪", changes: "↻", related: "∿" };
+const KIND_LABEL: Record<FocusItem["kind"], string> = { ask: "Asked of you", goal: "A company goal you carry", stage: "Your stage", mention: "Tagged", file: "New file", changes: "Changed", related: "Your work" };
 
 /** where a focus item opens: its place on the board (this app), or the file */
 export function focusHref(f: Pick<FocusItem, "id" | "board" | "objectId" | "kind" | "href">) {
-  if (f.objectId || f.kind === "changes" || f.kind === "mention" || f.kind === "stage" || f.kind === "ask") return `/?board=${encodeURIComponent(f.board)}${f.objectId ? `&focus=${encodeURIComponent(f.objectId)}` : ""}`;
+  if (f.objectId || f.kind === "changes" || f.kind === "mention" || f.kind === "stage" || f.kind === "ask" || f.kind === "goal") return `/?board=${encodeURIComponent(f.board)}${f.objectId ? `&focus=${encodeURIComponent(f.objectId)}` : ""}`;
   if (f.id.startsWith("file:")) return `/files/${f.id.slice(5)}`;
   return f.href;
 }
@@ -75,21 +75,24 @@ export function FocusRow({ item, pointed }: { item: FocusItem; pointed?: boolean
   );
 }
 
-export function GoalRow({ goal, pointed, onDone }: { goal: Goal; pointed?: boolean; onDone?: () => void }) {
+/** a goal with its progress: the person's own, or (with `owner`) one of the company's */
+export function GoalRow({ goal, pointed, onDone }: { goal: Goal | CompanyGoal; pointed?: boolean; onDone?: () => void }) {
   const done = goal.status === "done";
   const due = goal.dueAt ? new Date(goal.dueAt).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : null;
+  const owner = "owner" in goal ? goal.owner : null;
+  const bits = [owner ? `Carried by ${owner}` : null, goal.detail || null].filter(Boolean).join(" · ");
   return (
-    <div className="today-goal" data-done={done || undefined} data-pointed={pointed || undefined}>
-      <button className="today-check" aria-pressed={done} aria-label={done ? `${goal.title} is done` : `Mark “${goal.title}” done`} data-tip={done ? "Done" : "Mark done"} onClick={onDone} disabled={done || !onDone || goal.source !== "foundation"}>
+    <div className="today-goal" data-done={done || undefined} data-pointed={pointed || undefined} data-company={owner !== null || undefined}>
+      <button className="today-check" aria-pressed={done} aria-label={done ? `${goal.title} is done` : `Mark “${goal.title}” done`} data-tip={done ? "Done" : onDone ? "Mark done" : undefined} onClick={onDone} disabled={done || !onDone}>
         {done ? "✓" : ""}
       </button>
       <div className="today-goal-text">
         <span className="today-goal-title">{goal.title}</span>
-        {(goal.detail || due) && (
+        {(bits || due) && (
           <span className="today-goal-detail">
             {due && <b>{due}</b>}
-            {due && goal.detail ? " · " : ""}
-            {goal.detail}
+            {due && bits ? " · " : ""}
+            {bits}
           </span>
         )}
         <span className="today-bar" aria-label={`${Math.round(goal.progress * 100)}%`}>
@@ -179,6 +182,7 @@ export function Today({ user }: { user: UserInfo }) {
   }, []);
   const [draft, setDraft] = useState("");
   const [goalDraft, setGoalDraft] = useState("");
+  const [companyDraft, setCompanyDraft] = useState("");
   const [status, setStatus] = useState<Record<string, "ok" | "warn">>({});
   const listening = useRef<Listening | null>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -234,6 +238,8 @@ export function Today({ user }: { user: UserInfo }) {
   const running = last?.status === "running";
   const pointed = useMemo(() => new Set(t.pointed), [t.pointed]);
   const active = today?.goals.filter((g) => g.status === "active") ?? [];
+  const company = today?.company ?? { goals: [], canSet: false };
+  const companyActive = company.goals.filter((g) => g.status === "active");
   const first = today?.person.first ?? user.name.split(/\s+/)[0];
 
   // the words in the room
@@ -325,13 +331,40 @@ export function Today({ user }: { user: UserInfo }) {
 
       <aside className="today-state" aria-label="Today">
         <h2 className="today-panel-title">Today</h2>
+        {/* the company's goals first: what everyone here is working towards, then what wants you */}
+        {(companyActive.length > 0 || company.canSet || company.goals.length > 0) && (
+          <section className="today-group" aria-label="Company goals">
+            <h2 className="f-eyebrow">
+              Company goals <span className="today-count">{companyActive.length}</span>
+            </h2>
+            {company.goals.length === 0 && <p className="today-empty">No company goals yet. Set the few things everyone here is working towards: they open every Today and every new tab.</p>}
+            {company.goals.map((g) => (
+              <GoalRow key={g.id} goal={g} pointed={pointed.has(g.id)} onDone={company.canSet ? () => void saveCompanyGoal({ id: g.id, status: "done", progress: 1 }) : undefined} />
+            ))}
+            {company.canSet && (
+              <form
+                className="today-add"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!companyDraft.trim()) return;
+                  const title = companyDraft;
+                  setCompanyDraft("");
+                  void saveCompanyGoal({ title });
+                }}
+              >
+                <input value={companyDraft} onChange={(e) => setCompanyDraft(e.target.value)} placeholder="Set a company goal…" aria-label="Set a company goal" />
+              </form>
+            )}
+          </section>
+        )}
+
         <section className="today-group">
           <h2 className="f-eyebrow">
             Todos <span className="today-count">{today ? today.focus.length + active.length : "…"}</span>
           </h2>
           {today && today.focus.length === 0 && <p className="today-empty">Nothing is waiting on you. Asks, notes that tag you, stages you own and new files on your grids will show up here.</p>}
           {today?.focus.map((f) => <FocusRow key={f.id} item={f} pointed={pointed.has(f.id)} />)}
-          {today?.goals.map((g) => <GoalRow key={g.id} goal={g} pointed={pointed.has(g.id)} onDone={() => void saveGoal({ id: g.id, status: "done", progress: 1 })} />)}
+          {today?.goals.map((g) => <GoalRow key={g.id} goal={g} pointed={pointed.has(g.id)} onDone={g.source === "foundation" ? () => void saveGoal({ id: g.id, status: "done", progress: 1 }) : undefined} />)}
           <form
             className="today-add"
             onSubmit={(e) => {

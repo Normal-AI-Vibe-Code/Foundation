@@ -1,6 +1,7 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { MINI_HEADER, liveObjPos, setActiveObject, setObjectFloat } from "../state/store";
+import { MINI_HEADER, getObject, liveObjPos, setActiveObject, setObjectFloat, setObjectFolded } from "../state/store";
+import { CARD_REMOVE } from "./cardMenu";
 import { Spring2D, presets } from "../physics/spring";
 import { countRender } from "../state/renders";
 import { LIFT, MAX_LEAN, startCarry, type Carry } from "../lib/carry";
@@ -110,6 +111,21 @@ export function ObjectFrame({
     };
   }, [confirming]);
   const askRemove = () => (confirmRemove ? setConfirming(true) : onRemove());
+  // the card menu's Remove comes through here, so a card that asks first still asks
+  const askRef = useRef(askRemove);
+  askRef.current = askRemove;
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent<{ id: string; handled: boolean }>).detail;
+      if (d.id !== id) return;
+      d.handled = true;
+      askRef.current();
+    };
+    window.addEventListener(CARD_REMOVE, on);
+    return () => window.removeEventListener(CARD_REMOVE, on);
+  }, [id]);
+  // minimized (the card menu): its bar alone, always showing; the body is kept, not drawn
+  const folded = chrome === "bar" && !!getObject(id)?.folded;
 
   const spring = useMemo(
     () => new Spring2D(pos.x, pos.y, presets.drag),
@@ -254,7 +270,7 @@ export function ObjectFrame({
   return (
     <div
       ref={rootRef}
-      className={`frame-anchor chrome-${chrome}${confirming ? " is-confirming" : ""}`}
+      className={`frame-anchor chrome-${chrome}${confirming ? " is-confirming" : ""}${folded ? " is-folded" : ""}`}
       style={{ width }}
       // how small this card is drawn right now (the grid's zoom times its section's fit), for the ✕'s press area (App.css)
       onPointerEnter={(e) => {
@@ -288,8 +304,14 @@ export function ObjectFrame({
             </div>
             <span className="frame-title">{title}</span>
             <div className="header-actions">
-              {headerExtras}
-              <FullscreenButton id={id} />
+              {!folded && headerExtras}
+              {folded ? (
+                <button className="icon-btn" data-tip="Restore" aria-label="Restore" onClick={() => setObjectFolded(id, false)} data-card-restore>
+                  ▢
+                </button>
+              ) : (
+                <FullscreenButton id={id} />
+              )}
               <button
                 className={"icon-btn float-btn" + (float ? " floating" : "")}
                 data-tip={float ? "Dock into the section" : "Float freely"}
@@ -338,7 +360,8 @@ export function ObjectFrame({
             </motion.div>
           )}
         </AnimatePresence>
-        <div className={"frame-body " + (bodyClass ?? "")} onClick={chrome === "icons" && onTap ? () => onTap() : undefined}>
+        {/* minimized: the content stays mounted (a page keeps its place, a terminal its shell), just not shown */}
+        <div className={"frame-body " + (bodyClass ?? "")} hidden={folded} onClick={chrome === "icons" && onTap ? () => onTap() : undefined}>
           {children}
         </div>
         {chrome === "icons" && (
@@ -350,8 +373,8 @@ export function ObjectFrame({
             </div>
           </div>
         )}
-        {overlay}
-        {onResize && (
+        {!folded && overlay}
+        {onResize && !folded && (
           <div
             className="map-resize"
             onPointerDown={onResizeDown}

@@ -170,6 +170,9 @@ ol {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ext-goal .ext-owner {
+  text-align: left;
+}
 .ext-goal small {
   color: var(--color-dim);
   font-variant-numeric: tabular-nums;

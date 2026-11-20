@@ -19,7 +19,7 @@ $("open-today").href = todayUrl(base);
 $("open-boards").href = `${base}/#/board`;
 $("where").textContent = base.replace(/^https?:\/\//, "");
 
-const GLYPH = { ask: "?", stage: "◆", mention: "@", file: "⇪", changes: "↻", related: "∿" };
+const GLYPH = { ask: "?", goal: "◎", stage: "◆", mention: "@", file: "⇪", changes: "↻", related: "∿" };
 const boardLink = (f) => (f.id.startsWith("file:") && !f.objectId ? `${base}/files/${f.id.slice(5)}` : `${base}/?board=${encodeURIComponent(f.board)}${f.objectId ? `&focus=${encodeURIComponent(f.objectId)}` : ""}`);
 
 function apps(list) {
@@ -61,14 +61,24 @@ try {
     );
     for (const [i, f] of t.focus.slice(0, 6).entries()) if (f.tone) $("focus-list").children[i].firstChild.dataset.tone = f.tone;
   }
+  const goalRow = (g) =>
+    el(
+      "li",
+      { className: "ext-goal" },
+      el("span", { textContent: g.title }, g.owner ? el("small", { className: "ext-owner", textContent: ` · ${g.owner}` }) : null),
+      el("i", { className: "ext-bar" }, el("i", { style: `width:${Math.round(g.progress * 100)}%` })),
+      el("small", { textContent: `${Math.round(g.progress * 100)}%` }),
+    );
+  // what the company is working towards comes first (a server from before company goals has none)
+  const company = (t.company?.goals ?? []).filter((g) => g.status === "active");
+  if (company.length) {
+    $("company").hidden = false;
+    $("company-list").replaceChildren(...company.slice(0, 4).map(goalRow));
+  }
   const goals = t.goals.filter((g) => g.status === "active");
   if (goals.length) {
     $("goals").hidden = false;
-    $("goal-list").replaceChildren(
-      ...goals.slice(0, 5).map((g) =>
-        el("li", { className: "ext-goal" }, el("span", { textContent: g.title }), el("i", { className: "ext-bar" }, el("i", { style: `width:${Math.round(g.progress * 100)}%` })), el("small", { textContent: `${Math.round(g.progress * 100)}%` })),
-      ),
-    );
+    $("goal-list").replaceChildren(...goals.slice(0, 5).map(goalRow));
   }
   apps(t.apps);
 } catch (e) {

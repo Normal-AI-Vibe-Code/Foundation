@@ -1,0 +1,83 @@
+E2E after the security pass (2026-11-18): the eight failures, triaged and fixed
+=============================================================================
+
+Base: local main at 5126945. Runs: `npm run e2e -w @foundation/client` (Playwright,
+its own server, client and data), on this Windows machine.
+
+Per failure
+-----------
+1. bottom-bar "the tools: a terminal ... and T3"
+   Cause: test order. The admin opened the built-in terminal, then a member signed
+   in by email; dev sign-in is refused while that shell runs (the pass's rule), 403.
+   Fix (test): the member signs in first; the check now also proves a new dev
+   sign-in is refused while the terminal is open, with the reason.
+   After: passes alone, with the whole file (8/8), and in the full suite.
+
+2. character-studio "scripts/characters-expressions.mjs ..."
+   Cause: the script's output was right, then Node aborted at exit on Windows
+   (libuv UV_HANDLE_CLOSING assertion, 0xC0000409): process.exit() while fetch's
+   sockets were closing. Not the server; the script already signs in as the rules
+   allow (the person's own session as a cookie, saying it comes from no page).
+   Fix (product: the script): stops throw to the end of the file, which sets the
+   exit code; Node ends by itself. Output and behaviour unchanged.
+   After: passes alone and in the full suite.
+
+3. extension "Foundation for Chrome ..."
+   Cause (two): (a) the test's own setup changed things with the session cookie
+   without saying it came from Foundation's page; the server now refuses that.
+   (b) On this machine Playwright's bundled Chromium (builds 1248 and 1254) won't
+   start at all: Windows side-by-side error, also when started by hand (event
+   log: dependent assembly not found). Environment, not Foundation.
+   Fix (test): the setup's calls carry Foundation's origin (per call for the
+   extension's browser, so the extension's own pages are not altered). No product
+   change: the new tab hands off to Foundation's own page and the popup only reads.
+   After: with Chromium, still cannot launch here. Run once with the same spec
+   pointed at Microsoft Edge (local only, not committed): 1/1.
+   A note on what the browser sends for an extension's own pages went to Josh
+   directly; nothing was changed for it here.
+
+4. machines-fixes "Add a desktop: an older server says so ..."
+5. machines-tools "a machine's wells, its tools ..."
+   Cause: environment. Adding a desktop runs apt in the machine; the container
+   engine on this computer has no outbound connection (a plain ubuntu:24.04
+   container made straight through the engine API: apt times out connecting to
+   archive.ubuntu.com:80, DNS answers; the host reaches the same address, 200).
+   Nothing in the pass touches the containers' network.
+   Fix: none possible here. Every step before the desktop install passes.
+
+6. machines "Ctrl+C, pipes, a desktop, and an agent ..."
+   Cause: old expectation, not from the pass. Since 2026-11-16 the pipes strip is
+   the card's Ins & outs view, not under the terminal.
+   Fix (test): opens Ins & outs to check the strip, back to Terminal to type.
+   After: Ctrl+C and every pipes step pass; then it stops at Add a desktop for the
+   same reason as 4 and 5. The desktop, viewer and agent-leave steps were not run.
+
+7. section-agents "agents in the section and the text box on #/design"
+   Cause: not reproduced. Passed alone, in a batch after bottom-bar, and in the
+   full suite. Its dev sign-in was unchecked, so a refused sign-in (a shell left
+   running by an earlier file) would show only as a missing demo.
+   Fix (test): the sign-in is checked and a refusal names its reason.
+
+8. vision "a brief waits on its card for Run ..."
+   Cause: old expectation. The pass changed the Run card on purpose.
+   Fix (test): checks the job's target and whole brief on the card, a stale press
+   refused by the server (409, job stays queued), Run asking first, Cancel
+   starting nothing, and Run it ending in "Couldn't start Vision Code".
+   After: passes alone and in the full suite.
+
+Results
+-------
+The eight again, after the fixes: 4 passed (tools, script, #/design, Vision),
+4 failed for this machine's environment (extension: Chromium won't start;
+machines-fixes, machines-tools, machines: the container engine has no internet,
+so a desktop can't install).
+Whole suite once (before the #/design sign-in check was added): 116 passed,
+4 failed (the same four), 13 skipped, 0 did not run, 34.7 min.
+npm test -w @foundation/server: 405 tests, 399 pass, 6 skipped, 0 fail.
+npm test -w @foundation/client: 208 tests, 208 pass.
+npm run typecheck: clean (client and server).
+node scripts/check-security.mjs --diff origin/main --summary: clean.
+
+Not verified here: the extension in Chrome itself (only in Edge, once, locally),
+the Chrome Web Store build, the packaged desktop app, and every machine desktop
+step from Add a desktop on (the desktop, a viewer watching it, an agent's leave).
