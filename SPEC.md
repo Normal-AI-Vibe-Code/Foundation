@@ -398,6 +398,8 @@ An app can also publish `/.well-known/foundation.json` (`{name, description, mcp
 
 ## 3. Feature status
 
+Native full OS VMs (2026-11-20, Josh): **implemented / Review; real host boot unverified**. A section tool, right-click item and command add a WildOS VM setup card. Archived ISO imports stream to disk; native QEMU starts behind a separate person-only press, with its own persistent qcow2 disk, embedded authenticated desktop, guest-agent command runner, bounded RAM/CPU, explicit software emulation, shutdown, confirmed power-off and archive/restore. Configuration stays in SQLite, not the writable card. WSL/Docker are not required. See `docs/wildos.md`; host helper remains `npm run wildos`. Tests use simulated transports (no real boot); typecheck, client build and token checks passed. Browser access to the isolated dev server timed out, so day/night evidence is pending. Evidence: `docs/evidence/2026-11-20_native-vms/`.
+
 | Area | Feature | Status | Notes |
 |---|---|---|---|
 | **Monorepo** | npm workspaces, `npm run dev` runs both, Tauri still builds the client | done | Client moved to `apps/client` with `git mv` (history kept). Port 1430: Vision owns 1420 |
@@ -707,6 +709,8 @@ Every integration is off until its key exists; the server always starts. Copy `.
 ---
 
 ## 7. Known issues
+
+- **Native WildOS VMs (2026-11-20): Review, real boot still needed.** Josh supplied Docker bootstrap stderr: allocation failed while caching `docker-wsl-cli.iso`, after Linux and the existing ext4 disk were found; no disk corruption established. Readable WSL config has 16 GB on a 64 GB host. Native QEMU support is implemented (section setup, streaming ISO archive, persistent disks, desktop and guest commands), independent of WSL; hardware acceleration/software fallback and a real ISO need a host run. Tests use simulated QMP/guest-agent channels because even loopback TCP is denied here. Both browsers timed out on the isolated dev server; no day/night screenshot or real WildOS desktop verified. Viewers get status only; crashed-server VM reconnection, nested Windows mode, audio and device passthrough remain open. A previous live PID prevents booting a second copy; finish its shutdown on the host. The full baseline tests still fail/hang on sandbox network/Git access (including avatars fixture); no green full suite claimed. `docs/wildos.md` and the host e2e spec state the checks to finish.
 
 <!-- security-notes -->
 - **The security pass of 2026-11-18** (ADR-001 slices 1 and 2 and what followed; rules in `docs/SECURITY.md`; evidence in `docs/evidence/2026-11-18_*`).

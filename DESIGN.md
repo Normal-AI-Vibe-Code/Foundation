@@ -55,6 +55,8 @@ The interface wears **the theme of what is in focus**. The shell decides it from
 
 ## 3. Type
 
+Full OS machines (2026-11-20): a new machine's **Container / Full OS / WildOS VM** choice leads to the native QEMU setup form, drawn under Machines on `#/design` at 260/400/560 px. ISO import and archived SHA-256, name, RAM, CPU and software emulation, with one Add VM action; Start remains a separate person's press. The configured card has a quiet state/facts header, Start or Shut down, explicit confirmation for Power off and Archive, a Desktop / Commands switch, and full screen. Its desktop reuses the existing in-use ring and Esc Esc hand-off. Viewers see status, never a misleading interactive console. Tokens only, including error details and copyable guest-command output.
+
 - **Sans:** Hanken Grotesk Variable (OFL, bundled via `@fontsource-variable`). **Display:** Lufga where licensed, else Hanken. **Code:** Cascadia Code / SF Mono.
 - **Scale:** 11 · 12 · **13 (default)** · 14 · 16 · 20 · 24 · 32. No half sizes. One exception: **40** (`--text-40`), for the Shiba's words on Today, in display 300 — a voice set in type (it steps down to 24 on narrow screens).
 - **Eyebrow:** 11 px, 600, uppercase, `.22em`, moss. **Brand:** display 14 px, 700, uppercase, `.08em`.

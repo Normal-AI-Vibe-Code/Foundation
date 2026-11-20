@@ -14,8 +14,10 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
-import { createReadStream, existsSync, statSync } from "node:fs";
-import { rename, writeFile, readFile } from "node:fs/promises";
+import { createReadStream, createWriteStream, existsSync, statSync } from "node:fs";
+import { rename, writeFile, readFile, unlink } from "node:fs/promises";
+import { Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { join, extname } from "node:path";
 import type { ServerResponse } from "node:http";
 import { config } from "./config.ts";
@@ -127,6 +129,43 @@ export async function uploadFile(req: Req, userId: string): Promise<FileRow> {
   const body = await readBody(req);
   if (!body.length) throw new HttpError(400, "empty file");
   return storeFile(body, { name, mime, boardId, userId });
+}
+
+/** Large VM media goes straight to the archive, never Buffer.concat (ISOs exceed the regular upload limit). */
+export async function uploadVmIso(req: Req, boardId: string, userId: string): Promise<FileRow> {
+  const name = (req.query.get("name") ?? "").slice(0, 240);
+  if (!/\.iso$/i.test(name)) throw new HttpError(400, "Choose an .iso image");
+  const limit = 16 * 1024 ** 3;
+  if (Number(req.headers["content-length"]) > limit) throw new HttpError(413, "ISO limit is 16 GB");
+  const tmp = join(config.dataDir, "files", `${randomBytes(16).toString("hex")}.part`);
+  const hash = createHash("sha256");
+  let size = 0;
+  // ISO 9660 and UDF both have their recognition sequence near sector 16.
+  const head = Buffer.alloc(128 * 1024);
+  const meter = new Transform({ transform(chunk: Buffer, _encoding, cb) {
+    if (size < head.length) chunk.copy(head, size, 0, Math.min(chunk.length, head.length - size));
+    size += chunk.length;
+    if (size > limit) return cb(new HttpError(413, "ISO limit is 16 GB"));
+    hash.update(chunk); cb(null, chunk);
+  } });
+  let published = false;
+  try {
+    await pipeline(req, meter, createWriteStream(tmp, { flags: "wx" }));
+    if (size < 32774 || (!head.includes(Buffer.from("CD001"), 32768) && !head.includes(Buffer.from("NSR02"), 32768) && !head.includes(Buffer.from("NSR03"), 32768))) throw new HttpError(400, "This file does not look like an ISO/UDF image");
+    const sha = hash.digest("hex");
+    const same = one<FileRow>("select * from files where board_id = ? and sha256 = ? and archived_at is null", boardId, sha);
+    if (same) return same;
+    const dest = filePath(sha);
+    if (!existsSync(dest)) { await rename(tmp, dest); published = true; }
+    const id = `f_${randomBytes(8).toString("hex")}`;
+    run("insert into files (id,board_id,name,mime,size,sha256,uploaded_by,created_at) values (?,?,?,?,?,?,?,?)", id, boardId, name, OCTET, size, sha, userId, Date.now());
+    const row = one<FileRow>("select * from files where id = ?", id)!;
+    indexDoc("file", id, boardId, name, `${name} OS installation ISO SHA-256 ${sha}`);
+    return row;
+  } finally {
+    // Only unfinished staging bytes are removed. An archived upload is never deleted.
+    if (!published) await unlink(tmp).catch(() => {});
+  }
 }
 
 /**

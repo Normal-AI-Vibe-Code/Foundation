@@ -124,12 +124,12 @@
     },
     {
       "id": "wildos-wsl-host",
-      "title": "Diagnose WSL on this PC and boot WildOS, then connect its VM console",
+      "title": "Full local WildOS VMs inside Foundation sections",
       "kind": "hookup",
       "milestone": "apps",
       "area": "machines",
-      "status": "needs-you",
-      "body": "Host helper and guide prepared: npm run wildos diagnoses WSL/virtualization/Docker/Kiri; explicit RepairWsl, BuildIso and native-QEMU StartVm actions support -WhatIf. Diagnostic run and dry runs checked; typecheck passed. WSL 3.0.5 is installed, but this session cannot query its status/distributions (E_ACCESSDENIED) or access CIM/host features; Docker UI launch timed out and shell network is restricted. Josh: run npm run wildos in host PowerShell 7 and inspect its actual error. No host repair, ISO build, WildOS boot or embedded console verified. Foundation test baseline also has route-performance and local-Git-fixture failures. docs/wildos.md and docs/evidence/2026-11-19_wildos-host/.",
+      "status": "review",
+      "body": "Implemented native QEMU full OS VMs in sections: section tools/menu and command; streaming archived ISO import; own persistent sparse disk; embedded authenticated desktop; guest-agent command runner with idempotent request claims and independent command IDs; memory/CPU and emulation settings, installer/disk boot, shutdown, confirmed poweroff and archive/restore. Person and board gates, server-owned configuration, filtered child environment and audit. 18 server VM/child-door checks and 11 client token/machine-page checks pass; typecheck, build and security scan pass. Host browser checks are blocked (loopback EACCES and browser connection timeouts); QEMU/verified ISO unavailable, so no real WildOS boot or day/night screenshot claimed. Host acceptance spec: apps/client/e2e/local-vms.spec.ts (VM_E2E_ISO opts into real boot). Remaining: real host acceptance, orphan-process reattachment, viewer console, audio/nested Windows. docs/wildos.md; docs/evidence/2026-11-20_native-vms/.",
       "issue": 226
     },
     {

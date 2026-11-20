@@ -116,7 +116,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
   const extras = <PanelActions panel={panel} />;
 
   const body =
-    panel.panel === "machine" && panel.machine ? (
+    panel.panel === "machine" && (panel.machine || panel.vm) ? (
       <MachineBody panel={panel} />
     ) : (panel.panel === "app" || panel.panel === "link") && panel.via === "browser" && panel.url && !panel.fromMachine ? (
       <BrowserPage panel={panel} />

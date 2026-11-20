@@ -11,6 +11,7 @@ import {
   Section,
   addNote,
   startMachine,
+  startVm,
   addTextBox,
   addSectionAdjacent,
   getState,
@@ -488,6 +489,7 @@ export const SectionView = memo(function SectionView({
             {tool("Add a note", "▤", () => addNote(section.id))}
             {tool("Upload an image or video", "⇪", () => fileRef.current?.click(), "", keys("mod+U"))}
             {tool("Start a machine here: Linux on Kiri or Docker", "▣", () => startMachine(section.id))}
+            {tool("Add a full operating system here: WildOS VM", "▣", () => startVm(section.id))}
           </div>
           <div className="sec-group">
             {tool("Split into two columns", "◫", () => splitSection(section.id, "h"))}

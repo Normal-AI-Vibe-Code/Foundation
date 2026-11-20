@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { SearchHit } from "@foundation/protocol";
 import { isNight, setNight } from "@foundation/ui";
 import { api, logout, search } from "../lib/api";
-import { addNote, addPanel, appendSectionLocal, createTable, getState, requestSnap, startMachine, updatePanel } from "../state/store";
+import { addNote, addPanel, appendSectionLocal, createTable, getState, requestSnap, startMachine, startVm, updatePanel } from "../state/store";
 import { askAgent, setUi, toast, useUi } from "../state/ui";
 import { activeBoard } from "../sync/board";
 import { snippetHtml } from "../lib/snippet";
@@ -168,6 +168,7 @@ export function CommandBar() {
       { id: "note", glyph: "▤", label: "Add a note", run: () => void addNote(sec) },
       { id: "table", glyph: "⊞", label: "Add a table", run: () => void createTable(sec) },
       { id: "machine", glyph: "▣", label: "Start a machine in this section", hint: "Linux on Kiri or Docker, with a shared terminal", run: () => void startMachine(sec) },
+      { id: "native-vm", glyph: "▣", label: "Add a full operating system / WildOS VM", hint: "A local VM from an ISO, desktop and guest commands", run: () => void startVm(sec) },
       { id: "section", glyph: "▥", label: "New section", run: () => void appendSectionLocal(term && !looksLikeUrl(term) ? term : "New section") },
       { id: "upload", glyph: "⇪", label: "Upload files…", hint: "designs, CAD, PDFs, video", run: () => void window.dispatchEvent(new CustomEvent("foundation:upload")) },
       { id: "cad", glyph: "✉", label: "Ask someone for the latest CAD…", hint: "Hermes keeps following up", run: () => askAgent("Ask ") },

@@ -27,6 +27,7 @@
     "plan:check": "node scripts/plan.mjs check",
     "kiri": "node scripts/kiri.mjs",
     "kiri:install": "node scripts/kiri.mjs install",
+    "wildos": "pwsh -NoProfile -File scripts/wildos.ps1",
     "release": "node scripts/release.mjs",
     "rune:build": "node scripts/rune.mjs",
     "desktop:server": "node scripts/desktop-server.mjs --check"

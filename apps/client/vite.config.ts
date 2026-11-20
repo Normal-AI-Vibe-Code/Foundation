@@ -21,6 +21,7 @@ const proxy = {
   "/sync": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
   "/huddle": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
   "/machines": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
+  "/vms": { target: server.replace(/^http/, "ws"), ws: true, changeOrigin: false },
   // a machine's web port, relayed (apps/server/src/machineshare.ts): a pattern, so /machine.html stays the page's
   "^/m/": { target: server, ws: true, changeOrigin: false },
   // the built-in terminal's socket (apps/server/src/hostterm.ts)

@@ -11,6 +11,8 @@ import { createServer, type ServerResponse } from "node:http";
 import type { PanelDoc, UserInfo } from "@foundation/protocol";
 import { WebSocketServer } from "ws";
 import { config } from "./config.ts";
+import { registerVmRoutes } from "./vmroutes.ts";
+import { shutdownLocalVms } from "./localvms.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
 import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
@@ -86,6 +88,7 @@ startSlackLive();
 setCurator((o) => startRun(o));
 
 const r = new Router();
+registerVmRoutes(r);
 
 r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 
@@ -1382,7 +1385,7 @@ void bringInStarter()
 // pipe closes. Stop the agents' child processes, then go.
 if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
   let leaving = false;
-  const leave = () => {
+  const leave = async () => {
     if (leaving) return;
     leaving = true;
     try {
@@ -1391,11 +1394,16 @@ if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
       /* going anyway */
     }
     server.close();
+    await shutdownLocalVms();
     setTimeout(() => process.exit(0), 150).unref();
   };
   process.stdin.on("end", leave).on("close", leave).on("error", leave);
   process.stdin.resume();
 }
+
+for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => {
+  void shutdownLocalVms().finally(() => process.exit(0));
+});
 
 server.on("error", (e: NodeJS.ErrnoException) => {
   // one plain line: the desktop app shows it to the person and keeps it in its log

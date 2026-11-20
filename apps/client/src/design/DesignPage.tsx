@@ -5,6 +5,7 @@
  */
 
 import { CouncilTalkView } from "../shell/CouncilTalk";
+import { VmSetupView, VmStatusView } from "../panels/LocalVm";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
 import { ShibaDot } from "../today/notices";
@@ -1032,6 +1033,9 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <MachineAsksDemo />
         <AppToolAsksDemo />
         <MachineUseDemo />
+        <h3>Full operating systems · native QEMU</h3>
+        <div className="adapt-row">{[260, 400, 560].map((width) => <div key={width} className="frame-card live-specimen" style={{ width, height: 700 }}><VmSetupView files={[{ id: "demo-iso", name: "wildos-amd64.iso", size: 3 * 1073741824, sha256: "a2b4c6d8".repeat(8) }]} host={{ available: true, note: "Native QEMU · no WSL or Docker required", maxMemoryMB: 16384, maxCpus: 8 }} /></div>)}</div>
+        <div className="adapt-row"><div className="frame-card live-specimen" style={{ width: 560 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "stopped", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "software", bootIso: false, detail: "VM stopped. Its disk is kept." }} /></div><div className="frame-card live-specimen" style={{ width: 400 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "error", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "native", bootIso: true }} viewer error="Not enough available host memory. Close other VMs/apps or configure a smaller VM." /></div></div>
         <MachineHeadSpecimens />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>

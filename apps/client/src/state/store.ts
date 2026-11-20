@@ -2248,6 +2248,11 @@ export function startMachine(sectionId: string, at: Partial<Pick<PanelMeta, "flo
   return addPanel(sectionId, { panel: "machine", name: "Machine", machine: { name: `box-${Math.random().toString(16).slice(2, 6)}`, state: "absent" }, ...at });
 }
 
+/** A full OS setup card. Adding it starts no process or installation. */
+export function startVm(sectionId: string, at: Partial<Pick<PanelMeta, "float" | "x" | "y">> = {}): PanelMeta {
+  return addPanel(sectionId, { panel: "machine", name: "WildOS VM", machine: { name: "WildOS", state: "absent", wantVm: true }, w: 800, h: 700, ...at });
+}
+
 export function updatePanel(id: string, patch: Partial<PanelMeta>) {
   const p = state.panels[id];
   if (!p) return;

@@ -271,6 +271,8 @@ export interface PanelDoc extends ObjectBaseDoc {
   // ---- machines on a container engine (panel === "machine" without a url) ----
   /** a Linux machine or container this card runs on Kiri or Docker, kept by the server (machines.ts) */
   machine?: MachineState;
+  /** A full OS on the server's native QEMU backend; distinct from a container. */
+  vm?: LocalVmState;
   /**
    * A page opened from a machine card's port pill: which card and which
    * container port (and the machine's name then, for when the card is gone).
@@ -295,7 +297,24 @@ export interface PanelDoc extends ObjectBaseDoc {
  * reads it back (by the container's labels) and writes what it finds here,
  * so everyone sees the same state. Starting needs a person; agents propose.
  */
+/** Native full-system VM. The card is a projection; host configuration and paths stay server-owned. */
+export interface LocalVmState {
+  name: string;
+  os: string;
+  state: "ready" | "starting" | "running" | "stopping" | "stopped" | "error" | "archived";
+  isoName: string;
+  memoryMB: number;
+  cpus: number;
+  diskGB: number;
+  acceleration: "native" | "software";
+  bootIso: boolean;
+  detail?: string;
+  guestAgent?: boolean;
+}
+
 export interface MachineState {
+  /** Setup intent only. Native VM configuration is held by the server, never trusted from this flag. */
+  wantVm?: boolean;
   /** machine name; the container is `machine-<name>` (Kiri's convention, so `kiri machine shell <name>` finds it) */
   name: string;
   /** image it runs ("ubuntu:24.04"): picked by a person on the card, or proposed by an agent */

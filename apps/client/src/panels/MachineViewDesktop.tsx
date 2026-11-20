@@ -247,7 +247,7 @@ export function DesktopWell({ state, detail, name, viewer, busy, onAdd, onStop, 
  * screen stays whole. `alone`: in a window of its own (machineWindow.tsx), where the desktop has the keys from
  * the start and there is no grid to zoom, card to use or ring to draw.
  */
-export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onFull, children }: { panelId: string; name: string; viewer: boolean; onKeys: (on: boolean) => void; alone?: boolean; board?: string; onFull?: () => void; children?: ReactNode }) {
+export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onFull, children, nativeVm }: { panelId: string; name: string; viewer: boolean; onKeys: (on: boolean) => void; alone?: boolean; board?: string; onFull?: () => void; children?: ReactNode; nativeVm?: boolean }) {
   const bid = board ?? boardId();
   const wrap = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
@@ -269,7 +269,7 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
   // the machine's screen as it came (1280×800): the ring goes round the picture, not the letterbox
   const [shape, setShape] = useState<{ w: number; h: number } | null>(null);
   useRingWidth(wrap, hasKeys && !viewer && !alone);
-  const src = `${import.meta.env.BASE_URL}desktop.html#board=${encodeURIComponent(bid)}&panel=${encodeURIComponent(panelId)}${viewer ? "&view=1" : ""}`;
+  const src = `${import.meta.env.BASE_URL}desktop.html#board=${encodeURIComponent(bid)}&panel=${encodeURIComponent(panelId)}${viewer ? "&view=1" : ""}${nativeVm ? "&vm=1" : ""}`;
   const tell = (cmd: string, more: object = {}) => frame.current?.contentWindow?.postMessage({ type: "foundation:desktop", cmd, ...more }, window.location.origin);
   // the frame's ground is the card's, in day and night (a frame can't read our tokens)
   const paint = () => wrap.current && tell("paint", { background: getComputedStyle(wrap.current).backgroundColor });
@@ -374,7 +374,7 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
         </div>
       )}
     </div>
-    <MachineTools view="desktop" canType={!viewer} canCopy={Boolean(clip)} flash={flash} onCopy={() => void copy()} onPaste={() => void paste()} onFull={onFull} onPopOut={alone ? undefined : () => void openMachineWindow(bid, panelId, "desktop", name, viewer)}>
+    <MachineTools view="desktop" canType={!viewer} canCopy={Boolean(clip)} flash={flash} onCopy={() => void copy()} onPaste={() => void paste()} onFull={onFull} onPopOut={alone || nativeVm ? undefined : () => void openMachineWindow(bid, panelId, "desktop", name, viewer)}>
       {children}
     </MachineTools>
     </>
