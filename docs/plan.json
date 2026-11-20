@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-20T02:17:21.967Z",
+  "syncedAt": "2026-11-20T03:16:03.356Z",
   "columns": [
     {
       "id": "needs-you",
@@ -2121,6 +2121,26 @@
       "status": "needs-you",
       "body": "A push to main publishes a signed desktop release. Before pushing the 2026-11-18 security pass, a person checks the packaged desktop app: it signs in (the new code-and-confirm step), the agent answers one turn, and T3 starts. See docs/SECURITY.md.",
       "issue": 216
+    },
+    {
+      "id": "rune-motion-rules-icon",
+      "title": "Rune: motion by rule (panes and other boards land); the new mark and app icon",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-19: Rune animated between pane transitions, which it doesn't need to; and the icon was too small. Built: every board Rune is handed says lands or eases, by five rules (apps/client/src/rune/transitions.ts; DESIGN §6). The mark is Josh's two leaves, and the app icon is that mark on a full-bleed night-navy tile like the other apps'. Checked: test/rune-transitions.test.ts, e2e/rune.spec.ts 'motion has an owner' in Edge, #/design day and night (docs/evidence/2026-11-19_rune-motion-icon/). A person checks: the feel of a pane opening under Rune, the icon in the taskbar after a desktop build, and whether navy is the tile's colour.",
+      "issue": 217
+    },
+    {
+      "id": "rune-e2e-drag-link",
+      "title": "Rune: a section dragged onto another's cell doesn't swap, and a link in a note doesn't open (two e2e checks fail)",
+      "kind": "bug",
+      "milestone": "ship",
+      "area": "design",
+      "status": "backlog",
+      "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge: 'a section's tools, rename, drag, right-click menu and remove' fails where Vision is dragged by its header onto BomForm's cell (it stays at 1,0), and 'the paper, the face and a note in markdown' fails where a press on a note's link should report its address (no link event). Both fail the same way without the motion rules, so they predate them; probably the 2026-11-17 pointer rules, after which Rune's e2e wasn't run. Done when all ten checks pass.",
+      "issue": 218
     }
   ]
 }

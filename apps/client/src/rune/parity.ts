@@ -85,6 +85,7 @@ export const PARITY: ParityGroup[] = [
   {
     name: "Everywhere",
     rows: [
+      { what: "Motion: what eases and what lands", status: "partial", note: "By rule (rune/transitions.ts): another board, the floor's panes and places from the store land at once; a let-go and a change of look ease. The web renderer settles a section's place over 0.5 s where Rune lands it, and eases the floor's edge" },
       { what: "Tokens: every colour from tokens.css, day and night", status: "partial", note: "Night fades on Rune's colour spring, not the tokens' 1.4 s mix" },
       { what: "Type: Hanken Grotesk", status: "partial", note: "Latin and Latin Extended, upright and italic. Cyrillic and Vietnamese fall back to Inter, and so does everything for the moment before the face arrives" },
       { what: "Speed", status: "partial", note: "On 300 notes the web renderer holds 60 fps and Rune doesn't: panning fitted, half its frames run long (p95 100 ms against 16.7). Level on a board of web content. Measured, not yet fixed" },
