@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-20T03:37:03.175Z",
+  "syncedAt": "2026-11-20T03:40:33.912Z",
   "columns": [
     {
       "id": "needs-you",
@@ -113,7 +113,7 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chatform",
-      "status": "next",
+      "status": "review",
       "body": "R1. A grid's changes are kept with a recorded session (takes). A clock card on a section scrubs the session: recordings seek together, lines light as said, portraits and avatars speak, the section is drawn as it was. The scenario end to end: a STEP file in a channel, a huddle on it, taken to a grid, recorded, replayed. Architecture and contract: docs/chatform.md.",
       "issue": 198
     },
@@ -123,7 +123,7 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chatform",
-      "status": "next",
+      "status": "review",
       "body": "H1. A huddle belongs to a channel and posts a card; when it ends the card holds the people, transcript, recordings and Replay. Take it to a grid moves the same call onto a section. Agent participants answer aloud through their avatars. Architecture and contract: docs/chatform.md.",
       "issue": 199
     },
@@ -133,7 +133,7 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chatform",
-      "status": "next",
+      "status": "review",
       "body": "A1. Agents post as agents (violet, avatar, whom they worked for); @mention starts a turn that answers in the thread; chat tools on the tool surface and MCP; each T3 thread and Foundation session is a conversation in the Agents tab. Architecture and contract: docs/chatform.md.",
       "issue": 200
     },
@@ -143,7 +143,7 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chatform",
-      "status": "next",
+      "status": "review",
       "body": "B1. One adapter per service on the official routes (Gmail API, WhatsApp Business Cloud API, Instagram Messaging API, WeCom / WeChat Official Account), each honest about its state and the keys it lacks; inbound webhooks make portals and ghosts; agents draft, people send; a stand-in adapter in tests. Architecture and contract: docs/chatform.md.",
       "issue": 201
     },
@@ -153,7 +153,7 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chatform",
-      "status": "next",
+      "status": "review",
       "body": "I1. Slack's export zip (channels, groups, dms, mpims, users, day files) and, with a token, Slack's API: authors, times, threads, reactions, pins, mentions and files; brought in twice without doubling; a report of what was skipped. Every channel downloads as JSON and Markdown. Architecture and contract: docs/chatform.md.",
       "issue": 202
     },
@@ -163,7 +163,7 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chatform",
-      "status": "doing",
+      "status": "review",
       "body": "C1. #/chat with Chat, Agents, Inbox and Huddles tabs; unread badge; quick switcher; uploads of images, video, GIFs and files with inline previews; link previews; mentions, emoji, drafts; shown on #/design day and night; two-browser e2e. Architecture and contract: docs/chatform.md.",
       "issue": 203
     },
@@ -173,7 +173,7 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chatform",
-      "status": "doing",
+      "status": "review",
       "body": "S1. One conversation model in SQLite (chat.ts): open and private channels, DMs, groups, agent conversations and portals; messages with a per-channel seq, threads by root, reactions, pins, edits, removals that need confirm, request_id idempotency; who spoke is the server's to say; a /chat socket; FTS; unread and mentions into Today. Architecture and contract: docs/chatform.md.",
       "issue": 204
     },
