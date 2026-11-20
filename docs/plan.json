@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-20T02:17:21.967Z",
+  "syncedAt": "2026-11-20T03:23:26.127Z",
   "columns": [
     {
       "id": "needs-you",
@@ -89,7 +89,8 @@
       "milestone": "apps",
       "area": "apps",
       "status": "review",
-      "body": "Josh, 2026-11-19: start integrating HyperForm (where the vibe-coded apps are hosted); link HyperForm, PartForm, DeployForm and FactoryForm on Today; open them as web pages that take over a section, usable by agents, with a saved preview from far away and the live page up close. Built (SPEC §0.10): the app list with hosted addresses; ⤢ on a Today row opens the app in a new section it fills; such a page is a tab of the built-in browser (a frame can't show a site behind HyperForm's sign-in), live when near, its kept picture when far, an admin's to run, with Agents on the card for the `browser_` tools. Checked against a stand-in page in a real browser (`e2e/pages.spec.ts`, `test/pagecard.test.ts`); not yet against the real apps: that waits on a sign-in (card: hyperform-sign-in)."
+      "body": "Josh, 2026-11-19: start integrating HyperForm (where the vibe-coded apps are hosted); link HyperForm, PartForm, DeployForm and FactoryForm on Today; open them as web pages that take over a section, usable by agents, with a saved preview from far away and the live page up close. Built (SPEC §0.10): the app list with hosted addresses; ⤢ on a Today row opens the app in a new section it fills; such a page is a tab of the built-in browser (a frame can't show a site behind HyperForm's sign-in), live when near, its kept picture when far, an admin's to run, with Agents on the card for the `browser_` tools. Checked against a stand-in page in a real browser (`e2e/pages.spec.ts`, `test/pagecard.test.ts`); not yet against the real apps: that waits on a sign-in (card: hyperform-sign-in).",
+      "issue": 219
     },
     {
       "id": "hyperform-sign-in",
@@ -98,7 +99,8 @@
       "milestone": "apps",
       "area": "apps",
       "status": "needs-you",
-      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size."
+      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size.",
+      "issue": 220
     },
     {
       "id": "hyperform-projects",
@@ -107,7 +109,8 @@
       "milestone": "apps",
       "area": "connectors",
       "status": "next",
-      "body": "HyperForm has an MCP server, a CLI and machine certificates (its llms.txt). Next: a HyperForm connector that lists the projects it hosts (so Today's apps come from HyperForm instead of a hand-kept list, and a new app appears by itself), shows each one's last deployment, and uses a machine certificate so the server can read an app (and refresh a page card's picture) without a person's browser session. Needs a person to approve the connector's access on HyperForm (read only)."
+      "body": "HyperForm has an MCP server, a CLI and machine certificates (its llms.txt). Next: a HyperForm connector that lists the projects it hosts (so Today's apps come from HyperForm instead of a hand-kept list, and a new app appears by itself), shows each one's last deployment, and uses a machine certificate so the server can read an app (and refresh a page card's picture) without a person's browser session. Needs a person to approve the connector's access on HyperForm (read only).",
+      "issue": 221
     },
     {
       "id": "themes-browser-sheets",
