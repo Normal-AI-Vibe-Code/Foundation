@@ -177,10 +177,12 @@ html .f-night {
    The interface wears the theme of what is in focus: `data-theme` on the root, set by the shell
    (setTheme in index.ts). `paper` is the tokens above. `day` and `night` are paper with night
    pinned (the engine does it: .is-night). `room` is for a place that is a picture (Today): the
-   floor's panes go clear and their ink goes white. `.f-room` is the same look as a class, for
+   floor's panes go clear and their ink goes white, and so do the window's own buttons (the desktop
+   app draws them outside the shell: shell/WindowControls.tsx). `.f-room` is the same look as a class, for
    anything else drawn straight over a picture. */
 .f-room,
-html[data-theme="room"] :is(.top-bar, .floor-pane) {
+html[data-theme="room"] :is(.top-bar, .floor-pane),
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   --color-frost: var(--color-over-room);
   --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
   --color-dim: color-mix(in srgb, var(--color-over-room) 62%, transparent);
@@ -210,7 +212,8 @@ html[data-theme="room"] :is(.top-bar, .floor-pane) {
 .f-night,
 .f-paper,
 .f-room,
-html[data-theme="room"] :is(.top-bar, .floor-pane) {
+html[data-theme="room"] :is(.top-bar, .floor-pane),
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   --paper: var(--color-void);
   --paper-raised: var(--color-raise);
   --ink: var(--color-frost);

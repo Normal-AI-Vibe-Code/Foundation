@@ -318,6 +318,17 @@ button.tab,
   background: var(--color-bad);
   color: var(--color-on-fill);
 }
+/* in the room theme (Today; tokens.css turns their ink white) they are full white like the bar's type, with a shadow
+   under each so they read over any part of the picture (2026-11-17, Josh: "should contrast with the rest of the ui in
+   the today mode"; 2026-11-19: the theme does it, not Today's own sheet) */
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn {
+  color: var(--color-frost);
+  filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--color-room-shade) 70%, transparent));
+}
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close:hover {
+  color: var(--color-over-room);
+  filter: none;
+}
 .window-controls.is-demo {
   position: static;
   align-self: stretch;

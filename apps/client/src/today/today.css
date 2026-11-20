@@ -989,21 +989,4 @@ a.today-chip:active {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-over-room) 60%, transparent);
 }
 
-/* the window's own buttons (minimize, maximize, close) over Today: white like the bar, with a shadow under each so
-   they read over any part of the room (2026-11-17, Josh: "should contrast with the rest of the ui in the today mode").
-   They are drawn outside the shell (App.tsx), so they are reached through the page */
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn {
-  color: var(--color-over-room);
-  filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--color-room-shade) 70%, transparent));
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn:hover {
-  background: color-mix(in srgb, var(--color-over-room) 20%, transparent);
-  color: var(--color-over-room);
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn.is-close:hover {
-  background: var(--color-bad);
-  filter: none;
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo)::before {
-  background: color-mix(in srgb, var(--color-over-room) 34%, transparent);
-}
+/* the window's own buttons (minimize, maximize, close) wear the room theme too: tokens.css and shell.css */
