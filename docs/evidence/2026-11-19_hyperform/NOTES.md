@@ -22,3 +22,18 @@ What the real addresses answered without a sign-in (read with curl, 2026-11-19):
 
 Not checked: the real apps inside Foundation (it needs a person's sign-in), and whether Google allows its
 sign-in in the server's browser.
+
+## HyperForm's dashboard, read after Josh signed in (Claude's browser pane)
+
+| Project | Address | State | In Today's list |
+| --- | --- | --- | --- |
+| partform | partform.apps.normallab.co | Ready | PartForm ("Airform BOM"; then asks for an OnShape sign-in) |
+| deployform | deployform.apps.normallab.co | Sleeping | DeployForm ("Inventory & Install Tracker") |
+| factory-form | factory-form-factoryform.apps.normallab.co | Ready | FactoryForm |
+| formindustries-metalform | formindustries-metalform.apps.normallab.co | Sleeping | MetalForm (added) |
+| gnatt-chart | gnatt-chart-web.apps.normallab.co | Sleeping | Form Gantt (added) |
+| form-chess | form-chess-web.apps.normallab.co | Sleeping | Form Chess (added) |
+| airform | airform.space | Ready | Airform, the product site (added; public) |
+| form-figma | form-figma-files.apps.normallab.co | Ready | no: a storage service, not a page |
+| flowform | server.formresearch.ai | Stopped | no |
+| git | none | Stopped | no |

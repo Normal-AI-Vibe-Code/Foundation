@@ -93,6 +93,13 @@ test("the company's apps: the four on HyperForm are linked where they are hosted
     assert.equal(apps.get(id)?.signIn, "hyperform", id);
     assert.ok(onHyperForm(apps.get(id)?.url), id);
   }
+  // the others HyperForm's dashboard lists: behind its sign-in when it hosts them, a frame when it doesn't
+  assert.equal(apps.get("metalform")?.url, "https://formindustries-metalform.apps.normallab.co/");
+  assert.equal(apps.get("gantt")?.url, "https://gnatt-chart-web.apps.normallab.co/");
+  assert.equal(apps.get("chess")?.url, "https://form-chess-web.apps.normallab.co/");
+  for (const id of ["metalform", "gantt", "chess"]) assert.equal(apps.get(id)?.signIn, "hyperform", id);
+  assert.equal(apps.get("airform")?.url, "https://airform.space/");
+  assert.equal(apps.get("airform")?.signIn, undefined);
   // PartForm still shows BomForm's connector state, and an app with no address is still "not linked"
   assert.equal(apps.get("partform")?.connector, "bomform");
   assert.equal(apps.get("fleetform")?.url, null);
