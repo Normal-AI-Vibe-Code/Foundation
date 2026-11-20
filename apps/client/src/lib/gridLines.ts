@@ -48,3 +48,30 @@ export function gutterRuns(grid: { cols: number[]; rows: number[] }, sections: A
   }
   return out;
 }
+
+/**
+ * The grab areas along the track boundaries: `gutterRuns`, with each real edge cut again wherever the
+ * sections on either side of it change (2026-11-18, Josh: "it should just highlight the current grid size
+ * that has been expanded to"). A boundary's line still runs as far as it divides sections, but what lights
+ * under the pointer, and what the knob rides along, is the stretch between one pair of neighbours: from the
+ * top of that section's edge to the bottom of it, and no further. A boundary running inside merged sections
+ * is cut the same way, one stretch per section it crosses.
+ */
+export function gutterSegments(grid: { cols: number[]; rows: number[] }, sections: Array<{ c0: number; c1: number; r0: number; r1: number }>): GutterRun[] {
+  const at = (c: number, r: number) => sections.findIndex((s) => s.c0 <= c && c <= s.c1 && s.r0 <= r && r <= s.r1);
+  const out: GutterRun[] = [];
+  for (const run of gutterRuns(grid, sections)) {
+    let seg: GutterRun | null = null;
+    let was = "";
+    for (let k = run.from; k <= run.to; k++) {
+      const pair = run.axis === "col" ? `${at(run.index, k)}|${at(run.index + 1, k)}` : `${at(k, run.index)}|${at(k, run.index + 1)}`;
+      if (seg && pair === was) seg.to = k;
+      else {
+        seg = { ...run, from: k, to: k };
+        out.push(seg);
+        was = pair;
+      }
+    }
+  }
+  return out;
+}

@@ -14,7 +14,7 @@ import { config } from "./config.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
 import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
-import { SPACE_KINDS, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
+import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
@@ -25,6 +25,8 @@ import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
 import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { hostTerminals, requestHostTerminal } from "./hostterm.ts";
+import { cardPageOf, hostBrowserRunning, requestHostBrowser } from "./hostbrowser.ts";
+import { pageIdsOk, readPagePicture } from "./pagepictures.ts";
 import { changelog } from "./changelog.ts";
 import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3HostRunning, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
@@ -35,7 +37,7 @@ import { SERVER_VERSION, minClient, requireCurrentClient } from "./clientversion
 import { httpToolCtx, runTool, TOOLS } from "./tools.ts";
 import { handleMcp } from "./mcp.ts";
 import { seedCompanyBoard } from "./seed.ts";
-import { addLine, attachRecording, huddleArchive, huddleForInvite, transcriptText, type NewHuddle } from "./huddles.ts";
+import { huddleArchive, huddleForInvite, huddleRoutes, transcriptText, type NewHuddle } from "./huddles.ts";
 import { boardLink, channelHistory, channelInfo, inviteText, listChannels, postMessage, shareText, SlackError, slackStatus } from "./slack.ts";
 import { appendSection, boardMaps, huddleStateOf } from "@foundation/protocol";
 import { migrateAllBoards } from "./migrate.ts";
@@ -56,15 +58,21 @@ import { answerAppToolAsk } from "./apptools.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
 import { boardHasChannel, buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
+import { avatarRoutes, startAvatars } from "./avatars.ts";
 import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, bringInStarter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter, setApproval } from "./characters.ts";
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
 import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, restartMachine, startMachine, stopMachine } from "./machines.ts";
+import { closePublicLinks, openPublicLink, portTarget, relayHttp, signInFirst } from "./machineshare.ts";
+import { hubSearch, hubTags } from "./machinehub.ts";
+import { addWorker, clusterStatus, deletePod, kubeconfig, layCluster, openPodCard, runPod, startCluster } from "./machinecluster.ts";
+import { addMachineStep, functionWiring, installExamples, readFunctions, runFunction } from "./machinefunctions.ts";
 import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
 import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
 import { gridOutline } from "./subgrids.ts";
+import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
 import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
 
@@ -90,6 +98,8 @@ r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
 function shellRunning(): string | false {
   if (t3HostRunning()) return "T3";
   if (hostTerminals() > 0) return "the built-in terminal";
+  // the built-in browser sits on this computer with a person's sign-ins, and agents may be driving it
+  if (hostBrowserRunning()) return "the built-in browser";
   if (one("select 1 from jobs where status = 'running' and kind = 'rea' limit 1")) return "a REA job (it can run Claude Code)";
   return false;
 }
@@ -267,22 +277,30 @@ r.post("/api/boards/:id/people", async (req) => {
 });
 r.post("/api/boards", async (req) => {
   requireWriter(requireUser(req));
-  const body = await readJson<{ name?: string; kind?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
+  const body = await readJson<{ name?: string; kind?: string; folder?: string | null; url?: string; parent?: string | null; app?: string }>(req);
   const kind: SpaceKind = SPACE_KINDS.includes(body.kind as SpaceKind) ? (body.kind as SpaceKind) : "grid";
-  const url = kind === "page" ? cleanPageUrl(body.url) : null;
+  // an app as a tab: one of Foundation's own (T3: its address is minted each time it opens), or one at an address
+  const app = kind === "app" && (BUILT_IN_APPS as readonly string[]).includes(String(body.app)) ? String(body.app) : null;
+  const url = kind === "page" || (kind === "app" && !app) ? cleanPageUrl(body.url) : null;
   if (kind === "page" && !url) throw new HttpError(400, "A web page needs an address (http or https)");
+  if (kind === "app" && !app && !url) throw new HttpError(400, "An app needs an address (http or https), or to be one Foundation knows");
+  if (kind === "app") {
+    // an app has one tab: opening it again goes to the one there is
+    const there = listBoards().find((b) => b.kind === "app" && (app ? b.app === app : !b.app && b.url === url));
+    if (there) return { id: there.id, existing: true };
+  }
   let name = (body.name ?? "").trim().slice(0, 80);
   if (!name) {
     // an unnamed space takes a name nothing else has: "Untitled grid", then "Untitled grid 2"…
-    const base = kind === "page" ? new URL(url!).hostname : kind === "deck" ? "Untitled presentation" : "Untitled grid";
+    const base = app === "t3" ? "T3" : kind === "page" || kind === "app" ? new URL(url!).hostname : kind === "deck" ? "Untitled presentation" : "Untitled grid";
     const taken = new Set(listBoards().map((b) => b.name));
     name = base;
     for (let n = 2; taken.has(name); n++) name = `${base} ${n}`;
   }
-  const id = createBoardRow(name, { kind, folder: cleanFolder(body.folder), url });
+  const id = createBoardRow(name, { kind, folder: cleanFolder(body.folder), url, app });
   // the server lays the first sections, so two people opening a new space at once don't both seed it
   // (a deck's sections are its slides; a page space keeps a board for its people and activity, with nothing on it)
-  if (kind !== "page") {
+  if (!isPageKind(kind)) {
     const doc = getBoard(id).doc;
     if (boardMaps(doc).sections.size === 0) {
       editBoard(id, "system", (d) => {
@@ -306,8 +324,10 @@ r.post("/api/boards/:id", async (req) => {
   requireBoard(u, id);
   if (!listBoards().some((b) => b.id === id)) throw new HttpError(404, "No such grid");
   requireWriter(u, id);
-  const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null }>(req);
-  const patch: { name?: string; folder?: string | null; url?: string } = {};
+  const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null; theme?: string | null }>(req);
+  const patch: { name?: string; folder?: string | null; url?: string; theme?: "day" | "night" | null } = {};
+  // the look this grid pins for everyone who opens it ('day' | 'night'); anything else lets go: paper, following the orb
+  if (body.theme !== undefined) patch.theme = cleanTheme(body.theme);
   if (body.name !== undefined) {
     const name = String(body.name).trim().slice(0, 80);
     if (!name) throw new HttpError(400, "A grid needs a name");
@@ -395,10 +415,19 @@ r.get("/files/:id", (req, res) => {
   serveFile(req, res, req.params.id);
 });
 
-/** a file on a members-only board is that board's */
+/** a file on a members-only board is that board's; a chat upload is its uploader's and its messages' readers' (chat.ts) */
 function requireFileBoard(user: UserInfo, fileId: string) {
-  requireBoard(user, one<{ board_id: string | null }>("select board_id from files where id = ?", fileId)?.board_id);
+  const board = one<{ board_id: string | null }>("select board_id from files where id = ?", fileId)?.board_id;
+  if (board === "chat" && !canSeeChatFile(user, fileId)) throw new HttpError(404, "no such file");
+  requireBoard(user, board);
 }
+
+// ---------- ChatForm (chat.ts) ----------
+
+chatRoutes(r);
+(await import("./chatimport.ts")).chatImportRoutes(r); // history: Slack export zip and API pull in, ChatForm export out
+(await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
+(await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
 
@@ -524,35 +553,9 @@ function huddleOn(boardId: string, id: string) {
   if (!o || o.kind !== "panel" || o.panel !== "huddle") throw new HttpError(404, "no such huddle");
   return o;
 }
-r.get("/api/huddles/:id", (req) => {
-  const u = requireUser(req);
-  const board = req.query.get("board") ?? "company";
-  requireBoard(u, board);
-  const panel = huddleOn(board, req.params.id);
-  return { huddle: { id: panel.id, name: panel.name, channel: panel.channel ?? null, state: huddleStateOf(getBoard(board).doc, panel.id) ?? { people: [] } }, sessions: huddleArchive(board, panel.id) };
-});
-r.post("/api/huddles/:id/lines", async (req) => {
-  const u = requireUser(req);
-  const b = await readJson<{ board?: string; text?: string }>(req);
-  requireBoard(u, b.board ?? "company");
-  try {
-    return { line: addLine(b.board ?? "company", req.params.id, u, b.text ?? "", "typed") };
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message);
-  }
-});
-r.post("/api/huddles/:id/recordings", async (req) => {
-  const u = requireUser(req);
-  const b = await readJson<{ board?: string; fileId?: string; sessionId?: string; startedAt?: number; endedAt?: number }>(req);
-  if (!b.fileId) throw new HttpError(400, "fileId required");
-  requireBoard(u, b.board ?? "company");
-  requireFileVisible(u.id, b.fileId);
-  try {
-    return attachRecording(b.board ?? "company", req.params.id, { fileId: b.fileId, person: u.name, sessionId: b.sessionId, startedAt: b.startedAt ?? Date.now(), endedAt: b.endedAt ?? Date.now() });
-  } catch (e) {
-    throw new HttpError(400, (e as Error).message);
-  }
-});
+// a grid's huddle and a channel's (ChatForm H1): start, lines, recordings, take to a grid, agents, live list, archive
+huddleRoutes(r);
+(await import("./replay.ts")).replayRoutes(r); // replay: a recorded session's timeline and takes (the grid as it was); attaching from Vision and approved places in chat
 
 // ---------- Slack channels (bot token; posts go out under the person's name) ----------
 
@@ -726,6 +729,27 @@ r.get("/api/machines/images", async (req) => {
   requireUser(req);
   return engineImages(req.query.get("engine") ?? undefined);
 });
+// Docker Hub, for the image picker: its public search and a repository's tags (machinehub.ts)
+r.get("/api/machines/hub", async (req) => {
+  requireUser(req);
+  return { repos: await hubSearch(req.query.get("q") ?? "") };
+});
+r.get("/api/machines/hub/tags", async (req) => {
+  requireUser(req);
+  return { tags: await hubTags(req.query.get("repo") ?? "") };
+});
+// a machine's port shared: the Foundation link is always there (/m/…); a public link is a tunnel a person opens
+r.post("/api/boards/:id/machines/:panel/share", async (req) => {
+  const u = requirePerson(req, "Opening a public link to a machine");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ port?: number; close?: boolean }>(req);
+  if (b.close) {
+    closePublicLinks(req.params.id, req.params.panel, b.port, u.name);
+    return { closed: true };
+  }
+  if (!Number.isInteger(b.port)) throw new HttpError(400, "which port?");
+  return { share: await openPublicLink(req.params.id, req.params.panel, b.port!, u.name) };
+});
 // a card on screen asks: the server reads the engine and writes what's true to the board
 r.get("/api/boards/:id/machines/:panel", async (req) => {
   requireBoard(requireUser(req), req.params.id);
@@ -783,6 +807,78 @@ r.post("/api/boards/:id/machines/:panel/asks/:ask/:verdict", async (req) => {
   const u = requirePerson(req, verdict === "run" ? "Running an agent's command" : "Declining an agent's command");
   requireBoard(u, req.params.id);
   return { ask: answerAsk(req.params.id, req.params.panel, req.params.ask, u, verdict) };
+});
+// Kubernetes (machinecluster.ts): a cluster's cards laid, started (privileged nodes: a person), read, pods run,
+// deleted and opened as cards, a worker added, and the kubeconfig (admin to the cluster: a person who can edit)
+r.post("/api/boards/:id/clusters", async (req) => {
+  const u = requirePerson(req, "Laying a Kubernetes cluster");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ section?: string; name?: string; workers?: number }>(req);
+  if (!b.section) throw new HttpError(400, "which section?");
+  return layCluster(req.params.id, b.section, { name: b.name, workers: b.workers }, u.name);
+});
+r.post("/api/boards/:id/clusters/:cluster/start", async (req) => {
+  const u = requirePerson(req, "Starting a Kubernetes cluster");
+  requireWriter(u, req.params.id);
+  return startCluster(req.params.id, req.params.cluster, u.name);
+});
+r.get("/api/boards/:id/clusters/:panel", async (req) => {
+  requireBoard(requireUser(req), req.params.id);
+  return clusterStatus(req.params.id, req.params.panel);
+});
+r.get("/api/boards/:id/clusters/:panel/kubeconfig", async (req) => {
+  const u = requirePerson(req, "Reading a cluster's kubeconfig");
+  requireWriter(u, req.params.id);
+  return { kubeconfig: await kubeconfig(req.params.id, req.params.panel) };
+});
+r.post("/api/boards/:id/clusters/:panel/workers", async (req) => {
+  const u = requirePerson(req, "Adding a worker to a cluster");
+  requireWriter(u, req.params.id);
+  return addWorker(req.params.id, req.params.panel, u.name);
+});
+r.post("/api/boards/:id/clusters/:panel/pods", async (req) => {
+  const u = requirePerson(req, "Running a pod");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ name?: string; image?: string; keep?: boolean }>(req);
+  if (!b.image) throw new HttpError(400, "which image?");
+  return runPod(req.params.id, req.params.panel, { name: b.name, image: b.image, keep: b.keep === true }, u.name);
+});
+r.post("/api/boards/:id/clusters/:panel/pods/delete", async (req) => {
+  const u = requirePerson(req, "Deleting a pod");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ ns?: string; name?: string; confirm?: boolean }>(req);
+  return deletePod(req.params.id, req.params.panel, b.ns ?? "default", b.name ?? "", u.name, b.confirm === true);
+});
+r.post("/api/boards/:id/clusters/:panel/pods/open", async (req) => {
+  const u = requireUser(req);
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ ns?: string; name?: string; section?: string }>(req);
+  if (!b.name) throw new HttpError(400, "which pod?");
+  return openPodCard(req.params.id, req.params.panel, b.ns ?? "default", b.name, b.section, u.name);
+});
+// a machine's functions (machinefunctions.ts): reading them, running one on what's wired in (code runs in the
+// machine: a person), and the example's ImageMagick and picture functions (packages go in: a person)
+r.get("/api/boards/:id/machines/:panel/functions", async (req) => {
+  requireBoard(requireUser(req), req.params.id);
+  const functions = await readFunctions(req.params.id, req.params.panel, req.query.get("fresh") === "1");
+  return { functions, wiring: functionWiring(req.params.id, req.params.panel) };
+});
+r.post("/api/boards/:id/machines/:panel/functions/examples", async (req) => {
+  const u = requirePerson(req, "Putting functions into a machine");
+  requireWriter(u, req.params.id);
+  return installExamples(req.params.id, req.params.panel, u.name);
+});
+r.post("/api/boards/:id/machines/:panel/functions/:name/run", async (req) => {
+  const u = requirePerson(req, "Running a function in a machine");
+  requireWriter(u, req.params.id);
+  const b = await readJson<{ all?: boolean; text?: string }>(req);
+  return { run: await runFunction(req.params.id, req.params.panel, req.params.name, { all: b.all === true, text: typeof b.text === "string" ? b.text : undefined }, { name: u.name, id: u.id }) };
+});
+// the studio's example: a machine and a second collection after a collection, wired through fn:trim-resize
+r.post("/api/boards/:id/collections/:panel/machine", async (req) => {
+  const u = requirePerson(req, "Laying a machine after a collection");
+  requireWriter(u, req.params.id);
+  return addMachineStep(req.params.id, req.params.panel, u.name);
 });
 // an agent's ask to use an app's tool, on the app's card: the same gate (a person at their browser who can edit the board).
 // Allow lets agents call that tool of that saved app until its definition changes; it calls nothing itself (apptools.ts)
@@ -858,6 +954,8 @@ r.post("/api/system-grids/:key", (req) => {
   if (!isSystemGridKey(req.params.key)) throw new HttpError(404, "No such grid");
   return openSystemGrid(req.params.key);
 });
+
+avatarRoutes(r);
 
 /** make the Character studio board (or say where the one there is) */
 r.post("/api/characters/studio", (req) => {
@@ -986,6 +1084,21 @@ r.get("/api/t3/threads/:id", async (req) => {
 
 // ---------- the built-in terminal (hostterm.ts): a shell on this computer, for an admin, in person ----------
 r.post("/api/host-terminal", (req) => requestHostTerminal(req));
+// the built-in browser (hostbrowser.ts): a real browser on this computer, for an admin, in person; the key opens its socket
+r.post("/api/host-browser", async (req) => {
+  // a page card's ask names its board, its card and its address: the board must be one this person can see
+  const page = cardPageOf(await readJson<{ board?: unknown; card?: unknown; url?: unknown }>(req).catch(() => null));
+  if (page) requireBoard(requireUser(req), page.board);
+  return requestHostBrowser(req, page);
+});
+/** the picture kept of a page card (pagepictures.ts): the board's, for anyone who can see the board */
+r.get("/api/boards/:id/pages/:panel/picture", (req, res) => {
+  requireBoard(requireUser(req), req.params.id);
+  const pic = pageIdsOk(req.params.id, req.params.panel) ? readPagePicture({ board: req.params.id, card: req.params.panel }) : null;
+  if (!pic) throw new HttpError(404, "no picture of this page yet");
+  res.writeHead(200, { "content-type": "image/jpeg", "content-length": pic.jpeg.length, "cache-control": "private, no-cache", "x-content-type-options": "nosniff" });
+  res.end(req.method === "HEAD" ? undefined : pic.jpeg);
+});
 // what changed in Foundation's own code (changelog.ts): read-only, for anyone signed in
 r.get("/api/changelog", async (req) => {
   requireUser(req);
@@ -1154,10 +1267,12 @@ function agentRouteScope(req: Req, path: string) {
  * and preferences (their goals, profile and settings are theirs, not a board's). The board is the
  * route's :id, or ?board=, else the person's account role decides.
  */
-const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
+const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/, /^\/api\/chat\//];
 function gateWrites(req: Req, path: string) {
   if (req.method === "GET" || req.method === "OPTIONS" || !path.startsWith("/api/")) return;
   if (READ_POSTS.some((p) => p.test(path))) return;
+  // a chat upload: chat's rules, not a board's (a viewer posts files where it's a member; chat.ts checks attaching)
+  if (path === "/api/files" && req.query.get("board") === "chat") return;
   const user = userFromRequest(req);
   if (!user) return; // the route's own requireUser answers 401
   const board = /^\/api\/boards\/([^/]+)/.exec(path)?.[1] ?? req.query.get("board");
@@ -1187,6 +1302,20 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     return res.end();
+  }
+  // a machine's web port, relayed for anyone signed in here who can see its board (machineshare.ts): a viewer
+  // may read it, writing to it (any other method) needs someone who can edit
+  if (url.pathname.startsWith("/m/")) {
+    const t = portTarget(url.pathname);
+    if (!t) return json(res, { error: "no such machine port here (is the machine running, with that port published?)" }, 404);
+    const user = userFromRequest(req);
+    if (!user) return signInFirst(res, config.publicUrl);
+    if (!canSeeBoard(user, t.board)) return json(res, { error: "not your board" }, 403);
+    if (req.method !== "GET" && req.method !== "HEAD" && !canWrite(user.id, t.board)) return json(res, { error: "View only: someone who can edit this board uses it" }, 403);
+    // a write signed in by the cookie comes from one of our own pages here too (origins.ts): the machine's own page is one
+    const forgedRelay = cookieOriginRefusal(req);
+    if (forgedRelay) return json(res, { error: forgedRelay }, 403);
+    return relayHttp(req, res, t, url.search);
   }
   try {
     // a change signed in by the cookie comes from one of our own pages (cross-site request forgery: origins.ts)
@@ -1244,7 +1373,9 @@ resumeCharacters();
 // characters this build carries that this install hasn't had yet (a fresh install, or a studio made from an older set)
 void bringInStarter()
   .then((n) => n && console.log(`  characters         brought in ${n} from the starter set`))
-  .catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`));
+  .catch((e: Error) => console.error(`  characters         the starter set didn't load: ${e.message}`))
+  // Foundation's avatars on the studio, and their timers (avatars.ts)
+  .finally(() => startAvatars());
 
 // Started by the desktop app (src-tauri/src/server.rs), the server lives exactly as long as the app:
 // the app holds the other end of stdin, and however the app ends (quit, crash, Task Manager) that

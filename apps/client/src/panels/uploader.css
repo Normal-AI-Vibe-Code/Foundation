@@ -1,0 +1,304 @@
+/* Foundation's avatars (panels/UploaderView.tsx): the uploader on the Character studio's left. A head that says
+   what it is and where it uploads, a row of presses, the last upload, and the characters wired in, grouped by
+   what brought them, each with where it stands. On tokens only. */
+
+.up-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  min-width: 0;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  overflow: hidden;
+}
+.up-head {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.up-kind {
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.3 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.up-kind > i {
+  margin-left: var(--space-1);
+  font-style: normal;
+  color: var(--color-mist);
+  font-variant-numeric: tabular-nums;
+}
+.up-lede {
+  margin: 0;
+  max-width: 64ch;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.up-lede > b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+
+/* ---------- presses ---------- */
+
+.up-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.up-spacer {
+  flex: 1 1 auto;
+}
+.up-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+}
+.up-timer > select {
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  color: var(--color-frost);
+  background: var(--color-panel);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+}
+.up-next {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.up-wire {
+  cursor: grab;
+  touch-action: none;
+  color: var(--color-agent);
+}
+.up-wire:active {
+  cursor: grabbing;
+}
+.up-upload[disabled] {
+  opacity: 0.5;
+}
+[data-up-running] .up-upload {
+  animation: up-breathe 1.4s var(--ease-out-soft) infinite alternate;
+}
+@keyframes up-breathe {
+  to {
+    opacity: 0.55;
+  }
+}
+
+/* ---------- what happened ---------- */
+
+.up-note,
+.up-last {
+  flex: none;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.up-last {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+.up-last > span:first-child {
+  color: var(--color-frost);
+}
+.up-last.is-pushed {
+  border-color: color-mix(in srgb, var(--color-ok) 45%, var(--color-line));
+}
+.up-last.is-failed {
+  border-color: color-mix(in srgb, var(--color-bad) 55%, var(--color-line));
+}
+.up-last.is-failed > span:first-child {
+  color: var(--color-bad);
+}
+.up-when {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+}
+.up-when > a,
+.up-when > code {
+  margin-left: var(--space-2);
+  font: 500 var(--text-11) / 1 var(--font-mono);
+  color: var(--color-pulse);
+}
+.up-tally {
+  flex: none;
+  margin: 0;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+
+/* ---------- the characters ---------- */
+
+.up-groups {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-right: var(--space-2);
+}
+.up-group > h4 {
+  margin: 0 0 var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.up-group > h4 > i {
+  margin-left: var(--space-1);
+  font-style: normal;
+  color: var(--color-dim);
+  font-weight: 500;
+}
+.up-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: var(--space-4) var(--space-3);
+}
+.up-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.up-pic {
+  all: unset;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  cursor: pointer;
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+  box-shadow:
+    var(--shadow-sheet),
+    0 0 0 1px color-mix(in srgb, var(--color-agent) 40%, var(--color-line));
+  transition: transform var(--dur-quick) var(--ease-spring);
+}
+.up-pic:hover {
+  transform: translateY(-2px);
+}
+.up-pic:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+.up-pic > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.up-pic > i {
+  font-style: normal;
+  font-size: var(--text-32);
+  color: var(--color-dim);
+}
+.up-tile.is-waits .up-pic,
+.up-tile.is-leaves .up-pic {
+  opacity: 0.55;
+}
+.up-tile.is-leaves .up-pic {
+  filter: grayscale(1);
+}
+.up-words {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.up-words > b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--text-12) / 1.3 var(--font-sans);
+}
+.up-words > span {
+  flex: none;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+}
+.up-chip {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font: 500 var(--text-11) / 1.4 var(--font-sans);
+  border: 1px solid var(--color-line);
+  color: var(--color-mist);
+}
+.up-chip.is-main {
+  color: var(--color-ok);
+  border-color: color-mix(in srgb, var(--color-ok) 40%, transparent);
+}
+.up-chip.is-adds {
+  color: var(--color-agent);
+  border-color: color-mix(in srgb, var(--color-agent) 45%, transparent);
+}
+.up-chip.is-waits {
+  color: var(--color-warn);
+  border-color: color-mix(in srgb, var(--color-warn) 40%, transparent);
+}
+.up-chip.is-leaves {
+  color: var(--color-bad);
+  border-color: color-mix(in srgb, var(--color-bad) 40%, transparent);
+}
+.up-approve {
+  align-self: flex-start;
+}
+
+.up-empty {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-paper);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-dim);
+}
+.up-empty > span {
+  font-size: var(--text-32);
+  color: var(--color-agent);
+}
+.up-empty > p {
+  margin: 0;
+  max-width: 44ch;
+}
+
+/* a backwards wire (Wire in) over a section: it rings in the character violet, the section it would wire in */
+.section-card.is-wire-target {
+  box-shadow:
+    0 0 0 2px var(--viz-8),
+    0 0 0 8px color-mix(in srgb, var(--viz-8) 18%, transparent);
+  transition: box-shadow var(--dur-quick) var(--ease-out-soft);
+}

@@ -170,6 +170,15 @@ export function T3Glyph({ size = 16 }: { size?: number }) {
   );
 }
 
+/** open it whole, as a tab of its own: two arrows to opposite corners */
+export function ExpandGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M9.5 3h3.5v3.5M13 3L9 7M6.5 13H3V9.5M3 13l4-4" />
+    </svg>
+  );
+}
+
 /** settings for something (the agents, on Ask's pill): three sliders */
 export function SlidersGlyph({ size = 16 }: { size?: number }) {
   return (
@@ -297,6 +306,154 @@ export function WarnGlyph({ size = 16 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
       <path d="M8 2.2l6 10.6H2z" />
       <path d="M8 6.4v3M8 11.2v.1" />
+    </svg>
+  );
+}
+
+/** start: a triangle */
+export function PlayGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M5 3.2v9.6L12.8 8z" />
+    </svg>
+  );
+}
+
+/** stop: a square */
+export function StopGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="3.6" y="3.6" width="8.8" height="8.8" rx="1.4" />
+    </svg>
+  );
+}
+
+/** restart: an arrow coming round */
+export function RestartGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M13 8a5 5 0 1 1-1.6-3.7" />
+      <path d="M11.6 1.8v2.8H8.8" />
+    </svg>
+  );
+}
+
+/** remove: a bin */
+export function TrashGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M2.8 4.4h10.4M6.2 4.4V2.8h3.6v1.6M4.2 4.4l.7 8.6c.1.7.6 1.2 1.3 1.2h3.6c.7 0 1.2-.5 1.3-1.2l.7-8.6M6.6 6.8v4.6M9.4 6.8v4.6" />
+    </svg>
+  );
+}
+
+/** a link: two links of a chain */
+export function LinkGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M6.8 9.2a2.8 2.8 0 0 0 4 0l2-2a2.8 2.8 0 0 0-4-4l-.7.7" />
+      <path d="M9.2 6.8a2.8 2.8 0 0 0-4 0l-2 2a2.8 2.8 0 0 0 4 4l.7-.7" />
+    </svg>
+  );
+}
+
+/** share: three dots joined */
+export function ShareGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <circle cx="11.6" cy="3.8" r="1.8" />
+      <circle cx="4.4" cy="8" r="1.8" />
+      <circle cx="11.6" cy="12.2" r="1.8" />
+      <path d="M6 7.1l4-2.4M6 8.9l4 2.4" />
+    </svg>
+  );
+}
+
+/** the internet: a globe with a meridian */
+export function GlobeGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <circle cx="8" cy="8" r="6" />
+      <path d="M2 8h12M8 2c1.8 1.7 2.6 3.7 2.6 6S9.8 12.3 8 14M8 2C6.2 3.7 5.4 5.7 5.4 8s.8 4.3 2.6 6" />
+    </svg>
+  );
+}
+
+/** a function: ƒ with brackets */
+export function FunctionGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M9.6 2.6c-1.4-.3-2.4.4-2.6 1.8L5.9 11.6c-.2 1.4-1.2 2-2.6 1.8M5 6.4h4.4" />
+      <path d="M11 6.6l2.6 3.4M13.6 6.6L11 10" />
+    </svg>
+  );
+}
+
+/** in: an arrow into a bar */
+export function InGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M2 8h8M7 5l3 3-3 3M13 2.8v10.4" />
+    </svg>
+  );
+}
+
+/** out: an arrow out of a bar */
+export function OutGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M3 2.8v10.4M6 8h8M11 5l3 3-3 3" />
+    </svg>
+  );
+}
+
+/** a cluster: three boxes joined */
+export function ClusterGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="5.6" y="1.8" width="4.8" height="3.8" rx="1" />
+      <rect x="1.6" y="10.4" width="4.8" height="3.8" rx="1" />
+      <rect x="9.6" y="10.4" width="4.8" height="3.8" rx="1" />
+      <path d="M8 5.6v2.4M4 10.4V8h8v2.4" />
+    </svg>
+  );
+}
+
+/** a person: head and shoulders */
+export function PersonGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <circle cx="8" cy="5.4" r="2.6" />
+      <path d="M2.8 14c.4-2.8 2.6-4.4 5.2-4.4s4.8 1.6 5.2 4.4" />
+    </svg>
+  );
+}
+
+/** an eye: watching */
+export function EyeGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M1.6 8s2.4-4.4 6.4-4.4S14.4 8 14.4 8s-2.4 4.4-6.4 4.4S1.6 8 1.6 8z" />
+      <circle cx="8" cy="8" r="1.9" />
+    </svg>
+  );
+}
+
+/** a command: a prompt */
+export function PromptGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <path d="M2.6 4.4l3.4 3.6-3.4 3.6M7.6 12h5.8" />
+    </svg>
+  );
+}
+
+/** a search: the magnifier, at the tools' weight */
+export function FindGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <circle cx="7" cy="7" r="4.4" />
+      <path d="M10.3 10.3l3.5 3.5" />
     </svg>
   );
 }

@@ -96,7 +96,7 @@ test("the page and the Shiba read the same Today", () => {
   assert.equal(t.profile.title, "Motor lead");
   assert.equal(t.sources.dataroom.connected, false);
   const names = companyApps().map((a) => a.name);
-  for (const n of ["BomForm", "FactoryForm", "HyperForm", "Vision"]) assert.ok(names.includes(n), n);
+  for (const n of ["PartForm", "DeployForm", "FactoryForm", "HyperForm", "Vision"]) assert.ok(names.includes(n), n);
   const d = todayDigest(t);
   assert.match(d, /ask:ask_1/);
   assert.match(d, /Motor lead/);

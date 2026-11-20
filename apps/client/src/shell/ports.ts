@@ -11,7 +11,7 @@
  * a short straight road, and apps further apart by one long diagonal.
  */
 
-import type { LinkDoc } from "@foundation/protocol";
+import { CHARACTER_TYPE, SECTION_PORT, type LinkDoc } from "@foundation/protocol";
 import { SECTION_HEADER, allObjects, getState, objectWorldRect, sectionBodyRect, sectionCardRect, sharedSection, type PanelMeta } from "../state/store";
 import type { P, Rect, Side } from "./wireGeometry";
 import { pipeIntake, pipeMetrics, sideToward } from "./wireGeometry";
@@ -39,6 +39,7 @@ export const TYPE_TONE: Record<string, string> = {
   data: "var(--viz-3)",
   bom: "var(--viz-4)",
   decision: "var(--color-ok)",
+  character: "var(--viz-8)",
 };
 
 export function toneOf(type?: string) {
@@ -46,10 +47,47 @@ export function toneOf(type?: string) {
 }
 
 function otherEndY(l: LinkDoc, dir: "in" | "out") {
-  const st = getState();
-  const other = st.panels[dir === "in" ? l.from.panel : l.to.panel];
+  const id = dir === "in" ? l.from.panel : l.to.panel;
+  const sec = sectionEndRect(id);
+  if (sec) return sec.y;
+  const other = getState().panels[id];
   const r = other && objectWorldRect(other);
   return r ? r.y : 0;
+}
+
+// ---------- a section as a wire's end ----------
+
+/**
+ * A wire can leave a section (2026-11-17: a `Characters · <Set>` section wired into Foundation's avatars brings
+ * every character card in it). Its `from.panel` is the section's id and its port is SECTION_PORT; the wire
+ * leaves by the section's edge facing its other end, as a hosted app's does.
+ */
+export function isSectionEnd(id: string): boolean {
+  const st = getState();
+  return !st.panels[id] && Boolean(st.sections[id] ?? st.allSections[id]);
+}
+
+/** a section end's rect, when the section is on screen at this level (null: not a section, or not in view) */
+export function sectionEndRect(id: string): Rect | null {
+  const st = getState();
+  if (st.panels[id]) return null;
+  const sec = st.sections[id];
+  return sec ? sectionCardRect(st.grid, sec) : null;
+}
+
+const sectionEnds = new Map<string, PanelMeta>();
+/** a wire's end as a panel: the card, or a section standing in as one with its one output */
+export function endPanel(id: string): PanelMeta | undefined {
+  const st = getState();
+  const p = st.panels[id];
+  if (p) return p;
+  const sec = st.sections[id] ?? st.allSections[id];
+  if (!sec) return undefined;
+  const was = sectionEnds.get(id);
+  if (was && was.name === sec.name) return was;
+  const pseudo = { id, kind: "panel", panel: "grid", sectionId: id, name: sec.name, x: 0, y: 0, w: 0, h: 0, float: false, ports: [{ id: SECTION_PORT, name: SECTION_PORT, dir: "out", type: CHARACTER_TYPE }] } as unknown as PanelMeta;
+  sectionEnds.set(id, pseudo);
+  return pseudo;
 }
 
 export function portLayout(panel: PanelMeta, links: LinkDoc[]): Map<string, PortSlotLayout> {
@@ -75,6 +113,9 @@ export function portPoint(panel: PanelMeta, portId: string, linkId?: string, lin
     const landing = landingsOf(panel.id).find((l) => l.link === linkId);
     if (landing) return landing;
   }
+  const sec = sectionEndRect(panel.id);
+  if (sec) return { x: sec.x + sec.w, y: sec.y + SECTION_HEADER + EDGE_PAD };
+  if (isSectionEnd(panel.id)) return null;
   return cardPortPoint(panel, portId, linkId, links);
 }
 
@@ -118,6 +159,8 @@ export function cardRects(): Map<string, Rect> {
 
 /** what a wire treats as its own ends: a card, or for a hosted app its whole section (header included) */
 export function endRect(rects: Map<string, Rect>, panelId: string): Rect | undefined {
+  const asSection = sectionEndRect(panelId);
+  if (asSection) return asSection;
   const st = getState();
   const p = st.panels[panelId];
   const sec = p && st.sections[p.sectionId];
@@ -155,7 +198,8 @@ export function obstaclesFor(rects: Map<string, Rect>, from: string, to: string)
   }
   const out: Rect[] = [];
   for (const [id, r] of rects) if (id !== from && id !== to) out.push(r);
-  const homes = new Set([st.panels[from]?.sectionId, st.panels[to]?.sectionId]);
+  // a section a wire leaves from is its end, not something in its way
+  const homes = new Set([st.panels[from]?.sectionId ?? from, st.panels[to]?.sectionId ?? to]);
   for (const sec of Object.values(st.sections)) if (!homes.has(sec.id)) out.push(sectionCardRect(st.grid, sec));
   return out;
 }
@@ -173,6 +217,8 @@ const LANDING_PITCH = 18; // and this far from each other
 
 /** the section rect of a hosted app, or null for a card */
 export function hostRect(panelId: string): Rect | null {
+  const asSection = sectionEndRect(panelId);
+  if (asSection) return asSection;
   const st = getState();
   const p = st.panels[panelId];
   const sec = p && st.sections[p.sectionId];
@@ -232,7 +278,7 @@ export function landingsOf(panelId: string): Landing[] {
     const outgoing = l.from.panel === panelId;
     if (!outgoing && l.to.panel !== panelId) continue;
     const otherId = outgoing ? l.to.panel : l.from.panel;
-    const other = st.panels[otherId];
+    const other = endPanel(otherId);
     if (!other) continue;
     const otherHost = hostRect(otherId);
     const otherRect = otherHost ?? objectWorldRect(other);

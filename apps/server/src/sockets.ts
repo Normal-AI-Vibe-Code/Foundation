@@ -29,13 +29,16 @@ import type { UserInfo } from "@foundation/protocol";
 import type { WebSocketServer } from "ws";
 import { hashToken, isPerson, isServiceToken, requireUser, tokenFrom, userFromRequest, userFromSessionHash } from "./auth.ts";
 import { attachHostTerminal, HOST_TERM_PATH, spendHostTerminalKey } from "./hostterm.ts";
+import { attachHostBrowser, HOST_BROWSER_PATH, spendHostBrowser } from "./hostbrowser.ts";
 import { one, run } from "./db.ts";
 import { CLOSE_TOO_OLD, clientTooOld } from "./clientversion.ts";
 import { HttpError, type Req } from "./http.ts";
 import { attachConnection, boardEpoch, syncAccess } from "./boards.ts";
 import { attachHuddle } from "./huddles.ts";
+import { attachChat, CHAT_SOCKET_PATH, chatSocketIsPerson } from "./chatsock.ts";
 import { attachTerminal } from "./machines.ts";
 import { attachDesktop } from "./machinedesktop.ts";
+import { portTarget, relayUpgrade } from "./machineshare.ts";
 import { canSeeBoard } from "./members.ts";
 import { canWrite } from "./roles.ts";
 import { cookieOriginRefusal } from "./origins.ts";
@@ -52,6 +55,8 @@ const VNC = new RegExp(`^/machines/(${ID})/(${ID})/vnc$`);
 
 /** the board a socket path belongs to, or null if it isn't one of ours */
 export function socketBoard(path: string): string | null {
+  // ChatForm's one socket: the reserved board "chat" (open to everyone signed in); chat.ts decides what each event reaches
+  if (path === CHAT_SOCKET_PATH) return "chat";
   return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path) ?? VNC.exec(path))?.[1] ?? null;
 }
 
@@ -142,6 +147,18 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
     wss.handleUpgrade(req, socket, head, (ws) => attachHostTerminal(ht[1], ws, who));
     return;
   }
+  // the built-in browser: the same rule, its own key (POST /api/host-browser; hostbrowser.ts)
+  const hb = HOST_BROWSER_PATH.exec(url.pathname);
+  if (hb) {
+    const who = spendHostBrowser(hb[1], req.query.get("key"));
+    if (!who) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachHostBrowser(hb[1], ws, who.user, who.page));
+    return;
+  }
   // a socket signed in by the cookie is opened by one of our own pages (cross-site WebSocket hijacking: origins.ts)
   if (cookieOriginRefusal(req, { upgrade: true, ticket: url.searchParams.has("ticket") })) {
     socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
@@ -150,9 +167,32 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
   }
   const who = socketWho(req, url);
   const user = who?.user ?? null;
+  // ChatForm (chatsock.ts): a person's socket speaks as that person, anything else as an agent
+  if (url.pathname === CHAT_SOCKET_PATH) {
+    if (!who) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachChat(ws, who.user, who.person));
+    return;
+  }
+  // a machine's web port, relayed (machineshare.ts): its app's own sockets, for anyone who can see the board
+  if (url.pathname.startsWith("/m/")) {
+    const t = portTarget(url.pathname);
+    if (!t || !user || !canSeeBoard(user, t.board)) {
+      socket.write(`HTTP/1.1 ${t ? 401 : 404} ${t ? "Unauthorized" : "Not Found"}\r\n\r\n`);
+      socket.destroy();
+      return;
+    }
+    relayUpgrade(req, socket, head, t, url.search);
+    return;
+  }
   const hm = HUDDLE.exec(url.pathname);
+  // a channel's huddle seats people only (huddles.ts decides)
+  const huddlePerson = Boolean(who?.person);
   if (hm && user && canSeeBoard(user, hm[1])) {
-    wss.handleUpgrade(req, socket, head, (ws) => attachHuddle(hm[1], hm[2], ws, user, req.query.get("send") === "1"));
+    wss.handleUpgrade(req, socket, head, (ws) => attachHuddle(hm[1], hm[2], ws, user, req.query.get("send") === "1", huddlePerson));
     return;
   }
   // a machine card's shared terminal: a person who can edit types; viewers, agents and the service token watch

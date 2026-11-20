@@ -318,6 +318,17 @@ button.tab,
   background: var(--color-bad);
   color: var(--color-on-fill);
 }
+/* in the room theme (Today; tokens.css turns their ink white) they are full white like the bar's type, with a shadow
+   under each so they read over any part of the picture (2026-11-17, Josh: "should contrast with the rest of the ui in
+   the today mode"; 2026-11-19: the theme does it, not Today's own sheet) */
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn {
+  color: var(--color-frost);
+  filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--color-room-shade) 70%, transparent));
+}
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close:hover {
+  color: var(--color-over-room);
+  filter: none;
+}
 .window-controls.is-demo {
   position: static;
   align-self: stretch;
@@ -5350,4 +5361,37 @@ body.is-viewer .port {
 }
 .floor-demo .side-pane .pane-foot {
   flex: none;
+}
+
+/* ---------- 2026-11-18: an app as a tab of its own (shell/AppCanvas.tsx), and a framed app's look ---------- */
+
+/* T3 whole: the tool, filling the paper the floor leaves */
+.app-canvas {
+  display: flex;
+  flex-direction: column;
+}
+.app-canvas > .tool-t3 {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.app-canvas .tool-empty {
+  max-width: 640px;
+  margin: 0 auto;
+  padding-top: var(--space-7);
+}
+/* in the pane, the page follows the look around it: a page reads prefers-color-scheme from its frame's
+   color-scheme, so it goes dark in the room and at night, light by day. As a tab it is the app's own:
+   no opinion from here (`normal`), which is the system's, as when it runs in a browser */
+.tool-frame.is-themed {
+  color-scheme: light;
+}
+html.is-night .tool-frame.is-themed,
+html[data-theme="room"] .tool-frame.is-themed {
+  color-scheme: dark;
+}
+.app-canvas .tool-frame.is-themed,
+.app-canvas iframe {
+  color-scheme: normal;
 }

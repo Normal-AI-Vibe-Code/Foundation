@@ -139,7 +139,11 @@ export async function storeFile(body: Buffer, f: { name: string; mime: string; b
   // every door into the archive (uploads, places, Slack, Flowform, characters) stores a type that is safe to serve
   const mime = storedMime(f.mime);
   const sha = createHash("sha256").update(body).digest("hex");
-  const same = one<FileRow>("select * from files where sha256 = ? and board_id is ? and archived_at is null", sha, boardId);
+  // a chat upload ("chat", ChatForm's reserved board) is its uploader's until a message carries it: the same bytes from someone else are their own file
+  const same =
+    boardId === "chat"
+      ? one<FileRow>("select * from files where sha256 = ? and board_id = 'chat' and uploaded_by is ? and archived_at is null", sha, userId)
+      : one<FileRow>("select * from files where sha256 = ? and board_id is ? and archived_at is null", sha, boardId);
   if (same) return same;
   const dest = filePath(sha);
   if (!existsSync(dest)) {
@@ -242,9 +246,11 @@ export function cadHeaderText(head: string): string {
 }
 
 export function listFiles(boardId?: string | null) {
+  // chat uploads are listed by the messages that carry them (chat.ts decides who sees those), never here
+  if (boardId === "chat") return [];
   return boardId
     ? all<FileRow>("select * from files where board_id = ? and archived_at is null order by created_at desc limit 500", boardId)
-    : all<FileRow>("select * from files where archived_at is null order by created_at desc limit 500");
+    : all<FileRow>("select * from files where archived_at is null and board_id is not 'chat' order by created_at desc limit 500");
 }
 
 export function archiveFile(id: string) {
@@ -290,6 +296,12 @@ export function serveFile(req: Req, res: ServerResponse, id: string) {
   createReadStream(path).pipe(res);
 }
 
+/** ChatForm's uploads live on the reserved board "chat", which is nobody's board: chat.ts says who may see one (its uploader, and readers of a message that carries it) */
+let chatFileRule: ((userId: string, fileId: string) => boolean) | null = null;
+export function setChatFileRule(fn: (userId: string, fileId: string) => boolean) {
+  chatFileRule = fn;
+}
+
 /**
  * May this person (or the agent working for them) see this file: it answers to the board it belongs to, so
  * a file on a members-only board is that board's members' (a file on no board is everyone's). Board tools
@@ -299,6 +311,7 @@ export function canSeeFile(userId: string, fileId: string): boolean {
   const row = one<{ board_id: string | null }>("select board_id from files where id = ?", fileId);
   if (!row) return false;
   if (!row.board_id) return true;
+  if (row.board_id === "chat") return chatFileRule ? chatFileRule(userId, fileId) : false;
   const user = userId === "agent" ? { id: "agent", role: "member" } : one<{ id: string; role: string }>("select id, role from users where id = ?", userId);
   return Boolean(user && canSeeBoard(user as UserInfo, row.board_id));
 }

@@ -1,0 +1,351 @@
+/* The in-call pieces (HuddleCall.tsx), a channel's huddle card and dock (chat/HuddleCard.tsx). Tokens only; DESIGN.md §5 "Huddle portal". */
+
+/* ---------- the stage: a shared screen large, the faces as a strip ---------- */
+
+.huddle-stage.is-sharing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.huddle-screen {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  display: grid;
+  place-items: center;
+}
+.huddle-screen video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.huddle-strip {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+  height: 84px;
+  overflow-x: auto;
+}
+.huddle-strip .huddle-tile {
+  flex: none;
+  width: 132px;
+}
+.huddle-ctl.is-on {
+  background: var(--color-pulse-dim);
+  border-color: color-mix(in srgb, var(--color-pulse) 40%, transparent);
+  color: var(--color-pulse);
+}
+.huddle-ctl.is-agent {
+  color: var(--color-agent);
+  border-color: color-mix(in srgb, var(--color-agent) 40%, transparent);
+}
+.huddle-ctl:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.huddle-ctl-text {
+  font: 700 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.04em;
+}
+
+/* an agent's seat: its avatar, ringed in the agent colour; it glows while it talks */
+.huddle-tile.is-agent {
+  background: var(--color-agent-dim);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 30%, transparent);
+  transition: box-shadow var(--dur-pane) var(--ease-out-soft);
+}
+.huddle-tile.is-agent.is-talking {
+  box-shadow: inset 0 0 0 2px var(--color-agent);
+}
+.huddle-agent-figure {
+  position: absolute;
+  inset: 6px 6px 30px;
+  display: grid;
+  place-items: center;
+}
+.huddle-agent-figure .avatar {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.huddle-agent-mark {
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-agent);
+  color: var(--color-on-fill);
+  font: 700 var(--text-11) / 16px var(--font-sans);
+  letter-spacing: 0.02em;
+}
+
+/* a person with the camera off */
+.huddle-portrait {
+  flex: none;
+}
+.huddle-portrait.is-character {
+  display: inline-grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+}
+.huddle-portrait.is-character .avatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- controls: a popover over a control ---------- */
+
+.huddle-call-controls {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
+.huddle-ctl-anchor {
+  position: relative;
+  flex: none;
+}
+.huddle-pop {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--color-frost);
+}
+.huddle-pop-note {
+  margin: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.huddle-pop-head {
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.huddle-pop-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  cursor: pointer;
+}
+.huddle-pop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font: 400 var(--text-12) / 1.2 var(--font-sans);
+}
+.huddle-pop-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.huddle-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.huddle-link:hover {
+  color: var(--color-frost);
+}
+.huddle-stop {
+  color: var(--color-agent);
+}
+
+/* take it to a grid */
+.huddle-place {
+  position: absolute;
+  right: var(--space-4);
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--color-frost);
+}
+.huddle-place-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  color: var(--color-dim);
+}
+.huddle-place-field select {
+  height: var(--h-pill);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+}
+.huddle-place-foot {
+  display: flex;
+  gap: var(--space-2);
+}
+
+/* a grid's card for a private conversation's huddle: whose it is, nothing more */
+.huddle-locked {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  border: 1px dashed var(--color-line-strong);
+  text-align: center;
+  padding: var(--space-5);
+}
+
+/* ---------- a channel's huddle: the card in the timeline ---------- */
+
+.hcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 460px;
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+}
+.hcard.is-live {
+  border-color: color-mix(in srgb, var(--color-ok) 45%, var(--color-line));
+}
+.hcard-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+  color: var(--color-frost);
+}
+.hcard-when {
+  color: var(--color-dim);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.hcard-gap {
+  flex: 1;
+}
+.hcard-faces {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.hcard-faces .huddle-faces .huddle-portrait + .huddle-portrait {
+  margin-left: -8px;
+}
+.hcard-names {
+  min-width: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+}
+.hcard-excerpt {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--color-line-strong);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+}
+.hcard-excerpt b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.hcard-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.hcard-where {
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.2 var(--font-sans);
+}
+
+/* ---------- a channel's huddle: the call docked above the timeline ---------- */
+
+.hdock {
+  flex: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: min(46vh, 420px);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-abyss);
+  container-type: inline-size;
+}
+.hdock-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.hdock-title {
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+  color: var(--color-frost);
+}
+.hdock-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--space-4);
+}
+.hdock-body .huddle-stage {
+  flex: 1;
+  min-width: 0;
+}
+.hdock-notes {
+  flex: none;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+}
+@container (max-width: 720px) {
+  .hdock-notes {
+    display: none;
+  }
+}
+.hdock-head-btn {
+  height: 24px;
+}
+
+/* ChatForm's head: the huddle button */
+.hhead-btn.is-live {
+  color: var(--color-ok);
+}
+.hdock .huddle-place {
+  bottom: 56px;
+  right: var(--space-6);
+}
+
+/* #/design: the huddle row of the ChatForm chapter */
+.hdemo {
+  align-items: flex-start;
+}
+.hdemo-stage {
+  flex: 1;
+  min-width: 0;
+}
+.hdemo-stage .hdock {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+}

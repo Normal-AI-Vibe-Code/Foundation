@@ -74,7 +74,10 @@ export function upsertUser(email: string, name: string): UserInfo {
   const color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
   const role = config.adminEmails.includes(e) ? "admin" : "member";
   run("insert into users (id, email, name, color, role, created_at) values (?, ?, ?, ?, ?, ?)", id, e, name || e.split("@")[0], color, role, Date.now());
-  return { id, email: e, name: name || e.split("@")[0], color, role };
+  const user: UserInfo = { id, email: e, name: name || e.split("@")[0], color, role };
+  // someone Slack's history already knows by this email becomes themselves in ChatForm (a lazy import: chat reads auth)
+  void import("./chatimport.ts").then((m) => m.linkGhostsByEmail(user)).catch(() => {});
+  return user;
 }
 
 export const hashToken = (t: string) => createHash("sha256").update(t).digest("hex");

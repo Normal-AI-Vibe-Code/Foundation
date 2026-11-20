@@ -29,9 +29,13 @@
 }
 
 /* .f-day re-declares every token with night pinned off: a surface that is
-   always paper, whatever the room (the sign-in page). */
+   always paper, whatever the room (the sign-in page). .f-paper re-declares them
+   as they are (following night): paper again inside a themed surface, such as a
+   panel that opens out of a pane in the room. */
 :root,
-.f-day {
+.f-day,
+.f-night,
+.f-paper {
   /* surfaces — paper by day, graphite by night (greys only: the work brings the colour) */
   --color-void: color-mix(in srgb, #0f0f10 calc(var(--night) * 100%), #f6f3ec);
   --color-abyss: color-mix(in srgb, #171718 calc(var(--night) * 100%), #fcfbf7);
@@ -161,6 +165,75 @@ html .f-day {
   --night: 0;
   --night-hard: 0;
   color-scheme: light;
+}
+/* and its other half: a surface that is always graphite */
+html .f-night {
+  --night: 1;
+  --night-hard: 1;
+  color-scheme: dark;
+}
+
+/* ---------- themes (DESIGN.md §2.1) ----------
+   The interface wears the theme of what is in focus: `data-theme` on the root, set by the shell
+   (setTheme in index.ts). `paper` is the tokens above. `day` and `night` are paper with night
+   pinned (the engine does it: .is-night). `room` is for a place that is a picture (Today): the
+   floor's panes go clear and their ink goes white, and so do the window's own buttons (the desktop
+   app draws them outside the shell: shell/WindowControls.tsx). `.f-room` is the same look as a class, for
+   anything else drawn straight over a picture. */
+.f-room,
+html[data-theme="room"] :is(.top-bar, .floor-pane),
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
+  --color-frost: var(--color-over-room);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 62%, transparent);
+  --color-moss: color-mix(in srgb, var(--color-over-room) 74%, transparent);
+  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
+  --color-raise: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  --color-abyss: color-mix(in srgb, var(--color-over-room) 8%, transparent);
+  --color-void: transparent;
+  --color-line: color-mix(in srgb, var(--color-over-room) 24%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-over-room) 44%, transparent);
+  --color-pulse: var(--color-over-room);
+  --color-volt: var(--color-over-room);
+  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
+  --color-agent: var(--color-over-room);
+  --color-agent-dim: color-mix(in srgb, var(--color-over-room) 18%, transparent);
+  --color-on-fill: var(--color-room-shade);
+  --shadow-sheet: none;
+  background: transparent;
+  color: var(--color-over-room);
+}
+
+/* Foundation's older names for the tokens (the grid's CSS uses them). Declared wherever the tokens
+   are re-declared, so a themed surface re-resolves them too: declared on the root alone, they kept
+   the root's ink inside the room (release notes drawn dark over Today). */
+:root,
+.f-day,
+.f-night,
+.f-paper,
+.f-room,
+html[data-theme="room"] :is(.top-bar, .floor-pane),
+html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
+  --paper: var(--color-void);
+  --paper-raised: var(--color-raise);
+  --ink: var(--color-frost);
+  --ink-soft: var(--color-mist);
+  --ink-faint: var(--color-dim);
+  --line: var(--color-line);
+  --line-strong: var(--color-line-strong);
+  --accent: var(--color-frost);
+  --select: var(--color-pulse);
+  --select-soft: var(--color-pulse-dim);
+  --pulse: color-mix(in srgb, var(--color-ok) 35%, transparent);
+  --danger: var(--color-bad);
+  --shadow-card: var(--shadow-sheet);
+  --shadow-card-lift: var(--shadow-lift);
+  --font: var(--font-sans);
+  --mono: var(--font-code);
+  /* glass is mixed from the tokens, so it is mixed again wherever they change */
+  --glass-fill: color-mix(in srgb, var(--color-abyss) 72%, transparent);
+  --glass-fill-strong: color-mix(in srgb, var(--color-abyss) 86%, transparent);
+  --glass-edge: color-mix(in srgb, var(--color-frost) 14%, transparent);
 }
 
 /* ---------- primitives every surface uses ---------- */

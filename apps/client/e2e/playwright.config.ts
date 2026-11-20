@@ -68,6 +68,8 @@ export default defineConfig({
         FOUNDATION_CLIENT_URL: CLIENT,
         FOUNDATION_ADMIN_EMAILS: "admin@normal.dev",
         FOUNDATION_DEV_LOGIN: "1",
+        // DeployForm here is a stand-in page (slack-standin.mjs): a check never opens the real one (pages.spec.ts)
+        DEPLOYFORM_URL: `http://127.0.0.1:${SLACK_PORT}/e2e/page.html`,
         // a stand-in Slack (e2e/slack-standin.mjs); no agent runtime, so a check never spends an agent turn
         SLACK_API_BASE: `http://127.0.0.1:${SLACK_PORT}`,
         SLACK_USER_TOKEN: "xoxp-standin",
@@ -76,6 +78,8 @@ export default defineConfig({
         MESHY_API_KEY: "msy-standin",
         // the checks make their own characters: no starter set (E2E_STARTER names a folder to bring one in)
         FOUNDATION_STARTER_DIR: process.env.E2E_STARTER ?? "",
+        // Foundation's avatars never push from a check: off, unless E2E_AVATARS_REPO names a throwaway checkout
+        FOUNDATION_AVATARS_REPO: process.env.E2E_AVATARS_REPO ?? "",
         FOUNDATION_MESHY_POLL_MS: "250",
         FOUNDATION_CLAUDE_CLI: "/nonexistent/claude",
         // the crew's agents run a fixed playbook through the real board tools (no model, nothing spent)

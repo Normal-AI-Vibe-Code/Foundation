@@ -1,0 +1,21 @@
+[
+    {
+        "id": "G02MPIM",
+        "name": "mpdm-ada--noa--deploybot-1",
+        "created": 1772182800,
+        "creator": "U01ADA",
+        "is_archived": false,
+        "members": [
+            "U01ADA",
+            "U02NOA",
+            "U03BOT"
+        ],
+        "pins": [],
+        "topic": {
+            "value": ""
+        },
+        "purpose": {
+            "value": "Group messaging"
+        }
+    }
+]

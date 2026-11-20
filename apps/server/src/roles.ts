@@ -36,6 +36,7 @@ export const READ_TOOLS = new Set([
   "flowform", // the person's own Flowform, through a read-only token; writes nothing here
   "pipeline_status",
   "huddle_transcript",
+  "replay_timeline", // a recorded session's timeline; reads only
   "slack_read",
   "set_plan", // shows the session's plan; writes nothing to the board
   "find_images",
@@ -46,6 +47,12 @@ export const READ_TOOLS = new Set([
   "set_goal",
   "set_profile",
   "point_today",
+  // ChatForm: no board; chattools.ts enforces chat's own rule (the person's channels; posting where they're a member)
+  "chat_channels",
+  "chat_read",
+  "chat_search",
+  "chat_post",
+  "chat_react",
 ]);
 
 function accountRole(userId: string): BoardRole {

@@ -33,7 +33,7 @@ import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { TOOLS } from "../shell/Tools";
 import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } from "../shell/wireGeometry";
 import { tunnelGeometry } from "../shell/wireGeometry";
-import { AppChip, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
+import { AppChip, AppRow, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
 import type { CompanyApp, CompanyGoal, FocusItem, Goal, Mood } from "../today/model";
 
 const NOW = Date.now();
@@ -55,8 +55,8 @@ const SAMPLE_GOALS: Goal[] = [
 ];
 const SAMPLE_APPS: CompanyApp[] = [
   { id: "factoryform", name: "FactoryForm", role: "Inventory, stations, work orders", url: "#", glyph: "⚙" },
-  { id: "bomform", name: "BomForm", role: "BOMs, certification", url: "#", glyph: "▤" },
-  { id: "hyperform", name: "HyperForm", role: "HyperForm programme", url: null, glyph: "◈" },
+  { id: "partform", name: "PartForm", role: "Every part and BOM", url: "#", glyph: "▤", signIn: "hyperform" },
+  { id: "fleetform", name: "FleetForm", role: "The fleet", url: null, glyph: "⛬" },
 ];
 
 function TodayDemo() {
@@ -100,6 +100,13 @@ function TodayDemo() {
             <GoalRow key={g.id} goal={g} pointed={i === 0} />
           ))}
         </section>
+        {/* the apps as Today's panel lists them: the row opens one in your browser, ⤢ opens it in Foundation */}
+        <section className="today-group" data-design-apps>
+          <h2 className="f-eyebrow">Apps</h2>
+          {SAMPLE_APPS.map((a, i) => (
+            <AppRow key={a.id} app={a} status={i === 0 ? "ok" : i === 1 ? "warn" : undefined} />
+          ))}
+        </section>
       </div>
       <nav className="today-chips design-today-chips">
         {SAMPLE_APPS.map((a, i) => (
@@ -109,6 +116,7 @@ function TodayDemo() {
     </div>
   );
 }
+import { CardMenuDemo, ReleasePageDemo, ThemesDemo } from "./ThemeDemos";
 import { PlanBoard, ReleasesTab, type NewCardInput, type SyncState } from "../settings/SettingsPage";
 import type { ReleasePost } from "../settings/releases";
 import { syncSentence } from "../settings/plan";
@@ -121,6 +129,7 @@ import { RichToolbar } from "../components/RichText";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
 import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
 import { MachineTools } from "../panels/MachineTools";
+import { MachineHeadSpecimens } from "./MachineSpecimens";
 import { AgentsMayLine, AgentUseLine, DesktopWell, ViewSwitch } from "../panels/MachineViewDesktop";
 import { IoLines } from "../panels/MachineViewIo";
 import type { MachineAsk, SlackSectionState } from "@foundation/protocol";
@@ -142,6 +151,8 @@ import { SubGridDemo } from "./SubGridDemo";
 import { PointerDemo } from "./PointerDemo";
 import { CharacterStudioDemo } from "./CharacterStudioDemo";
 import { CollectionDemo } from "./CollectionDemo";
+import { ChatFormDemo } from "../chat/ChatDesign";
+import { UploaderDemo } from "./UploaderDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -159,18 +170,19 @@ const TYPE = [
 
 /** which of the page's sections make up each chapter of the design grid (protocol DESIGN_CHAPTERS), by title */
 export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
-  foundations: ["The mark", "Surfaces", "Ink & accents", "Type", "Shape"],
+  foundations: ["The mark", "Surfaces", "Ink & accents", "Themes", "Type", "Shape"],
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
   floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
-  cards: ["Using a card", "Adding files", "Text box", "Writing together"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Text box", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
+  chat: ["ChatForm"],
   machines: ["Machines"],
   agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
-  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Rune renderer"],
+  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Release page", "Rune renderer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
 const Only = createContext<Set<string> | null>(null);
@@ -245,6 +257,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           ))}
           <span className="design-note">Data uses --viz-1…8 in order.</span>
         </div>
+      </Section>
+
+      <Section title="Themes" note="The interface wears the theme of what is in focus (the shell sets data-theme on the root; packages/ui setTheme). Paper is the default and follows the orb. A grid may pin Always day or Always night for everyone on it (its ⓘ pane → Look). The room is Today: the floor's panes go clear and their ink goes white over the Shiba's room. An app opened as a tab is its own look inside its frame, with paper around it. Each is also a class (.f-paper, .f-day, .f-night, .f-room) for a surface that must wear one whatever is in focus. Anything that resolves tokens by hand (a terminal's colours) listens to onLook and reads them again.">
+        <ThemesDemo />
       </Section>
 
       <Section title="Type" note="Hanken Grotesk (OFL, bundled). Display prefers Lufga where licensed. Scale 11/12/13/14/16/20/24/32 — no half sizes.">
@@ -954,6 +970,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <SlackMarks />
       </Section>
 
+      <Section title="ChatForm" note="Foundation's conversations: channels, direct messages, groups, agents and the people beyond the bridges, one model. Its button sits right after Today, of Today's family, with what's for you beside the word (mentions, unread direct messages). The place keeps the top bar and the side menu: a strip with the tabs (Chat · Agents · Inbox · Huddles) and a search field drawn as a line; the sidebar on the floor (sections that fold; unread bold, mentions as the accent pill, muted dim); the timeline, newest at the foot, with day rules held at the top, a New rule in the accent, runs of one author within five minutes; a person is their initials on their colour, an agent its character in a violet ring with the Agent mark and whom it worked for, a ghost its service's monogram and via WhatsApp. Hover bar: quick reactions, react, reply in thread, pin, link, more. The composer is raised paper, ringed blue in focus (a person writes it): markdown tools, @ # :, files as chips with their progress. A thread opens beside it, over the timeline when the place is narrow. Ctrl/⌘+K inside it is the quick switcher.">
+        <ChatFormDemo />
+      </Section>
+
       <Section title="Machines" note="A Linux machine or container in a section, on this computer's engine: Kiri or Docker (one wire, the Docker Engine API). The state pill leads: Running (green, breathing), Pulling and Starting (amber, with the engine's own progress), Stopped and Not started (grey), Error (red, in the engine's words), No engine (amber, a hatched well that says why). Kiri installed but asleep is not No engine: the tag says Kiri · asleep and Start wakes it first; a machine whose disk is on a sleeping Kiri is Out of reach (amber), never removed. Then the engine and its version, the image in code type, and published ports as pills that open the port as a page in the section. Start is the one blue action, and only a person presses it: an agent's proposal says so in violet. Running, the shared terminal fills the card (paper, ink, the tokens as its colours); viewers watch it under an amber View only tag. Remove asks twice. A page opened from a port follows its machine: while the machine isn't running the page's poster dims and the machine's state stands over it (the card's own pill, what happened in its words, Start it for a person and Show the machine), and it reloads by itself when the machine runs again; a removed machine, or a card taken off the board, says it's gone. An agent's command (machine_run) waits on the card under the head: violet, the agent's name, the command in code type, its why, and the time left; Run is a person's blue go-ahead beside Decline, and a viewer sees who can answer instead. Running and answered asks shrink to a line (amber running, green exit 0, red otherwise, struck through when declined or unanswered) for two minutes. Shown at 560, 400 and 260 px. Typing (2026-11-15): a plain click in the terminal puts the caret there; while the shell (or the desktop) has the keys the well wears the 2 px in-use ring and a raised line says Keys go to this machine · Esc Esc to leave, and none of the app's shortcuts take a key. The head's Terminal · Desktop switch shows the machine's graphical desktop on the same ground: none yet is a dashed well with Add a desktop (blue, a person's press; the package manager's own progress in amber while it installs). Agents use a desktop only where a person pressed Let agents use this desktop (a plain pill: the person's decision; once given, a violet dot, who and when, and Stop). While an agent drives, a violet line says ✦ who is using this desktop and what it just did, with its last few actions under it; an agent asking without leave gets the same line with the person's button. The pipes sit above the foot on the panel ground: In ← what's wired in, the value in code type, when, and /foundation/in; Out → where it goes, the value, when, and /foundation/out; one dim line on using them from the shell. A viewer sees the same without the buttons.">
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 560, height: 320 }}>
@@ -1012,6 +1032,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <MachineAsksDemo />
         <AppToolAsksDemo />
         <MachineUseDemo />
+        <MachineHeadSpecimens />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
             <div className="machine-body is-pulling">
@@ -1145,6 +1166,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <CollectionDemo />
       </Section>
 
+      <Section title="Foundation's avatars" note="On the Character studio's left, in a section of its own, the uploader: what's wired into it is Foundation's set of avatars, on every Foundation. A character card's output wires in one character; a section wires in every character card in it (each set's Characters is wired when the studio gets it), the wire leaving by the section's edge facing the uploader, in the character violet (viz-8). Wire in draws a wire backwards out of its input: let go on a character card, or over a section. The head says where it uploads (owner/repo · main); Upload now is the one blue action, beside a Timer (Off, every hour, 6 hours, day, week) and when it next runs. The last upload sits on raised paper, its hairline ok green when it pushed and bad red when it failed, with its commit. The characters are tiles at least 132 wide on raised paper with a violet hairline, grouped under what brought them, each with a chip saying where it stands: In main (ok), Added at the next upload (violet), Waiting (warn: unfinished, or for a person's Approve), Leaves at the next upload (bad, the still greyed). A server that can't upload says why in the note and greys its presses. On tokens only.">
+        <UploaderDemo />
+      </Section>
+
       <Section
         title="Settings, and grids inside grids"
         note="Settings is a place inside Foundation: the side menu stays, a strip of tabs sits under the top bar, and the first tab is the settings themselves, as groups of rows on paper (the name in 13/600, what it means in mist 12, the choice at the right as a segmented pill). Plan and Design language are grids. A grid can sit inside another: in the side menu's All Grids it's a row one step in under its parent, and on the parent grid a section stands for it (a card with its name, what it holds and Open the grid). Whose model an agent is shows as a bead in the ink: Claude, ChatGPT, Kimi, DeepSeek, Gemini, Grok, Cursor, a local model."
@@ -1205,6 +1230,14 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <div className="design-releases">
           <ReleasesTab posts={DEMO_POSTS} route="" />
         </div>
+      </Section>
+
+      <Section title="Release page" note="The Changes tool's first face, and what heads a post in Settings → Releases: a release drawn from its own post. A cover (the mark in pulse, the version in display 300/32, the date, THIS APP on the one running) on a wash of the accent and the agent tint over the panel well; the title in display 20/600; the post's opening paragraph as the description (mist 13/1.55); one bar cut in proportion to the post's parts in the data colours, with the counts (changes · fixes) in dim tabular 11; then each part as a tile on raised paper: its icon on a 14 % wash of its colour, its name 13/600, how many things it lists, and one sentence in mist 12. A tile opens the full notes at its part. On tokens only: white over the room on Today, ink on paper elsewhere.">
+        <ReleasePageDemo post={DEMO_POSTS[0]} />
+      </Section>
+
+      <Section title="A card's menu, pinned and minimized" note="Right-click any card: its name, then Frame it, Full screen and Minimize; Pin to the section or Unpin (a table), Let it fill the section or Show as a card (an app), Float or Dock; Inputs and outputs… (the right pane: every port with its type, what is on it now in full, and each card it is wired to); Open as a tab (an app); Copy a link; Remove in the bad colour, last. A viewer gets the ones that change nothing. A table's cells keep their own menu. Pinned, a table leaves the flow and spans its section on the section's own paper: no card under it, its rules only, at the section's exact width; the flow's cards lie over it. A section a person adds starts with one. Minimized, a card is its bar alone (40 tall), always showing, with ▢ to restore.">
+        <CardMenuDemo />
       </Section>
 
       <Section title="Rune renderer" note="A second engine beside the web renderer (Settings → Renderer; it's this device's choice, and the web renderer is the default). While Rune draws the board, a quiet glass pill in the bottom bar says so, beside the zoom: a green dot when it's drawing, a breathing blue one while it starts, amber and Rune off when it was asked for and couldn't run (the label says why, and a toast says it once). A press opens the list of where Rune stands. In Settings the two engines are raised cards, the chosen one ringed blue; under them, whether WebGPU and the build are here, then the ledger: each part of the board with one of four words. Never violet: which engine draws is a person's choice.">

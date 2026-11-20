@@ -226,7 +226,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
           {p.open && (
             <motion.div
               key="panel"
-              className="server-switch-lift"
+              className="server-switch-lift f-paper"
               initial={{ opacity: 0, y: p.drop ? -8 : 10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.14 } }}

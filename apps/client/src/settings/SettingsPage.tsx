@@ -16,6 +16,7 @@
  * The night orb sits in the head, as on #/design.
  */
 
+import { ReleaseCard } from "./ReleasePage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
@@ -547,13 +548,12 @@ function NewCardForm({ plan, onCreate, onDone }: { plan: Plan; onCreate(input: N
 // ---------------------------------------------------------------- releases
 
 /** the version this app was built as, so its post can say "this app" */
-const RUNNING = clientPackage.version;
+export const RUNNING = clientPackage.version;
 
 export function ReleasesTab({ posts, route }: { posts: ReleasePost[]; route: string }) {
   // #/settings/releases/0.2.0 opens that post; otherwise the newest
   const asked = /#\/settings\/releases\/([\w.-]+)/.exec(route)?.[1];
   const current = posts.find((p) => p.version === asked) ?? posts[0];
-  const body = useMemo(() => (current ? renderMarkdown(current.body) : ""), [current]);
   if (!current) return <p className="design-lede">No release notes yet: they go in docs/blog/&lt;version&gt;.md.</p>;
   return (
     <section className="releases">
@@ -573,7 +573,8 @@ export function ReleasesTab({ posts, route }: { posts: ReleasePost[]; route: str
           Foundation {current.version} · {longDate(current.date)}
         </div>
         <h2>{current.title}</h2>
-        <div className="note-rendered releases-body" dangerouslySetInnerHTML={{ __html: body }} />
+        {/* what it's made of (the bar, the parts as tiles), then the notes: the release page's own pieces */}
+        <ReleaseCard key={current.version} post={current} compact />
       </article>
     </section>
   );

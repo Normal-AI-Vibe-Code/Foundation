@@ -303,6 +303,10 @@ for (const sql of [
   "alter table boards add column url text",
   // grids of grids (2026-11-15): a grid may sit inside another; null parent = at the top of All Grids
   "alter table boards add column parent text",
+  // themes and apps (2026-11-18): a grid may pin its own look ('day' | 'night'; null = paper, following the orb),
+  // and a space may be an app opened as a tab (kind 'app'): `app` names it ('t3', or null for one at a url)
+  "alter table boards add column theme text",
+  "alter table boards add column app text",
   "alter table users add column flowform_user_id text",
   // agent sessions: each tab is its own conversation, resumable after a restart
   "alter table agent_runs add column session_id text",

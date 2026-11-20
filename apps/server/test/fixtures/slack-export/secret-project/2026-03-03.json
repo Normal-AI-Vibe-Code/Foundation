@@ -1,0 +1,48 @@
+[
+    {
+        "client_msg_id": "cm-1772529000.000110",
+        "type": "message",
+        "text": "The secret plans are in",
+        "user": "U01ADA",
+        "ts": "1772529000.000110",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "reply_count": 1,
+        "thread_ts": "1772529000.000110"
+    },
+    {
+        "client_msg_id": "cm-1772529060.000111",
+        "type": "message",
+        "text": "Seen, thanks",
+        "user": "U02NOA",
+        "ts": "1772529060.000111",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/noa_72.png",
+            "first_name": "Noa",
+            "real_name": "Noa Kim",
+            "display_name": "noa",
+            "team": "T0FORM",
+            "name": "noa",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "thread_ts": "1772529000.000110",
+        "parent_user_id": "U01ADA"
+    }
+]
