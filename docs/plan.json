@@ -84,9 +84,50 @@
       "id": "chatform",
       "name": "ChatForm",
       "about": "The company's conversations in Foundation: channels, DMs, agents, huddles and replay, Slack's history, and bridges to mail, WhatsApp, Instagram and WeChat"
+    },
+    {
+      "id": "hosted",
+      "name": "Hosted Foundation",
+      "about": "One server everyone's apps and browsers reach, so the company's chat, boards and agents are shared"
     }
   ],
   "cards": [
+    {
+      "id": "hosted-signin-decision",
+      "title": "Decide how Google sign-in reaches a hosted address: Flowform widened, or Foundation's own Google client",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "auth",
+      "status": "needs-you",
+      "body": "The blocker for a hosted Foundation (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Sign-in goes through Flowform, whose callback rule takes only a loopback address (http, 127.0.0.1 or localhost, a port), so a server at an https address can't finish a sign-in: `loopbackOrigin()` in apps/server/src/flowform.ts refuses one. Two ways, a person's choice: (a) Flowform widens `native_loopback_callback` to accept the hosted address (a change on Flowform's side; Foundation keeps one sign-in for the company), or (b) Foundation gets its own Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, an internal consent screen on the Form Industries Google Workspace). SPEC §6 #2. *hosted-signin* builds whichever is chosen."
+    },
+    {
+      "id": "hosted-where",
+      "title": "Choose where the hosted Foundation runs and its address",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "ship",
+      "status": "needs-you",
+      "body": "A person's choice and accounts (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Where: a small cloud VM (simplest, always on) or an always-on computer in the office. Its name: for example foundation.formindustries.com, with DNS pointed at it. Who pays, and who holds the machine's keys. Whether it's open to the internet (Google sign-in is the fence) or only reachable on the company's private network (Tailscale in front). *hosted-deploy* makes it runnable; this card says where."
+    },
+    {
+      "id": "tailnet-stopgap",
+      "title": "Until hosting: two computers share one Foundation through an SSH tunnel over Tailscale",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "desktop",
+      "status": "needs-you",
+      "body": "A stopgap for Josh's home and work computers, not the company's way in (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) The home computer runs the app's built-in server (it stays up while the app is open); the work computer forwards its own localhost:4410 to it, so the work app finds a server on :4410, uses it, and the Flowform sign-in returns through the tunnel. Nothing in Foundation changes and nothing is on the open internet. Home (admin PowerShell): `winget install --id Tailscale.Tailscale`, `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`, `Start-Service sshd; Set-Service sshd -StartupType Automatic`; keep Foundation open and the PC awake. Work: Tailscale on the same account, quit Foundation, then `ssh -N -L 4410:127.0.0.1:4410 <you>@<home-pc>` and open Foundation. Not run yet. Work IT may not allow Tailscale; huddles connect directly and may fail on a strict network."
+    },
+    {
+      "id": "wildos-wsl-host",
+      "title": "Diagnose WSL on this PC and boot WildOS, then connect its VM console",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "Host helper and guide prepared: npm run wildos diagnoses WSL/virtualization/Docker/Kiri; explicit RepairWsl, BuildIso and native-QEMU StartVm actions support -WhatIf. Diagnostic run and dry runs checked; typecheck passed. WSL 3.0.5 is installed, but this session cannot query its status/distributions (E_ACCESSDENIED) or access CIM/host features; Docker UI launch timed out and shell network is restricted. Josh: run npm run wildos in host PowerShell 7 and inspect its actual error. No host repair, ISO build, WildOS boot or embedded console verified. Foundation test baseline also has route-performance and local-Git-fixture failures. docs/wildos.md and docs/evidence/2026-11-19_wildos-host/."
+    },
     {
       "id": "chatform-slack-export",
       "title": "Export the Slack workspace and bring it in",
@@ -196,6 +237,42 @@
       "status": "needs-you",
       "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size.",
       "issue": 220
+    },
+    {
+      "id": "hosted-signin",
+      "title": "Sign in to a hosted Foundation: the browser, the desktop app, and who may join",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "auth",
+      "status": "next",
+      "body": "Foundation's side of *hosted-signin-decision* (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) When FOUNDATION_PUBLIC_URL is an https address that isn't this computer: the web sign-in and the desktop app's device sign-in (code and \"This is me\") finish on that address, not a loopback one; the session cookie is Secure on https; the desktop app on a remote server signs in for a bearer (it already does, SPEC §7) and the server switch's Remote server connects to it. Who may join: a person new to a hosted server gets a sensible default role, and an admin can see and change it (no one from outside the company's Google domain by default). Build it against a stand-in Flowform (and a stand-in Google client if (b) is chosen) so it doesn't wait on the decision; the invariants hold (tokens hashed and never in URLs, viewers can't write). Tests in apps/server/test; check in a browser against a server run behind an https proxy."
+    },
+    {
+      "id": "hosted-deploy",
+      "title": "A hosted Foundation you can deploy: one command, HTTPS, its data kept and backed up",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "ship",
+      "status": "next",
+      "body": "Make Foundation's server runnable on a machine that isn't a person's computer (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) A container (or the desktop app's bundled server, scripts/desktop-server.mjs, as a service) with the client built in; HTTPS in front (Caddy or similar); the data folder (SQLite and the file archive) on a kept volume, with a nightly backup and a written restore; health and a version on a page; every setting a hosted server needs in one place (docs/hosting.md: FOUNDATION_PUBLIC_URL, FOUNDATION_HOSTS, FOUNDATION_CORS_ORIGINS, sign-in keys, FOUNDATION_ICE_SERVERS). Uploaded files stay archived, never deleted. SQLite is fine to start; S3 and Postgres or libsql stay on *hosted-server*. Checked by deploying to a scratch VM or a local container with a real certificate."
+    },
+    {
+      "id": "hosted-local-features",
+      "title": "What machines, the built-in browser, Kiri and Vision hand-offs do on a hosted server",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "machines",
+      "status": "next",
+      "body": "These run on the server's own computer, which on a hosted server is the cloud box, not the person's (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Until a person decides otherwise, a hosted server says so plainly and doesn't offer them (machines, the built-in browser in work/host-browser, Kiri, T3 and Vision Code hand-offs), and chat, boards, files and agents work without them. Write down the choice to make later (who may start what on whose hardware) as a needs-you card; Vision's half is *vision-pairing*. Nothing that spends money or runs third-party code starts without a person."
+    },
+    {
+      "id": "hosted-chat-check",
+      "title": "Two people on two computers chat through a hosted Foundation",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "chatform",
+      "status": "next",
+      "body": "The check that says company chat works (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) An e2e run (apps/client/e2e) against a server set up as hosted (an https address, not loopback, through a proxy): two people sign in, one from a browser and one as the desktop app's page, and share a channel, a DM, a thread, a reaction, a file and unread; a reconnect after the network drops. Then the real one, a person's check once *hosted-deploy* is up: Josh at home and at work, and a third person. Huddles across networks need TURN (*huddle-sfu*). Evidence in docs/evidence/<date>_hosted-chat/."
     },
     {
       "id": "hyperform-projects",
@@ -484,7 +561,7 @@
       "milestone": "vision",
       "area": "vision",
       "status": "backlog",
-      "body": "Hand-offs use T3's CLI on the same machine. A hosted server needs a T3 pairing link and a stored client credential: a decision for Josh on where that credential lives (SPEC §7).",
+      "body": "Hand-offs use T3's CLI on the same machine. A hosted server needs a T3 pairing link and a stored client credential: a decision for Josh on where that credential lives (SPEC §7). Part of a hosted Foundation: *hosted-local-features*.",
       "issue": 28
     },
     {
@@ -981,10 +1058,10 @@
       "id": "hosted-server",
       "title": "A hosted server: S3 media, Postgres or libsql",
       "kind": "plan",
-      "milestone": "ship",
+      "milestone": "hosted",
       "area": "ship",
       "status": "backlog",
-      "body": "And what a hosted server means for machines (they'd run on the host) and Vision hand-offs (a pairing link).",
+      "body": "And what a hosted server means for machines (they'd run on the host) and Vision hand-offs (a pairing link). Comes after the first hosted Foundation (*hosted-deploy*), which starts on SQLite and a files folder; this is the step up when one server and its disk aren't enough.",
       "issue": 76
     },
     {
