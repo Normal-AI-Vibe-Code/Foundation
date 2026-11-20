@@ -27,6 +27,7 @@ import { keys } from "../lib/keys";
 import { motion, AnimatePresence } from "motion/react";
 import { setUi, useUi } from "../state/ui";
 import { PresenceStack, useBoardTick } from "./Presence";
+import { SpaceGlyph } from "./SpaceGlyph";
 import { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "../lib/grids";
 import type { Place } from "../lib/place";
 
@@ -147,7 +148,9 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
                     data-tip={on ? `${KIND_NAME[kind]} · double-click to rename` : `${b.name} · ${KIND_NAME[kind]}`}
                     data-kbd={i < 9 ? keys(`mod+${i + 1}`) : undefined}
                   >
-                    <span className="tab-glyph">{b.id === "company" ? "◉" : KIND_GLYPH[kind]}</span>
+                    <span className="tab-glyph">
+                      <SpaceGlyph space={b} />
+                    </span>
                     <span className="tab-title">{b.name}</span>
                     {on && <span className={`f-dot ${status === "live" ? "is-ok" : status === "offline" ? "is-warn" : "is-live"}`} title={status === "live" ? "Live" : status === "offline" ? "Offline — edits will sync when back" : "Connecting…"} />}
                     {on && status !== "live" && board && (board.pending || board.fromDevice) && (

@@ -180,7 +180,7 @@ function MachineAsks({ panelId, viewer }: { panelId: string; viewer: boolean }) 
     return () => clearInterval(t);
   }, [live, recent]);
   const [busy, setBusy] = useState<string | null>(null);
-  const answer = async (ask: MachineAsk, verdict: "run" | "decline") => {
+  const answer = async (ask: MachineAsk, verdict: "run" | "decline" | "allow") => {
     setBusy(ask.id);
     try {
       await api(`/api/boards/${encodeURIComponent(board())}/machines/${panelId}/asks/${ask.id}/${verdict}`, { method: "POST", json: {} });
@@ -205,11 +205,13 @@ const clock = (ms: number) => {
  * why, with Run (a person's forward action, blue) and Decline; viewers see who
  * can answer. Running and answered ones are a line each. Also drawn on #/design.
  */
-export function MachineAskList({ asks, viewer, now, busy, onAnswer }: { asks: MachineAsk[]; viewer: boolean; now: number; busy?: string | null; onAnswer?: (a: MachineAsk, verdict: "run" | "decline") => void }) {
+export function MachineAskList({ asks, viewer, now, busy, onAnswer }: { asks: MachineAsk[]; viewer: boolean; now: number; busy?: string | null; onAnswer?: (a: MachineAsk, verdict: "run" | "decline" | "allow") => void }) {
   return (
     <div className="machine-asks">
       {asks.map((a) =>
-        a.state === "waiting" ? (
+        a.tool ? (
+          <AppToolAskRow key={a.id} a={a} viewer={viewer} busy={busy === a.id} onAnswer={onAnswer} />
+        ) : a.state === "waiting" ? (
           <div key={a.id} className="machine-ask is-waiting">
             <div className="machine-ask-head">
               <span className="f-dot is-agent is-live" />
@@ -255,6 +257,92 @@ export function MachineAskList({ asks, viewer, now, busy, onAnswer }: { asks: Ma
           </div>
         ),
       )}
+    </div>
+  );
+}
+
+/**
+ * An agent's ask to use a tool of a saved app (ADR-001 G3): which agent, which
+ * app and tool, first use or changed, what the tool says it does, the
+ * arguments this call would send, and the address Foundation would connect
+ * to. Allow lets agents call that tool from now on (the agent calls again);
+ * nothing runs on the press itself.
+ */
+function AppToolAskRow({ a, viewer, busy, onAnswer }: { a: MachineAsk; viewer: boolean; busy: boolean; onAnswer?: (a: MachineAsk, verdict: "allow" | "decline") => void }) {
+  const t = a.tool!;
+  if (a.state !== "waiting")
+    return (
+      <div className={`machine-ask is-${a.state.replace(" ", "-")}`}>
+        <div className="machine-ask-head">
+          <span className={`f-dot ${a.state === "allowed" ? "is-ok" : ""}`} />
+          <code className="machine-ask-line">{a.command}</code>
+          <span className="machine-ask-verb">{a.state === "allowed" ? `${a.decidedBy} allowed it · ${a.by} can call it again` : a.state === "declined" ? `${a.decidedBy} declined ${a.by}'s ask` : `${a.by}'s ask ended; nothing was called`}</span>
+        </div>
+      </div>
+    );
+  return (
+    <div className="machine-ask is-waiting">
+      <div className="machine-ask-head">
+        <span className="f-dot is-agent is-live" />
+        <span className="machine-ask-who">✦ {a.by}</span>
+        <span className="machine-ask-verb">
+          wants to use a tool of {t.app}
+          {a.for && a.for !== a.by ? ` · for ${a.for}` : ""}
+        </span>
+      </div>
+      <div className="machine-ask-why">
+        <b>{a.command}</b> · {t.change === "first" ? "First use." : "Changed since it was allowed."}
+        {t.description ? ` ${t.description}` : ""}
+      </div>
+      <pre className="machine-ask-cmd" data-tip="The arguments this call would send">{t.args}</pre>
+      <div className="machine-ask-where" data-tip="The address Foundation would connect to: the saved app's, not the card's">
+        {t.address}
+      </div>
+      <div className="machine-ask-actions">
+        {viewer ? (
+          <span className="machine-ask-note">View only: someone who can edit this board allows or declines it.</span>
+        ) : (
+          <>
+            <button className="f-pill is-accent" disabled={busy} onClick={() => onAnswer?.(a, "allow")}>
+              Allow
+            </button>
+            <button className="f-pill" disabled={busy} onClick={() => onAnswer?.(a, "decline")}>
+              Decline
+            </button>
+            <span className="machine-ask-terms">Agents may call {a.command} from now on, until it changes · nothing runs on this press</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** agents' asks to use an app's tools, on the app's card (the board's `machineAsks`, written by the server alone) */
+export function AppToolAsks({ panelId, viewer }: { panelId: string; viewer: boolean }) {
+  const asks = useMachineAsks(panelId).filter((a) => a.tool);
+  const [now, setNow] = useState(() => Date.now());
+  const recent = asks.some((a) => a.endedAt && now - a.endedAt < ANSWERED_MS);
+  useEffect(() => {
+    if (!recent) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [recent]);
+  const [busy, setBusy] = useState<string | null>(null);
+  const answer = async (ask: MachineAsk, verdict: "run" | "decline" | "allow") => {
+    setBusy(ask.id);
+    try {
+      await api(`/api/boards/${encodeURIComponent(board())}/apps/${panelId}/asks/${ask.id}/${verdict}`, { method: "POST", json: {} });
+    } catch (e) {
+      toast((e as Error).message, "bad");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const shown = asks.filter((a) => a.state === "waiting" || (a.endedAt && now - a.endedAt < ANSWERED_MS));
+  if (!shown.length) return null;
+  return (
+    <div className="app-asks" onPointerDown={(e) => e.stopPropagation()}>
+      <MachineAskList asks={shown.slice(-3)} viewer={viewer} now={now} busy={busy} onAnswer={answer} />
     </div>
   );
 }

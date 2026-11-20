@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-20T03:40:33.912Z",
+  "syncedAt": "2026-11-20T02:17:21.967Z",
   "columns": [
     {
       "id": "needs-you",
@@ -176,6 +176,16 @@
       "status": "review",
       "body": "S1. One conversation model in SQLite (chat.ts): open and private channels, DMs, groups, agent conversations and portals; messages with a per-channel seq, threads by root, reactions, pins, edits, removals that need confirm, request_id idempotency; who spoke is the server's to say; a /chat socket; FTS; unread and mentions into Today. Architecture and contract: docs/chatform.md.",
       "issue": 204
+    },
+    {
+      "id": "themes-browser-sheets",
+      "title": "Themes by what's in focus, a real built-in browser, a release page, sheets and a card's menu",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "shell",
+      "status": "review",
+      "body": "Josh, 2026-11-18: the browser doesn't work (build Claude's, readable by agents); the terminal prints too many blank lines; Changes as a release page, white on Today through a theming system keyed to the grid or app in focus (the terminal stayed white back on a grid); T3's pane themed and its expand a tab of its own, listed in All Grids; the wheel zooms; the orb right of the profile; the section adjuster only as long as its section; right-click menus on cards; a new section starts with a full-width table drawn on the grid, unpinnable. Built: `setTheme`/`onLook` and the `room`, `paper`, `day`, `night` themes (a grid's Look in its pane); Chrome or Edge on the server's computer over the DevTools pipe, screencast to the pane, five agent tools behind a person's leave; `termtidy`; the release page; spaces of kind `app` (T3, any app card); wheel zoom with trackpad pan and a setting; grab areas per section edge; the card menu with minimize, pin, inputs and outputs, open as a tab, remove; pinned tables and a sheet in every section a person adds. Checked: `e2e/look` (9), `test/hostbrowser` (6, one on the real Chrome), `termtidy` (6), `release-outline` (4), `sections` (8); github.com/login seen in the pane. Not checked: the desktop window, Josh's older grids (the adjuster fault there was not reproduced), T3 running, Rune. 2026-11-19, Josh: every new section keeps starting with a table. Needs Josh: how the wheel reads his mouse (SPEC, Waiting on a person).",
+      "issue": 205
     },
     {
       "id": "council-seats-and-machine-io",
@@ -1109,12 +1119,12 @@
     },
     {
       "id": "app-addresses",
-      "title": "Set FleetForm's address (and say if PartForm is BomForm)",
+      "title": "Set BomForm's, HyperForm's and FleetForm's addresses",
       "kind": "hookup",
       "milestone": "today",
       "area": "apps",
       "status": "needs-you",
-      "body": "2026-11-19: HyperForm, PartForm, DeployForm and FactoryForm are linked on Today where HyperForm hosts them, with nothing to set (SPEC §0.10, §6 #18). Left for a person: `FLEETFORM_URL` (Today shows FleetForm as not linked), and whether PartForm is the app that was called BomForm (the list shows one row for both).",
+      "body": "Today shows them as not linked until `BOMFORM_URL`, `HYPERFORM_URL`, `FLEETFORM_URL` are set (SPEC §6 #18). What is HyperForm's app? Only the Data Room's diligence video mentions it.",
       "issue": 111
     },
     {
@@ -2098,144 +2108,14 @@
       "issue": 193
     },
     {
-      "id": "hyperform-projects",
-      "title": "HyperForm's projects in Foundation: list them, show deploy state, read an app without a person's session",
+      "id": "wt-person-gate",
+      "title": "Working together 1: the person gate",
       "kind": "plan",
       "milestone": "apps",
-      "area": "connectors",
-      "status": "next",
-      "body": "HyperForm has an MCP server, a CLI and machine certificates (its llms.txt). Next: a HyperForm connector that lists the projects it hosts (so Today's apps come from HyperForm instead of a hand-kept list, and a new app appears by itself), shows each one's last deployment, and uses a machine certificate so the server can read an app (and refresh a page card's picture) without a person's browser session. Needs a person to approve the connector's access on HyperForm (read only).",
-      "issue": 221
-    },
-    {
-      "id": "hyperform-sign-in",
-      "title": "Sign in to HyperForm once in Foundation's browser, and say what you see",
-      "kind": "hookup",
-      "milestone": "apps",
-      "area": "apps",
-      "status": "needs-you",
-      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size.",
-      "issue": 220
-    },
-    {
-      "id": "hyperform-apps",
-      "title": "HyperForm's apps on Today, opened in Foundation as live pages with kept pictures",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "apps",
+      "area": "security",
       "status": "review",
-      "body": "Josh, 2026-11-19: start integrating HyperForm (where the vibe-coded apps are hosted); link HyperForm, PartForm, DeployForm and FactoryForm on Today; open them as web pages that take over a section, usable by agents, with a saved preview from far away and the live page up close. Built (SPEC §0.10): the app list with hosted addresses; ⤢ on a Today row opens the app in a new section it fills; such a page is a tab of the built-in browser (a frame can't show a site behind HyperForm's sign-in), live when near, its kept picture when far, an admin's to run, with Agents on the card for the `browser_` tools. Checked against a stand-in page in a real browser (`e2e/pages.spec.ts`, `test/pagecard.test.ts`); not yet against the real apps: that waits on a sign-in (card: hyperform-sign-in).",
-      "issue": 219
-    },
-    {
-      "id": "rune-e2e-drag-link",
-      "title": "Rune: a section dragged onto another's cell doesn't swap, and a link in a note doesn't open (two e2e checks fail)",
-      "kind": "bug",
-      "milestone": "ship",
-      "area": "design",
-      "status": "backlog",
-      "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge: 'a section's tools, rename, drag, right-click menu and remove' fails where Vision is dragged by its header onto BomForm's cell (it stays at 1,0), and 'the paper, the face and a note in markdown' fails where a press on a note's link should report its address (no link event). Both fail the same way without the motion rules, so they predate them; probably the 2026-11-17 pointer rules, after which Rune's e2e wasn't run. Done when all ten checks pass.",
-      "issue": 218
-    },
-    {
-      "id": "rune-motion-rules-icon",
-      "title": "Rune: motion by rule (panes and other boards land); the new mark and app icon",
-      "kind": "plan",
-      "milestone": "polish",
-      "area": "design",
-      "status": "review",
-      "body": "Josh, 2026-11-19: Rune animated between pane transitions, which it doesn't need to; and the icon was too small. Built: every board Rune is handed says lands or eases, by five rules (apps/client/src/rune/transitions.ts; DESIGN §6). The mark is Josh's two leaves, and the app icon is that mark on a full-bleed night-navy tile like the other apps'. Checked: test/rune-transitions.test.ts, e2e/rune.spec.ts 'motion has an owner' in Edge, #/design day and night (docs/evidence/2026-11-19_rune-motion-icon/). A person checks: the feel of a pane opening under Rune, the icon in the taskbar after a desktop build, and whether navy is the tile's colour.",
-      "issue": 217
-    },
-    {
-      "id": "security-pass-desktop-check",
-      "title": "Check the desktop app before the security pass is pushed",
-      "kind": "plan",
-      "milestone": "ship",
-      "area": "security",
-      "status": "needs-you",
-      "body": "A push to main publishes a signed desktop release. Before pushing the 2026-11-18 security pass, a person checks the packaged desktop app: it signs in (the new code-and-confirm step), the agent answers one turn, and T3 starts. See docs/SECURITY.md.",
-      "issue": 216
-    },
-    {
-      "id": "wt-handoff",
-      "title": "Working together 12: hand-off between agents",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "agent",
-      "status": "backlog",
-      "body": "A run in another app shown as a subagent in ours; its asks display-only. Needs Vision's tool door. Slice 12 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 215
-    },
-    {
-      "id": "wt-shared-package",
-      "title": "Working together 10: one reducer",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "agent",
-      "status": "backlog",
-      "body": "Take the shared AG-UI conventions and reducer from @pacific/agui by hash-locked copy; retire the duplicate. Slice 10 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 214
-    },
-    {
-      "id": "wt-watch",
-      "title": "Working together 9: watching and Waiting for you",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "apps",
-      "status": "backlog",
-      "body": "Chains started elsewhere can be seen and stopped; every pending ask in one list, each saying where it is answered. Slice 9 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 213
-    },
-    {
-      "id": "wt-first-chain",
-      "title": "Working together 8: the first chain",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "vision",
-      "status": "backlog",
-      "body": "Foundation's agent asks Vision for a part from SolidCraft through Vision's engine door; the Chain view draws it; evidence end to end. Needs Vision's side (slice 7). Slice 8 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 212
-    },
-    {
-      "id": "wt-mandates",
-      "title": "Working together 6: mandates",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "security",
-      "status": "backlog",
-      "body": "Short-lived, chain-bound tokens for calls between enrolled apps, with generated-chain tests for the weakest-link rule. Slice 6 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 211
-    },
-    {
-      "id": "wt-registry",
-      "title": "Working together 5: enrolment and the map",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "apps",
-      "status": "backlog",
-      "body": "The apps table grows into participants a person enrols by code; manifest v2 served and read; the map drawn from the registry. Builds on app-registry (#48) and foundation-json (#49). Slice 5 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 210
-    },
-    {
-      "id": "wt-deny-ledger",
-      "title": "Working together 4: marked runs and the ledger",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "security",
-      "status": "backlog",
-      "body": "A run that has read outside content is refused the tools that send data out or spend; one ledger line per tool call. Slice 4 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 209
-    },
-    {
-      "id": "wt-origin-mark",
-      "title": "Working together 3: where it ran, in the data",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "agent",
-      "status": "backlog",
-      "body": "Every agent event and every board object carries its origin and whether it includes outside content; the origin badge and chain row on #/design, day and night. Needs /api/agui. Slice 3 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
-      "issue": 208
+      "body": "Things only a person may start are refused to an agent's token everywhere, with a test for each; programs Foundation starts get no keys, a pinned REA and a folder outside data/. Slice 1 of ADR-001 (docs/decisions/ADR-001-working-together.md). Merged to main 2026-11-18. In Review until a person runs one real agent turn from the page, which checks that Claude Code still finds its login.",
+      "issue": 206
     },
     {
       "id": "wt-tool-doors",
@@ -2248,24 +2128,94 @@
       "issue": 207
     },
     {
-      "id": "wt-person-gate",
-      "title": "Working together 1: the person gate",
+      "id": "wt-origin-mark",
+      "title": "Working together 3: where it ran, in the data",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Every agent event and every board object carries its origin and whether it includes outside content; the origin badge and chain row on #/design, day and night. Needs /api/agui. Slice 3 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 208
+    },
+    {
+      "id": "wt-deny-ledger",
+      "title": "Working together 4: marked runs and the ledger",
       "kind": "plan",
       "milestone": "apps",
       "area": "security",
-      "status": "review",
-      "body": "Things only a person may start are refused to an agent's token everywhere, with a test for each; programs Foundation starts get no keys, a pinned REA and a folder outside data/. Slice 1 of ADR-001 (docs/decisions/ADR-001-working-together.md). Merged to main 2026-11-18. In Review until a person runs one real agent turn from the page, which checks that Claude Code still finds its login.",
-      "issue": 206
+      "status": "backlog",
+      "body": "A run that has read outside content is refused the tools that send data out or spend; one ledger line per tool call. Slice 4 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 209
     },
     {
-      "id": "themes-browser-sheets",
-      "title": "Themes by what's in focus, a real built-in browser, a release page, sheets and a card's menu",
+      "id": "wt-registry",
+      "title": "Working together 5: enrolment and the map",
       "kind": "plan",
-      "milestone": "polish",
-      "area": "shell",
-      "status": "review",
-      "body": "Josh, 2026-11-18: the browser doesn't work (build Claude's, readable by agents); the terminal prints too many blank lines; Changes as a release page, white on Today through a theming system keyed to the grid or app in focus (the terminal stayed white back on a grid); T3's pane themed and its expand a tab of its own, listed in All Grids; the wheel zooms; the orb right of the profile; the section adjuster only as long as its section; right-click menus on cards; a new section starts with a full-width table drawn on the grid, unpinnable. Built: `setTheme`/`onLook` and the `room`, `paper`, `day`, `night` themes (a grid's Look in its pane); Chrome or Edge on the server's computer over the DevTools pipe, screencast to the pane, five agent tools behind a person's leave; `termtidy`; the release page; spaces of kind `app` (T3, any app card); wheel zoom with trackpad pan and a setting; grab areas per section edge; the card menu with minimize, pin, inputs and outputs, open as a tab, remove; pinned tables and a sheet in every section a person adds. Checked: `e2e/look` (9), `test/hostbrowser` (6, one on the real Chrome), `termtidy` (6), `release-outline` (4), `sections` (8); github.com/login seen in the pane. Not checked: the desktop window, Josh's older grids (the adjuster fault there was not reproduced), T3 running, Rune. 2026-11-19, Josh: every new section keeps starting with a table. Needs Josh: how the wheel reads his mouse (SPEC, Waiting on a person).",
-      "issue": 205
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "The apps table grows into participants a person enrols by code; manifest v2 served and read; the map drawn from the registry. Builds on app-registry (#48) and foundation-json (#49). Slice 5 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 210
+    },
+    {
+      "id": "wt-mandates",
+      "title": "Working together 6: mandates",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "backlog",
+      "body": "Short-lived, chain-bound tokens for calls between enrolled apps, with generated-chain tests for the weakest-link rule. Slice 6 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 211
+    },
+    {
+      "id": "wt-first-chain",
+      "title": "Working together 8: the first chain",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "vision",
+      "status": "backlog",
+      "body": "Foundation's agent asks Vision for a part from SolidCraft through Vision's engine door; the Chain view draws it; evidence end to end. Needs Vision's side (slice 7). Slice 8 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 212
+    },
+    {
+      "id": "wt-watch",
+      "title": "Working together 9: watching and Waiting for you",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "Chains started elsewhere can be seen and stopped; every pending ask in one list, each saying where it is answered. Slice 9 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 213
+    },
+    {
+      "id": "wt-shared-package",
+      "title": "Working together 10: one reducer",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Take the shared AG-UI conventions and reducer from @pacific/agui by hash-locked copy; retire the duplicate. Slice 10 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 214
+    },
+    {
+      "id": "wt-handoff",
+      "title": "Working together 12: hand-off between agents",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "A run in another app shown as a subagent in ours; its asks display-only. Needs Vision's tool door. Slice 12 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 215
+    },
+    {
+      "id": "security-pass-desktop-check",
+      "title": "Check the desktop app before the security pass is pushed",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "security",
+      "status": "needs-you",
+      "body": "A push to main publishes a signed desktop release. Before pushing the 2026-11-18 security pass, a person checks the packaged desktop app: it signs in (the new code-and-confirm step), the agent answers one turn, and T3 starts. See docs/SECURITY.md.",
+      "issue": 216
     }
   ]
 }

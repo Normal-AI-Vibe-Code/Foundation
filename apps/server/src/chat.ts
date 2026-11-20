@@ -55,6 +55,7 @@ import {
   type UserInfo,
 } from "@foundation/protocol";
 import { all, db, indexDoc, one, run, unindexDoc } from "./db.ts";
+import { setChatFileRule } from "./files.ts";
 import { HttpError, readJson, type Req, type Router } from "./http.ts";
 import { isPerson, requireUser } from "./auth.ts";
 import { canSeeBoard } from "./members.ts";
@@ -1038,6 +1039,12 @@ export function canSeeChatFile(user: UserInfo, fileId: string): boolean {
     return Boolean(ch && canSeeChannel(user, ch));
   });
 }
+
+// board tools and routes that take a file id ask files.ts, which asks this for a chat upload (an agent sees what its person sees; the service token nothing)
+setChatFileRule((userId, fileId) => {
+  const u = one<UserInfo>("select id, email, name, color, role from users where id = ?", userId);
+  return Boolean(u && canSeeChatFile(u, fileId));
+});
 
 /** files a person may put on a message: their own chat uploads, chat files they can already see, files of boards they can see */
 function requireAttachable(user: UserInfo, ids: unknown): string[] {

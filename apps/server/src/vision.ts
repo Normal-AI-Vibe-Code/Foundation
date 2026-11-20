@@ -18,7 +18,7 @@
  * archives what lands (searchable, never deleted) and puts it on the board.
  */
 
-import { spawn } from "node:child_process";
+import { childOptions, spawnChild, type SpawnOptions } from "./child.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, extname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -61,12 +61,13 @@ function cli(args: string[]): Promise<string> {
     } catch (e) {
       return fail(e as Error);
     }
-    // no shell: the arguments go to the program as they are
-    const child = spawn(cmd, [...pre, ...args, "--base-dir", where.home, "--log-level", "error"], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    // no shell: the arguments go to the program as they are. Minting or revoking a session only reads and
+    // writes Vision Code's home, which it's told with --base-dir: the allowlist only (child.ts), no extras
+    const child = spawnChild(cmd, [...pre, ...args, "--base-dir", where.home, "--log-level", "error"], childOptions<SpawnOptions>({ extras: [] }, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true }));
     let out = "";
     let err = "";
-    child.stdout.on("data", (b: Buffer) => (out += b));
-    child.stderr.on("data", (b: Buffer) => (err += b));
+    child.stdout!.on("data", (b: Buffer) => (out += b));
+    child.stderr!.on("data", (b: Buffer) => (err += b));
     child.on("error", (e) => fail(new Error(`Vision Code's CLI at ${where.cli} wouldn't start (${e.message}). If it lives elsewhere, set T3_CLI to its t3 program (t3.exe on Windows) where Foundation's server starts.`)));
     child.on("close", (code) => (code === 0 ? ok(out) : fail(new Error(`t3 ${args.slice(0, 3).join(" ")} failed: ${(err || out).slice(-400)}`))));
   });

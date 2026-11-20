@@ -16,7 +16,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { spawn, execFileSync } from "node:child_process";
+import { childOptions, execFileSyncChild, spawnChild, type ChildOptions, type ExecFileSyncOptions, type SpawnOptions } from "./child.ts";
 import { randomBytes } from "node:crypto";
 import { writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -26,6 +26,7 @@ import { config } from "./config.ts";
 import { all, one, run } from "./db.ts";
 import { boardDigest, editBoard } from "./boards.ts";
 import { runTool, toolContent, TOOLS, type ToolCtx } from "./tools.ts";
+import { audit } from "./audit.ts";
 import { canWrite } from "./roles.ts";
 import { createSession, revokeSession } from "./auth.ts";
 import { logActivity } from "@foundation/protocol";
@@ -57,7 +58,8 @@ function contextBlock(opts: { boardId: string; user: UserInfo; persona?: "shiba"
 import { describeCrewWork, joinCrew, leaveCrew, setDoing, type CrewMember, seatName } from "./crew.ts";
 import { setHelperStarter } from "./tools.ts";
 import { runScript } from "./script.ts";
-import { claudeCommand, here, type Runtime } from "./rea.ts";
+import { CLAUDE_CODE_ENV, claudeCommand, here, type Runtime } from "./rea.ts";
+import { workFolder } from "./childenv.ts";
 
 /** a ChatForm turn (chatagents.ts): the agent's name, the chat it's in (replaces the board context) and how to speak there; no board cursor */
 export interface ChatTurn {
@@ -92,6 +94,50 @@ You are one of the crew: people see you on the board as a named cursor (your nam
 - If the ask has parts that can run at the same time in different places (a second data source, a separate section), call_in_help with exact instructions for one part, and do the rest yourself. Most asks need no helper. Set your plan before you call one in: your helpers get it.
 - Called in as a helper (your <you> says by whom), you start with your part, the lead's plan and what the crew has made so far. Call crew_work before you make each thing, and don't make what a teammate has made or is making: build on it, or say it's there.`;
 
+/**
+ * What `claude -p` is started with for a board run: Foundation's tools and nothing of the person's own.
+ * `--strict-mcp-config`: only the MCP server in Foundation's config (the board's tools), not the person's
+ * user, project or plugin MCP servers (mail, docs, trackers). `--setting-sources ""`: none of their settings
+ * files (user, project, local), so their permission allow-rules, hooks and env don't widen a board run.
+ * `--tools=`: no built-in tools at all (`claude --help`: `--tools ""` disables all of them; the Agent SDK
+ * 0.3.323 turns `tools: []` into this same `--tools=`), and `--disallowedTools=` naming every built-in as
+ * a second fence, should a version ever bring one back. `--allowedTools` only pre-approves Foundation's.
+ * Flag names as Claude Code 2.1.288's `claude --help` gives them.
+ */
+export function subscriptionArgs(o: { prompt: string; mcpFile: string; system: string }): string[] {
+  return [
+    "-p",
+    o.prompt,
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--mcp-config",
+    o.mcpFile,
+    "--strict-mcp-config",
+    "--setting-sources",
+    "",
+    "--append-system-prompt",
+    o.system,
+    "--allowedTools",
+    "mcp__foundation__*",
+    "--tools=",
+    `--disallowedTools=${CLAUDE_BUILT_IN_TOOLS.join(",")}`,
+  ];
+}
+
+/**
+ * Claude Code's built-in tools, every one a board run is denied (subscriptionArgs): shells, files, the web,
+ * sub-agents, tasks, worktrees, skills, schedules, messages. The same list Casey's SDK options deny.
+ */
+export const CLAUDE_BUILT_IN_TOOLS = Object.freeze([
+  "Agent", "Task", "Bash", "BashOutput", "KillBash", "KillShell", "PowerShell", "Monitor",
+  "Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "NotebookRead", "Glob", "Grep", "LS",
+  "WebFetch", "WebSearch", "TodoWrite", "TaskCreate", "TaskGet", "TaskUpdate", "TaskList", "TaskOutput", "TaskStop",
+  "ExitPlanMode", "EnterPlanMode", "EnterWorktree", "ExitWorktree", "ListMcpResourcesTool", "ReadMcpResourceTool",
+  "Skill", "SlashCommand", "ToolSearch", "AskUserQuestion", "CronCreate", "CronDelete", "CronList", "ScheduleWakeup",
+  "RemoteTrigger", "Workflow", "SendMessage", "Artifact", "PushNotification",
+]);
+
 const histories = new Map<string, Anthropic.MessageParam[]>();
 const claudeSessions = new Map<string, string>();
 
@@ -118,7 +164,9 @@ export function resolveClaude(cli: string, rt: Runtime, exec: (cmd: string, args
 let claude: ClaudeStart | null = null;
 /** Claude Code on this computer, checked once */
 export function claudeStart(): ClaudeStart {
-  claude ??= resolveClaude(config.claudeCli, here(), (cmd, args) => execFileSync(cmd, args, { stdio: "ignore", timeout: 5000, windowsHide: true }));
+  // `claude --version` gets what Claude Code needs to start at all (CLAUDE_CODE_ENV: where its config is,
+  // and Git Bash on Windows), never a key
+  claude ??= resolveClaude(config.claudeCli, here(), (cmd, args) => execFileSyncChild(cmd, args, childOptions<ExecFileSyncOptions>({ extras: CLAUDE_CODE_ENV }, { stdio: "ignore", timeout: 5000, windowsHide: true })));
   return claude;
 }
 
@@ -207,7 +255,7 @@ export async function runAgent(opts: {
   };
   try {
     if (runtime === "api") await runApi(opts, emit);
-    else if (runtime === "script") await runScript(opts, emit, { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id });
+    else if (runtime === "script") await runScript(opts, emit, { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" });
     else await runSubscription(opts, emit, runId);
     finish(opts.signal.aborted ? "stopped" : "done");
   } catch (e) {
@@ -255,6 +303,12 @@ export function startRun(opts: Omit<Parameters<typeof runAgent>[0], "emit" | "si
     setTimeout(() => live.delete(r.id), 60_000).unref?.();
   };
   emit({ type: "run", id: r.id });
+  // who started it: a person (the route asks requirePerson), a lead calling in help, or the Slack board's curator for the person who turned it on
+  audit(
+    opts.lead
+      ? { actor_kind: "agent", actor_id: opts.lead.id, actor_name: opts.lead.name, for_person: opts.user.id, board_id: opts.boardId, door: "agent-run", action: "run.start", target: r.id, decision: "allowed", result: "ok" }
+      : { actor_kind: "person", actor_id: opts.user.id, actor_name: opts.user.name, board_id: opts.boardId, door: "route", action: "run.start", target: r.id, decision: "allowed", approved_by: opts.user.id, result: "ok" },
+  );
   // every board turn is someone you can see: a name, a colour, a cursor on the board.
   // The Shiba isn't on a board (it talks to one person on their Today), so it has no cursor
   let crew: CrewMember | undefined;
@@ -327,6 +381,7 @@ export function stopRun(id: string, userId: string) {
   const r = live.get(id);
   if (!r || r.userId !== userId) return false;
   r.ctrl.abort();
+  audit({ actor_kind: "person", actor_id: userId, board_id: r.boardId, door: "route", action: "run.stop", target: id, decision: "allowed", result: "ok" });
   return true;
 }
 
@@ -350,6 +405,7 @@ export function stopAllRuns(boardId: string, userId: string): number {
   for (const r of live.values()) {
     if (r.done || r.userId !== userId || r.boardId !== boardId || r.ctrl.signal.aborted) continue;
     r.ctrl.abort();
+    audit({ actor_kind: "person", actor_id: userId, board_id: boardId, door: "route", action: "run.stop", target: r.id, decision: "allowed", result: "ok" });
     n++;
   }
   return n;
@@ -381,7 +437,7 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
     role: "user",
     content: `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`,
   });
-  const ctx: ToolCtx = { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id };
+  const ctx: ToolCtx = { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" };
   const tools = apiTools();
   let usage = { input: 0, output: 0 };
 
@@ -446,13 +502,27 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
 
 // ---------- subscription runtime (Claude Code, T3-style session) ----------
 
+/**
+ * Where and with what Claude Code runs (ADR-001 G13). One folder under the work folder for every
+ * subscription turn, never `data/`: Claude Code keeps its sessions per working folder, and `--resume`
+ * finds a session only from the folder it was made in, so the folder stays the same from turn to turn.
+ * Its environment is the allowlist plus CLAUDE_CODE_ENV (its login), never ANTHROPIC_API_KEY or any
+ * other key: with that key set, `claude -p` would bill it instead of the person's plan.
+ */
+export function subscriptionSpawnOptions(): ChildOptions<SpawnOptions> {
+  return childOptions<SpawnOptions>({ extras: CLAUDE_CODE_ENV }, { cwd: workFolder("agent"), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+}
+
 async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent) => void, runId: string) {
   const c = claudeStart();
   if (!c.ok) throw new Error(`The subscription runtime can't start: ${c.reason}`);
   const key = convKey(opts);
   // a short-lived session for this person, so the agent's writes are theirs
   const token = createSession(opts.user.id, 2 * 3600_000, "agent");
-  const mcpFile = join(config.dataDir, `mcp-${randomBytes(6).toString("hex")}.json`);
+  audit({ actor_kind: "service", actor_id: "server", actor_name: "Foundation", for_person: opts.user.id, board_id: opts.boardId, door: "agent-run", action: "agent_token.mint", target: runId, decision: "allowed", reason: "a run's own MCP bearer, 2 hours", result: "ok" });
+  // the run's pass to the board, in a folder of the run's own (not data/, not the folder Claude Code works in), gone when it ends
+  const runDir = workFolder("runs", /^[A-Za-z0-9_-]+$/.test(runId) ? runId : `run_${randomBytes(6).toString("hex")}`);
+  const mcpFile = join(runDir, "mcp.json");
   writeFileSync(
     mcpFile,
     JSON.stringify({
@@ -467,19 +537,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
     { mode: 0o600 },
   );
   const prompt = `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`;
-  const argv = [
-    "-p",
-    prompt,
-    "--output-format",
-    "stream-json",
-    "--verbose",
-    "--mcp-config",
-    mcpFile,
-    "--append-system-prompt",
-    SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? "") + "\nYour board tools are the mcp__foundation__* tools.",
-    "--allowedTools",
-    "mcp__foundation__*",
-  ];
+  const argv = subscriptionArgs({ prompt, mcpFile, system: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? "") + "\nYour board tools are the mcp__foundation__* tools." });
   // the Claude Code session to continue: this server's memory, else the last run of this tab
   const resume =
     claudeSessions.get(key) ??
@@ -491,11 +549,11 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
   emit({ type: "status", status: "thinking" });
   await new Promise<void>((resolve, reject) => {
     // no shell: the prompt is one argument, whatever it holds
-    const child = spawn(c.cmd, [...c.pre, ...argv], { cwd: config.dataDir, env: process.env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const child = spawnChild(c.cmd, [...c.pre, ...argv], subscriptionSpawnOptions());
     opts.signal.addEventListener("abort", () => child.kill("SIGTERM"));
     let buf = "";
     let err = "";
-    child.stdout.on("data", (b: Buffer) => {
+    child.stdout!.on("data", (b: Buffer) => {
       buf += b.toString("utf8");
       let i: number;
       while ((i = buf.indexOf("\n")) >= 0) {
@@ -504,7 +562,7 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
         if (line) handleLine(line);
       }
     });
-    child.stderr.on("data", (b: Buffer) => (err += b.toString("utf8")));
+    child.stderr!.on("data", (b: Buffer) => (err += b.toString("utf8")));
     const handleLine = (line: string) => {
       let ev: {
         type: string;
@@ -544,9 +602,13 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
         emit({ type: "done", runtime: "subscription", usage: { input: ev.usage?.input_tokens ?? 0, output: ev.usage?.output_tokens ?? 0 } });
       }
     };
-    child.on("error", reject);
+    child.on("error", (e) => {
+      rmSync(runDir, { recursive: true, force: true });
+      revokeSession(token);
+      reject(e);
+    });
     child.on("close", (code) => {
-      rmSync(mcpFile, { force: true });
+      rmSync(runDir, { recursive: true, force: true });
       revokeSession(token);
       if (code === 0 || opts.signal.aborted) resolve();
       else reject(new Error(`Claude Code exited ${code}: ${err.slice(-600)}`));

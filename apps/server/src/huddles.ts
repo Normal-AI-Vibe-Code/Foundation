@@ -42,6 +42,7 @@ import { requirePerson, requireUser } from "./auth.ts";
 import { canSeeBoard, requireBoard } from "./members.ts";
 import { canWrite } from "./roles.ts";
 import { canSeeChannel, getChannel, getMessage, personParty, postMessage, setChannelHuddle, updateMessage } from "./chat.ts";
+import { requireFileVisible } from "./files.ts";
 
 /** the reserved board id a channel's rooms signal on */
 export const CHAT_HOME = "chat";
@@ -1241,6 +1242,7 @@ export function huddleRoutes(r: Router) {
     const b = await readJson<{ board?: string; fileId?: string; sessionId?: string; startedAt?: number; endedAt?: number; kind?: string }>(req);
     if (!b.fileId) throw new HttpError(400, "fileId required");
     const a = huddleAccess(u, b.board ?? "company", req.params.id);
+    if (a.boardId !== CHAT_HOME) requireFileVisible(u.id, b.fileId); // a grid huddle's recording is a file its uploader can see (a channel's: attachRecording's own rule)
     try {
       return attachRecording(a.boardId, req.params.id, { fileId: b.fileId, person: u.name, userId: u.id, sessionId: b.sessionId, startedAt: b.startedAt ?? Date.now(), endedAt: b.endedAt ?? Date.now(), kind: b.kind === "screen" ? "screen" : "camera" });
     } catch (e) {

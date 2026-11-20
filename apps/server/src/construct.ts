@@ -15,8 +15,10 @@ import * as Y from "yjs";
 import { appendSection, boardMaps, findSection, putNote, uid, type MediaDoc, type NoteDoc, type PanelDoc, type SectionDoc } from "@foundation/protocol";
 import { all, one } from "./db.ts";
 import { editBoard } from "./boards.ts";
-import { storeFile, type FileRow } from "./files.ts";
+import { canSeeFile, storeFile, type FileRow } from "./files.ts";
 import { searchLocal } from "./search.ts";
+import { SLACK_SEARCH_NOT_YOURS, slackUserTokenFor } from "./slackuser.ts";
+import { guardEgress } from "./egressguard.ts";
 
 // ---------- finding ----------
 
@@ -64,16 +66,23 @@ interface SlackFile {
 }
 
 async function slackGet<T>(method: string, params: Record<string, string>, token: string): Promise<T> {
+  guardEgress("Slack"); // an agent's call reaches Slack only where a person allowed it (egress.ts)
   const res = await fetch(`${slackBase()}/${method}?${new URLSearchParams(params)}`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) });
   const body = (await res.json()) as { ok: boolean; error?: string } & T;
   if (!body.ok) throw new Error(`Slack ${method}: ${body.error ?? "failed"}`);
   return body;
 }
 
-/** images in Slack about the query: search.files with the user token, else the bot's files.list filtered by name */
-async function slackImages(query: string, limit: number): Promise<{ found: Found[]; note?: string }> {
-  const { user, bot } = slackTokens();
+/**
+ * images in Slack about the query: search.files with the user token when the search is its owner's (slackuser.ts),
+ * else the bot's files.list filtered by name. `viewer`: who the search is for.
+ */
+async function slackImages(query: string, limit: number, viewer: string): Promise<{ found: Found[]; note?: string }> {
+  const tokens = slackTokens();
+  const bot = tokens.bot;
+  const user = tokens.user ? ((await slackUserTokenFor(viewer)) ?? "") : "";
   if (!user && !bot) {
+    if (tokens.user) return { found: [], note: SLACK_SEARCH_NOT_YOURS };
     return { found: [], note: "Slack isn't connected, so Slack wasn't searched. Set SLACK_USER_TOKEN (search:read) to search Slack's files, or SLACK_BOT_TOKEN with files:read (SPEC §6)." };
   }
   const toFound = (f: SlackFile): Found => ({
@@ -109,15 +118,17 @@ async function slackImages(query: string, limit: number): Promise<{ found: Found
       .sort((a, b) => b.n - a.n);
     return {
       found: scored.slice(0, limit).map((x) => toFound(x.f)),
-      note: "Searched Slack by file names and comments (the bot token can't full-text search; set SLACK_USER_TOKEN for that).",
+      note: tokens.user
+        ? `Searched Slack by file names and comments, with what the bot can see. ${SLACK_SEARCH_NOT_YOURS}`
+        : "Searched Slack by file names and comments (the bot token can't full-text search; set SLACK_USER_TOKEN for that).",
     };
   } catch (e) {
     return { found: [], note: `Slack: ${(e as Error).message}` };
   }
 }
 
-/** images Foundation already has: uploaded files (full text) and image cards on the board */
-function archiveImages(query: string, boardId: string, limit: number): Found[] {
+/** images Foundation already has: uploaded files (full text) and image cards on the board; only files on boards `viewer` can see */
+function archiveImages(query: string, boardId: string, limit: number, viewer: string): Found[] {
   const ws = words(query);
   const out = new Map<string, Found>();
   // full-text hits first (names, and where imported images came from)
@@ -125,11 +136,11 @@ function archiveImages(query: string, boardId: string, limit: number): Found[] {
     if (h.source !== "file") continue;
     const id = h.id.replace(/^file:/, "");
     const f = one<FileRow>("select * from files where id = ? and archived_at is null", id);
-    if (f && IMAGE.test(f.mime)) out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
+    if (f && IMAGE.test(f.mime) && canSeeFile(viewer, f.id)) out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
   }
   // then names, word by word (search wants every word; a name may have only some)
   for (const f of all<FileRow>("select * from files where archived_at is null and mime like 'image/%' and (board_id is null or board_id != 'chat') order by created_at desc limit 500")) {
-    if (out.has(`file:${f.id}`) || !ws.length || matches(f.name, ws) === 0) continue;
+    if (out.has(`file:${f.id}`) || !ws.length || matches(f.name, ws) === 0 || !canSeeFile(viewer, f.id)) continue;
     out.set(`file:${f.id}`, { ref: `file:${f.id}`, source: "files", title: f.name, at: f.created_at, url: `/files/${f.id}` });
   }
   return [...out.values()].slice(0, limit);
@@ -143,13 +154,14 @@ function boardImages(doc: Y.Doc, query: string): Found[] {
     .map((o) => ({ ref: `media:${o.id}`, source: "board" as const, title: o.name, from: `on the board, in “${m.sections.get(o.sectionId)?.name ?? "?"}”`, url: o.src }));
 }
 
-export async function findImages(doc: Y.Doc, boardId: string, query: string, sources: Array<"files" | "slack" | "board"> = ["files", "slack", "board"], limit = 40) {
+/** `viewer`: the person the search is for (or "agent", the service token): files on boards they can't see aren't found */
+export async function findImages(doc: Y.Doc, boardId: string, query: string, viewer: string, sources: Array<"files" | "slack" | "board"> = ["files", "slack", "board"], limit = 40) {
   const notes: string[] = [];
   const found: Found[] = [];
   if (sources.includes("board")) found.push(...boardImages(doc, query));
-  if (sources.includes("files")) found.push(...archiveImages(query, boardId, limit));
+  if (sources.includes("files")) found.push(...archiveImages(query, boardId, limit, viewer));
   if (sources.includes("slack")) {
-    const s = await slackImages(query, limit);
+    const s = await slackImages(query, limit, viewer);
     found.push(...s.found);
     if (s.note) notes.push(s.note);
   }
@@ -169,16 +181,19 @@ export async function findImages(doc: Y.Doc, boardId: string, query: string, sou
 /** an image's file in Foundation's archive, importing it from Slack if that's where it lives */
 async function fileFor(ref: string, boardId: string, userId: string): Promise<{ file: FileRow; title?: string; from?: string; at?: number } | null> {
   if (ref.startsWith("file:")) {
-    const file = one<FileRow>("select * from files where id = ?", ref.slice(5));
+    // a file answers to its board: one on a board this person can't see isn't theirs to lay out
+    const file = canSeeFile(userId, ref.slice(5)) ? one<FileRow>("select * from files where id = ?", ref.slice(5)) : undefined;
     return file ? { file } : null;
   }
   if (ref.startsWith("slack:")) {
+    // the bot's token, or the user token only when this ask is its owner's (slackuser.ts)
     const { user, bot } = slackTokens();
-    const token = bot || user;
-    if (!token) throw new Error("Slack isn't connected (SLACK_BOT_TOKEN with files:read)");
+    const token = bot || (user ? await slackUserTokenFor(userId) : null);
+    if (!token) throw new Error(user ? SLACK_SEARCH_NOT_YOURS : "Slack isn't connected (SLACK_BOT_TOKEN with files:read)");
     const { file: f } = await slackGet<{ file: SlackFile }>("files.info", { file: ref.slice(6) }, token);
     const url = f.url_private_download ?? f.url_private;
     if (!url || !IMAGE.test(f.mimetype ?? "")) return null;
+    guardEgress("Slack");
     const res = await fetch(url, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(20_000) });
     if (!res.ok) throw new Error(`Slack wouldn't hand over ${f.name ?? f.id} (${res.status})`);
     const body = Buffer.from(await res.arrayBuffer());
@@ -277,7 +292,7 @@ export async function layOut(
       if (it.ref?.startsWith("media:")) {
         const o = boardMaps(doc).objects.get(it.ref.slice(6));
         const fileId = o?.kind === "media" ? /\/files\/(f_[a-z0-9]+)/.exec(o.src)?.[1] : undefined;
-        const file = fileId ? one<FileRow>("select * from files where id = ?", fileId) : undefined;
+        const file = fileId && canSeeFile(ctx.userId, fileId) ? one<FileRow>("select * from files where id = ?", fileId) : undefined;
         if (file) placed.push({ kind: "image", file, ...(await pixelSize(file)), title: it.title ?? file.name, caption: it.caption, at: file.created_at });
         else skipped.push(`${it.ref} (not a stored image)`);
       } else if (it.ref) {

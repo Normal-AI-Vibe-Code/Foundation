@@ -12,6 +12,7 @@ import { all, one, run } from "./db.ts";
 import { editBoard } from "./boards.ts";
 import { config } from "./config.ts";
 import type { ToolCtx } from "./tools.ts";
+import { guardEgress } from "./egressguard.ts";
 
 export interface AskRow {
   id: string;
@@ -108,6 +109,7 @@ async function slackDm(assignee: string, text: string) {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token || !assignee.includes("@")) return;
   try {
+    guardEgress("Slack"); // an agent's ask DMs only where a person allowed Slack messages (egress.ts); held, nothing is sent
     const u = (await (await fetch(`https://slack.com/api/users.lookupByEmail?email=${encodeURIComponent(assignee)}`, { headers: { authorization: `Bearer ${token}` } })).json()) as { ok: boolean; user?: { id: string } };
     if (!u.ok || !u.user) return;
     await fetch("https://slack.com/api/chat.postMessage", {

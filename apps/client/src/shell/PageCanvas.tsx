@@ -4,28 +4,32 @@
  * The space still has its board underneath, for its people and activity; the
  * grid just isn't what you look at.
  *
- * The page runs in the same sandbox as an app on a card (frameSandbox.ts):
- * a page from elsewhere keeps its own origin and can't reach the board.
+ * The page follows the same frame rules as an app on a card (frameSandbox.ts):
+ * always sandboxed, its own origin only for a saved app, never Foundation itself
+ * (a sentence says so in its place).
  */
 
 import { floorInsets, useUi } from "../state/ui";
-import { SERVER as FOUNDATION_SERVER } from "../lib/api";
-import { sandboxFor } from "../panels/frameSandbox";
+import { frameAllow, frameFor } from "../panels/frameSandbox";
+import { useFrameContext } from "../lib/frames";
 import type { BoardRow } from "../lib/grids";
 
 export function PageCanvas({ space }: { space: BoardRow }) {
   const ui = useUi();
+  const ctx = useFrameContext();
   const insets = floorInsets(ui);
   if (!space.url) return null;
+  const d = frameFor(space.url, ctx);
   return (
     <div className="page-canvas" style={{ left: insets.left, right: insets.right, top: insets.top }}>
-      <iframe
-        key={space.url}
-        src={space.url}
-        title={space.name}
-        allow="clipboard-read; clipboard-write; fullscreen"
-        sandbox={sandboxFor(space.url, [window.location.origin, FOUNDATION_SERVER || window.location.origin])}
-      />
+      {!d.ok ? (
+        <div className="tool-empty" data-frame-refused>
+          <b>{space.name}</b>
+          <p>{d.reason}</p>
+        </div>
+      ) : (
+        ctx.ready && <iframe key={space.url} src={d.url} title={space.name} allow={frameAllow(d, "fullscreen")} sandbox={d.sandbox} referrerPolicy="no-referrer" />
+      )}
     </div>
   );
 }

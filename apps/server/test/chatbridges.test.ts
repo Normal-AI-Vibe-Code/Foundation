@@ -6,7 +6,7 @@
 
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdtempSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -36,7 +36,7 @@ const SECRETS = {
   WECOM_AGENT_ID: "1000002",
   WECOM_SECRET: "wecom-secret-SECRET",
   WECOM_TOKEN: "QDG6eK",
-  WECOM_AES_KEY: "jWmYm7qr5nMoAUwZRjGtBxmz3KA1tkAj3ykkR6q2B2C",
+  WECOM_AES_KEY: randomBytes(32).toString("base64").replace(/=+$/, ""), // an EncodingAESKey is 43 base64 characters; made fresh each run
   GMAIL_CLIENT_ID: "gmail-client.apps.googleusercontent.com",
   GMAIL_CLIENT_SECRET: "gmail-client-SECRET",
 };

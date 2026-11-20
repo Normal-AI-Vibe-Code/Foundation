@@ -1,0 +1,5 @@
+#!/bin/sh
+# Before a push: no secret, no unpinned runtime code, no open gap in a public
+# doc, in the tree or in any commit about to leave (scripts/check-security.mjs).
+# Enable once per clone with: git config core.hooksPath scripts/hooks
+npm run -s check:security -- --diff origin/main

@@ -114,7 +114,7 @@ const until = async (fn: () => boolean, ms = 3000) => {
 };
 
 function enter(cookie: string, path: string) {
-  const ws = new WebSocket(`ws://${base}${path}?send=1`, { headers: { cookie } });
+  const ws = new WebSocket(`ws://${base}${path}?send=1`, { headers: { cookie, origin: "http://localhost:1430" } });
   sockets.push(ws);
   ws.on("error", () => undefined);
   const heard: HuddleWire[] = [];

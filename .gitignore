@@ -25,6 +25,8 @@ dist-ssr
 
 # Foundation server data (SQLite, uploaded files)
 /data/
+# folders of their own for the programs the server starts (Claude Code, REA): beside data/, never in it
+/work/
 .env
 apps/server/.env
 
@@ -41,3 +43,9 @@ apps/client/public/rune/
 # The server the desktop app carries: built by scripts/desktop-server.mjs (a Node binary and a bundle)
 apps/client/src-tauri/server/*
 !apps/client/src-tauri/server/README.md
+
+# detailed open security findings: never committed (docs/SECURITY.md says why)
+/.private/
+
+# agents' own scratch checkouts: never part of the repository
+/.claude/worktrees/

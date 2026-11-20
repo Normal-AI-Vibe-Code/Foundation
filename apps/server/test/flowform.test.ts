@@ -56,10 +56,10 @@ const load = async () => {
   return ff;
 };
 
-/** just enough of IncomingMessage / ServerResponse for the handlers */
-function req(path: string, headers: Record<string, string> = {}, params: Record<string, string> = {}) {
+/** just enough of IncomingMessage / ServerResponse for the handlers; from this computer unless `peer` says otherwise */
+function req(path: string, headers: Record<string, string> = {}, params: Record<string, string> = {}, peer = "127.0.0.1") {
   const url = new URL(path, "http://localhost:1430");
-  return { headers: { host: "localhost:1430", ...headers }, params, query: url.searchParams } as never;
+  return { headers: { host: "localhost:1430", ...headers }, params, query: url.searchParams, socket: { remoteAddress: peer } } as never;
 }
 function res() {
   const out = { status: 0, headers: {} as Record<string, unknown>, body: "" };
@@ -78,6 +78,23 @@ function res() {
   return { r: r as never, out };
 }
 const cookiesOf = (h: unknown) => ([] as string[]).concat((h as string | string[]) ?? []);
+
+/**
+ * desktop: flowform came back to the browser at /done; the browser shows the confirm page, and the
+ * person presses (or not). Returns the page /done answered with and the browser's press cookie.
+ */
+async function finishInBrowser(ff: typeof import("../src/flowform.ts"), nonce: string, token: string) {
+  const page = res();
+  await ff.done(req(`/auth/flowform/done/${nonce}?session_token=${token}`, {}, { nonce }), page.r);
+  const press = cookiesOf(page.out.headers["set-cookie"]).find((c) => c.startsWith("foundation_ff_confirm="))?.split(";")[0] ?? "";
+  return { page: page.out, press };
+}
+/** the person's press on that page, from the page itself */
+function answer(ff: typeof import("../src/flowform.ts"), press: string, yes: boolean, headers: Record<string, string> = {}) {
+  const out = res();
+  ff.confirm(req(`/auth/flowform/confirm/${yes ? "yes" : "no"}`, { cookie: press, origin: "http://localhost:1430", "sec-fetch-site": "same-origin", ...headers }), out.r, yes ? "yes" : "no");
+  return out.out;
+}
 
 test("web: flowform's Google login comes back to the browser that started it", async () => {
   const ff = await load();
@@ -142,8 +159,14 @@ test("desktop: the window polls, the system browser finishes", async () => {
   const replay = res();
   await ff.done(req(`/auth/flowform/done/${nonce}?session_token=${"a".repeat(32)}`, {}, { nonce }), replay.r);
   assert.equal(replay.out.status, 400);
-  assert.match(page.out.body, /signed in/);
-  assert.equal(page.out.headers["set-cookie"], undefined); // the browser gets nothing
+  // the browser is asked, with the window's code, and gets no Foundation session of its own
+  assert.match(page.out.body, /An app on a computer is asking to sign in/);
+  assert.ok(page.out.body.includes(begun.code));
+  assert.ok(!cookiesOf(page.out.headers["set-cookie"]).some((c) => c.startsWith("foundation_session=")));
+  const press = cookiesOf(page.out.headers["set-cookie"]).find((c) => c.startsWith("foundation_ff_confirm="))!.split(";")[0];
+  // until the press, the window gets nothing
+  assert.deepEqual(ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r), { status: "pending" });
+  assert.equal(answer(ff, press, true).status, 200);
 
   const got = res();
   const out = ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), got.r) as { status: string; user: { email: string; role: string } };
@@ -160,7 +183,8 @@ test("an unverified flowform address names a new user but never claims an existi
   const signIn = async (token: string) => {
     const begun = ff.beginDesktop(req("/auth/flowform/begin"));
     const nonce = new URL(new URL(begun.url).searchParams.get("cb")!).pathname.split("/").pop()!;
-    await ff.done(req(`/auth/flowform/done/${nonce}?session_token=${token}`, {}, { nonce }), res().r);
+    const { press } = await finishInBrowser(ff, nonce, token);
+    if (press) answer(ff, press, true);
     return ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r) as { status: string; user?: { id: string; email: string }; error?: string };
   };
 
@@ -184,7 +208,7 @@ test("an older flowform without email_verified still vouches for its Google sign
   const ff = await load();
   const begun = ff.beginDesktop(req("/auth/flowform/begin"));
   const nonce = new URL(new URL(begun.url).searchParams.get("cb")!).pathname.split("/").pop()!;
-  await ff.done(req(`/auth/flowform/done/${nonce}?session_token=${"b".repeat(32)}`, {}, { nonce }), res().r);
+  answer(ff, (await finishInBrowser(ff, nonce, "b".repeat(32))).press, true);
   const out = ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r) as { status: string; user: { email: string } };
   assert.equal(out.status, "ok");
   assert.equal(out.user.email, "older@formindustries.com");
@@ -239,10 +263,10 @@ test("a sign-in in flight survives a server restart, finishes once, and keeps no
   assert.equal(replay.out.status, 400);
   assert.match(replay.out.body, /expired/);
 
-  // desktop: the browser finishes on one process, the window collects on the next
-  const page = res();
-  await second.done(req(`/auth/flowform/done/${deskNonce}?session_token=${"7".repeat(32)}`, {}, { nonce: deskNonce }), page.r);
-  assert.equal(page.out.status, 200);
+  // desktop: the browser finishes on one process, the person presses on the next, the window collects on a third
+  const { page, press } = await finishInBrowser(second, deskNonce, "7".repeat(32));
+  assert.equal(page.status, 200);
+  assert.equal(answer(await restart(), press, true).status, 200);
   const again = await restart();
   const deskReplay = res();
   await again.done(req(`/auth/flowform/done/${deskNonce}?session_token=${"7".repeat(32)}`, {}, { nonce: deskNonce }), deskReplay.r);
@@ -274,16 +298,19 @@ test("an attempt older than 10 minutes is refused and swept", async () => {
     const late = ff.beginDesktop(req("/auth/flowform/begin")); // finished just inside the window
     const lateNonce = nonceOf(late.url);
 
-    ff.attemptClock.now = () => t0 + 10 * 60_000 - 1;
-    await ff.done(req(`/auth/flowform/done/${lateNonce}?session_token=${"6".repeat(32)}`, {}, { nonce: lateNonce }), res().r);
+    // a desktop sign-in is over in five minutes
+    ff.attemptClock.now = () => t0 + 5 * 60_000 - 1;
+    answer(ff, (await finishInBrowser(ff, lateNonce, "6".repeat(32))).press, true);
     assert.equal((ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${late.poll}` }), res().r) as { status: string }).status, "ok");
 
-    ff.attemptClock.now = () => t0 + 10 * 60_000 + 1;
+    ff.attemptClock.now = () => t0 + 5 * 60_000 + 1;
     assert.throws(() => ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r), /no such sign-in/);
     const desk = res();
     await ff.done(req(`/auth/flowform/done/${deskNonce}?session_token=${"6".repeat(32)}`, {}, { nonce: deskNonce }), desk.r);
     assert.equal(desk.out.status, 400);
     assert.match(desk.out.body, /expired/);
+    // the web attempt (ten minutes) is still live at five; it is refused after ten
+    ff.attemptClock.now = () => t0 + 10 * 60_000 + 1;
     const web = res();
     await ff.done(req(`/auth/flowform/done/${webNonce}?session_token=${"6".repeat(32)}`, { cookie: browserCookie }, { nonce: webNonce }), web.r);
     assert.equal(web.out.status, 400);
@@ -319,7 +346,7 @@ test("linking folds a flowform user into an existing one, and flowform then sign
   const signIn = async (token: string) => {
     const begun = ff.beginDesktop(req("/auth/flowform/begin"));
     const nonce = new URL(new URL(begun.url).searchParams.get("cb")!).pathname.split("/").pop()!;
-    await ff.done(req(`/auth/flowform/done/${nonce}?session_token=${token}`, {}, { nonce }), res().r);
+    answer(ff, (await finishInBrowser(ff, nonce, token)).press, true);
     return ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r) as { user: { id: string; email: string; role: string } };
   };
   const viaFlowform = (await signIn("9".repeat(32))).user;
@@ -341,4 +368,148 @@ test("linking folds a flowform user into an existing one, and flowform then sign
   assert.equal(after.role, "admin");
 
   assert.throws(() => ff.linkAccounts("josh.dev@gmail.com", "josh.dev@gmail.com"), /same user/);
+});
+
+test("desktop: only a person's app on this computer can begin, and it is given a code to show", async () => {
+  const ff = await load();
+  const { config } = await import("../src/config.ts");
+  const { createSession, upsertUser } = await import("../src/auth.ts");
+  const someone = upsertUser("begin@formindustries.com", "Bea");
+  const agentBearer = createSession(someone.id, 60_000, "agent");
+  const saved = config.serviceToken;
+  config.serviceToken = "s".repeat(40);
+  try {
+    // an agent's bearer, an agent's cookie and the service token are refused
+    assert.throws(() => ff.beginDesktop(req("/auth/flowform/begin", { authorization: `Bearer ${agentBearer}` })), /agent's token can't begin/);
+    assert.throws(() => ff.beginDesktop(req("/auth/flowform/begin", { cookie: `foundation_session=${agentBearer}` })), /agent's session can't begin/);
+    assert.throws(() => ff.beginDesktop(req("/auth/flowform/begin", { authorization: `Bearer ${config.serviceToken}` })), /service token can't begin/);
+    // from another computer (or through a proxy that names another client): refused, unless this server is hosted
+    assert.throws(() => ff.beginDesktop(req("/auth/flowform/begin", {}, {}, "192.168.1.20")), /only from the computer/);
+    assert.throws(() => ff.beginDesktop(req("/auth/flowform/begin", { "x-forwarded-for": "10.0.0.9" })), /only from the computer/);
+    const pub = config.publicUrl;
+    config.publicUrl = "https://foundation.example.com";
+    try {
+      assert.equal(ff.hostedServer(), true);
+      assert.equal(ff.beginRefusal(req("/auth/flowform/begin", {}, {}, "192.168.1.20")), null);
+      // hosted or not, an agent is never let begin
+      assert.match(ff.beginRefusal(req("/auth/flowform/begin", { authorization: `Bearer ${agentBearer}` }, {}, "192.168.1.20")) ?? "", /agent/);
+    } finally {
+      config.publicUrl = pub;
+    }
+    assert.equal(ff.hostedServer(), false);
+    // the person's own app: a code of eight from an unambiguous alphabet, grouped
+    const begun = ff.beginDesktop(req("/auth/flowform/begin"));
+    assert.match(begun.code, /^[ABCDEFGHJKMNPQRTUVWXY346789]{4}-[ABCDEFGHJKMNPQRTUVWXY346789]{4}$/);
+    assert.equal(begun.expiresIn, 300);
+    const codes = new Set(Array.from({ length: 50 }, () => ff.signInCode()));
+    assert.ok(codes.size > 45, "codes are random");
+  } finally {
+    config.serviceToken = saved;
+  }
+});
+
+test("desktop: the poll gets a session only after the person presses This is me, exactly once", async () => {
+  people["5".repeat(32)] = { user_id: "ff-9", display_name: "Pat", email: "pat@formindustries.com", email_verified: true, role: "user" };
+  const ff = await load();
+  const begun = ff.beginDesktop(req("/auth/flowform/begin"));
+  const ask = () => ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r) as { status: string; session?: string };
+  const { page, press } = await finishInBrowser(ff, nonceOf(begun.url), "5".repeat(32));
+  assert.equal(page.status, 200);
+  assert.match(page.body, /Pat/);
+  assert.ok(page.body.includes(begun.code));
+  assert.match(page.body, /This is me, sign that app in/);
+  assert.match(page.body, /Not me/);
+  // the page can't be framed (a press must be the person's own) and runs no script
+  assert.match(String(page.headers["content-security-policy"]), /frame-ancestors 'none'/);
+  assert.match(String(page.headers["content-security-policy"]), /default-src 'none'/);
+  assert.match(press, /^foundation_ff_confirm=.+/);
+
+  // signed in at Flowform, not pressed yet: nothing, however often it asks
+  for (let i = 0; i < 3; i++) assert.deepEqual(ask(), { status: "pending" });
+  // a press from another page, or with no press cookie, does nothing
+  assert.equal(answer(ff, press, true, { origin: "https://evil.example" }).status, 403);
+  assert.equal(answer(ff, press, true, { "sec-fetch-site": "cross-site" }).status, 403);
+  assert.equal(answer(ff, "foundation_ff_confirm=guess", true).status, 400);
+  assert.deepEqual(ask(), { status: "pending" });
+
+  // the press: the next poll gets the app's session, and only that poll
+  assert.equal(answer(ff, press, true).status, 200);
+  assert.equal(answer(ff, press, true).status, 400, "a press is spent");
+  const got = res();
+  const out = ff.poll(req("/auth/flowform/poll?bearer=1", { authorization: `Bearer ${begun.poll}` }), got.r) as { status: string; session?: string; user: { email: string } };
+  assert.equal(out.status, "ok");
+  assert.equal(out.user.email, "pat@formindustries.com");
+  assert.ok(out.session);
+  assert.throws(ask, /no such sign-in/);
+});
+
+test("desktop: after Not me the window gets nothing, ever", async () => {
+  people["4".repeat(32)] = { user_id: "ff-10", display_name: "Sam", email: "sam@formindustries.com", email_verified: true, role: "user" };
+  const ff = await load();
+  const { one } = await import("../src/db.ts");
+  const before = one<{ n: number }>("select count(*) as n from sessions")!.n;
+  const begun = ff.beginDesktop(req("/auth/flowform/begin"));
+  const ask = () => ff.poll(req("/auth/flowform/poll?bearer=1", { authorization: `Bearer ${begun.poll}` }), res().r) as { status: string; session?: string; error?: string };
+  const { press } = await finishInBrowser(ff, nonceOf(begun.url), "4".repeat(32));
+  const no = answer(ff, press, false);
+  assert.equal(no.status, 200);
+  assert.match(no.body, /not signed in/);
+  // a later "This is me" from the same browser is too late
+  assert.equal(answer(ff, press, true).status, 400);
+  const told = ask();
+  assert.equal(told.status, "error");
+  assert.equal(told.session, undefined);
+  assert.throws(ask, /no such sign-in/);
+  assert.throws(ask, /no such sign-in/);
+  assert.equal(one<{ n: number }>("select count(*) as n from sessions")!.n, before, "no session was made");
+});
+
+test("desktop: a sign-in nobody presses for expires, and a late press does nothing", async () => {
+  people["3".repeat(32)] = { user_id: "ff-11", display_name: "Lee", email: "lee@formindustries.com", email_verified: true, role: "user" };
+  const ff = await load();
+  const t0 = Date.now();
+  try {
+    ff.attemptClock.now = () => t0;
+    const begun = ff.beginDesktop(req("/auth/flowform/begin"));
+    const { press } = await finishInBrowser(ff, nonceOf(begun.url), "3".repeat(32));
+    ff.attemptClock.now = () => t0 + 4 * 60_000;
+    assert.deepEqual(ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r), { status: "pending" }); // still waiting on the press
+    ff.attemptClock.now = () => t0 + 5 * 60_000 + 1;
+    assert.equal(answer(ff, press, true).status, 400);
+    assert.throws(() => ff.poll(req("/auth/flowform/poll", { authorization: `Bearer ${begun.poll}` }), res().r), /no such sign-in/);
+  } finally {
+    ff.attemptClock.now = () => Date.now();
+  }
+});
+
+test("web: where to land afterwards is a path on this site, never another site however it's spelled", async () => {
+  const ff = await load();
+  for (const ok of ["/", "/b/plan", "/?arrive", "/b/plan#x"]) assert.equal(ff.safeReturn(ok), ok);
+  for (const bad of ["//evil.example", "/\\evil.example", "/\\/evil.example", "\\\\evil.example", "https://evil.example", "/b\nLocation: x", "/\tevil", "evil", "", null]) assert.equal(ff.safeReturn(bad), "/", String(bad));
+  // and the attempt keeps that
+  const start = res();
+  ff.startWeb(req(`/auth/flowform/start?return=${encodeURIComponent("/\\evil.example")}`), start.r);
+  const { one } = await import("../src/db.ts");
+  assert.equal(one<{ return_to: string }>("select return_to from flowform_attempts where nonce_hash = ?", sha(nonceOf(start.out.headers.location as string)))?.return_to, "/");
+});
+
+test("Google's own sign-in comes back only to the browser that started it", async () => {
+  const { config } = await import("../src/config.ts");
+  const { googleStart, googleCallback, GOOGLE_STATE_COOKIE } = await import("../src/auth.ts");
+  const saved = config.google.clientId;
+  config.google.clientId = "test-client.apps.googleusercontent.com";
+  try {
+    const a = googleStart();
+    const state = new URL(a.url).searchParams.get("state")!;
+    assert.match(a.cookie, new RegExp(`^${GOOGLE_STATE_COOKIE}=${state}; Path=/auth/google; HttpOnly; SameSite=Lax`));
+    // another browser (no cookie, or another sign-in's) is refused before Google is asked anything
+    await assert.rejects(googleCallback("code", state, ""), /started in a different browser/);
+    const b = googleStart();
+    const other = new URL(googleStart().url).searchParams.get("state")!;
+    await assert.rejects(googleCallback("code", new URL(b.url).searchParams.get("state")!, other), /started in a different browser/);
+    // a state is spent once, whichever browser brought it
+    await assert.rejects(googleCallback("code", state, state), /sign-in expired/);
+  } finally {
+    config.google.clientId = saved;
+  }
 });

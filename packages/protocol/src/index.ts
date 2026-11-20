@@ -29,11 +29,12 @@ export const BOARD = {
   activity: "activity", // Y.Array<ActivityEntry>
   noteText: "noteText", // noteId → Y.Text (schema 3: typing merges character by character)
   huddles: "huddles", // huddle panel id → HuddleState (schema 6: kept by the server alone, off the card)
-  machineAsks: "machineAsks", // machine panel id → MachineAsk[] (commands agents asked to run; kept by the server alone, off the card)
+  machineAsks: "machineAsks", // machine or app panel id → MachineAsk[] (commands agents asked to run, app tools they asked to use; kept by the server alone, off the card)
   slack: "slack", // section id → SlackSectionState (a section kept for a Slack channel; kept by the server alone)
   characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
   agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
   collections: "collections", // collection panel id → CollectionState (what it has gathered, and the section it lays out into; kept by the server alone)
+  desktopLeave: "desktopLeave", // machine panel id → DesktopLeave (a person's leave for agents to use its desktop, and an agent's ask for it; kept by the server alone, off the card)
 } as const;
 
 /** the place that means "the whole grid" in the board's `agents` map */
@@ -131,6 +132,14 @@ interface ObjectBaseDoc {
    * the actor of the tool call that made them.
    */
   createdBy?: string;
+  /**
+   * Pinned to its section (2026-11-18): it leaves the flow and spans the section, drawn on the section's own
+   * paper from under the header down, at the section's full width; other cards lie over it. One to a section.
+   * Unpinned, it is a card again. Tables first (a new section a person adds starts with one).
+   */
+  pinned?: boolean;
+  /** Minimized: drawn as its title bar alone, wherever it sits; its content is kept and comes back when restored */
+  folded?: boolean;
 }
 
 export interface TableDoc extends ObjectBaseDoc {
@@ -302,15 +311,8 @@ export interface MachineState {
    * machine's disk, so Remove clears it.
    */
   desktop?: MachineDesktop;
-  /**
-   * A person let agents use this machine's desktop (look at it, move the
-   * pointer, type): who and when. Unset is the default: agents can't.
-   * Only a signed-in person who can edit the board sets it, from their
-   * browser; anyone who can edit takes it away; Remove clears it.
-   */
-  agentsMay?: { by: string; at: number };
-  /** an agent tried to use the desktop without that leave: the card offers the person the button */
-  agentAsked?: { by: string; for?: string; at: number };
+  // whether agents may use the desktop is not on the card (a writer's socket could set it there): the board's
+  // `desktopLeave` map, which only the server writes (desktopLeaveOf)
   /** what agents last did on the desktop, newest last (a few kept): the card shows who is driving */
   agentActs?: MachineAgentAct[];
   /** the machine's pipes: when /foundation/in was last written and /foundation/out last read, and what was in them */
@@ -406,6 +408,7 @@ export function machineName(s: string): string {
  */
 export interface MachineAsk {
   id: string;
+  /** the command to run; for an app's tool, the tool's name */
   command: string;
   /** the agent's few words on why */
   why?: string;
@@ -413,7 +416,15 @@ export interface MachineAsk {
   by: string;
   /** the person it works for */
   for?: string;
-  state: "waiting" | "running" | "done" | "declined" | "timed out" | "withdrawn" | "failed";
+  /**
+   * Set when this asks to use a tool of a saved app (on an app's card, ADR-001
+   * G3) rather than to run a command in a machine. Nothing is called on Allow:
+   * Allow lets agents call that tool of that app from then on (until its
+   * definition changes), and the agent calls again. Such an ask doesn't wait
+   * in the server or time out; it stays until a person answers it.
+   */
+  tool?: AppToolAsk;
+  state: "waiting" | "running" | "done" | "declined" | "timed out" | "withdrawn" | "failed" | "allowed";
   at: number;
   /** the person who pressed Run or Decline */
   decidedBy?: string;
@@ -426,9 +437,44 @@ export interface MachineAsk {
   expiresAt?: number;
 }
 
-/** the commands agents asked to run in a machine, newest last */
+/** what an ask to use an app's tool shows a person: which app, where, which tool, and what this call would send */
+export interface AppToolAsk {
+  /** the saved app (the registry's `apps` row) the card resolved to */
+  appId: string;
+  app: string;
+  /** the saved MCP address Foundation would connect to (the registry's, not the card's) */
+  address: string;
+  description: string;
+  /** the arguments this call wants to send, as JSON (shortened) */
+  args: string;
+  /** "first": never allowed; "changed": allowed before, but its definition changed since */
+  change: "first" | "changed";
+  /** sha256 of the tool's name, description and input schema as listed: what Allow allows */
+  defHash: string;
+}
+
+/** the commands agents asked to run in a machine (and, on an app's card, the tools they asked to use), newest last */
 export function machineAsksOf(doc: Y.Doc, panelId: string): MachineAsk[] {
   return boardMaps(doc).machineAsks.get(panelId) ?? [];
+}
+
+/**
+ * Agents' leave to use a machine's desktop, kept by the server alone in the board's `desktopLeave` map (a
+ * writer's sync socket can't set it: only a person's press, through the server, does).
+ */
+export interface DesktopLeave {
+  /**
+   * A person let agents use this machine's desktop (look at it, move the pointer, type): who and when.
+   * Unset is the default: agents can't. Only a signed-in person who can edit the board sets it, from their
+   * browser; anyone who can edit takes it away; Remove clears it.
+   */
+  agentsMay?: { by: string; at: number };
+  /** an agent tried to use the desktop without that leave: the card offers the person the button */
+  agentAsked?: { by: string; for?: string; at: number };
+}
+
+export function desktopLeaveOf(doc: Y.Doc, panelId: string): DesktopLeave {
+  return boardMaps(doc).desktopLeave.get(panelId) ?? {};
 }
 
 // ---------- Slack sections: a section kept for a channel ----------
@@ -655,6 +701,7 @@ export function boardMaps(doc: Y.Doc) {
     characters: doc.getMap<CharacterState>(BOARD.characters),
     agents: doc.getMap<PostedAgent[]>(BOARD.agents),
     collections: doc.getMap<CollectionState>(BOARD.collections),
+    desktopLeave: doc.getMap<DesktopLeave>(BOARD.desktopLeave),
   };
 }
 

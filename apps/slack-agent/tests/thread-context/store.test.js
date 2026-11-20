@@ -44,6 +44,32 @@ describe('SessionStore', () => {
     assert.strictEqual(smallStore.getSession('C1', 'T3'), 'sid-3');
   });
 
+  it('finds a session only for the person who started it', () => {
+    store.setSession('C1', 'T1', 'sid-a', 'UA');
+    assert.strictEqual(store.getSession('C1', 'T1', 'UA'), 'sid-a');
+    assert.strictEqual(store.getSession('C1', 'T1', 'UB'), null);
+    assert.strictEqual(store.getSession('C1', 'T1'), null);
+    assert.strictEqual(store.isEngaged('C1', 'T1'), true);
+    assert.strictEqual(store.isEngaged('C1', 'T2'), false);
+  });
+
+  it('decides resume, start, not_owner or not_engaged', () => {
+    store.setSession('C1', 'T1', 'sid-a', 'UA');
+    assert.deepStrictEqual(store.decide('C1', 'T1', 'UA', { startIfNew: false }), {
+      kind: 'resume',
+      sessionId: 'sid-a',
+    });
+    assert.deepStrictEqual(store.decide('C1', 'T1', 'UB', { startIfNew: false }), { kind: 'not_owner' });
+    assert.deepStrictEqual(store.decide('C1', 'T1', 'UB', { startIfNew: true }), { kind: 'start' });
+    assert.deepStrictEqual(store.decide('C1', 'T9', 'UB', { startIfNew: false }), { kind: 'not_engaged' });
+  });
+
+  it('tells a person once per thread', () => {
+    assert.strictEqual(store.firstRefusal('C1', 'T1', 'UB'), true);
+    assert.strictEqual(store.firstRefusal('C1', 'T1', 'UB'), false);
+    assert.strictEqual(store.firstRefusal('C1', 'T1', 'UC'), true);
+  });
+
   it('overwrites existing key', () => {
     store.setSession('C1', 'T1', 'sid-old');
     store.setSession('C1', 'T1', 'sid-new');

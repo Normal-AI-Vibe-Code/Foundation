@@ -103,7 +103,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** a huddle socket that keeps what it hears; `closed` resolves with the close code */
 function enter(who: Who, path: string, send: boolean) {
   const headers: Record<string, string> = typeof who === "string" ? { cookie: who } : { authorization: `Bearer ${who.bearer}` };
-  const ws = new WebSocket(`ws://${base}${path}?send=${send ? 1 : 0}`, { headers });
+  const ws = new WebSocket(`ws://${base}${path}?send=${send ? 1 : 0}`, { headers: headers.cookie ? { origin: "http://localhost:1430", ...headers } : headers });
   sockets.push(ws);
   ws.on("error", () => undefined);
   const heard: HuddleWire[] = [];

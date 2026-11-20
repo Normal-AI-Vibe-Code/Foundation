@@ -8,7 +8,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { CLIENT, person, settle } from "./helpers";
+import { CLIENT, FRAME, person, settle } from "./helpers";
 
 const OUT = process.env.FITTED_OUT ?? "../../docs/evidence/e2e-results";
 
@@ -52,7 +52,7 @@ test("a live page's gate is the scale it's drawn at: zoom × its section's fit",
   for (const [section, extra] of [["Roomy", 0], ["Crowded", 24]] as const) {
     await tool("add_section", { name: section });
     await tool("add_note", { section, title: `${section} note`, markdown: "A note first, so the page is a card." });
-    await tool("add_panel", { section, panel: "app", name: `${section} page`, url: `${CLIENT}/e2e/frame.html` });
+    await tool("add_panel", { section, panel: "app", name: `${section} page`, url: FRAME });
     for (let n = 0; n < extra; n++) await tool("add_note", { section, title: `${section} ${n}`, markdown: `## ${section} ${n}\n\nfiller` });
   }
   await page.goto(`/?board=${board}`);

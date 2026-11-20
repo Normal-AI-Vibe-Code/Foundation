@@ -4,7 +4,7 @@
  * isn't in a git checkout (an installed copy) says so instead.
  */
 
-import { execFile } from "node:child_process";
+import { childOptions, execFileChild, type ExecFileOptions } from "./child.ts";
 
 export interface Commit {
   hash: string;
@@ -34,7 +34,8 @@ export function parseLog(out: string): Commit[] {
 export function changelog(limit = 60, cwd = process.cwd()): Promise<{ available: boolean; branch?: string; commits: Commit[]; why?: string }> {
   const n = Math.max(1, Math.min(200, Math.floor(limit) || 60));
   const git = (args: string[]) =>
-    new Promise<string>((ok, no) => execFile("git", args, { cwd, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 8000 }, (e, out) => (e ? no(e) : ok(out))));
+    // git reads the checkout and needs nothing beyond the allowlist (it finds its settings in the home folder)
+    new Promise<string>((ok, no) => execFileChild("git", args, childOptions<ExecFileOptions>({ extras: [] }, { cwd, windowsHide: true, maxBuffer: 8 * 1024 * 1024, timeout: 8000 }), (e, out) => (e ? no(e) : ok(out))));
   return Promise.all([git(["log", `-n${n}`, `--format=%H${SEP}%cI${SEP}%an${SEP}%s${SEP}%b${END}`]), git(["rev-parse", "--abbrev-ref", "HEAD"]).catch(() => "")])
     .then(([log, branch]) => ({ available: true, branch: branch.trim() || undefined, commits: parseLog(log) }))
     .catch((e: Error) => ({ available: false, commits: [], why: /not a git repository/i.test(e.message) ? "This server isn't running from a git checkout." : "git couldn't be read here." }));

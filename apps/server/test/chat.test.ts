@@ -108,7 +108,7 @@ const mkChannel = (who: Who, body: Record<string, unknown>) => ok<{ channel: Cha
 
 /** a /chat socket that keeps what it hears */
 async function listen(headers: Record<string, string>, query = "") {
-  const ws = new WebSocket(`ws://${base}/chat${query}`, { headers });
+  const ws = new WebSocket(`ws://${base}/chat${query}`, { headers: headers.cookie ? { origin: "http://localhost:1430", ...headers } : headers });
   sockets.push(ws);
   ws.on("error", () => undefined);
   const events: ChatEvent[] = [];

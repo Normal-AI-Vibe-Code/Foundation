@@ -219,7 +219,9 @@ test("the menu's Agents card puts the section's agents on the grid as a card, fo
 test("agents in the section and the text box on #/design, day and night", async ({ browser }) => {
   for (const scheme of ["dark", "light"] as const) {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme });
-    await ctx.request.post(`${CLIENT}/auth/dev`, { data: { name: "Ada Test", email: "ada@normal.dev" } });
+    // a refused sign-in (dev sign-in is refused while T3, the built-in terminal or a job has a shell here) says so
+    const signedIn = await ctx.request.post(`${CLIENT}/auth/dev`, { data: { name: "Ada Test", email: "ada@normal.dev" } });
+    expect(signedIn.ok(), `dev sign-in: ${signedIn.status()} ${await signedIn.text()}`).toBe(true);
     const p = await ctx.newPage();
     await p.goto("/#/design");
     const when = scheme === "dark" ? "night" : "day";

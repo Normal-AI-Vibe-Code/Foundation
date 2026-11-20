@@ -8,7 +8,7 @@
  */
 
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { person, settle } from "./helpers";
+import { CLIENT, FRAME, person, settle } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-17_bottom-bar";
 let admin: Page;
@@ -39,6 +39,8 @@ test.beforeAll(async ({ browser }) => {
   ctx = a.context;
 });
 test.afterAll(async () => {
+  // T3 off even if a check stopped half way: dev sign-in is refused while it runs, and the next files sign in
+  await ctx?.request.post(`${CLIENT}/api/t3host/stop`, { failOnStatusCode: false }).catch(() => {});
   await ctx?.close();
 });
 
@@ -224,6 +226,8 @@ test("day and night reach the grid's paper, even when the browser has taken the 
 });
 
 test("the tools: a terminal that runs a line for an admin, the change log, the files, a browser, and T3", async ({ browser }) => {
+  // the member signs in first: dev sign-in is refused while the built-in terminal (a shell here) is open
+  const m = await person(browser, "Ada Test", "ada@normal.dev");
   // terminal: nothing runs until Start; then a line in, its answer and the folder back
   await admin.locator('[data-tool-open="terminal"]').click();
   const pane = admin.locator(".tool-pane");
@@ -244,8 +248,14 @@ test("the tools: a terminal that runs a line for an admin, the change log, the f
   await admin.keyboard.press("Backspace");
   await admin.screenshot({ path: `${SHOTS}/09_terminal.png` });
 
+  // and while it is, nobody signs in by email alone (the shell could sign itself in as a person)
+  const late = await browser.newContext();
+  const lateSignIn = await late.request.post(`${CLIENT}/auth/dev`, { data: { name: "Late Test", email: "late@normal.dev" }, failOnStatusCode: false });
+  expect(lateSignIn.status()).toBe(403);
+  expect(await lateSignIn.text()).toContain("the built-in terminal is running");
+  await late.close();
+
   // a member gets no terminal: the server refuses, and the tool says why
-  const m = await person(browser, "Ada Test", "ada@normal.dev");
   const refused = await m.page.request.post("/api/host-terminal", { data: {} });
   expect(refused.status()).toBe(403);
   await m.page.locator('[data-tool-open="terminal"]').click();
@@ -266,7 +276,7 @@ test("the tools: a terminal that runs a line for an admin, the change log, the f
   await admin.locator('[data-tool-tab="files"]').click();
   await expect(pane.locator(".tool-files")).toBeVisible();
   await admin.locator('[data-tool-tab="browser"]').click();
-  await pane.locator("[data-browser-addr]").fill("localhost:" + new URL(admin.url()).port + "/e2e/frame.html");
+  await pane.locator("[data-browser-addr]").fill(FRAME.replace(/^http:\/\//, ""));
   await pane.locator("[data-browser-addr]").press("Enter");
   await expect(pane.locator("[data-browser-frame]")).toBeVisible();
   await admin.screenshot({ path: `${SHOTS}/11_browser.png` });
