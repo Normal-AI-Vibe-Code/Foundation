@@ -57,7 +57,7 @@ export const PARITY: ParityGroup[] = [
   {
     name: "Cards",
     rows: [
-      { what: "Note at rest", status: "partial", note: "Markdown by Rune's kit, in the web note's sizes, tokens and margins. Bullets are smaller, a task's box doesn't tick, and code is IBM Plex Mono where the web's is the system's code face; tables and pictures in a note are unchecked" },
+      { what: "Note at rest", status: "partial", note: "Markdown by Rune's kit, in the web note's sizes, tokens and margins. Bullets are smaller, a task's box doesn't tick, and code is IBM Plex Mono where the web's is the system's code face; tables and pictures in a note are unchecked. A link wears its real host as the web's does; pressed in its middle on a note drawn at full size it doesn't open (it does on a note drawn small)" },
       { what: "Note: writing", status: "partial", note: "Rune's own field (caret, selection, undo, IME, clipboard), each keystroke to the board; no markdown highlighting, no shared carets" },
       { what: "Image", status: "partial", note: "Bare, at rest; no hover icons, no invert on dark. One Rune can't fetch by address (a hosted server's file) stays the web's" },
       { what: "Move within its section", status: "partial", note: "Lifts and follows; no lean, and it can't be carried to another section or tab" },
