@@ -63,6 +63,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
 
       - name: Tests
+        timeout-minutes: 15 # two minutes when well; a test that never ends must not hold the release for the whole job
         run: npm test
 
       - name: Typecheck

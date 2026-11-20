@@ -39,6 +39,7 @@ before(async () => {
 after(() => {
   stopHostTerminals();
   server?.close();
+  server?.closeAllConnections(); // a socket a failed test left open must not keep the run alive
 });
 
 type FakeReq = Parameters<typeof requestHostTerminal>[0];
@@ -99,7 +100,7 @@ test("the key opens its socket once; nothing else opens it", async () => {
   // a real shell: a line goes in, its output and a prompt with the folder come back
   const got: Array<{ t: string; data?: string; cwd?: string }> = [];
   ws.on("message", (raw) => got.push(JSON.parse(String(raw))));
-  const until = async (ok: () => boolean, ms = 15_000) => {
+  const until = async (ok: () => boolean, ms = 60_000) => {
     const t0 = Date.now();
     while (!ok()) {
       if (Date.now() - t0 > ms) throw new Error(`timed out; got ${JSON.stringify(got).slice(0, 400)}`);

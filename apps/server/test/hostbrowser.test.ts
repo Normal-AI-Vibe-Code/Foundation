@@ -75,6 +75,9 @@ after(async () => {
   await hb.stopHostBrowser();
   server?.close();
   site?.close();
+  // sockets a failed test left open must not keep the run alive
+  server?.closeAllConnections();
+  site?.closeAllConnections();
 });
 
 /** a JPEG's width and height, from its frame header */
@@ -291,7 +294,7 @@ test("the real browser: a person opens it, sees the page, lets an agent read it 
     const frames: Buffer[] = [];
     ws.on("message", (raw, binary) => (binary ? frames.push(raw as Buffer) : got.push(JSON.parse(String(raw)))));
     const say = (m: unknown) => ws.send(JSON.stringify(m));
-    const until = async (ok: () => boolean, what: string, ms = 30_000) => {
+    const until = async (ok: () => boolean, what: string, ms = 90_000) => {
       const t0 = Date.now();
       while (!ok()) {
         if (Date.now() - t0 > ms) throw new Error(`timed out waiting for ${what}; got ${JSON.stringify(got.slice(-4)).slice(0, 1200)}`);

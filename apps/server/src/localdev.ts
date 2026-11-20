@@ -24,7 +24,7 @@
  */
 
 import { createConnection } from "node:net";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { open, readdir, readFile, stat } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -295,6 +295,27 @@ export function ignoredFolder(cwd: string): boolean {
   return under(tmpdir()) || under(config.dataDir) || under(config.workDir);
 }
 
+/** one folder under any of its spellings (Windows' 8.3 short names, letter case, links) */
+const realKey = (p: string) => {
+  try {
+    const k = localKey(realpathSync.native(p));
+    return process.platform === "win32" ? k.toLowerCase() : k;
+  } catch {
+    return localKey(p);
+  }
+};
+/** git's root for a session's folder, spelled the way the session spelled it: git answers with the long path, so a
+ *  session that ran under a short one (`RUNNER~1`) would otherwise be a second project beside its own worktrees' */
+function spelledAs(cwd: string, gitRoot: string): string | null {
+  const want = realKey(gitRoot);
+  for (let p = cwd; ; ) {
+    if (realKey(p) === want) return p;
+    const up = dirname(p);
+    if (up === p) return null;
+    p = up;
+  }
+}
+
 const roots = new Map<string, Promise<{ root: string; worktree?: string }>>();
 /** the project a session's folder belongs to: its git repository (worktrees fold into it), or the folder */
 export function projectOf(cwd: string): Promise<{ root: string; worktree?: string }> {
@@ -308,9 +329,10 @@ export function projectOf(cwd: string): Promise<{ root: string; worktree?: strin
         : git(["rev-parse", "--path-format=absolute", "--git-common-dir", "--show-toplevel"], cwd, 3000)
             .then((out) => {
               const [common, top] = out.trim().split(/\r?\n/);
-              const root = common && /[\\/]\.git$/.test(common) ? dirname(common) : top || cwd;
-              const worktree = top && localKey(top) !== localKey(root) ? basename(top) : undefined;
-              return { root: root.replace(/\//g, cwd.includes("\\") ? "\\" : "/"), worktree };
+              const gitRoot = common && /[\\/]\.git$/.test(common) ? dirname(common) : top || cwd;
+              const worktree = top && localKey(top) !== localKey(gitRoot) ? basename(top) : undefined;
+              const root = spelledAs(cwd, gitRoot) ?? gitRoot.replace(/\//g, cwd.includes("\\") ? "\\" : "/");
+              return { root, worktree };
             })
             .catch(() => ({ root: cwd }));
     roots.set(cwd, p);
