@@ -6,7 +6,7 @@
 
 import { test, expect } from "@playwright/test";
 import { writeFileSync, mkdirSync } from "node:fs";
-import { CLIENT, person, settle } from "./helpers";
+import { CLIENT, FRAME, person, settle } from "./helpers";
 
 const OUT = process.env.PERF_OUT ?? "../../docs/evidence/2026-11-03_perf";
 
@@ -25,7 +25,7 @@ test("pan, zoom and drag on 200 cards and 20 live frames", async ({ browser }) =
     const note = (n: number) => tool("add_note", { section, title: `Note ${s}.${n}`, markdown: `## Note ${s}.${n}\n\n- a line of text\n- **another** with \`code\`\n- and a [link](https://example.com)` });
     // a note first (an app in an empty section would become the section's app), then the two apps near the top
     await note(0);
-    for (let f = 0; f < 2; f++) await tool("add_panel", { section, panel: "app", name: `Live ${s}.${f}`, url: `${CLIENT}/e2e/frame.html` });
+    for (let f = 0; f < 2; f++) await tool("add_panel", { section, panel: "app", name: `Live ${s}.${f}`, url: FRAME });
     for (let n = 1; n < 18; n++) await note(n);
   }
   await page.goto(`/?board=${board}`);

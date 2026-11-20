@@ -1,11 +1,11 @@
 /**
  * Server configuration from the environment (and an optional `.env` beside
  * the repo root). Every integration is off until its key is present — the
- * server always starts, offline, with dev login.
+ * server always starts, offline. Dev login is off unless FOUNDATION_DEV_LOGIN=1.
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 // The repo's root when run from source. The desktop app runs a bundled copy from its install folder
 // (scripts/desktop-server.mjs) and names its own folder instead (FOUNDATION_ROOT: the app's data
@@ -30,14 +30,25 @@ export const config = {
   host: env("FOUNDATION_HOST", "127.0.0.1"),
   publicUrl: env("FOUNDATION_PUBLIC_URL", `http://localhost:${port}`),
   clientUrl: env("FOUNDATION_CLIENT_URL", "http://localhost:1430"),
-  /** more page origins that may call this server with credentials (comma-separated), beyond the client, localhost and the desktop app */
   /** the oldest client this server still works with (x.y.z; unset: any). Older ones get no board socket and are told to update (clientversion.ts) */
   minClient: env("FOUNDATION_MIN_CLIENT").trim(),
+  /** more page origins that may call this server with credentials (comma-separated, exact), beyond the client and the desktop app's window (origins.ts) */
   corsOrigins: env("FOUNDATION_CORS_ORIGINS")
     .split(",")
     .map((s) => s.trim().replace(/\/$/, ""))
     .filter(Boolean),
+  /**
+   * more names this server answers to (comma-separated Host values, exact: "foundation.example.com" or
+   * "192.168.1.20:4410"), beyond localhost/127.0.0.1/[::1] on its own or the client's port and the hosts of
+   * FOUNDATION_PUBLIC_URL and FOUNDATION_CLIENT_URL. Anything else is refused (DNS rebinding; origins.ts)
+   */
+  hosts: env("FOUNDATION_HOSTS")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
   dataDir: resolve(root, env("FOUNDATION_DATA_DIR", "data")),
+  /** where third-party programs Foundation starts get folders of their own (childenv.ts workFolder): beside the data folder, never in it (ADR-001 G13) */
+  workDir: "",
   /** comma-separated emails or @domain entries allowed to sign in */
   allowlist: env("FOUNDATION_ALLOWLIST", "@formindustries.com,@normal.dev,josh.leong@gmail.com")
     .split(",")
@@ -47,8 +58,12 @@ export const config = {
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean),
-  /** dev login (pick a name, no password) — on unless explicitly disabled */
-  devLogin: env("FOUNDATION_DEV_LOGIN", "1") !== "0",
+  /**
+   * dev login (pick a name, no password): off unless FOUNDATION_DEV_LOGIN=1. Even on, it answers only
+   * a loopback request, for an email on a non-empty allowlist, while Foundation's T3 isn't running
+   * (auth.ts devSignInRefusal; ADR-001 G0)
+   */
+  devLogin: env("FOUNDATION_DEV_LOGIN", "0") === "1",
   /** flowform-server: Foundation signs in with flowform's Google login (same server, same client) */
   flowformUrl: env("FLOWFORM_URL", "https://server.formresearch.ai"),
   /** the Flowform client version Foundation's file downloads declare: Flowform's file routes refuse older clients (426, "1.9.0 or newer", 2026-11-11) */
@@ -66,7 +81,15 @@ export const config = {
   /** run agent turns through Claude Code on this machine (subscription) */
   claudeCli: env("FOUNDATION_CLAUDE_CLI", "claude"),
   slack: { token: env("SLACK_USER_TOKEN") || env("SLACK_BOT_TOKEN") },
-  github: { token: env("GITHUB_TOKEN"), org: env("FOUNDATION_GITHUB_ORG", "") },
+  github: {
+    token: env("GITHUB_TOKEN"),
+    org: env("FOUNDATION_GITHUB_ORG", ""),
+    /** the only GitHub owners (users or orgs) the repo tools read, comma-separated; unset: any (github.ts checkRepo) */
+    owners: env("FOUNDATION_GITHUB_OWNERS")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  },
   /** live company apps (connectors) */
   connectors: {
     factoryform: env("FACTORYFORM_URL", "http://127.0.0.1:3001"),
@@ -76,5 +99,7 @@ export const config = {
   /** bearer token other services/agents use for /mcp and /api when not signed in */
   serviceToken: env("FOUNDATION_SERVICE_TOKEN"),
 };
+
+config.workDir = resolve(root, env("FOUNDATION_WORK_DIR", join(dirname(config.dataDir), "work")));
 
 export type Config = typeof config;

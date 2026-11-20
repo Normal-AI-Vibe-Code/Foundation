@@ -20,6 +20,8 @@ import { escEscToLeave, HOLDS_KEYS } from "../lib/keysHeld";
 import { toast, useUi } from "../state/ui";
 import { openExternal } from "../utils/media";
 import { openUrlAsPanel } from "./CommandBar";
+import { frameAllow, frameFor } from "../panels/frameSandbox";
+import { useFrameContext } from "../lib/frames";
 
 export function BrowserTool() {
   return useUi().role === "admin" ? <HostBrowser /> : <FramedBrowser />;
@@ -558,6 +560,8 @@ function FramedBrowser() {
   const [text, setText] = useState("");
   const [nonce, setNonce] = useState(0);
   const url = stack.list[stack.at] ?? "";
+  const frameCtx = useFrameContext();
+  const decision = url ? frameFor(url, frameCtx) : null;
   const go = (raw: string) => {
     const u = normal(raw);
     if (!u) return;
@@ -596,8 +600,14 @@ function FramedBrowser() {
           On the grid
         </button>
       </form>
-      {url ? (
-        <iframe key={`${url}#${nonce}`} className="tool-frame" src={url} title={url} referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals" data-browser-frame />
+      {url && !decision?.ok ? (
+        <div className="tool-empty" data-frame-refused>
+          <b>Not shown here</b>
+          <p>{decision?.reason}</p>
+        </div>
+      ) : url && decision?.ok ? (
+        // a typed address follows the frame rules (frameSandbox.ts): sandboxed, its own origin only for a saved app
+        frameCtx.ready && <iframe key={`${url}#${nonce}`} className="tool-frame" src={decision.url} title={url} referrerPolicy="no-referrer" allow={frameAllow(decision)} sandbox={decision.sandbox} data-browser-frame />
       ) : (
         <div className="tool-empty">
           <b>A page, beside the grid</b>

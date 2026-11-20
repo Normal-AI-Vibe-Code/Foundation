@@ -24,7 +24,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { CLIENT, settle, waitLive } from "./helpers";
+import { CLIENT, FRAME as FRAME_PAGE, settle, waitLive } from "./helpers";
 
 const GPU = !!process.env.PERF_GPU;
 const DPR = Number(process.env.PERF_DPR ?? 2);
@@ -146,7 +146,7 @@ test("frame times: Rune beside the web renderer, on 300 notes and on the heavy b
           });
         });
       },
-      { objects, grid: HEAVY.grid, frame: `${CLIENT}/e2e/frame.html`, texts: objects.map((_, i) => text(i)) },
+      { objects, grid: HEAVY.grid, frame: FRAME_PAGE, texts: objects.map((_, i) => text(i)) },
     );
     await settle(page, 2500);
     return board;

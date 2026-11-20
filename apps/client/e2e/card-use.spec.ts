@@ -11,7 +11,7 @@
 
 import { test, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { CLIENT, person, settle } from "./helpers";
+import { CLIENT, FRAME, person, settle } from "./helpers";
 
 const SHOTS = `../../docs/evidence/2026-11-11_heavy-board`;
 
@@ -23,7 +23,7 @@ test("a live app never takes the wheel until it's put in use; Ctrl+Enter is full
   const tool = (name: string, data: object) => context.request.post(`${CLIENT}/api/boards/${board}/tools/${name}`, { data });
   await tool("add_section", { name: "Apps" });
   await tool("add_note", { section: "Apps", title: "First", markdown: "A note so the app is a card, not the section's app" });
-  await tool("add_panel", { section: "Apps", panel: "app", name: "Live", url: `${CLIENT}/e2e/frame.html` });
+  await tool("add_panel", { section: "Apps", panel: "app", name: "Live", url: FRAME });
   await page.goto(`/?board=${board}`);
   await page.waitForFunction(() => Object.keys((window as unknown as { __foundation: { getState(): { panels: object } } }).__foundation.getState().panels).length > 0);
   // frame the app at full size, so its frame mounts

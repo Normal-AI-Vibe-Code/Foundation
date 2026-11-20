@@ -65,7 +65,7 @@ after(() => {
 });
 
 const { runTool } = await import("../src/tools.ts");
-const { getJob, startJob } = await import("../src/jobs.ts");
+const { getJob, jobShown, startJob } = await import("../src/jobs.ts");
 const { getHandoff, pollHandoffs, turnStart, findProject } = await import("../src/vision.ts");
 const { getBoard, closeBoards } = await import("../src/boards.ts");
 const { run } = await import("../src/db.ts");
@@ -110,7 +110,7 @@ test("vision_brief writes the brief and a hand-off that waits for a person; nobo
 test("Run starts the thread with a short-lived session that's revoked after; exports come back; reviewers asked once", async () => {
   const doc = getBoard("vis").doc;
   const jobId = getHandoff([...boardMaps(doc).objects.values()].map((o) => (o as { sessionId?: string }).sessionId).find(Boolean)!)!.id;
-  startJob(jobId, "vis", "Ada");
+  startJob(jobId, "vis", "Ada", jobShown(getJob(jobId)!).shown);
   await until(() => !!getHandoff(jobId)?.thread_id);
   const h = getHandoff(jobId)!;
 
@@ -159,7 +159,7 @@ async function runFails(title: string) {
   const out = (await runTool(ctx, "vision_brief", { title, goal: "g", reviewers: [], section: "Design" })) as { handoff: string };
   const jobId = (boardMaps(doc).objects.get(out.handoff) as { sessionId: string }).sessionId;
   const before = commands.length;
-  startJob(jobId, "vis", "Ada");
+  startJob(jobId, "vis", "Ada", jobShown(getJob(jobId)!).shown);
   await until(() => getJob(jobId)?.status === "error");
   assert.equal(commands.length, before, "Vision Code was never reached");
   return boardMaps(doc).objects.get(out.handoff) as { status: string; text: string };
@@ -209,7 +209,7 @@ test("no T3_URL: the hand-off goes where Vision Code's server-runtime.json says,
     const out = (await runTool(ctx, "vision_brief", { title: "Moved port", goal: "g", reviewers: [], section: "Design" })) as { handoff: string };
     const jobId = (boardMaps(doc).objects.get(out.handoff) as { sessionId: string }).sessionId;
     const before = commands.length;
-    startJob(jobId, "vis", "Ada");
+    startJob(jobId, "vis", "Ada", jobShown(getJob(jobId)!).shown);
     await until(() => !!getHandoff(jobId)?.thread_id || getJob(jobId)?.status === "error");
     assert.equal(getJob(jobId)!.status, "running", getJob(jobId)!.output ?? "");
     assert.equal(commands.at(-1)!.type, "thread.turn.start");

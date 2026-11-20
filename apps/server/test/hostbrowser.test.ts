@@ -18,6 +18,8 @@ import { join } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 
 process.env.FOUNDATION_DATA_DIR = mkdtempSync(join(tmpdir(), "foundation-test-"));
+// the browser keeps its profile in the work folder: a fresh one for this run, not one shared with other runs
+process.env.FOUNDATION_WORK_DIR = mkdtempSync(join(tmpdir(), "foundation-test-work-"));
 process.env.FOUNDATION_ADMIN_EMAILS = "boss@formindustries.com";
 process.env.FOUNDATION_SERVICE_TOKEN = "s".repeat(40);
 
@@ -426,9 +428,13 @@ test("the real browser: a person opens it, sees the page, lets an agent read it 
     say({ t: "mouse", kind: "up", x: at2.x, y: at2.y, button: 0, buttons: 0, clicks: 1, mods: 0 });
     await until(() => current()?.url === `${siteUrl}/second`, "the press landing on the link at 2×");
     // and a still page stops sending: no run of pictures chasing each other
-    await new Promise((r) => setTimeout(r, 1200));
-    const settled = frames.length;
-    await new Promise((r) => setTimeout(r, 1200));
+    // (a sharp picture can take over a second on a busy computer: wait for the pictures to stop, then see they stay stopped)
+    let settled = -1;
+    for (const t0 = Date.now(); settled !== frames.length && Date.now() - t0 < 12_000; ) {
+      settled = frames.length;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    await new Promise((r) => setTimeout(r, 1500));
     assert.equal(frames.length, settled, "a still page sends nothing more");
   } finally {
     // closing the last socket stops the browser's process

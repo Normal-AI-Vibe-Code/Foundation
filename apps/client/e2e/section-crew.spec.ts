@@ -194,6 +194,8 @@ test("agents in a section on #/design, day and night", async ({ browser }) => {
 
 test("this computer's agents: a person starts T3, asks an agent in a section, and it joins that section's group", async ({ browser }) => {
   // (this server's T3 is a stand-in that speaks T3's start, sign-in and streams: apps/server/test/t3-standin.mjs. No model runs.)
+  // the admin signs in first: dev sign-in is refused while T3 runs (its agents have a shell here; ADR-001 G0)
+  const admin = (await person(browser, "Root Test", "admin@normal.dev", board)).page;
   const pane = kai.locator(".agents-pane");
   await expect(pane).toBeVisible();
   const t3 = pane.locator(".t3-block");
@@ -246,9 +248,14 @@ test("this computer's agents: a person starts T3, asks an agent in a section, an
   // the thread ends (the stand-in finishes it): Claude leaves the group
   await expect(face(kai)).toHaveCount(0, { timeout: 20_000 });
   await expect(claude.locator(".t3-work")).toHaveCount(0);
+  // while T3 runs, nobody else signs in without a password
+  const late = await browser.newContext();
+  const devRefused = await late.request.post(`${CLIENT}/auth/dev`, { data: { name: "Late Test", email: "late@normal.dev" }, failOnStatusCode: false });
+  expect(devRefused.status()).toBe(403);
+  expect(await devRefused.text()).toContain("T3 is running");
+  await late.close();
 
   // an admin adds Kimi (cloud, a key) and DeepSeek (this computer, no key): two groups
-  const admin = (await person(browser, "Root Test", "admin@normal.dev", board)).page;
   await admin.locator("[data-hud-agents]").click();
   const at3 = admin.locator(".agents-pane .t3-block");
   await expect(at3).toHaveAttribute("data-t3", "running", { timeout: 8000 });
@@ -277,7 +284,14 @@ test("this computer's agents: a person starts T3, asks an agent in a section, an
   await admin.screenshot({ path: `${SHOTS}/09_admin-cloud-and-local.png` });
   // Kai sees both groups too (the pane reads T3 every few seconds)
   await expect(t3.locator('[data-t3-where="local"] [data-t3-agent="deepseek-local"]')).toHaveCount(1, { timeout: 8000 });
+  // T3 stops before anyone else signs in (the next check, and the files after this one)
+  expect((await admin.context().request.post(`${CLIENT}/api/t3host/stop`)).ok()).toBeTruthy();
   await admin.context().close();
+});
+
+// T3 stops before the next checks sign in (dev sign-in is refused while it runs)
+test.afterAll(async () => {
+  await kai?.context().request.post(`${CLIENT}/api/t3host/stop`, { failOnStatusCode: false });
 });
 
 test("this computer's agents on #/design, day and night", async ({ browser }) => {

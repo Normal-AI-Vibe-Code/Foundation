@@ -12,22 +12,22 @@ import type { PanelDoc, UserInfo } from "@foundation/protocol";
 import { WebSocketServer } from "ws";
 import { config } from "./config.ts";
 import { one } from "./db.ts";
-import { HttpError, json, readJson, Router, sse, type Req } from "./http.ts";
-import { clearSession, createSession, googleAuthUrl, googleCallback, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
+import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
+import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
 import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
-import { archiveFile, listFiles, reindexFilesIfNeeded, serveFile, uploadFile } from "./files.ts";
+import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
-import { parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
+import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
-import { getJob, listJobs, startJob } from "./jobs.ts";
+import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
 import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
-import { requestHostTerminal } from "./hostterm.ts";
-import { requestHostBrowser } from "./hostbrowser.ts";
+import { hostTerminals, requestHostTerminal } from "./hostterm.ts";
+import { hostBrowserRunning, requestHostBrowser } from "./hostbrowser.ts";
 import { changelog } from "./changelog.ts";
-import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3OpenLink, type AddAgentInput } from "./t3host.ts";
+import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3HostRunning, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
 import { pollHandoffs } from "./vision.ts";
 import { boardPeople, boardRole, canWrite, requireWriter, setBoardRole } from "./roles.ts";
@@ -53,9 +53,10 @@ import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
 import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
+import { answerAppToolAsk } from "./apptools.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
 import { startDigest } from "./digest.ts";
-import { buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
+import { boardHasChannel, buildSlackBoard, fromBridge, joinFor, setAgents, setCurator, slackLiveStatus, startSlackLive, syncChannel, type BridgeMessage } from "./slacklive.ts";
 import { addInspiration, attachMavatar, characterFile, characterTasks, costs as characterCosts, createCharacter, editCharacter, bringInStarter, openStudio, resumeCharacters, roster, setAvatar, startStage, type NewCharacter, setApproval } from "./characters.ts";
 import { CHARACTER_STAGES, type CharacterStageKey } from "@foundation/protocol";
 import { readBody } from "./http.ts";
@@ -63,7 +64,10 @@ import { engineImages, engineStatus, loadImage, machineSeen, removeMachine, rest
 import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
 import { startMachineIo, tryOut } from "./machineio.ts";
 import { prefsOf, setPref } from "./prefs.ts";
+import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
 import { gridOutline } from "./subgrids.ts";
+import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
+import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -83,20 +87,37 @@ r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 // public: also what this server is, and the oldest client it still works with (clientversion.ts)
 r.get("/auth/config", () => ({ google: Boolean(config.google.clientId), devLogin: config.devLogin, flowform: { url: flowform.flowformUrl() }, version: SERVER_VERSION, minClient: minClient() || null }));
 r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
+/** what on this computer has a shell now, if anything: dev sign-in waits until it stops (auth.ts devSignInRefusal) */
+function shellRunning(): string | false {
+  if (t3HostRunning()) return "T3";
+  if (hostTerminals() > 0) return "the built-in terminal";
+  // the built-in browser sits on this computer with a person's sign-ins, and agents may be driving it
+  if (hostBrowserRunning()) return "the built-in browser";
+  if (one("select 1 from jobs where status = 'running' and kind = 'rea' limit 1")) return "a REA job (it can run Claude Code)";
+  return false;
+}
 r.post("/auth/dev", async (req, res) => {
-  if (!config.devLogin) throw new HttpError(403, "dev login is off");
+  // off unless FOUNDATION_DEV_LOGIN=1; then only from this computer, with an allowlist, while nothing here has a shell (ADR-001 G0)
+  const refused = devSignInRefusal(req, shellRunning());
+  if (refused) throw new HttpError(403, refused);
+  // a page elsewhere can't sign this browser in as someone (login CSRF): a browser always says which page a POST comes from
+  const origin = req.headers.origin;
+  if (origin !== undefined && !originAllowed(String(origin))) throw new HttpError(403, `A page at ${String(origin).slice(0, 80)} can't sign anyone in to Foundation. Open Foundation itself.`);
   const { email, name, bearer } = await readJson<{ email?: string; name?: string; bearer?: boolean }>(req);
   if (!email || !/^[^@\s]+@[^@\s]+$/.test(email)) throw new HttpError(400, "enter an email");
   if (!isAllowed(email)) throw new HttpError(403, `${email} is not on Foundation's allowlist`);
   const user = upsertUser(email, name ?? "");
+  audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, door: "route", action: "sign_in.dev", target: bearer === true ? "app session" : "browser session", decision: "allowed", result: "ok" });
   return { user, ...signIn(res, user.id, bearer === true) };
 });
 r.get("/auth/google/start", (_req, res) => {
-  res.writeHead(302, { location: googleAuthUrl() });
+  // the sign-in is bound to this browser: the callback must bring back the state this cookie holds
+  const { url, cookie } = googleStart();
+  res.writeHead(302, { location: url, "set-cookie": cookie });
   res.end();
 });
 r.get("/auth/google/callback", async (req, res) => {
-  const user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "");
+  const user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "", parseCookies(req.headers.cookie)[GOOGLE_STATE_COOKIE] ?? "");
   setSessionCookie(res, createSession(user.id));
   res.writeHead(302, { location: config.clientUrl });
   res.end();
@@ -106,6 +127,9 @@ r.get("/auth/flowform/start", (req, res) => flowform.startWeb(req, res));
 r.post("/auth/flowform/begin", (req) => flowform.beginDesktop(req));
 r.get("/auth/flowform/done/:nonce", (req, res) => flowform.done(req, res));
 r.post("/auth/flowform/poll", (req, res) => flowform.poll(req, res));
+// the person's press on the page /done shows a desktop sign-in: only then does the poll above get a session
+r.post("/auth/flowform/confirm/yes", (req, res) => flowform.confirm(req, res, "yes"));
+r.post("/auth/flowform/confirm/no", (req, res) => flowform.confirm(req, res, "no"));
 // a person's link to Flowform's boards and files, read-only, through its MCP endpoint (flowformlink.ts)
 r.get("/api/flowform/link", (req) => {
   const u = requireUser(req);
@@ -191,24 +215,27 @@ r.post("/api/ws-ticket", async (req) => {
   requireCurrentClient(client, req.headers.origin);
   return issueTicket(req, path);
 });
-/** a bearer for an external agent (Claude Code, Codex, Vision) acting as you */
+/** a bearer for an external agent (Claude Code, Codex, Vision) acting as you: a person makes it (an agent's token can't mint itself a longer one), and it lasts a week (ADR-001 G9) */
 r.post("/api/agent/token", (req) => {
-  const u = requireUser(req);
-  return { token: createSession(u.id, 30 * 864e5, "agent"), mcp: `${config.publicUrl}/mcp?board=company` };
+  const u = requirePerson(req, "Making an agent token");
+  audit({ actor_kind: "person", actor_id: u.id, actor_name: u.name, door: "route", action: "agent_token.mint", target: `${AGENT_TOKEN_DAYS} days`, decision: "allowed", approved_by: u.id, result: "ok" });
+  return { token: createSession(u.id, AGENT_TOKEN_DAYS * 864e5, "agent"), mcp: `${config.publicUrl}/mcp?board=company` };
 });
 
 // ---------- boards ----------
 
+// a members-only board is listed, and answers, only to its members (members.ts): to anyone else it isn't there
 r.get("/api/boards", (req) => {
   const u = requireUser(req);
-  return { boards: listBoards().map((b) => ({ ...b, role: boardRole(u.id, b.id) })) };
+  const hidden = hiddenBoards(u);
+  return { boards: listBoards().filter((b) => !hidden.has(b.id)).map((b) => ({ ...b, role: boardRole(u.id, b.id) })) };
 });
 r.get("/api/boards/:id/epoch", (req) => {
-  requireUser(req);
+  requireBoard(requireUser(req), req.params.id);
   return { epoch: boardEpoch(req.params.id) };
 });
 r.get("/api/boards/:id/people", (req) => {
-  requireUser(req);
+  requireBoard(requireUser(req), req.params.id);
   return { people: boardPeople(req.params.id) };
 });
 // ---------- the plan board (docs/plan.json; Settings → Plan) ----------
@@ -232,8 +259,10 @@ r.post("/api/plan/sync", async (req) => {
   return syncPlan(u);
 });
 
+// who may edit a board: an admin, in person (an admin's agent token can't change roles)
 r.post("/api/boards/:id/people", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Changing who may edit a board");
+  requireBoard(u, req.params.id);
   const { userId, role } = await readJson<{ userId?: string; role?: "member" | "viewer" | null }>(req);
   if (!userId || (role !== null && role !== "member" && role !== "viewer")) throw new HttpError(400, "userId and role (member, viewer or null) required");
   setBoardRole(u, req.params.id, userId, role);
@@ -274,6 +303,7 @@ r.post("/api/boards", async (req) => {
     }
   }
   if (body.parent) {
+    requireBoard(requireUser(req), String(body.parent));
     requireWriter(requireUser(req), String(body.parent));
     const out = setBoardParent(id, String(body.parent));
     if ("error" in out) throw new HttpError(400, out.error);
@@ -284,6 +314,7 @@ r.post("/api/boards", async (req) => {
 r.post("/api/boards/:id", async (req) => {
   const u = requireUser(req);
   const id = req.params.id;
+  requireBoard(u, id);
   if (!listBoards().some((b) => b.id === id)) throw new HttpError(404, "No such grid");
   requireWriter(u, id);
   const body = await readJson<{ name?: string; folder?: string | null; url?: string; parent?: string | null; theme?: string | null }>(req);
@@ -305,7 +336,10 @@ r.post("/api/boards/:id", async (req) => {
   // a grid of grids: put it inside another (which must be one this person can write too), or back at the top
   if (body.parent !== undefined) {
     const parent = body.parent === null || body.parent === "" ? null : String(body.parent);
-    if (parent) requireWriter(u, parent);
+    if (parent) {
+      requireBoard(u, parent);
+      requireWriter(u, parent);
+    }
     const out = setBoardParent(id, parent);
     if ("error" in out) throw new HttpError(400, out.error);
   }
@@ -410,6 +444,8 @@ r.post("/api/places/:id/bring", async (req) => {
 
 r.get("/api/search", async (req) => {
   const u = requireUser(req);
+  // a board named here is one the caller can see (its allowances decide what an agent's search may send)
+  requireBoard(u, req.query.get("board"));
   const q = (req.query.get("q") ?? "").trim();
   if (!q) return { hits: [], sources: {} };
   return searchAll(q, { boardId: req.query.get("board") ?? undefined, remote: req.query.get("remote") !== "0", hidden: hiddenBoards(u), userId: u.id });
@@ -425,22 +461,28 @@ r.get("/api/apps", (req) => {
   requireUser(req);
   return { apps: listApps() };
 });
+// saving an app and probing an address: a person (the server fetches whatever address is given; ADR-001 G10).
+// Probe isn't in READ_POSTS, so a viewer is refused by the write gate as well
 r.post("/api/apps", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Saving an app");
   const body = await readJson<{ name: string; url?: string; repo?: string; mcp?: string; description?: string }>(req);
   if (!body.name) throw new HttpError(400, "name required");
   return { app: saveApp(body, u.id) };
 });
 r.post("/api/apps/probe", async (req) => {
-  requireUser(req);
+  requirePerson(req, "Probing an app's address");
   const { url } = await readJson<{ url?: string }>(req);
   if (!url || !/^https?:\/\//.test(url)) throw new HttpError(400, "an http(s) URL");
   return probeApp(url);
 });
 r.get("/api/repo", async (req) => {
   requireUser(req);
-  const repo = parseRepo(req.query.get("repo") ?? "");
-  if (!repo) throw new HttpError(400, "owner/name or a GitHub URL");
+  let repo: string;
+  try {
+    repo = checkRepo(req.query.get("repo") ?? "");
+  } catch (e) {
+    throw new HttpError(400, (e as Error).message);
+  }
   const [info, readme, commits] = await Promise.all([repoInfo(repo), repoReadme(repo).catch(() => ""), repoCommits(repo).catch(() => [])]);
   return { info, readme: readme.slice(0, 40_000), commits };
 });
@@ -473,8 +515,9 @@ r.get("/api/asks", (req) => {
   const hidden = hiddenBoards(u);
   return { asks: listAsks(req.query.get("board") ?? undefined).filter((a) => !hidden.has(a.board_id)) };
 });
+// an ask DMs the assignee on Slack as "Foundation · <name> asks": a person's (agents ask with the ask_person tool)
 r.post("/api/asks", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Asking someone on Slack as you");
   const b = await readJson<{ board: string; assignee: string; prompt: string; kind?: string; section?: string }>(req);
   requireBoard(u, b.board);
   return createAsk({ boardId: b.board, actor: u.name, userId: u.id }, { assignee: b.assignee, prompt: b.prompt, kind: b.kind ?? "cad_upload", section: b.section });
@@ -483,6 +526,7 @@ r.post("/api/asks/:id/resolve", async (req) => {
   const u = requireUser(req);
   const { fileId } = await readJson<{ fileId?: string }>(req);
   requireBoard(u, one<{ board_id: string }>("select board_id from asks where id = ?", req.params.id)?.board_id);
+  if (fileId) requireFileVisible(u.id, fileId);
   return resolveAsk(req.params.id, u.name, fileId);
 });
 
@@ -515,6 +559,7 @@ r.post("/api/huddles/:id/recordings", async (req) => {
   const b = await readJson<{ board?: string; fileId?: string; sessionId?: string; startedAt?: number; endedAt?: number }>(req);
   if (!b.fileId) throw new HttpError(400, "fileId required");
   requireBoard(u, b.board ?? "company");
+  requireFileVisible(u.id, b.fileId);
   try {
     return attachRecording(b.board ?? "company", req.params.id, { fileId: b.fileId, person: u.name, sessionId: b.sessionId, startedAt: b.startedAt ?? Date.now(), endedAt: b.endedAt ?? Date.now() });
   } catch (e) {
@@ -540,26 +585,34 @@ r.get("/api/slack/channels", (req) => {
   requireUser(req);
   return slackDo(async () => ({ channels: await listChannels() }));
 });
+// a channel is read for a board that has it (a Slack card, or the Slack board's section): not any channel the bot sees
 r.get("/api/slack/channels/:id", (req) => {
-  requireUser(req);
+  const u = requireUser(req);
+  const board = req.query.get("board") ?? "";
+  if (!board) throw new HttpError(400, "which board is this channel on? (?board=)");
+  requireBoard(u, board);
+  if (!listBoards().some((b) => b.id === board) || !boardHasChannel(board, req.params.id)) throw new HttpError(404, "That Slack channel isn't on this board. Put it on the board (a Slack card) to read it here.");
   return slackDo(async () => ({ channel: await channelInfo(req.params.id), messages: await channelHistory(req.params.id, 40, req.query.get("fresh") === "1") }));
 });
+// posting, sharing, inviting and handing over huddle notes go out under the person's name ("<name> via
+// Foundation"): a person's press, never an agent's bearer or the service token
 r.post("/api/slack/channels/:id/messages", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Posting to Slack as you");
   const b = await readJson<{ text?: string }>(req);
   return slackDo(() => postMessage(req.params.id, b.text ?? "", u));
 });
 /** send the channel a link to a place on the board */
 r.post("/api/slack/channels/:id/share", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Sharing to Slack as you");
   const b = await readJson<{ board?: string; objectId?: string; title?: string; note?: string }>(req);
   const board = b.board ?? "company";
+  requireBoard(u, board);
   const text = shareText({ by: u.name, board, objectId: b.objectId, title: b.title || "A place", note: b.note });
   return slackDo(async () => ({ ...(await postMessage(req.params.id, text, u, { board, objectId: b.objectId ?? null })), url: boardLink(board, b.objectId) }));
 });
 /** invite the channel into a huddle on the board */
 r.post("/api/slack/channels/:id/invite", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Inviting a Slack channel as you");
   const b = await readJson<{ board?: string; huddleId?: string; create?: Omit<NewHuddle, "channel"> }>(req);
   const board = b.board ?? "company";
   requireBoard(u, board);
@@ -578,9 +631,11 @@ r.post("/api/slack/channels/:id/invite", async (req) => {
 });
 /** hand a huddle session's notes (transcript + recordings) to a channel */
 r.post("/api/slack/channels/:id/huddle-notes", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Sending huddle notes to Slack as you");
   const b = await readJson<{ board?: string; huddleId?: string; sessionId?: string; summary?: string }>(req);
   const board = b.board ?? "company";
+  // a members-only board's huddle transcript is its members' to share
+  requireBoard(u, board);
   const h = huddleOn(board, b.huddleId ?? "");
   const s = huddleArchive(board, h.id).find((x) => x.id === b.sessionId) ?? huddleArchive(board, h.id)[0];
   if (!s) throw new HttpError(404, "that huddle hasn't met yet");
@@ -596,15 +651,19 @@ r.get("/api/slack/live", async (req) => {
   requireUser(req);
   return slackLiveStatus();
 });
-/** make the Slack board (or bring the one there is up to date) and say where it is */
+/**
+ * make the Slack board (or bring the one there is up to date) and say where it is. It reads every channel
+ * the app is in, and a read can start an agent turn: a person's press, like a single channel's read below
+ */
 r.post("/api/slack/board", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Building or re-reading the Slack board");
   requireWriter(u);
   return slackDo(() => buildSlackBoard(u));
 });
 /** read one channel into its section now */
+// a read can end in an agent turn (slacklive.ts wantCurate, once a person turned agents on): a person's press
 r.post("/api/slack/board/sync", async (req) => {
-  const u = requireUser(req);
+  const u = requirePerson(req, "Reading a Slack channel into the board");
   const board = req.query.get("board") ?? "";
   requireBoard(u, board);
   const { channel } = await readJson<{ channel?: string }>(req);
@@ -654,14 +713,20 @@ r.get("/api/jobs/:id", (req) => {
   const job = getJob(req.params.id);
   if (!job) throw new HttpError(404, "no such job");
   requireBoard(u, job.board_id);
-  return { job };
+  // what the card and its confirmation show: the whole target and goal from the job itself, and the hash a Run names
+  return { job, ...jobShown(job) };
 });
-r.post("/api/jobs/:id/run", (req) => {
-  const u = requireUser(req);
+// a job runs third-party code or spends on a model: only a person presses Run (jobs.ts; ADR-001 G1)
+r.post("/api/jobs/:id/run", async (req) => {
+  const u = requirePerson(req, "Running a job");
   const job = getJob(req.params.id);
   if (!job) throw new HttpError(404, "no such job");
   requireBoard(u, job.board_id);
-  return { job: startJob(job.id, job.board_id ?? "company", u.name) };
+  // seeing the job's board isn't enough: a viewer of it can't start what runs on it
+  requireWriter(u, job.board_id);
+  // it runs only what the card showed: the press names the hash of the target and goal it showed (jobs.ts)
+  const { shown } = await readJson<{ shown?: string }>(req);
+  return { job: startJob(job.id, job.board_id ?? "company", u.name, typeof shown === "string" ? shown : "", u.id) };
 });
 
 // ---------- machines (Kiri or Docker, through the Engine API) ----------
@@ -732,11 +797,21 @@ r.post("/api/boards/:id/machines/:panel/asks/:ask/:verdict", async (req) => {
   requireBoard(u, req.params.id);
   return { ask: answerAsk(req.params.id, req.params.panel, req.params.ask, u, verdict) };
 });
+// an agent's ask to use an app's tool, on the app's card: the same gate (a person at their browser who can edit the board).
+// Allow lets agents call that tool of that saved app until its definition changes; it calls nothing itself (apptools.ts)
+r.post("/api/boards/:id/apps/:panel/asks/:ask/:verdict", async (req) => {
+  const verdict = req.params.verdict;
+  if (verdict !== "allow" && verdict !== "decline") throw new HttpError(404, "allow or decline");
+  const u = requirePerson(req, verdict === "allow" ? "Allowing an app's tool" : "Declining an agent's ask");
+  requireBoard(u, req.params.id);
+  return { ask: answerAppToolAsk(req.params.id, req.params.panel, req.params.ask, u, verdict) };
+});
 r.post("/api/boards/:id/machines/load", async (req) => {
   const u = requirePerson(req, "Loading an image into an engine");
   requireBoard(u, req.params.id);
   const b = await readJson<{ fileId?: string; engine?: string }>(req);
   if (!b.fileId) throw new HttpError(400, "name the file to load");
+  requireFileVisible(u.id, b.fileId);
   return loadImage(req.params.id, b.fileId, u.name, b.engine);
 });
 
@@ -774,6 +849,7 @@ r.get("/api/agents/available", (req) => {
 });
 r.post("/api/boards/:id/agents", async (req) => {
   const u = requireUser(req);
+  requireBoard(u, req.params.id);
   requireWriter(u, req.params.id);
   const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
   if (!place || !agent) throw new HttpError(400, "place (a section id, or * for the grid) and agent required");
@@ -781,6 +857,7 @@ r.post("/api/boards/:id/agents", async (req) => {
 });
 r.post("/api/boards/:id/agents/remove", async (req) => {
   const u = requireUser(req);
+  requireBoard(u, req.params.id);
   requireWriter(u, req.params.id);
   const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
   if (!place || !agent) throw new HttpError(400, "place and agent required");
@@ -903,12 +980,18 @@ r.post("/api/today/profile", async (req) => {
 
 // ---------- Vision Code (T3) sessions, read-only ----------
 
+// whole coding transcripts, on no board: an admin, in person
+function requireT3Reader(req: Req) {
+  const u = requirePerson(req, "Reading Vision Code's threads");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can read Vision Code's threads.");
+  return u;
+}
 r.get("/api/t3/threads", async (req) => {
-  requireUser(req);
+  requireT3Reader(req);
   return t3Threads();
 });
 r.get("/api/t3/threads/:id", async (req) => {
-  requireUser(req);
+  requireT3Reader(req);
   const t = await t3Thread(req.params.id);
   if (!t) throw new HttpError(404, "no such Vision Code thread");
   return t;
@@ -985,8 +1068,9 @@ r.delete("/api/t3host/agents/:id", async (req) => {
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can remove an agent.");
   return { agents: await removeT3Agent(req.params.id).catch((e) => { throw new HttpError(400, (e as Error).message); }) };
 });
+// the server asks an address on this computer for its models: a person's form, not an agent's port scan
 r.get("/api/t3host/local", async (req) => {
-  requireUser(req);
+  requirePerson(req, "Asking this computer's model server");
   return localModels(req.query.get("base") || undefined).catch((e) => { throw new HttpError(400, (e as Error).message); });
 });
 r.get("/api/t3host/presets", (req) => {
@@ -994,8 +1078,10 @@ r.get("/api/t3host/presets", (req) => {
   return T3_PRESETS;
 });
 
+// a new run spends on a model: a person asks (ADR-001 G2). Crew helpers and the Slack curator start theirs
+// in-process (agent.ts startRun), not through this route. Still in READ_POSTS: a viewer who is a person may ask
 r.post("/api/agent", async (req, res) => {
-  const user = requireUser(req);
+  const user = requirePerson(req, "Asking the agent");
   const body = await readJson<{ board?: string; prompt?: string; runtime?: string; session?: string; persona?: string; as?: string }>(req);
   if (!body.prompt?.trim()) throw new HttpError(400, "say something");
   requireBoard(user, body.board || "company");
@@ -1030,6 +1116,48 @@ r.post("/api/agent/runs/:id/stop", (req) => {
   return { stopped: stopRun(req.params.id, user.id) };
 });
 
+// ---------- the audit log, and what agents may send outside (audit.ts, egress.ts) ----------
+
+// who did what: an admin, in person, reads it (audit.ts). Rows hold no argument values, results or message text
+r.get("/api/audit", (req) => {
+  const u = requirePerson(req, "Reading the audit log");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can read the audit log.");
+  const board = req.query.get("board");
+  const after = Number(req.query.get("after") ?? 0);
+  const limit = Number(req.query.get("limit") ?? 100);
+  return { rows: readAudit({ board, after, limit }), chain: verifyAudit() };
+});
+
+// what agents on a board may send to outside services (egress.ts): anyone who can see the board reads it;
+// a person who can edit it (on a members-only board, its owner or an admin) sets it, from their own browser or app
+r.get("/api/boards/:id/egress", (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  return egressState(req.params.id, u);
+});
+const changeEgress = (on: boolean) => async (req: Req) => {
+  const u = requirePerson(req, on ? "Letting agents send outside" : "Taking back what agents may send outside");
+  requireBoard(u, req.params.id);
+  const b = await readJson<{ service?: string; kind?: string }>(req);
+  const sk = serviceKind(String(b.service ?? ""), String(b.kind ?? ""));
+  if (!sk) throw new HttpError(400, "Name a service and a kind of send it takes (GET this board's egress lists them)");
+  setAllowance(req.params.id, u, sk.service, sk.kind, on);
+  return egressState(req.params.id, u);
+};
+r.post("/api/boards/:id/egress", changeEgress(true));
+r.delete("/api/boards/:id/egress", changeEgress(false));
+
+/** an agent's request to a read route that reaches an outside service runs under the board's allowances (egress.ts routeScope) */
+function agentRouteScope(req: Req, path: string) {
+  const user = userFromRequest(req);
+  if (!user || isPerson(req)) return null;
+  const service = user.id === "agent";
+  // a board's allowance is lent only to a caller who can see that board: naming another one borrows nothing
+  const named = req.query.get("board");
+  const board = named && canSeeBoard(user, named) ? named : null;
+  return routeScope(req.method ?? "GET", path, board, { kind: service ? "service" : "agent", id: service ? "agent" : `agent:${user.id}`, name: user.name, for: service ? null : user.id });
+}
+
 // ---------- view only ----------
 
 /**
@@ -1041,7 +1169,7 @@ r.post("/api/agent/runs/:id/stop", (req) => {
  * and preferences (their goals, profile and settings are theirs, not a board's). The board is the
  * route's :id, or ?board=, else the person's account role decides.
  */
-const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/apps\/probe$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
+const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/];
 function gateWrites(req: Req, path: string) {
   if (req.method === "GET" || req.method === "OPTIONS" || !path.startsWith("/api/")) return;
   if (READ_POSTS.some((p) => p.test(path))) return;
@@ -1053,18 +1181,17 @@ function gateWrites(req: Req, path: string) {
 
 // ---------- server ----------
 
-function corsAllowed(origin: string) {
-  return origin === config.clientUrl || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || origin === "tauri://localhost" || config.corsOrigins.includes(origin);
-}
-
 const server = createServer(async (rawReq, res: ServerResponse) => {
   const req = rawReq as Req;
   const url = new URL(req.url ?? "/", "http://local");
   req.query = url.searchParams;
-  // the client on its own port (dev), the desktop app's page (http://localhost:31440, tauri://localhost) and
-  // FOUNDATION_CORS_ORIGINS. The app on a hosted server sends a bearer (Authorization), so preflights are kept 10 minutes
+  // a request must name this server (DNS rebinding: origins.ts), whatever it is for, /auth/dev included
+  const misnamed = hostRefusal(req);
+  if (misnamed) return json(res, { error: misnamed }, 421);
+  // exactly the client (FOUNDATION_CLIENT_URL), the desktop app's window (http://localhost:31440, tauri://localhost)
+  // and FOUNDATION_CORS_ORIGINS. The app on a hosted server sends a bearer (Authorization), so preflights are kept 10 minutes
   const origin = req.headers.origin;
-  if (origin && corsAllowed(origin)) {
+  if (origin && originAllowed(origin)) {
     res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("access-control-allow-headers", "content-type, authorization, range, mcp-session-id, mcp-protocol-version");
@@ -1077,6 +1204,10 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     return res.end();
   }
   try {
+    // a change signed in by the cookie comes from one of our own pages (cross-site request forgery: origins.ts)
+    // (the desktop sign-in's press page posts from this server's own origin and uses no Foundation session: it checks its own origin and cookie)
+    const forged = url.pathname.startsWith("/auth/flowform/confirm/") ? null : cookieOriginRefusal(req);
+    if (forged) throw new HttpError(403, forged);
     if (url.pathname === "/mcp") {
       const user = userFromRequest(req);
       if (!user) throw new HttpError(401, "MCP needs a bearer token (POST /api/agent/token)");
@@ -1087,7 +1218,8 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     if (!m) throw new HttpError(404, "not found");
     req.params = m.params;
     gateWrites(req, url.pathname);
-    const out = await m.handler(req, res);
+    const scope = agentRouteScope(req, url.pathname);
+    const out = scope ? await callScope.run(scope, () => m.handler(req, res)) : await m.handler(req, res);
     if (!res.headersSent && out !== undefined) json(res, out);
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
@@ -1099,7 +1231,15 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 * 1024 });
 // every socket (sync, huddles, a machine's terminal) and how it proves who opens it: sockets.ts
-server.on("upgrade", (req, socket, head) => handleUpgrade(wss, req, socket, head));
+server.on("upgrade", (req, socket, head) => {
+  // a socket must name this server too (DNS rebinding: origins.ts); whose page opens it is checked in handleUpgrade
+  if (hostRefusal(req)) {
+    socket.write("HTTP/1.1 421 Misdirected Request\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+  handleUpgrade(wss, req, socket, head);
+});
 
 reindexFilesIfNeeded();
 watchFactoryForm();
@@ -1152,7 +1292,10 @@ server.listen(config.port, config.host, () => {
   const rt = runtimes();
   console.log(`\n  Foundation server  ${config.publicUrl}`);
   console.log(`  data               ${config.dataDir}`);
-  console.log(`  sign-in            ${config.google.clientId ? "Google" : ""}${config.google.clientId && config.devLogin ? " + " : ""}${config.devLogin ? "dev login" : ""}`);
+  const doors = [config.google.clientId ? "Google" : `Google through Flowform (${flowform.flowformUrl()})`, config.devLogin ? "dev login (this computer only)" : ""].filter(Boolean);
+  console.log(`  sign-in            ${doors.join(" + ")}`);
+  // never locked out without being told why: dev login is off unless asked for
+  if (!config.devLogin && !config.google.clientId) console.log("  dev login          off. To sign in by email on this computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart");
   console.log(`  agent              ${rt.subscription ? "Claude Code (subscription)" : rt.subscriptionNote ? `— (${rt.subscriptionNote.split("\n")[0]})` : "—"}${rt.api ? ` · API (${rt.model})` : ""}`);
   console.log(`  MCP                ${config.publicUrl}/mcp?board=company\n`);
 });

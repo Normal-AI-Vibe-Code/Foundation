@@ -29,7 +29,7 @@
 
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { CLIENT, person, settle, waitLive } from "./helpers";
+import { CLIENT, FRAME, person, settle, waitLive } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-16_card-chrome";
 const PUSH = 38;
@@ -95,7 +95,7 @@ test.beforeAll(async ({ browser }) => {
   await tool("add_note", { section: "Notes", title: "Short", markdown: "# Short\n\nNothing to scroll here." });
   await tool("add_section", { name: "Apps" });
   await tool("add_note", { section: "Apps", title: "Beside", markdown: "A note, so the app is a card and not the section's app." });
-  await tool("add_panel", { section: "Apps", panel: "app", name: "Live", url: `${CLIENT}/e2e/frame.html` });
+  await tool("add_panel", { section: "Apps", panel: "app", name: "Live", url: FRAME });
   // a character, on this board: a card in "Characters · Animals"
   const taro = await ctx.request.post(`${CLIENT}/api/boards/${board}/characters`, { data: { name: "Taro", set: "animals", form: "mesh", identity: "A plump red shiba in a soft gouache style.", refs: [], height: 0.6 } });
   expect(taro.ok(), await taro.text()).toBe(true);

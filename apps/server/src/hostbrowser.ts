@@ -14,7 +14,7 @@
  *    when the last one closes (and when the server goes). Every socket shares the one browser and its tabs;
  *  - the protocol travels on the process's own pipes (`--remote-debugging-pipe`: fds 3 and 4, JSON ended by a NUL),
  *    never a TCP port, so nothing else on this computer can drive it;
- *  - its profile is a folder in the server's data (`<data>/host-browser`), apart from anyone's own browser, so
+ *  - its profile is a folder in the server's work folder (`<work>/host-browser`, never `data/`), apart from anyone's own browser, so
  *    sign-ins made here last between runs;
  *  - the address bar and agents open only http:, https: and about:blank. Downloads are refused, and a page's file
  *    chooser is not offered (nothing on this computer's disk is reachable from a page);
@@ -44,9 +44,10 @@
  *   {t:"copied", text} · {t:"note", text, bad?} · {t:"closed", why}
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { childOptions, spawnChild, type ChildProcess, type SpawnOptions } from "./child.ts";
+import { workFolder } from "./childenv.ts";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
@@ -291,6 +292,9 @@ interface Tab {
   /** input that arrived while a sharp picture was being taken */
   held?: Array<() => void>;
   sharpTurn?: number;
+  /** a picture at the size now is owed (the cast just began, or the size changed) and hasn't come */
+  owed?: boolean;
+  oweTimer?: NodeJS.Timeout;
   size?: Size;
   dialog?: { kind: string; message: string; value: string; timer: NodeJS.Timeout };
   /** the isolated world browser_read's refs live in */
@@ -332,7 +336,7 @@ let lastProc: ChildProcess | null = null;
 /** a browser on its way out: the next one waits for it (they share the profile folder) */
 let leaving: Promise<void> = Promise.resolve();
 
-const profileDir = () => join(config.dataDir, "host-browser");
+const profileDir = () => workFolder("host-browser");
 
 const say = (s: Sock, m: unknown) => {
   if (s.ws.readyState === s.ws.OPEN) s.ws.send(JSON.stringify(m));
@@ -344,6 +348,8 @@ const sayAll = (r: Run, m: unknown) => {
 function launch(found: FoundBrowser): Run {
   const dir = profileDir();
   mkdirSync(dir, { recursive: true });
+  // the tabs of the last run are not brought back (sign-ins are kept: they live elsewhere in the profile)
+  rmSync(join(dir, "Default", "Sessions"), { recursive: true, force: true });
   const args = [
     "--remote-debugging-pipe",
     "--headless=new",
@@ -362,7 +368,8 @@ function launch(found: FoundBrowser): Run {
     "--window-size=1280,800",
     "about:blank",
   ];
-  const proc = spawn(found.path, args, { stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"], windowsHide: true });
+  // the browser gets the allowlisted environment (child.ts), no extras: none of the server's keys
+  const proc = spawnChild(found.path, args, childOptions<SpawnOptions>({ extras: [] }, { stdio: ["ignore", "ignore", "ignore", "pipe", "pipe"], windowsHide: true }));
   lastProc = proc;
   const r: Run = {
     proc,
@@ -550,12 +557,38 @@ function syncCast(r: Run, tab: Tab) {
   if (watched && !tab.casting) {
     tab.casting = true;
     r.cdp.fire("Page.startScreencast", { format: "jpeg", quality: 72, everyNthFrame: 1 }, tab.session);
+    owe(r, tab);
   } else if (!watched && tab.casting) {
     tab.casting = false;
     tab.lastData = undefined;
+    tab.owed = false;
+    clearTimeout(tab.oweTimer);
     clearTimeout(tab.sharpTimer);
     r.cdp.fire("Page.stopScreencast", {}, tab.session);
   }
+}
+
+/**
+ * A still page sends a picture only when it draws. If the one picture the browser sends as a cast begins (or after
+ * the size changes) came at the size before, or didn't come, nothing follows and the pane stays empty: seen with
+ * a profile that has been used before, where the page is drawn sooner. So a picture at the size now is owed, and
+ * while it hasn't come the cast is begun again, which makes the browser send one.
+ */
+function owe(r: Run, tab: Tab, tries = 0) {
+  tab.owed = true;
+  clearTimeout(tab.oweTimer);
+  if (tries >= 12) return;
+  tab.oweTimer = setTimeout(() => {
+    tab.oweTimer = undefined;
+    if (r.over || !tab.owed || !tab.casting || !r.tabs.has(tab.id)) return;
+    if (!tab.sharpening) {
+      tab.lastData = undefined;
+      r.cdp.fire("Page.stopScreencast", {}, tab.session);
+      r.cdp.fire("Page.startScreencast", { format: "jpeg", quality: 72, everyNthFrame: 1 }, tab.session);
+    }
+    owe(r, tab, tries + 1);
+  }, 350);
+  tab.oweTimer.unref();
 }
 
 function sendFrame(s: Sock, tab: Tab, f: { jpeg: Buffer; w: number; h: number }) {
@@ -634,6 +667,9 @@ function applySize(r: Run, tab: Tab, size: Size) {
   if (tab.size && tab.size.w === size.w && tab.size.h === size.h && tab.size.dpr === size.dpr) return;
   tab.size = size;
   r.cdp.fire("Emulation.setDeviceMetricsOverride", { width: size.w, height: size.h, deviceScaleFactor: size.dpr, mobile: false }, tab.session);
+  // the same picture at another density is still a new picture to sharpen
+  tab.lastData = undefined;
+  if (tab.casting) owe(r, tab);
 }
 
 async function refreshHistory(r: Run, tab: Tab) {
@@ -712,6 +748,9 @@ function onEvent(r: Run, method: string, p: any, session: string | undefined) {
       // shows that for a frame (the page at the wrong size, or tiled): not a picture of the page. Nor is the same
       // picture again, which the redraw afterwards sends.
       if (tab.size && (w !== tab.size.w || h !== tab.size.h)) break;
+      // a picture at the size now has come: nothing is owed, whatever is done with this one
+      tab.owed = false;
+      clearTimeout(tab.oweTimer);
       if (p.data === tab.lastData) break;
       if (tab.sharpening) {
         // the page did change while the sharp picture was being taken: take another when this one is done

@@ -9,11 +9,13 @@
  * Reads are polled while a card is on screen and cached here for a few
  * seconds, so ten people looking at one channel cost one Slack call.
  *
- * Search keeps using the user token (search:read) in search.ts; this module
- * never needs it. SLACK_API_BASE points the client at a stand-in (tests).
+ * Search uses the user token (search:read) in search.ts, only for its owner's
+ * own asks (slackuser.ts); this module never needs it. Reading a channel by
+ * id is tied to a board that has it (slacklive.ts boardHasChannel). SLACK_API_BASE points the client at a stand-in (tests).
  */
 
 import { config } from "./config.ts";
+import { guardEgress } from "./egressguard.ts";
 
 const READ_TTL = 4000;
 
@@ -53,6 +55,7 @@ export function slackConfigured() {
 
 async function call<T>(method: string, params: Record<string, unknown> = {}, post = false): Promise<T> {
   if (!token()) throw new SlackError("not_configured", "Slack isn't connected — set SLACK_BOT_TOKEN (SPEC §6)");
+  guardEgress("Slack"); // an agent's call reaches Slack only where a person allowed it (egress.ts)
   const headers: Record<string, string> = { authorization: `Bearer ${token()}` };
   let url = `${base()}/${method}`;
   let body: string | undefined;
@@ -330,6 +333,7 @@ export async function channelItems(channel: string, limit = 60): Promise<Channel
 /** a file's bytes, fetched as the app (Slack's file links are private) */
 export async function downloadFile(f: SlackFileRef, max = 40 * 1024 * 1024): Promise<Buffer> {
   if (!token()) throw new SlackError("not_configured", "Slack isn't connected");
+  guardEgress("Slack");
   let url = f.url;
   if (!url) {
     const r = await call<{ file: RawFile }>("files.info", { file: f.id });

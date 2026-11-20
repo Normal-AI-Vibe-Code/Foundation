@@ -53,6 +53,8 @@ import { releaseKind } from "../settings/releases";
 import { ReleaseCard, ReleaseKindGlyph } from "../settings/ReleasePage";
 import { BrowserGlyph, ChangesGlyph, ExpandGlyph, FilesGlyph, T3Glyph, TerminalGlyph } from "./glyphs";
 import { openAppTab } from "../lib/grids";
+import { frameAllow, frameFor } from "../panels/frameSandbox";
+import { useFrameContext } from "../lib/frames";
 
 export const TOOLS: Array<{ id: ToolId; name: string; tip: string; glyph: ReactNode }> = [
   { id: "terminal", name: "Terminal", tip: "Terminal: a shell on the server's computer (admins)", glyph: <TerminalGlyph /> },
@@ -490,6 +492,15 @@ export function t3PageUrl(url: string, here: string = typeof window !== "undefin
   return here === "localhost" ? url.replace(/^http:\/\/127\.0\.0\.1:/, "http://localhost:") : url;
 }
 
+/** the configured T3 address's origin: the page the server hands over for T3 (/api/t3host/open), not anything typed */
+function t3Origin(page: string): string | null {
+  try {
+    return new URL(page).origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * T3, in the tools pane or (`full`) as the canvas of its own tab (shell/AppCanvas.tsx). In the pane its page
  * follows the look around it (dark in the room and at night: `color-scheme` on the frame); the pane's ⤢ opens
@@ -502,6 +513,8 @@ export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean
   const [page, setPage] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const viewer = ui.role === "viewer";
+  const frameCtx = useFrameContext();
+  const t3Frame = page ? frameFor(page, { ...frameCtx, t3: t3Origin(page) }) : null;
   useEffect(() => {
     void refreshAvailable();
     const t = setInterval(() => void refreshAvailable(), t3 === "running" ? 8000 : 3000);
@@ -564,8 +577,14 @@ export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean
           </button>
         )}
       </div>
-      {t3 === "running" && page ? (
-        <iframe key={page} className="tool-frame is-themed" src={page} title="T3" allow="clipboard-read; clipboard-write; microphone" data-t3-frame />
+      {t3 === "running" && page && t3Frame?.ok ? (
+        // T3's own address (from the server, not typed) keeps its origin; still sandboxed, and never Foundation (frameSandbox.ts)
+        <iframe key={page} className="tool-frame is-themed" src={t3Frame.url} title="T3" allow={frameAllow(t3Frame)} sandbox={t3Frame.sandbox} data-t3-frame />
+      ) : t3 === "running" && page && t3Frame && !t3Frame.ok ? (
+        <div className="tool-empty" data-frame-refused>
+          <b>T3</b>
+          <p>{t3Frame.reason}</p>
+        </div>
       ) : (
         <div className="tool-empty">
           <b>This computer's agents</b>

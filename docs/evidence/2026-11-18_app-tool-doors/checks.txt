@@ -1,0 +1,35 @@
+ADR-001 slice 2 (G3): an app's MCP tools behind a person. Checks run 2026-11-18 on this machine (loaded).
+
+Worktree fast-forwarded from cbb3277 to local main 07be40b (slice 1 and ADR-001) before work began.
+
+npm ci                                  ok
+npm run typecheck                       ok (client and server)
+
+npm test -w @foundation/server          (server-tests.log)
+  tests 319, pass 303, fail 10, exit 1
+  All 10 failures in test/t3host.test.ts and test/t3threads.test.ts (the stand-in T3; "T3 isn't running", timeouts).
+  Rerun of those two files alone (server-tests-t3-rerun.log): 19 tests, 17 pass, 2 fail (different tests, 13-27 s each).
+  Second rerun (server-tests-t3-rerun2.log): 19 tests, 19 pass, exit 0.
+  So every server test passed in at least one run; the T3 pair needed two reruns under load.
+
+  test/app-tool-doors.test.ts (new; real server, two stand-in MCP servers on loopback), 8/8 pass, in the full run and alone:
+    ✔ setup: a person, a viewer, an agent's token, and an app's card the agent puts on the board
+    ✔ an agent points the card at an address no person saved: app_tools and call_app_tool are refused, and that address hears nothing
+    ✔ only a person saves the app; then a card whose address matches it (up to a trailing slash and the host's case) lists its tools, none allowed yet
+    ✔ a tool not yet allowed isn't called: an ask goes on the card, and only a person who can edit the board can answer it
+    ✔ a person's Allow records the leave and calls nothing; the agent's retry reaches the tool, says where its result came from, and puts it on the port
+    ✔ a tool whose definition changes after Allow is held again, and the new ask says it changed
+    ✔ Decline: nothing is called, and the same ask isn't raised again for that run
+    ✔ the machine route doesn't answer an app tool's ask, and the app route doesn't answer a machine's
+
+npm test -w @foundation/client          (client-tests.log)
+  tests 172, pass 172, fail 0 (wires.test.ts's wall-clock test passed this time)
+
+#/design (client only, vite on :1475, headless Chromium through Playwright; the Browser pane refused to open localhost):
+  01-design-day.png, 02-design-night.png: the app-tool ask specimens at 560, 400 (viewer) and 260 px.
+  At 260 px the ask is 250 px wide; the arguments box is 230 px wide and doesn't scroll sideways (scrollWidth = clientWidth).
+
+Not run:
+  e2e (no e2e covers machine asks, so there was no nearest equivalent to extend; none written).
+  The ask on a live app card in a real browser with a real server; Allow pressed from a browser.
+  PERF frames, the desktop window, Rune.

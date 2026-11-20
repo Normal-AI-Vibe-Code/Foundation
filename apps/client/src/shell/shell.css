@@ -2669,6 +2669,59 @@ body.is-connecting .port-in.is-snap {
 .agent-status .f-pill {
   margin-left: auto;
 }
+/* what a job will run: the whole target and goal, from the job itself; scrolls, never cut (PanelView JobWhat) */
+.agent-what {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  user-select: text;
+}
+.agent-what.is-asking {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+}
+.agent-what-ask {
+  color: var(--color-frost);
+  font: 600 var(--text-14) / 1.3 var(--font-sans);
+  margin-bottom: var(--space-2);
+}
+.agent-what-text {
+  margin: 0 0 var(--space-3);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.5 var(--font-code);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.agent-what-actions {
+  /* the answer stays in reach while a long target or goal scrolls under it */
+  position: sticky;
+  bottom: calc(-1 * var(--space-4));
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0 var(--space-4);
+  margin-bottom: calc(-1 * var(--space-4));
+  background: var(--color-raise);
+}
+/* #/design: a job's card before Run, at rest and asking, at a card's size */
+.job-demos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+.job-demo {
+  display: flex;
+  width: 320px;
+  height: 260px;
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+}
 .agent-output {
   flex: 1;
   margin: 0;
@@ -3201,6 +3254,33 @@ body.is-connecting .port-in.is-snap {
 }
 .login-waiting span:nth-child(2) {
   flex: 1;
+}
+/* the code an app shows while its sign-in finishes in the browser (login/SignInCode.tsx) */
+.signin-code {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.signin-code-value {
+  color: var(--color-frost);
+  font: 600 var(--text-24) / 1.2 var(--font-code);
+  letter-spacing: 0.12em;
+  user-select: all;
+}
+/* #/design: the waiting line and the code on the sign-in page's paper (always day, like the page) */
+.signin-demo {
+  max-width: 420px;
+  padding: var(--space-6);
+  border-radius: var(--radius-pane);
+  background: var(--color-void);
+  color: var(--color-frost);
+}
+.signin-code-note {
+  margin: 0;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  line-height: 1.4;
 }
 .login-error {
   color: var(--color-bad);
@@ -4238,6 +4318,108 @@ body.is-viewer .port {
 }
 .pane-empty.is-bad {
   color: var(--color-bad);
+}
+
+/* side pane → what this board's agents may send outside (EgressSettings): a service, its badge, a switch per kind */
+.egress-service {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-bottom: var(--space-3);
+}
+.egress-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-height: var(--h-pill);
+  padding: 0 var(--space-3);
+}
+.egress-name {
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+}
+.egress-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 20px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+}
+.egress-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+}
+.egress-what {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.egress-sends {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.egress-state {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+}
+.egress-row.is-on .egress-state {
+  color: var(--color-ok);
+}
+.egress-switch {
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  cursor: pointer;
+}
+.egress-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-mist);
+  transition: transform var(--dur-quick) var(--ease-spring);
+}
+.egress-switch[aria-checked="true"] {
+  background: var(--color-pulse);
+  border-color: var(--color-pulse);
+}
+.egress-switch[aria-checked="true"] .egress-knob {
+  transform: translateX(14px);
+  background: var(--color-on-fill);
+}
+.egress-switch:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+.egress-switch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.egress-who {
+  padding-top: var(--space-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .egress-knob {
+    transition: none;
+  }
 }
 
 /* ---------- offline: the board from this device's copy ---------- */

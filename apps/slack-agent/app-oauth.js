@@ -2,12 +2,20 @@ import 'dotenv/config';
 
 import { readFileSync } from 'node:fs';
 
-import { App, LogLevel } from '@slack/bolt';
+import { App } from '@slack/bolt';
 import pkg from '@slack/oauth';
 
 const { FileInstallationStore } = pkg;
 
+import { LOG_LEVEL_NAME, logLevelFrom, STATE_SECRET_NAME, stateSecretProblem } from './config/settings.js';
 import { registerListeners } from './listeners/index.js';
+
+const stateSecret = process.env[STATE_SECRET_NAME];
+const stateSecretRefusal = stateSecretProblem(stateSecret);
+if (stateSecretRefusal) {
+  console.error(stateSecretRefusal);
+  process.exit(1);
+}
 
 const manifest = JSON.parse(readFileSync('manifest.json', 'utf-8'));
 const botScopes = manifest.oauth_config.scopes.bot;
@@ -41,12 +49,12 @@ const installationStore = {
 };
 
 const app = new App({
-  logLevel: LogLevel.DEBUG,
+  logLevel: logLevelFrom(process.env[LOG_LEVEL_NAME]),
   signingSecret: process.env.SLACK_SIGNING_SECRET,
   ignoreSelf: false,
   clientId: process.env.SLACK_CLIENT_ID,
   clientSecret: process.env.SLACK_CLIENT_SECRET,
-  stateSecret: 'bolt-js-support-agent',
+  stateSecret,
   scopes: botScopes,
   installationStore,
   installerOptions: {

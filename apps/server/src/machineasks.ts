@@ -27,6 +27,7 @@ import { execOnce } from "./machines.ts";
 import { canWrite } from "./roles.ts";
 import { HttpError } from "./http.ts";
 import { aim, crewMember, setDoing } from "./crew.ts";
+import { audit } from "./audit.ts";
 
 /** how long an ask waits for a person, by default and at most */
 export function askWaitMs() {
@@ -73,7 +74,8 @@ export function findMachineCard(boardId: string, ref: string): PanelDoc | undefi
   return objects.find((o) => o.id === ref) ?? objects.find((o) => o.machine?.name === needle) ?? objects.find((o) => o.name.trim().toLowerCase() === needle);
 }
 
-function writeAsk(boardId: string, panelId: string, ask: MachineAsk, line?: { who: string; role: "human" | "agent"; text: string; for?: string }) {
+/** put an ask on a card (the board's `machineAsks`, which only the server writes); apptools.ts uses it for an app's card */
+export function writeAsk(boardId: string, panelId: string, ask: MachineAsk, line?: { who: string; role: "human" | "agent"; text: string; for?: string }) {
   editBoard(boardId, "machines", (doc) => {
     const m = boardMaps(doc);
     const list = machineAsksOf(doc, panelId).filter((a) => a.id !== ask.id);
@@ -198,6 +200,7 @@ export function answerAsk(boardId: string, panelId: string, askId: string, perso
   if (!canWrite(person.id, boardId)) throw new HttpError(403, `View only: someone who can edit “${boardId}” answers an agent's command`);
   const w = waiting.get(askId);
   if (!w || w.boardId !== boardId || w.panelId !== panelId) throw new HttpError(404, "That command isn't waiting any more (it was answered, ran out of time, or its agent stopped)");
+  audit({ actor_kind: "person", actor_id: person.id, actor_name: person.name, board_id: boardId, door: "route", action: verdict === "run" ? "machine_ask.run" : "machine_ask.decline", target: `${panelId}:${askId}`, provenance: "ours-local", decision: "allowed", approved_by: verdict === "run" ? person.id : null, result: "ok" });
   w.decide(verdict === "run" ? { kind: "run", by: person.name } : { kind: "decline", by: person.name });
   return w.ask;
 }
@@ -216,9 +219,11 @@ function sweepStaleAsks(boardId: string) {
   const doc = getBoard(boardId).doc;
   const m = boardMaps(doc);
   const stale: Array<[string, MachineAsk[]]> = [];
+  // an app tool's ask (`tool`) waits on the board, not in this process: it stays until a person answers it (apptools.ts)
+  const isStale = (a: MachineAsk) => !a.tool && (a.state === "waiting" || a.state === "running") && !waiting.has(a.id);
   for (const [panelId, list] of m.machineAsks.entries()) {
-    if (list.some((a) => (a.state === "waiting" || a.state === "running") && !waiting.has(a.id))) {
-      stale.push([panelId, list.map((a) => ((a.state === "waiting" || a.state === "running") && !waiting.has(a.id) ? { ...a, state: "withdrawn" as const, endedAt: Date.now() } : a))]);
+    if (list.some(isStale)) {
+      stale.push([panelId, list.map((a) => (isStale(a) ? { ...a, state: "withdrawn" as const, endedAt: Date.now() } : a))]);
     }
   }
   if (stale.length) editBoard(boardId, "machines", () => stale.forEach(([id, list]) => m.machineAsks.set(id, list)));
