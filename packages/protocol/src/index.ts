@@ -12,11 +12,13 @@ import * as Y from "yjs";
 import type { CharacterState } from "./characters.ts";
 import type { CollectionState } from "./collections.ts";
 import type { UploaderState } from "./avatars.ts";
+import type { LocalProject, LocalWatch } from "./localdev.ts";
 export * from "./characters.ts";
 export * from "./collections.ts";
 export * from "./chat.ts";
 export * from "./replay.ts";
 export * from "./avatars.ts";
+export * from "./localdev.ts";
 
 // ---------- board document layout ----------
 
@@ -37,6 +39,8 @@ export const BOARD = {
   agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
   collections: "collections", // collection panel id → CollectionState (what it has gathered, and the section it lays out into; kept by the server alone)
   uploaders: "uploaders", // uploader panel id → UploaderState (Foundation's avatars wired into it, its timer and its last upload; kept by the server alone)
+  local: "local", // project key → LocalProject (this computer's projects, on the LOCAL_GRID_ID grid; kept by the server alone)
+  localWatch: "localWatch", // "state" → LocalWatch (whether this computer is being watched, and when it last looked; kept by the server alone)
   desktopLeave: "desktopLeave", // machine panel id → DesktopLeave (a person's leave for agents to use its desktop, and an agent's ask for it; kept by the server alone, off the card)
 } as const;
 
@@ -211,6 +215,7 @@ export type PanelKind =
   | "collection" // a collector: gathers what the cards wired into it make (pictures, characters) and can lay it out in a section; tiles drag out as copies
   | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
   | "character" // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
+  | "local" // one of this computer's projects (localdev.ts; `source`: the project key, `node`: preview, progress or changes), kept by the server
   | "replay"; // a recorded huddle session's clock (ChatForm R1): scrub it and the section it sits in is drawn as it was then (`sessionId`: the huddle session)
 
 export interface Port {
@@ -784,6 +789,8 @@ export function boardMaps(doc: Y.Doc) {
     collections: doc.getMap<CollectionState>(BOARD.collections),
     uploaders: doc.getMap<UploaderState>(BOARD.uploaders),
     desktopLeave: doc.getMap<DesktopLeave>(BOARD.desktopLeave),
+    local: doc.getMap<LocalProject>(BOARD.local),
+    localWatch: doc.getMap<LocalWatch>(BOARD.localWatch),
   };
 }
 

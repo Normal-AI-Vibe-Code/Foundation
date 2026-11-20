@@ -53,6 +53,7 @@ import { bringFlowformFile, listRooms as listFlowformRooms, liveRooms, pullRoom,
 import { beginGrant, downloadsStatus, dropSession, fileThumb } from "./flowformfiles.ts";
 import { isPerson, requirePerson } from "./auth.ts";
 import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
+import { connectLocal, localStatus, resumeLocal, stopLocal } from "./localdev.ts";
 import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
@@ -431,6 +432,12 @@ chatRoutes(r);
 (await import("./chatimport.ts")).chatImportRoutes(r); // history: Slack export zip and API pull in, ChatForm export out
 (await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
 (await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
+
+// ---------- this computer: the projects being built here, as a grid (localdev.ts) ----------
+
+r.get("/api/local", (req) => localStatus(requireUser(req), isPerson(req)));
+r.post("/api/local/connect", async (req) => connectLocal(requireUser(req), isPerson(req)));
+r.post("/api/local/stop", (req) => stopLocal(requireUser(req), isPerson(req)));
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
 
@@ -1373,6 +1380,7 @@ settleOrphanRuns();
 startHermes();
 startDigest();
 resumeCharacters();
+resumeLocal();
 // characters this build carries that this install hasn't had yet (a fresh install, or a studio made from an older set)
 void bringInStarter()
   .then((n) => n && console.log(`  characters         brought in ${n} from the starter set`))

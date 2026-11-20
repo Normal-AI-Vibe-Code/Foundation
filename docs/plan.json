@@ -2361,6 +2361,15 @@
       "status": "done",
       "body": "A push to main publishes a signed desktop release. Before pushing the 2026-11-18 security pass, a person checks the packaged desktop app: it signs in (the new code-and-confirm step), the agent answers one turn, and T3 starts. See docs/SECURITY.md. Josh checked the desktop app and the pass was pushed on 2026-11-19 (71bed0d).",
       "issue": 216
+    },
+    {
+      "id": "this-computer-grid",
+      "title": "This computer: a grid of the projects being built here",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "grid",
+      "status": "review",
+      "body": "Connect this computer (Settings → Places, an admin in person) and Foundation keeps a members-only grid of the projects being built on it: a section per git repository with Preview (newest screenshot, dev server), Progress (Claude Code and T3 sessions, their plans and wrap-ups) and Changes (git) cards, read from Claude Code's transcripts, T3 and git and never written. Cards, the grid's tab and side-menu row, section headers and the grid's council wear the computer mark. Built 2026-11-20 (apps/server/src/localdev.ts, apps/client/src/panels/LocalView.tsx; tests in apps/server/test/localdev.test.ts). Waits in Review for a person to try it in the packaged desktop app."
     }
   ]
 }

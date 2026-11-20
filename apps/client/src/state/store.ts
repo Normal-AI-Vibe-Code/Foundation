@@ -2205,6 +2205,7 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   pipeline: [1480, 330],
   collection: [360, 420],
   replay: [360, 120],
+  local: [480, 420],
   uploader: [960, 1100],
 };
 
