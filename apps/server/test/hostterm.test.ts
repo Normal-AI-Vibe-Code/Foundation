@@ -129,3 +129,43 @@ test("the change log reads this checkout's commits, newest first", async () => {
   const none = await changelog(3, tmpdir());
   assert.equal(none.available, false);
 });
+
+test("the change log is kept while HEAD stays where it is, and read again when it moves", async () => {
+  const { changelog, headMark } = await import("../src/changelog.ts");
+  const { execFileSync } = await import("node:child_process");
+  const repo = mkdtempSync(join(tmpdir(), "foundation-changelog-"));
+  const git = (...args: string[]) => execFileSync("git", ["-c", "user.name=Ada", "-c", "user.email=ada@example.com", "-c", "commit.gpgsign=false", ...args], { cwd: repo, windowsHide: true, stdio: "pipe" });
+  // no checkout: nothing to go by, so nothing is kept
+  assert.equal(headMark(repo), null);
+  git("init", "-q");
+  git("commit", "-q", "--allow-empty", "-m", "first");
+  const first = await changelog(5, repo);
+  assert.deepEqual(first.commits.map((c) => c.subject), ["first"]);
+  // the same answer, without asking git again
+  assert.equal(await changelog(5, repo), first);
+  // another length is its own answer
+  assert.notEqual(await changelog(4, repo), first);
+  // from a folder inside the checkout too
+  assert.equal(headMark(join(repo, ".git", "logs")), headMark(repo));
+  git("commit", "-q", "--allow-empty", "-m", "second");
+  const second = await changelog(5, repo);
+  assert.deepEqual(second.commits.map((c) => c.subject), ["second", "first"]);
+});
+
+test("a statement is compiled once and kept by its SQL", async () => {
+  const { keptStatements, one, run, all } = await import("../src/db.ts");
+  run("create table if not exists kept_probe (k text primary key, v integer)");
+  const before = keptStatements();
+  for (let i = 0; i < 50; i++) run("insert or replace into kept_probe (k, v) values (?, ?)", `k${i % 5}`, i);
+  assert.equal(keptStatements(), before + 1);
+  assert.equal(one<{ n: number }>("select count(*) n from kept_probe")?.n, 5);
+  // a kept statement still answers after the table it reads is changed under it
+  assert.equal(all<{ v: number }>("select v from kept_probe where k = ?", "k4")[0].v, 49);
+  run("alter table kept_probe add column note text");
+  assert.deepEqual({ ...all("select * from kept_probe where k = ?", "k4")[0] }, { k: "k4", v: 49, note: null });
+  assert.equal(all<{ v: number }>("select v from kept_probe where k = ?", "k4")[0].v, 49);
+  // past the limit the oldest go, and what's asked for is compiled again
+  for (let i = 0; i < 600; i++) one(`select ${i} as n`);
+  assert.ok(keptStatements() <= 500);
+  assert.equal(one<{ n: number }>("select count(*) n from kept_probe")?.n, 5);
+});
