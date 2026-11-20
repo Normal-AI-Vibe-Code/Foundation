@@ -2384,12 +2384,12 @@
     },
     {
       "id": "rune-e2e-drag-link",
-      "title": "Rune: a section dragged onto another's cell doesn't swap, and a link in a note doesn't open (two e2e checks fail)",
+      "title": "Rune: a link pressed in its middle doesn't open on a note drawn at full size; a section drag-swap check that fails now and then",
       "kind": "bug",
       "milestone": "ship",
       "area": "design",
       "status": "backlog",
-      "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge: 'a section's tools, rename, drag, right-click menu and remove' fails where Vision is dragged by its header onto BomForm's cell (it stays at 1,0), and 'the paper, the face and a note in markdown' fails where a press on a note's link should report its address (no link event). Both fail the same way without the motion rules, so they predate them; probably the 2026-11-17 pointer rules, after which Rune's e2e wasn't run. Done when all ten checks pass.",
+      "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge. Done the same day: Rune's notes show a link's real host as the web's do (the check pressed where the web's link had moved to). Still open: (1) on a note framed in a wide section (drawn at 1.05) a press in the middle of a link goes to the card and opens nothing, though the pointer shows a link there; it answers on a note drawn small. Not the host mark, not the card being held on press. Look at Rune's runtime/input/hit.rs primary_target and selection/links.rs. Held as an expected failure in 'a press on a note's link says where it goes': done when that check turns red for passing and its mark comes off. (2) 'a section's tools, rename, drag…' failed twice at the drag-swap and then passed six times on the same code; cause not found.",
       "issue": 218
     }
   ]
