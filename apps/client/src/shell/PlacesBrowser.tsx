@@ -4,6 +4,11 @@
  * open it; pull a file out onto the grid and it's copied into the archive and
  * lands as a card where it was dropped (the original is only read). Nothing
  * outside an approved place is ever listed: the server resolves every path.
+ *
+ * Approving is here too (2026-11-20, Josh: "the Files system for this computer should have an approval system
+ * built into the panel"): an admin, signed in as themselves, approves a folder by its path and takes an approval
+ * away, without leaving for Settings → Places. The server decides who may (`canApprove`, and again on the write);
+ * taking one away asks first, and touches no file.
  */
 
 import { useEffect, useState } from "react";
@@ -40,12 +45,53 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
   const [more, setMore] = useState(0);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    api<{ places: Place[] }>("/api/places").then(
-      (r) => setPlaces(r.places),
+  // approving, here in the panel
+  const [canApprove, setCanApprove] = useState(false);
+  const [path, setPath] = useState("");
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [why, setWhy] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  const read = () =>
+    api<{ places: Place[]; canApprove?: boolean }>("/api/places").then(
+      (r) => {
+        setPlaces(r.places);
+        setCanApprove(r.canApprove === true);
+      },
       (e: Error) => setErr(e.message),
     );
+  useEffect(() => {
+    void read();
   }, []);
+
+  const approve = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!path.trim() || busy) return;
+    setBusy(true);
+    setWhy(null);
+    try {
+      await api("/api/places", { method: "POST", json: { path, name } });
+      setPath("");
+      setName("");
+      await read();
+      toast("Approved: Foundation may read that folder", "ok");
+    } catch (x) {
+      setWhy((x as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (id: string) => {
+    setWhy(null);
+    try {
+      await api(`/api/places/${encodeURIComponent(id)}/remove`, { method: "POST", json: { confirm: true } });
+      setRemoving(null);
+      await read();
+    } catch (x) {
+      setWhy((x as Error).message);
+    }
+  };
 
   useEffect(() => {
     if (!at) return;
@@ -68,24 +114,53 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
     return (
       <div className="places">
         <div className="pane-eyebrow">Approved places on this computer</div>
-        {places.length === 0 && (
-          <div className="pane-empty">
-            No folders are approved yet. An admin approves the ones Foundation may read in <a href="#/settings/places">Settings → Places</a>.
-          </div>
-        )}
+        {places.length === 0 && <div className="pane-empty">{canApprove ? "No folders are approved yet. Approve one below, and it can be browsed here and dragged from onto a grid." : "No folders are approved yet. An admin, signed in as themselves, approves the ones Foundation may read."}</div>}
         {places.map((p) => (
-          <button key={p.id} className="search-row is-folder" disabled={!p.reachable} onClick={() => setAt({ place: p, dir: "" })} data-tip={p.path}>
-            <span className="search-row-glyph">▱</span>
-            <span className="search-row-main">
-              <span className="search-row-title">{p.name}</span>
-              <span className="search-row-snip">{p.reachable ? p.path : `Not reachable now · ${p.path}`}</span>
-            </span>
-            <span className="search-row-src">folder</span>
-          </button>
+          <div key={p.id} className="places-item" data-place={p.id}>
+            <button className="search-row is-folder" disabled={!p.reachable} onClick={() => setAt({ place: p, dir: "" })} data-tip={p.path}>
+              <span className="search-row-glyph">▱</span>
+              <span className="search-row-main">
+                <span className="search-row-title">{p.name}</span>
+                <span className="search-row-snip">{p.reachable ? p.path : `Not reachable now · ${p.path}`}</span>
+              </span>
+              <span className="search-row-src">folder</span>
+            </button>
+            {canApprove && removing !== p.id && (
+              <button className="places-remove" onClick={() => setRemoving(p.id)} aria-label={`Take away the approval for ${p.name}`} data-tip="Take away this approval" data-place-remove>
+                ✕
+              </button>
+            )}
+            {removing === p.id && (
+              <div className="places-ask" role="group" aria-label={`Take away the approval for ${p.name}?`}>
+                <span>Stop reading this folder? The folder isn't touched, and files already on grids stay.</span>
+                <button className="f-pill is-danger" onClick={() => void remove(p.id)} data-place-remove-yes>
+                  Remove
+                </button>
+                <button className="f-pill" onClick={() => setRemoving(null)}>
+                  Keep
+                </button>
+              </div>
+            )}
+          </div>
         ))}
-        {places.length > 0 && (
-          <div className="places-foot">
-            <a href="#/settings/places">Manage places</a>
+        {canApprove ? (
+          <form className="places-approve" onSubmit={approve} data-place-approve>
+            <div className="pane-eyebrow">Approve a folder</div>
+            <input className="places-approve-field is-path" value={path} onChange={(e) => setPath(e.target.value)} placeholder={"The folder's full path, like C:\\Users\\you\\Documents\\Drawings"} aria-label="Folder path" spellCheck={false} autoComplete="off" />
+            <div className="places-approve-row">
+              <input className="places-approve-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" aria-label="Name" autoComplete="off" />
+              <button className="f-pill is-accent" disabled={!path.trim() || busy}>
+                {busy ? "Checking…" : "Approve"}
+              </button>
+            </div>
+            <p className="places-approve-note">Foundation reads only inside approved folders, never writes to them, and leaves hidden files, keys and credentials where they are.</p>
+          </form>
+        ) : (
+          <div className="places-foot">Only an admin, signed in here as themselves, can approve or take away a folder.</div>
+        )}
+        {why && (
+          <div className="pane-empty is-bad" role="alert">
+            {why}
           </div>
         )}
       </div>

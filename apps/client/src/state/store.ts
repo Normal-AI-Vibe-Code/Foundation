@@ -33,6 +33,10 @@ interface ObjectBase {
   bornAt: number;
   /** the crew agent that made it (protocol ObjectBaseDoc.createdBy); people's cards leave it unset */
   createdBy?: string;
+  /** pinned to its section: out of the flow, spanning the section on its own paper (protocol ObjectBaseDoc.pinned) */
+  pinned?: boolean;
+  /** minimized to its title bar (protocol ObjectBaseDoc.folded) */
+  folded?: boolean;
 }
 
 export interface TableMeta extends ObjectBase {
@@ -183,9 +187,35 @@ export function tablePixelSize(t: { cols: number; rows: number }) {
 export const MINI_HEADER = 34;
 
 export function objectPixelSize(obj: AnyObject): { w: number; h: number } {
+  // minimized: its title bar alone (a table's and a map's own header; any other card's bar)
+  if (obj.folded) return { w: "cols" in obj ? tablePixelSize(obj).w : obj.w, h: "cols" in obj || "sourceTableId" in obj ? HEADER_H : FOLDED_H };
   if ("cols" in obj) return tablePixelSize(obj);
   if ("sourceTableId" in obj) return { w: obj.w, h: obj.h + HEADER_H };
   return { w: obj.w, h: obj.h }; // cards rest without a header bar; it overlays on hover
+}
+
+/** a minimized card: its bar and the 5 px it sits in from the card's edge, top and bottom */
+export const FOLDED_H = 40;
+
+/** the card pinned to a section, if it still lives there (one to a section: the newest pin) */
+export function pinnedOf(sectionId: string): AnyObject | null {
+  const sec = state.sections[sectionId] ?? state.allSections[sectionId];
+  if (!sec || sec.host) return null; // a hosted app fills the section: nothing shows under it
+  let best: AnyObject | null = null;
+  for (const o of objectsInSection(sectionId)) if (o.pinned && (!best || o.bornAt >= best.bornAt)) best = o;
+  return best;
+}
+
+/**
+ * How a pinned card is drawn: at the section body's top-left, scaled by `k` so its own width is exactly the
+ * section's (a table keeps its cells' measure and is scaled as one, a little above or below 1).
+ */
+export function pinnedScale(sec: Section, obj: AnyObject): number {
+  const st = getState();
+  const card = sectionBaseRect(sec.virtual ? st.grid : (st.grids[sec.parent ?? ROOT] ?? DEFAULT_GRID), sec);
+  const w = objectPixelSize({ ...obj, folded: false }).w;
+  const k = (card.w - 2) / Math.max(1, w);
+  return Number.isFinite(k) && k > 0 ? k : 1;
 }
 
 /** every primitive living in a section */
@@ -346,7 +376,9 @@ function flowAt(sec: Section, availW: number): { pos: Map<string, { x: number; y
   const out = new Map<string, { x: number; y: number }>();
   let extW = 0;
   let extH = 0;
-  const all = objectsInSection(sectionId).filter((o) => o.id !== sec.host); // the hosted app isn't in the flow
+  // the hosted app isn't in the flow, and neither is the card pinned to the section (it is the ground the flow lies on)
+  const pin = pinnedOf(sectionId)?.id;
+  const all = objectsInSection(sectionId).filter((o) => o.id !== sec.host && o.id !== pin);
   const docked = all.filter((o) => !o.float).sort((a, b) => a.bornAt - b.bornAt);
   const floaters = all
     .filter((o) => o.float)
@@ -604,6 +636,12 @@ export function objectWorldRect(obj: AnyObject) {
   const sec = st.sections[obj.sectionId];
   if (!sec) return null;
   if (sec.host === obj.id) return { ...sectionBodyRect(st.grid, sec), s: 1 }; // a hosted app is the section
+  if (obj.pinned && pinnedOf(sec.id)?.id === obj.id) {
+    // pinned: it spans the section's body from its top-left, at the scale that makes its width the section's
+    const body = sectionBodyRect(st.grid, sec);
+    const k = pinnedScale(sec, obj);
+    return { x: body.x + 1, y: body.y + 1, w: body.w - 2, h: Math.min(body.h - 2, objectPixelSize(obj).h * k), s: k };
+  }
   const card = sectionCardRect(st.grid, sec);
   const s = sectionFit(sec.id);
   const { w, h } = objectPixelSize(obj);
@@ -744,9 +782,11 @@ export function usePanel(id: string | undefined): PanelMeta | undefined {
 
 /** what one section draws from the store: its cards, its app, and which of them is active */
 export interface SectionSnap {
-  /** the cards in the section's flow (not its hosted app) */
+  /** the cards in the section's flow (not its hosted app, nor the card pinned to it) */
   objects: AnyObject[];
   host: PanelMeta | null;
+  /** the card pinned to the section: it spans it, under the flow */
+  pinned: AnyObject | null;
   /** the active card, if it's one of this section's */
   activeObjectId: string | null;
   sectionFocus: boolean;
@@ -772,12 +812,14 @@ export function sectionSnap(sectionId: string): SectionSnap {
   const cached = sectionSnaps.get(sectionId);
   if (cached && cached.st === state) return cached.snap;
   const host = hostOf(sectionId);
-  const objects = objectsInSection(sectionId).filter((o) => o.id !== host?.id);
+  const pinned = pinnedOf(sectionId);
+  const objects = objectsInSection(sectionId).filter((o) => o.id !== host?.id && o.id !== pinned?.id);
   const a = state.focusLevel === "object" ? state.activeObjectId : null;
   const next: SectionSnap = {
     objects,
     host,
-    activeObjectId: a && (a === host?.id || objects.some((o) => o.id === a)) ? a : null,
+    pinned,
+    activeObjectId: a && (a === host?.id || a === pinned?.id || objects.some((o) => o.id === a)) ? a : null,
     sectionFocus: state.focusLevel === "section",
     pendingRemoval: state.pendingRemoval === sectionId,
     ...flowFields(sectionId),
@@ -790,6 +832,7 @@ export function sectionSnap(sectionId: string): SectionSnap {
     prev &&
     prev.objects === next.objects &&
     prev.host === next.host &&
+    prev.pinned === next.pinned &&
     prev.activeObjectId === next.activeObjectId &&
     prev.sectionFocus === next.sectionFocus &&
     prev.pendingRemoval === next.pendingRemoval &&
@@ -1259,6 +1302,7 @@ export function addSectionAdjacent(
     activeSectionId: fresh.id,
     snapRequest: { kind: "section", id: fresh.id, nonce: Math.random() },
   });
+  startWithSheet(fresh.id);
   return fresh.id;
 }
 
@@ -1504,6 +1548,35 @@ export function createSectionAt(c: number, r: number) {
     activeSectionId: fresh.id,
     snapRequest: { kind: "section", id: fresh.id, nonce: Math.random() },
   });
+  startWithSheet(fresh.id);
+}
+
+/**
+ * A section a person adds starts as a sheet (2026-11-18, Josh: "I'd like for the creation of a new section to
+ * actually have a few full-screen primitives starting with tables, the table should span to the full width of
+ * the section"): a table pinned to it, sized to fill it, drawn on the section's own paper. Unpin it and it is
+ * a card like any other; an app opened into a section that still holds only its untouched sheet takes the
+ * section instead (addPanel).
+ */
+function startWithSheet(sectionId: string) {
+  const t = createTable(sectionId, undefined, undefined, { quiet: true });
+  setObjectPinned(t.id, true);
+  set({ activeSectionId: sectionId, focusLevel: "section", activeObjectId: null, snapRequest: { kind: "section", id: sectionId, nonce: Math.random() } });
+}
+
+/** a table nobody has written in */
+function tableIsBlank(id: string): boolean {
+  const t = workbook.getTable(id);
+  if (!t) return true;
+  for (const c of t.cells.values()) if (c.raw) return false;
+  return true;
+}
+
+/** the untouched sheet a section started with, when that is all it holds */
+function startingSheet(sectionId: string): TableMeta | null {
+  const objs = objectsInSection(sectionId);
+  const only = objs.length === 1 ? objs[0] : null;
+  return only && "cols" in only && only.pinned && tableIsBlank(only.id) ? only : null;
 }
 
 export function renameSection(id: string, name: string) {
@@ -1555,6 +1628,67 @@ function findObject(id: string): { key: ObjKey; obj: AnyObject } | null {
     if (obj) return { key, obj };
   }
   return null;
+}
+
+/** the map a card's meta lives in */
+function slotOf(obj: AnyObject): "tables" | "maps" | "notes" | "media" | "panels" {
+  return isPanel(obj) ? "panels" : "cols" in obj ? "tables" : "sourceTableId" in obj ? "maps" : "text" in obj ? "notes" : "media";
+}
+function patchObject(id: string, patch: Partial<ObjectBase>, more: Partial<AppState> = {}) {
+  const obj = getObject(id);
+  if (!obj) return;
+  const slot = slotOf(obj);
+  set({ [slot]: { ...state[slot], [id]: { ...obj, ...patch } }, ...more } as Partial<AppState>);
+}
+
+/** what can be pinned to a section today: tables (a hosted app is the same idea for apps: setSectionHost) */
+export function canPin(obj: AnyObject): boolean {
+  return "cols" in obj;
+}
+
+/**
+ * Pin a card to its section, or let it go. Pinned, it leaves the flow and spans the section on its own
+ * paper; a table grows (never shrinks) to as many columns and rows as fill the section. One to a section:
+ * pinning another lets the first go. Unpinned, it is a docked card again, at the size it has.
+ */
+export function setObjectPinned(id: string, pinned: boolean) {
+  const obj = getObject(id);
+  if (!obj || !canPin(obj) || !!obj.pinned === pinned) return;
+  const sec = state.sections[obj.sectionId] ?? state.allSections[obj.sectionId];
+  if (!sec) return;
+  if (!pinned) return patchObject(id, { pinned: false, float: false });
+  // the others in the section let go
+  let tables = state.tables;
+  for (const o of objectsInSection(sec.id)) if (o.pinned && o.id !== id && "cols" in o) tables = { ...tables, [o.id]: { ...o, pinned: false } };
+  if ("cols" in obj) {
+    const card = sectionBaseRect(sec.virtual ? state.grid : (state.grids[sec.parent ?? ROOT] ?? DEFAULT_GRID), sec);
+    const bodyW = card.w - 2;
+    const bodyH = card.h - 2 - SECTION_HEADER;
+    const cols = Math.max(obj.cols, Number.isFinite(bodyW) ? Math.floor((bodyW - ROWNUM_W) / CELL_W) : obj.cols, 1);
+    const k = Number.isFinite(bodyW) ? bodyW / (ROWNUM_W + cols * CELL_W) : 1;
+    const rows = Math.max(obj.rows, Number.isFinite(bodyH) ? Math.floor((bodyH / k - HEADER_H - COLHEAD_H) / CELL_H) : obj.rows, 1);
+    if (cols !== obj.cols || rows !== obj.rows) workbook.resize(id, cols, rows);
+    tables = { ...tables, [id]: { ...obj, cols, rows, pinned: true, folded: false, float: false } };
+    set({ tables, ...unhostFor(sec.id) });
+  }
+}
+
+/** minimize a card to its title bar, or bring it back */
+export function setObjectFolded(id: string, folded: boolean) {
+  const obj = getObject(id);
+  if (!obj || !!obj.folded === folded) return;
+  patchObject(id, { folded });
+}
+
+/** take a card off the grid, whatever kind it is (a card that asks first does so on its own frame: ObjectFrame) */
+export function removeObject(id: string) {
+  const obj = getObject(id);
+  if (!obj) return;
+  if (isPanel(obj)) removePanel(id);
+  else if ("cols" in obj) removeTable(id);
+  else if ("sourceTableId" in obj) removeMap(id);
+  else if ("text" in obj) removeNote(id);
+  else removeMedia(id);
 }
 
 export function setObjectFloat(id: string, float: boolean) {
@@ -1877,7 +2011,7 @@ const DEFAULT_COLS = 4;
 const DEFAULT_ROWS = 8;
 let tableCount = 0;
 
-export function createTable(sectionId: string, atX?: number, atY?: number): TableMeta {
+export function createTable(sectionId: string, atX?: number, atY?: number, opts: { quiet?: boolean } = {}): TableMeta {
   sectionId = leafSection(sectionId); // a section that is a grid of sections: its first one
   const id = uid("table");
   tableCount++;
@@ -1904,7 +2038,7 @@ export function createTable(sectionId: string, atX?: number, atY?: number): Tabl
     tables: { ...state.tables, [id]: meta },
     ...unhostFor(sectionId),
     activeSectionId: sectionId,
-    snapRequest: { kind: "object", id, nonce: Math.random() },
+    ...(opts.quiet ? {} : { snapRequest: { kind: "object" as const, id, nonce: Math.random() } }),
   });
   return meta;
 }
@@ -2070,6 +2204,8 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   design: [1180, 900],
   pipeline: [1480, 330],
   collection: [360, 420],
+  replay: [360, 120],
+  local: [480, 420],
   uploader: [960, 1100],
 };
 
@@ -2082,7 +2218,10 @@ export function addPanel(
   const [w, h] = PANEL_SIZE[p.panel];
   // an app opened into an empty section becomes that section's app
   const sec = state.sections[sectionId];
-  const hosts = Boolean(sec) && objectsInSection(sectionId).length === 0 && isHostable(p.panel);
+  // (a section that still holds only the untouched sheet it started with counts as empty: the sheet gives way)
+  const sheet = sec && isHostable(p.panel) ? startingSheet(sectionId) : null;
+  const hosts = Boolean(sec) && (objectsInSection(sectionId).length === 0 || !!sheet) && isHostable(p.panel);
+  if (sheet) removeTable(sheet.id);
   const meta: PanelMeta = {
     id: uid("pnl"),
     sectionId,
@@ -2108,6 +2247,11 @@ export function addPanel(
  *  One way in for the section's tools, its right-click menu and ⌘K. `at` places it where the person pointed. */
 export function startMachine(sectionId: string, at: Partial<Pick<PanelMeta, "float" | "x" | "y">> = {}): PanelMeta {
   return addPanel(sectionId, { panel: "machine", name: "Machine", machine: { name: `box-${Math.random().toString(16).slice(2, 6)}`, state: "absent" }, ...at });
+}
+
+/** A full OS setup card. Adding it starts no process or installation. */
+export function startVm(sectionId: string, at: Partial<Pick<PanelMeta, "float" | "x" | "y">> = {}): PanelMeta {
+  return addPanel(sectionId, { panel: "machine", name: "WildOS VM", machine: { name: "WildOS", state: "absent", wantVm: true }, w: 800, h: 700, ...at });
 }
 
 export function updatePanel(id: string, patch: Partial<PanelMeta>) {

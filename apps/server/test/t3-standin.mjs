@@ -67,7 +67,8 @@ const http = createServer(async (req, res) => {
     if (c.type === "project.create") send("orchestration.subscribeShell", [{ kind: "project-upserted", sequence: 1, project: { id: c.projectId, title: c.title, workspaceRoot: c.workspaceRoot } }]);
     if (c.type === "thread.turn.start") {
       if (c.message.text.includes("REFUSE")) return json(400, { message: "the provider refused this turn" });
-      const b = c.bootstrap.createThread;
+      // a follow-up turn on a thread it has carries no bootstrap
+      const b = c.bootstrap?.createThread ?? threads[c.threadId] ?? {};
       upsert({ id: c.threadId, projectId: b.projectId, title: b.title, modelSelection: c.modelSelection, latestTurn: { state: "running" }, session: { status: "running", providerInstanceId: c.modelSelection.instanceId }, hasPendingApprovals: false, hasPendingUserInput: false, archivedAt: null, updatedAt: new Date().toISOString() });
       if (USE_TOOLS) setTimeout(() => void useTools(c), 1500);
       if (FINISH_MS) setTimeout(() => threads[c.threadId] && upsert({ ...threads[c.threadId], latestTurn: { state: "completed" }, session: { status: "ready", providerInstanceId: c.modelSelection.instanceId } }), FINISH_MS);

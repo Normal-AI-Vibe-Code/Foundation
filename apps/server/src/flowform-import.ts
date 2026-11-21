@@ -32,7 +32,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { execFileSync } from "node:child_process";
+import { childOptions, execFileSyncChild, type ExecFileSyncOptions } from "./child.ts";
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
@@ -116,7 +116,8 @@ export function openBackup(path: string): { dir: string; close: () => void } {
     root = tmp;
     close = () => rmSync(tmp, { recursive: true, force: true });
     try {
-      execFileSync("tar", ["-xzf", path, "-C", tmp]);
+      // tar unpacks a file into a folder: nothing beyond the allowlist
+      execFileSyncChild("tar", ["-xzf", path, "-C", tmp], childOptions<ExecFileSyncOptions>({ extras: [] }));
     } catch (e) {
       close();
       throw e;

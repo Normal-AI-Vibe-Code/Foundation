@@ -5,18 +5,22 @@
  */
 
 import { CouncilTalkView } from "../shell/CouncilTalk";
+import { VmSetupView, VmStatusView } from "../panels/LocalVm";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
 import { ShibaDot } from "../today/notices";
 import { ShibaTalk } from "../today/ShibaTalk";
 import { PROVIDER_NAME, ProviderMark } from "../characters/providers";
 import { Group, Row, Seg } from "../settings/SettingsSpace";
+import { EgressView, type EgressState } from "../shell/EgressSettings";
 import "../panels/system-cards.css";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { DesignChapter } from "@foundation/protocol";
 import { motion } from "motion/react";
 import { durations, easings, isNight, setNight, springs } from "@foundation/ui";
 import { initAsciiWind2 } from "../login/asciiWind2";
+import { SignInCode } from "../login/SignInCode";
+import { JobWhat } from "../panels/JobWhat";
 import { Mark } from "../brand/Mark";
 import { UpdateCard } from "../update/UpdateCard";
 import { ServerSwitchView, type ServerSwitchViewProps } from "../server/ServerSwitch";
@@ -30,11 +34,16 @@ import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { TOOLS } from "../shell/Tools";
 import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } from "../shell/wireGeometry";
 import { tunnelGeometry } from "../shell/wireGeometry";
-import { AppChip, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
-import type { CompanyApp, FocusItem, Goal, Mood } from "../today/model";
+import { AppChip, AppRow, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
+import type { CompanyApp, CompanyGoal, FocusItem, Goal, Mood } from "../today/model";
 
 const NOW = Date.now();
+const SAMPLE_COMPANY: CompanyGoal[] = [
+  { id: "cg1", title: "Fly the PTHP demonstrator", detail: "First tethered hover", owner: "Ada", status: "active", progress: 0.45, dueAt: NOW + 40 * 864e5, board: "company", objectId: null },
+  { id: "cg2", title: "Every station on FactoryForm work orders", detail: "", owner: "", status: "active", progress: 0.7, dueAt: null, board: "company", objectId: null },
+];
 const SAMPLE_FOCUS: FocusItem[] = [
+  { id: "goal:cg1", kind: "goal", title: "Fly the PTHP demonstrator", why: "A company goal you carry · 45% · due 24 Dec", board: "company", boardName: "Form Industries", href: "#", at: NOW },
   { id: "ask:a", kind: "ask", title: "Upload the latest stator STEP", why: "Kai asked you for CAD · 1 d overdue", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW, tone: "bad" },
   { id: "stage:s", kind: "stage", title: "03 · CAD", why: "You own this stage · 2 to tick", board: "company", boardName: "Form Industries", href: "#", at: NOW, tone: "warn" },
   { id: "mention:m", kind: "mention", title: "@Ada can you sign off the bearing loads before Friday?", why: "You're tagged in a note on Rim drive", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW },
@@ -47,8 +56,8 @@ const SAMPLE_GOALS: Goal[] = [
 ];
 const SAMPLE_APPS: CompanyApp[] = [
   { id: "factoryform", name: "FactoryForm", role: "Inventory, stations, work orders", url: "#", glyph: "⚙" },
-  { id: "bomform", name: "BomForm", role: "BOMs, certification", url: "#", glyph: "▤" },
-  { id: "hyperform", name: "HyperForm", role: "HyperForm programme", url: null, glyph: "◈" },
+  { id: "partform", name: "PartForm", role: "Every part and BOM", url: "#", glyph: "▤", signIn: "hyperform" },
+  { id: "fleetform", name: "FleetForm", role: "The fleet", url: null, glyph: "⛬" },
 ];
 
 function TodayDemo() {
@@ -75,16 +84,28 @@ function TodayDemo() {
       <div className="design-today-state today-state">
         <section className="today-group">
           <h2 className="f-eyebrow">
-            Focus today <span className="today-count">5</span>
+            Company goals <span className="today-count">2</span>
+          </h2>
+          {SAMPLE_COMPANY.map((g) => (
+            <GoalRow key={g.id} goal={g} onDone={() => {}} />
+          ))}
+        </section>
+        <section className="today-group">
+          <h2 className="f-eyebrow">
+            Todos <span className="today-count">8</span>
           </h2>
           {SAMPLE_FOCUS.map((f, i) => (
             <FocusRow key={f.id} item={f} pointed={i === 2} />
           ))}
-        </section>
-        <section className="today-group">
-          <h2 className="f-eyebrow">Goals</h2>
           {SAMPLE_GOALS.map((g, i) => (
             <GoalRow key={g.id} goal={g} pointed={i === 0} />
+          ))}
+        </section>
+        {/* the apps as Today's panel lists them: the row opens one in your browser, ⤢ opens it in Foundation */}
+        <section className="today-group" data-design-apps>
+          <h2 className="f-eyebrow">Apps</h2>
+          {SAMPLE_APPS.map((a, i) => (
+            <AppRow key={a.id} app={a} status={i === 0 ? "ok" : i === 1 ? "warn" : undefined} />
           ))}
         </section>
       </div>
@@ -96,6 +117,7 @@ function TodayDemo() {
     </div>
   );
 }
+import { CardMenuDemo, ReleasePageDemo, ThemesDemo } from "./ThemeDemos";
 import { PlanBoard, ReleasesTab, type NewCardInput, type SyncState } from "../settings/SettingsPage";
 import type { ReleasePost } from "../settings/releases";
 import { syncSentence } from "../settings/plan";
@@ -130,6 +152,8 @@ import { SubGridDemo } from "./SubGridDemo";
 import { PointerDemo } from "./PointerDemo";
 import { CharacterStudioDemo } from "./CharacterStudioDemo";
 import { CollectionDemo } from "./CollectionDemo";
+import { LocalDemo } from "./LocalDemo";
+import { ChatFormDemo } from "../chat/ChatDesign";
 import { UploaderDemo } from "./UploaderDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
@@ -148,18 +172,19 @@ const TYPE = [
 
 /** which of the page's sections make up each chapter of the design grid (protocol DESIGN_CHAPTERS), by title */
 export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
-  foundations: ["The mark", "Surfaces", "Ink & accents", "Type", "Shape"],
+  foundations: ["The mark", "Surfaces", "Ink & accents", "Themes", "Type", "Shape"],
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
-  floor: ["The floor", "Chrome on call", "Server switch", "Desktop updates"],
-  cards: ["Using a card", "Adding files", "Text box", "Writing together"],
+  floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Text box", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
+  chat: ["ChatForm"],
   machines: ["Machines"],
-  agents: ["The crew", "Agents in a section", "Agents in the section"],
+  agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
-  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Rune renderer"],
+  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
 const Only = createContext<Set<string> | null>(null);
@@ -199,7 +224,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       </>
       )}
 
-      <Section title="The mark" note="Four panels on a grid: two full rows over a row split in two. Blue on paper and glass; the white original on a solid fill or dark ground.">
+      <Section title="The mark" note="Two leaves, one over the other: a low one over one twice its height, each rounded at its top left and bottom right. Blue on paper and glass; the white original on a solid fill or dark ground.">
         <div className="mark-specimens">
           {[64, 32, 20, 16].map((n) => (
             <span key={n} className="mark-specimen">
@@ -234,6 +259,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           ))}
           <span className="design-note">Data uses --viz-1…8 in order.</span>
         </div>
+      </Section>
+
+      <Section title="Themes" note="The interface wears the theme of what is in focus (the shell sets data-theme on the root; packages/ui setTheme). Paper is the default and follows the orb. A grid may pin Always day or Always night for everyone on it (its ⓘ pane → Look). The room is Today: the floor's panes go clear and their ink goes white over the Shiba's room. An app opened as a tab is its own look inside its frame, with paper around it. Each is also a class (.f-paper, .f-day, .f-night, .f-room) for a surface that must wear one whatever is in focus. Anything that resolves tokens by hand (a terminal's colours) listens to onLook and reads them again.">
+        <ThemesDemo />
       </Section>
 
       <Section title="Type" note="Hanken Grotesk (OFL, bundled). Display prefers Lufga where licensed. Scale 11/12/13/14/16/20/24/32 — no half sizes.">
@@ -487,23 +516,23 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
                 </div>
               </section>
             </div>
-            {/* the foot (2026-11-17): the server the menu's width above Settings; day and night left of you; edges on the Settings icon's */}
-            <div className="server-switch-place is-bar is-pane">
-              <div className="server-switch">
-                <span className="server-switch-pill">
-                  <i className="server-switch-dot" data-tone="ok" />
-                  <span className="server-switch-addr">localhost:4410</span>
-                  <span className="server-switch-caret">▴</span>
-                </span>
-              </div>
-            </div>
-            <section className="pane-band pane-low">
+            {/* the foot (2026-11-17): Settings with the server as a small pill to its right; day and night left of you */}
+            <section className="pane-band pane-low pane-low-row">
               <span className="pane-row pane-place">
                 <span className="pane-glyph">
                   <GearGlyph />
                 </span>
                 <span className="pane-label">Settings</span>
               </span>
+              <div className="server-switch-place is-bar is-pane">
+                <div className="server-switch">
+                  <span className="server-switch-pill">
+                    <i className="server-switch-dot" data-tone="ok" />
+                    <span className="server-switch-addr">localhost:4410</span>
+                    <span className="server-switch-caret">▴</span>
+                  </span>
+                </div>
+              </div>
             </section>
             <footer className="pane-foot">
               <NightOrb onToggle={() => setNight(!isNight())} />
@@ -943,6 +972,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <SlackMarks />
       </Section>
 
+      <Section title="ChatForm" note="Foundation's conversations: channels, direct messages, groups, agents and the people beyond the bridges, one model. Its button sits right after Today, of Today's family, with what's for you beside the word (mentions, unread direct messages). The place keeps the top bar and the side menu: a strip with the tabs (Chat · Agents · Inbox · Huddles) and a search field drawn as a line; the sidebar on the floor (sections that fold; unread bold, mentions as the accent pill, muted dim); the timeline, newest at the foot, with day rules held at the top, a New rule in the accent, runs of one author within five minutes; a person is their initials on their colour, an agent its character in a violet ring with the Agent mark and whom it worked for, a ghost its service's monogram and via WhatsApp. Hover bar: quick reactions, react, reply in thread, pin, link, more. The composer is raised paper, ringed blue in focus (a person writes it): markdown tools, @ # :, files as chips with their progress. A thread opens beside it, over the timeline when the place is narrow. Ctrl/⌘+K inside it is the quick switcher.">
+        <ChatFormDemo />
+      </Section>
+
       <Section title="Machines" note="A Linux machine or container in a section, on this computer's engine: Kiri or Docker (one wire, the Docker Engine API). The state pill leads: Running (green, breathing), Pulling and Starting (amber, with the engine's own progress), Stopped and Not started (grey), Error (red, in the engine's words), No engine (amber, a hatched well that says why). Kiri installed but asleep is not No engine: the tag says Kiri · asleep and Start wakes it first; a machine whose disk is on a sleeping Kiri is Out of reach (amber), never removed. Then the engine and its version, the image in code type, and published ports as pills that open the port as a page in the section. Start is the one blue action, and only a person presses it: an agent's proposal says so in violet. Running, the shared terminal fills the card (paper, ink, the tokens as its colours); viewers watch it under an amber View only tag. Remove asks twice. A page opened from a port follows its machine: while the machine isn't running the page's poster dims and the machine's state stands over it (the card's own pill, what happened in its words, Start it for a person and Show the machine), and it reloads by itself when the machine runs again; a removed machine, or a card taken off the board, says it's gone. An agent's command (machine_run) waits on the card under the head: violet, the agent's name, the command in code type, its why, and the time left; Run is a person's blue go-ahead beside Decline, and a viewer sees who can answer instead. Running and answered asks shrink to a line (amber running, green exit 0, red otherwise, struck through when declined or unanswered) for two minutes. Shown at 560, 400 and 260 px. Typing (2026-11-15): a plain click in the terminal puts the caret there; while the shell (or the desktop) has the keys the well wears the 2 px in-use ring and a raised line says Keys go to this machine · Esc Esc to leave, and none of the app's shortcuts take a key. The head's Terminal · Desktop switch shows the machine's graphical desktop on the same ground: none yet is a dashed well with Add a desktop (blue, a person's press; the package manager's own progress in amber while it installs). Agents use a desktop only where a person pressed Let agents use this desktop (a plain pill: the person's decision; once given, a violet dot, who and when, and Stop). While an agent drives, a violet line says ✦ who is using this desktop and what it just did, with its last few actions under it; an agent asking without leave gets the same line with the person's button. The pipes sit above the foot on the panel ground: In ← what's wired in, the value in code type, when, and /foundation/in; Out → where it goes, the value, when, and /foundation/out; one dim line on using them from the shell. A viewer sees the same without the buttons.">
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 560, height: 320 }}>
@@ -999,7 +1032,11 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           </div>
         </div>
         <MachineAsksDemo />
+        <AppToolAsksDemo />
         <MachineUseDemo />
+        <h3>Full operating systems · native QEMU</h3>
+        <div className="adapt-row">{[260, 400, 560].map((width) => <div key={width} className="frame-card live-specimen" style={{ width, height: 700 }}><VmSetupView files={[{ id: "demo-iso", name: "wildos-amd64.iso", size: 3 * 1073741824, sha256: "a2b4c6d8".repeat(8) }]} host={{ available: true, note: "Native QEMU · no WSL or Docker required", maxMemoryMB: 16384, maxCpus: 8 }} /></div>)}</div>
+        <div className="adapt-row"><div className="frame-card live-specimen" style={{ width: 560 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "stopped", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "software", bootIso: false, detail: "VM stopped. Its disk is kept." }} /></div><div className="frame-card live-specimen" style={{ width: 400 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "error", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "native", bootIso: true }} viewer error="Not enough available host memory. Close other VMs/apps or configure a smaller VM." /></div></div>
         <MachineHeadSpecimens />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
@@ -1100,6 +1137,19 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         </div>
       </Section>
 
+      <Section title="Running a job" note="A job an agent queued (reverse-engineering with REA, a Vision hand-off) waits on its card for a person. Before Run the card shows what will run, from the job itself, never the card's text: the whole target and the whole goal, in code type, wrapping anywhere and scrolling, never cut. Run asks first, on a raised pane inside the card: which program will run (Claude Code, rea-agents, Vision Code), the target and goal again, Run it in violet and Cancel. The press names exactly what it showed; the server runs only that, and refuses if the job changed since. A finished job's text starts with whose output it is.">
+        <div className="job-demos">
+          {[false, true].map((asking) => (
+            <div key={String(asking)} className="job-demo">
+              <JobWhat
+                what={{ target: "C:\\Users\\ada\\Projects\\shroud-configurator\\resources\\app.asar", goal: "Map how it works: structure, data flow, APIs, and anything we can reuse. Then list every IPC channel the renderer uses, with the arguments each takes.", program: "rea-agents", shown: "" }}
+                ask={asking ? { onRun: () => {}, onCancel: () => {} } : undefined}
+              />
+            </div>
+          ))}
+        </div>
+      </Section>
+
       <Section title="The crew" note="Agents you can see. Each ask gets an agent with a generated name and a colour of its own from the violet family (six, --color-crew-0…5), and a cursor that glides on a spring to what it's about to change, a beat before the change lands, saying what it's doing in a paper chip. A helper says who called it in. Done shows in green where it finished, then the cursor fades and leaves. When an agent brings you somewhere, a glass pill under the top bar says so with Back; if you were busy moving, it asks first (Go, in violet, because an agent will act). Hold Space and the voice sheet rises from the bottom: the mic's own level in violet bars, your words as heard, the crew at work below with Open and Stop; a tap of Space types instead.">
         <CrewDemo />
       </Section>
@@ -1133,8 +1183,19 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <SubGridDemo />
       </Section>
 
+      <Section
+        title="What agents may send outside"
+        note="In a grid's own pane (the ⓘ on its tab), under who can change it: Agents on this board may send to. One group per outside service this server has set up, its name in 13/600 and a badge that says where it runs in words (↗ External service · Slack, a hairline pill in mist). Under it a row per kind of thing an agent would send, said plainly in mist 12, with Allowed by whom (ok green) or Not allowed (dim) beneath, and a switch at the right: blue with the knob over when on. Everything starts off. A person who can edit the grid flips one (on a members-only grid, its owner or an admin); a viewer sees the same rows with the switches held and a line saying who can change them. An agent that wanted to send gets a sentence saying a person has to allow it, and nothing goes. A person's own search from their browser needs none of this. Shown at 272 (the pane's own width), as a viewer, and at 220, the narrowest the pane goes."
+      >
+        <EgressDemo />
+      </Section>
+
       <Section title="Text box" note={`A note written as formatted text: what you see is what's kept. Click in it to write; a toolbar rides the card's foot while it has the caret (raised paper, card radius, 34 tall): the style (Body, Title, Heading, Subheading), bold, italic, underline, strikethrough, bulleted and numbered lists, quote, link, clear. A mark that's on is the pulse tint. ${keys("mod+B")}, ${keys("mod+I")} and ${keys("mod+U")} work as in any word processor. Under it, it is the note's own markdown in the note's shared text, so search, agents and the other renderer read it as they read any note; underline is kept as <u>. From the right-click menu (Text box), and from an empty section's Write.`}>
         <TextBoxDemo />
+      </Section>
+
+      <Section title="Pictures and links from elsewhere" note="Text an agent, a tool, Slack, a README or another app wrote is drawn as markdown, and what it points at stays put until a person chooses. A picture from any address but Foundation's own files (or one written into the text) is a dashed pill on raised paper: Image from and its host in ink, and Load image, which loads that one picture, this time; nothing is remembered. A link says where it really goes: its host in code type, dim 11, beside the words (unless the words already name it), and it opens in a new tab that can't reach back. Only web addresses become links.">
+        <ElsewhereDemo />
       </Section>
 
       <Section title="Writing together" note={`A note at rest is its markdown, tables included. Double-click and it opens as a CodeMirror editor on the note's shared text: monospace, the markdown's own marks dimmed, headings and strong text in weight, links blue — no colour of its own. Every keystroke is shared as it's typed, so two people can write in one note, even in one word, and both keep their words whole. Each person keeps their own colour: someone else's caret is a 2 px bar in it, named while it moves and quiet once it rests; their selection is a 22 % tint. A note at rest names whoever is writing in it with a breathing chip at the bottom right, clear of the bar that drops in at the top. ${keys("mod+Z")} takes back only your own words. The two editors below share one text: type in either.`}>
@@ -1157,14 +1218,39 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <ServerSwitchDemo />
       </Section>
 
+      <Section title="Signing in an app" note="The desktop app (or a page on another site's server) signs in through Google in the system browser, like a device sign-in. While it waits it shows a code of eight, grouped in fours, from letters and digits that can't be mixed up (no 0/O, 1/I/L, 5/S, 2/Z), in code type, under the waiting line. After Google the browser lands on Foundation's own page (server-rendered, no script, never framed) that says, in plain words, an app on a computer is asking to sign in as this person, shows the same code large, and asks: This is me, sign that app in, or Not me. The app gets its session only after This is me, once; Not me ends it; the whole sign-in is over in five minutes.">
+        <div className="signin-demo f-day">
+          <div className="login-waiting" role="status">
+            <span className="f-dot is-live" />
+            <span>Finish signing in with Google in your browser.</span>
+            <button type="button" className="f-pill login-cancel">
+              Cancel
+            </button>
+          </div>
+          <SignInCode code="HM7Q-4KXT" />
+        </div>
+      </Section>
+
       <Section title="Release notes" note="Settings → Releases: docs/blog/<version>.md, newest first. The versions run down a sticky list on the left (the current one raised paper, the one this app is built as tagged in blue); the post reads on the right at 720 px: an eyebrow with the version and date, the title in display 24, the body in mist 14/1.6 with frost headings and bold. Under 720 px the list runs across the top.">
         <div className="design-releases">
           <ReleasesTab posts={DEMO_POSTS} route="" />
         </div>
       </Section>
 
+      <Section title="Release page" note="The Changes tool's first face, and what heads a post in Settings → Releases: a release drawn from its own post. A cover (the mark in pulse, the version in display 300/32, the date, THIS APP on the one running) on a wash of the accent and the agent tint over the panel well; the title in display 20/600; the post's opening paragraph as the description (mist 13/1.55); one bar cut in proportion to the post's parts in the data colours, with the counts (changes · fixes) in dim tabular 11; then each part as a tile on raised paper: its icon on a 14 % wash of its colour, its name 13/600, how many things it lists, and one sentence in mist 12. A tile opens the full notes at its part. On tokens only: white over the room on Today, ink on paper elsewhere.">
+        <ReleasePageDemo post={DEMO_POSTS[0]} />
+      </Section>
+
+      <Section title="A card's menu, pinned and minimized" note="Right-click any card: its name, then Frame it, Full screen and Minimize; Pin to the section or Unpin (a table), Let it fill the section or Show as a card (an app), Float or Dock; Inputs and outputs… (the right pane: every port with its type, what is on it now in full, and each card it is wired to); Open as a tab (an app); Copy a link; Remove in the bad colour, last. A viewer gets the ones that change nothing. A table's cells keep their own menu. Pinned, a table leaves the flow and spans its section on the section's own paper: no card under it, its rules only, at the section's exact width; the flow's cards lie over it. A section a person adds starts with one. Minimized, a card is its bar alone (40 tall), always showing, with ▢ to restore.">
+        <CardMenuDemo />
+      </Section>
+
       <Section title="Rune renderer" note="A second engine beside the web renderer (Settings → Renderer; it's this device's choice, and the web renderer is the default). While Rune draws the board, a quiet glass pill in the bottom bar says so, beside the zoom: a green dot when it's drawing, a breathing blue one while it starts, amber and Rune off when it was asked for and couldn't run (the label says why, and a toast says it once). A press opens the list of where Rune stands. In Settings the two engines are raised cards, the chosen one ringed blue; under them, whether WebGPU and the build are here, then the ledger: each part of the board with one of four words. Never violet: which engine draws is a person's choice.">
         <RuneDesign />
+      </Section>
+
+      <Section title="This computer" note="The projects being built on the computer the server runs on, as a grid of their own (Settings → Places → Connect this computer; an admin, in person). A section per git repository, its worktrees folded in, each holding three cards the server keeps: Preview (the newest screenshot a session saw, and the dev server the project declares, its port in the code face with a dot: ok when something answers, ↗ to open it), Progress (the lead session: its title 14/600, where it runs, its plan as a 4 px ok bar with n/m and its steps, done struck, the one under way 600 with a breathing agent-violet box, then its last wrap-up behind a strong hairline; the others as 24 px rows), and Changes (the branch in the code face, ↑↓ against upstream, the changed files with their status letter in warn, ok or bad, the last five commits). Every card wears the local pill: a computer, On this computer, and the watch's dot (ok while it looks, warn when it stopped). The same mark sits beside a section's council chip (Local, or n working here), on the grid's council button, on the grid's tab and its row in the side menu, with the dot at the row's right. Never violet but for a session at work: the computer isn't an agent.">
+        <LocalDemo />
       </Section>
 
       <Section title="Panels that adapt" note="Design for the narrowest width first; container queries, never the window. Check 260, 400 and 560 px.">
@@ -1348,6 +1434,74 @@ function MachineUseDemo() {
   );
 }
 
+/**
+ * An agent's ask to use a saved app's tool, over the app's page (ADR-001 G3): first use and a changed
+ * tool waiting, then allowed and declined (560, 400 as a viewer, 260). Allow calls nothing; the agent calls again.
+ */
+function AppToolAsksDemo() {
+  const now = Date.now();
+  const tool = (change: "first" | "changed", args: string) => ({ appId: "app_demo", app: "Vision", address: "http://localhost:5174/mcp", description: "Make a part from a sketch: extrudes the closed profile by the given depth.", args, change, defHash: "demo" });
+  const first: MachineAsk = { id: "ask_app1", command: "make_part", by: "Kestrel", for: "Ada", state: "waiting", at: now - 8_000, tool: tool("first", '{\n "sketch": "rim-profile-v3",\n "depth_mm": 12,\n "material": "6061-T6"\n}') };
+  const changed: MachineAsk = { id: "ask_app2", command: "export_step", by: "Wren", for: "Kai", state: "waiting", at: now - 3_000, tool: tool("changed", '{\n "part": "rim"\n}') };
+  const done: MachineAsk[] = [
+    { id: "ask_app0", command: "list_parts", by: "Kestrel", for: "Ada", state: "allowed", at: now - 90_000, decidedBy: "Ada", endedAt: now - 80_000, tool: tool("first", "{}") },
+    { id: "ask_app3", command: "delete_part", by: "Kestrel", for: "Ada", state: "declined", at: now - 60_000, decidedBy: "Kai", endedAt: now - 50_000, tool: tool("first", '{\n "part": "rim"\n}') },
+  ];
+  const card = (width: number, height: number, asks: MachineAsk[], viewer = false) => (
+    <div className="frame-card live-specimen" style={{ width, height, position: "relative" }}>
+      <div className="live-frame">
+        <div className="frame-poster">
+          <div className="frame-poster-name">Vision</div>
+          <div className="frame-poster-domain">localhost:5174</div>
+        </div>
+        <div className="app-asks">
+          <MachineAskList asks={asks} viewer={viewer} now={now} />
+        </div>
+      </div>
+    </div>
+  );
+  return (
+    <div className="adapt-row">
+      {card(560, 420, [...done, first])}
+      {card(400, 360, [changed], true)}
+      {card(260, 360, [first])}
+    </div>
+  );
+}
+
+/** what a grid's agents may send outside (EgressSettings): an editor's pane at 272, a viewer's, and the narrowest pane (220) */
+function EgressDemo() {
+  const kinds = (service: string, on: Record<string, string | undefined>) => {
+    const words: Record<string, Record<string, string>> = {
+      Slack: { query: "Search words, to find messages and pictures in Slack", read: "Which channel or file to read, to read its messages or copy a picture in", message: "A message an agent writes, sent to a teammate as a direct message" },
+      GitHub: { query: "Search words, to find the company's repositories", read: "Which repository to read, to read its README and recent commits" },
+    };
+    return Object.entries(words[service]).map(([kind, sends]) => ({ kind, sends, allowed: Boolean(on[kind]), ...(on[kind] ? { allowedBy: on[kind] } : {}) }));
+  };
+  const services = (on: Record<string, Record<string, string | undefined>>): EgressState["services"] =>
+    ["Slack", "GitHub"].map((service) => ({ service, provenance: "external", badge: `External service · ${service}`, configured: true, kinds: kinds(service, on[service] ?? {}) }));
+  const editor: EgressState = { services: services({ Slack: { query: "Ada", read: "Ada" } }), canChange: true, who: "Anyone who can edit this grid can change these." };
+  const viewer: EgressState = { services: services({ Slack: { query: "Ada" } }), canChange: false, who: "Anyone who can edit this grid can change these." };
+  const narrow: EgressState = { services: services({}), canChange: true, who: "This grid's owner or an admin can change these." };
+  const [live, setLive] = useState(editor);
+  const pane = (width: number, state: EgressState, onToggle?: (s: string, k: string, on: boolean) => void) => (
+    <div className="side-pane space-info" style={{ width, border: "1px solid var(--color-line)", borderRadius: "var(--radius-pane)", background: "var(--color-void)" }}>
+      <div className="pane-scroll">
+        <EgressView state={state} onToggle={onToggle} />
+      </div>
+    </div>
+  );
+  const flip = (s: string, k: string, on: boolean) =>
+    setLive((cur) => ({ ...cur, services: cur.services.map((x) => (x.service !== s ? x : { ...x, kinds: x.kinds.map((y) => (y.kind !== k ? y : { ...y, allowed: on, allowedBy: on ? "you" : undefined })) })) }));
+  return (
+    <div className="adapt-row">
+      {pane(272, live, flip)}
+      {pane(272, viewer)}
+      {pane(220, narrow, () => {})}
+    </div>
+  );
+}
+
 /** the crew, laid out still: cursors on a card, the guide pill, the sheet listening and typing */
 /** an agent's command on a running machine's card: waiting for a person, then what became of it (560, 400 as a viewer, 260) */
 function MachineAsksDemo() {
@@ -1476,6 +1630,20 @@ function SectionAgentsDemo() {
           </header>
           <SectionAgentsView sectionName="Review" teams={null} recent={[]} canAsk={false} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** an agent's note pointing at a picture and a page elsewhere: the placeholder, and the link's real host */
+function ElsewhereDemo() {
+  const html = renderMarkdown(
+    "## Shroud supplier\n\nThe quote is in [the supplier's portal](https://portal.example-supplier.com/q/4471), and the drawing they sent:\n\n![rev C drawing](https://cdn.example-supplier.com/rev-c.png)\n\nThe model is in [github.com/form/shroud](https://github.com/form/shroud).",
+  );
+  return (
+    <div className="frame-card oncall-static" style={{ position: "relative", width: 400 }}>
+      <div className="note-inner">
+        <div className="note-rendered" dangerouslySetInnerHTML={{ __html: html }} />
       </div>
     </div>
   );
@@ -2254,7 +2422,7 @@ function HeldPageDemo(p: { width: number; word: string; tone: "ok" | "warn" | "b
   );
 }
 
-const UPDATE_NOTES = ["## Foundation 0.3.0", "- Desktop updates: this card", "- A new icon: four panels on a grid", "- Signed installers, checked before they run"].join("\n");
+const UPDATE_NOTES = ["## Foundation 0.3.0", "- Desktop updates: this card", "- A new icon: two leaves on a night tile", "- Signed installers, checked before they run"].join("\n");
 const UPDATE_PHASES: Array<{ phase: UpdatePhase; width: number; layout?: "floating" | "inline"; extra?: Record<string, unknown> }> = [
   { phase: "available", width: 400 },
   { phase: "available", width: 260 },
@@ -2344,6 +2512,13 @@ const SWITCH_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps
 function ServerSwitchDemo() {
   return (
     <div className="update-demo server-switch-demo">
+      {/* signed in (2026-11-18): it opens in the side menu's own flow, right above the Settings band, on the menu's paper */}
+      <div style={{ width: 272 }}>
+        <div className="f-eyebrow update-demo-label">In the side menu, open above Settings</div>
+        <div className="server-switch-menu-demo">
+          <ServerSwitchView {...SWITCH_BASE} still open host={null} panelOnly />
+        </div>
+      </div>
       {SWITCH_STATES.map((d, i) => (
         <div key={i} style={{ width: 360 }}>
           <div className="f-eyebrow update-demo-label">{d.label}</div>

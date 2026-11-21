@@ -1,0 +1,230 @@
+/* Slack history (tabs/History.tsx), inside the Inbox tab's Slack sheet. On tokens only. */
+
+.hist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.hist h3 {
+  margin: 0;
+  font: 600 var(--text-14) / 1.3 var(--font-sans);
+  color: var(--color-frost);
+}
+.hist h4 {
+  margin: 0 0 var(--space-2);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: var(--track-caps);
+  text-transform: uppercase;
+  color: var(--color-mist);
+}
+.hist code {
+  font: 500 var(--text-12) / 1.3 var(--font-code);
+}
+
+.hist-steps {
+  margin: 0;
+  padding-left: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.hist-note,
+.hist-why {
+  margin: 0;
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+.hist-why {
+  color: var(--color-warn);
+}
+
+/* the drop zone */
+.hist-drop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  min-height: 72px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  transition: border-color var(--dur-quick) var(--ease-out-soft);
+}
+.hist-drop.is-over {
+  border-color: var(--color-pulse);
+  box-shadow: 0 0 0 3px var(--color-pulse-dim);
+}
+.hist-drop.is-locked {
+  opacity: 0.6;
+}
+.hist-drop-title {
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1.4 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.hist-sending {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+
+/* progress */
+.hist-bar {
+  position: relative;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-line);
+  overflow: hidden;
+}
+.hist-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-pulse);
+  transition: width var(--dur-pane) var(--ease-out-soft);
+}
+.hist-job-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.hist-job-live:empty {
+  display: none;
+}
+
+.hist-check {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+}
+.hist-check.is-inline {
+  align-items: center;
+}
+
+/* the report */
+.hist-report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+.hist-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+.hist-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+}
+.hist-stat-k {
+  font: 600 var(--text-20) / 1.2 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-frost);
+}
+.hist-stat-label {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.hist-stat-sub {
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  line-height: 1.4;
+}
+.hist-skipped ul,
+.hist-warn {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+.hist-skipped li {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-frost);
+  font-size: var(--text-12);
+  line-height: 1.45;
+}
+.hist-skip-n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-mist);
+}
+.hist-skip-eg {
+  color: var(--color-dim);
+  overflow-wrap: anywhere;
+}
+.hist-warn li {
+  padding: var(--space-1) 0;
+  color: var(--color-warn);
+  font-size: var(--text-12);
+}
+
+/* the API, the earlier imports, the export: rows under a rule, like Settings */
+.hist-api,
+.hist-jobs,
+.hist-export {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+.hist-job {
+  display: grid;
+  grid-template-columns: 8px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: none;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.hist-job:hover,
+.hist-job.is-on {
+  background: var(--color-raise);
+}
+.hist-job-what {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hist-job-n,
+.hist-job-when {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+@container (max-width: 520px) {
+  .hist-job {
+    grid-template-columns: 8px 1fr auto;
+  }
+  .hist-job-n {
+    display: none;
+  }
+}

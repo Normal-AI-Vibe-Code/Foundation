@@ -20,12 +20,15 @@ import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
 import { WIDTHS, setUi, spaceOpenedAt, toast, useUi } from "../state/ui";
 import { logout } from "../lib/api";
-import { KIND_GLYPH, KIND_NAME, childrenOf, fileGrid, parentOf, wouldLoop, type BoardRow, type SpaceKind } from "../lib/grids";
+import { KIND_NAME, childrenOf, isPageKind, fileGrid, parentOf, wouldLoop, type BoardRow, type SpaceKind } from "../lib/grids";
 import { goSettings, type Place } from "../lib/place";
 import { initials } from "./Presence";
 import { FloorEdge } from "./FloorEdge";
 import { ServerSwitch } from "../server/ServerSwitch";
 import { NightOrb } from "./NightOrb";
+import { SpaceGlyph } from "./SpaceGlyph";
+import { LOCAL_GRID_ID } from "@foundation/protocol";
+import { LocalRowDot } from "../panels/LocalView";
 import { isNight, setNight } from "@foundation/ui";
 
 interface Props {
@@ -48,6 +51,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
   const ui = useUi();
   const viewer = user.role === "viewer";
   const [shut, setShut] = useState<Set<string>>(() => new Set());
+  /** where the server switch draws its panel: above the Settings band */
+  const [serverSlot, setServerSlot] = useState<HTMLDivElement | null>(null);
   /** the grid being dragged, and the row (or "top") it's over */
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -59,7 +64,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
     // re-sorted when the open grid changes (it just became the most recent)
   }, [listed, current]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canTake = (into: string | null) => !!drag && (into === null ? !!parentOf(boards.find((b) => b.id === drag)!, listed) : !wouldLoop(drag, into, listed) && listed.find((b) => b.id === into)?.kind !== "page" && boards.find((b) => b.id === drag)?.parent !== into);
+  const canTake = (into: string | null) => !!drag && (into === null ? !!parentOf(boards.find((b) => b.id === drag)!, listed) : !wouldLoop(drag, into, listed) && !isPageKind(listed.find((b) => b.id === into)?.kind) && boards.find((b) => b.id === drag)?.parent !== into);
   const drop = async (into: string | null) => {
     const id = drag;
     setDrag(null);
@@ -145,12 +150,15 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             tree && <span className="grid-caret is-none" aria-hidden />
           )}
           <button className="pane-row space-open" onClick={() => onSwitch(b.id)} data-tip={`${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : " · drag onto a grid to put it inside"}`}>
-            <span className="pane-glyph">{b.id === "company" ? "◉" : KIND_GLYPH[kind]}</span>
+            <span className="pane-glyph">
+              <SpaceGlyph space={b} />
+            </span>
             <span className="pane-label">{b.name}</span>
+            {b.id === LOCAL_GRID_ID && <LocalRowDot />}
             {!tree && parent && <span className="pane-when">{parent.name}</span>}
             {tree && kids.length > 0 && <span className="pane-when">{kids.length}</span>}
           </button>
-          {tree && !viewer && b.role !== "viewer" && kind !== "page" && (
+          {tree && !viewer && b.role !== "viewer" && !isPageKind(kind) && (
             <button className="space-move" onClick={() => onNew("grid", b.id)} aria-label={`New grid inside ${b.name}`} data-tip="New grid inside">
               ＋
             </button>
@@ -202,19 +210,19 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             </section>
           </div>
 
-          {/* the server this app talks to, the menu's width, above Settings (2026-11-17: out of the top bar) */}
-          <ServerSwitch where="pane" />
-          <section className="pane-band pane-low">
+          {/* the server pill's panel opens here, in the menu's flow right above the Settings band (2026-11-18) */}
+          <div className="pane-server-slot" ref={setServerSlot} />
+          {/* Settings, and the server this app talks to as a small pill to its right in the same band (2026-11-17) */}
+          <section className="pane-band pane-low pane-low-row">
             <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
               <span className="pane-glyph">
                 <GearGlyph />
               </span>
               <span className="pane-label">Settings</span>
             </button>
+            <ServerSwitch where="pane" host={serverSlot} />
           </section>
           <footer className="pane-foot">
-            {/* day and night, left of you (2026-11-17: out of the top bar) */}
-            <NightOrb onToggle={() => setNight(!isNight())} />
             <span className="me-avatar" style={{ background: user.color }} title={user.email}>
               {initials(user.name)}
             </span>
@@ -230,6 +238,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
                 Sign out
               </button>
             </span>
+            {/* day and night, right of you, at the foot's other end (2026-11-18, Josh: "to the right of the profile button … on the other side") */}
+            <NightOrb onToggle={() => setNight(!isNight())} />
           </footer>
 
           <FloorEdge side="right" value={ui.paneW} {...WIDTHS.pane} onChange={(w) => setUi({ paneW: w })} label="Foundation menu" />

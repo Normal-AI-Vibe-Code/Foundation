@@ -5,7 +5,7 @@
  * sources stream in after.
  */
 
-import { goSettings, goToday } from "../lib/place";
+import { goChat, goSettings, goToday } from "../lib/place";
 import { openCouncil } from "../lib/councilOpen";
 import { newCharacter, openCharacterStudio } from "../lib/characterStudio";
 import { keys } from "../lib/keys";
@@ -15,7 +15,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { SearchHit } from "@foundation/protocol";
 import { isNight, setNight } from "@foundation/ui";
 import { api, logout, search } from "../lib/api";
-import { addNote, addPanel, appendSectionLocal, createTable, getState, requestSnap, startMachine, updatePanel } from "../state/store";
+import { addNote, addPanel, appendSectionLocal, createTable, getState, requestSnap, startMachine, startVm, updatePanel } from "../state/store";
 import { askAgent, setUi, toast, useUi } from "../state/ui";
 import { activeBoard } from "../sync/board";
 import { snippetHtml } from "../lib/snippet";
@@ -39,6 +39,7 @@ const SOURCE_LABEL: Record<SearchHit["source"], string> = {
   app: "App",
   activity: "Activity",
   flowform: "Flowform",
+  chat: "ChatForm",
 };
 
 export function looksLikeUrl(q: string) {
@@ -167,6 +168,7 @@ export function CommandBar() {
       { id: "note", glyph: "▤", label: "Add a note", run: () => void addNote(sec) },
       { id: "table", glyph: "⊞", label: "Add a table", run: () => void createTable(sec) },
       { id: "machine", glyph: "▣", label: "Start a machine in this section", hint: "Linux on Kiri or Docker, with a shared terminal", run: () => void startMachine(sec) },
+      { id: "native-vm", glyph: "▣", label: "Add a full operating system / WildOS VM", hint: "A local VM from an ISO, desktop and guest commands", run: () => void startVm(sec) },
       { id: "section", glyph: "▥", label: "New section", run: () => void appendSectionLocal(term && !looksLikeUrl(term) ? term : "New section") },
       { id: "upload", glyph: "⇪", label: "Upload files…", hint: "designs, CAD, PDFs, video", run: () => void window.dispatchEvent(new CustomEvent("foundation:upload")) },
       { id: "cad", glyph: "✉", label: "Ask someone for the latest CAD…", hint: "Hermes keeps following up", run: () => askAgent("Ask ") },
@@ -175,6 +177,7 @@ export function CommandBar() {
       { id: "stop-crew", glyph: "■", label: "Stop all my agents on this board", hint: "the crew-wide stop, helpers too", run: () => void stopAllOnBoard() },
       { id: "connect", glyph: "⌁", label: "Connect Claude Code / Codex to this grid", hint: "copies an MCP command; more in Settings → Agents", run: copyMcpCommand },
       { id: "today", glyph: "◌", label: "Today", hint: "the Shiba, your todos, the company's apps", run: () => goToday() },
+      { id: "chatform", glyph: "✉", label: "Open ChatForm", hint: "channels, direct messages, threads, agents", run: () => goChat() },
       { id: "settings", glyph: "⚙", label: "Settings", hint: "appearance, agents, avatars, the plan, releases", run: () => goSettings() },
       { id: "design", glyph: "◐", label: "Design language", hint: "tokens, type, motion, effects", run: () => goSettings("design") },
       { id: "night", glyph: isNight() ? "☀" : "☾", label: isNight() ? "Day" : "Night", run: () => setNight(!isNight()) },

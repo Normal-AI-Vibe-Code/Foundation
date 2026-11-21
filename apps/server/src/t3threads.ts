@@ -30,6 +30,7 @@ import { createSession, revokeSession } from "./auth.ts";
 import { boardDigest, editBoard, getBoard } from "./boards.ts";
 import { aim, joinCrew, leaveCrew, seatName, setDoing, type CrewMember } from "./crew.ts";
 import { HttpError } from "./http.ts";
+import { audit } from "./audit.ts";
 import { BOARD_TOOLS_FILE, interruptT3Thread, onT3Work, startT3Thread, t3Host, type T3Work } from "./t3host.ts";
 
 interface Bound {
@@ -107,6 +108,7 @@ export async function askT3(user: UserInfo, input: { board: string; section: str
     const started = await startT3Thread({ agent: agent.id, model: input.model, title: short(text.split("\n")[0], 80), text: brief, folder, projectTitle: `Foundation · ${input.board} · ${short(text.split("\n")[0], 40)}` });
     const b: Bound = { threadId: started.threadId, boardId: input.board, sectionId: section.id, by: user.id, member, worked: false, at: Date.now(), token, toolsFile };
     bound.set(started.threadId, b);
+    audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, board_id: input.board, door: "route", action: "t3_thread.start", target: `${started.threadId} ${agent.id}`, provenance: "ours-local", service: `T3 · ${agent.id}`, decision: "allowed", approved_by: user.id, result: "ok" });
     setDoing(member, `starting on ${started.model}`);
     // T3 may have shown the thread at work before the start call came back: catch up
     const now = t3Host().work.find((w) => w.id === started.threadId);
@@ -144,6 +146,7 @@ export async function stopT3Thread(user: UserInfo, threadId: string) {
     throw new HttpError(502, (e as Error).message);
   });
   if (b) release(b, "stopped");
+  audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, board_id: b?.boardId ?? null, door: "route", action: "t3_thread.stop", target: threadId, decision: "allowed", result: "ok" });
   return { stopped: true };
 }
 

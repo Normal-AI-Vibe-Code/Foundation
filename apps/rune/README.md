@@ -47,6 +47,14 @@ camera.ts (one camera, both engines) ──▶ setCamera ──▶ two Live valu
   for both engines (`GridViewport.tsx`); it asks `hitWorld` what's under the pointer where the
   web renderer asks the DOM.
 - **Web layers stay web.** Wires, cursors and the chrome draw over the canvas.
+- **Motion has an owner.** Rune eases whatever changed between two views unless a commit says
+  otherwise, and a board that arrived while the pointer was moving counted as the pointer's doing:
+  a pane opening slid the grid's cut after it, and one board morphed into the next. So every
+  `setScene` says `animated` or not, and `apps/client/src/rune/transitions.ts` decides, the first
+  rule that applies: another board lands; the floor (panes, the window) lands; what a hand just
+  did through Rune (a let-go, a tool, a new section) settles; a change of look (day and night,
+  the selection) eases; everything else from the store lands. `test/rune-transitions.test.ts`
+  holds each rule.
 - **The paper is Rune's.** Rune's web canvas can't be see-through, so `paper.rs` draws the web
   paper's own shader (`apps/client/src/gl/background.ts`, in WGSL) through Rune's compositor
   hook, and a section's dots with it. The page tells it where the pointer is, whether it's

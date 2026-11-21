@@ -2,6 +2,11 @@ import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 /** :1450 by default; E2E_CLIENT_PORT moves it (Windows can reserve 1437–1536 at boot) */
 export const CLIENT = `http://localhost:${process.env.E2E_CLIENT_PORT ?? 1450}`;
+/**
+ * the stand-in live app (e2e/frame.html), served from another origin than Foundation's (the stand-in Slack's):
+ * Foundation never frames its own pages (src/panels/frameSandbox.ts)
+ */
+export const FRAME = `http://127.0.0.1:${process.env.E2E_SLACK_PORT ?? 4440}/e2e/frame.html`;
 
 /** a signed-in person in their own browser context (cookies apart) */
 export async function person(browser: Browser, name: string, email: string, board = "company"): Promise<{ context: BrowserContext; page: Page }> {
@@ -10,6 +15,9 @@ export async function person(browser: Browser, name: string, email: string, boar
   if (!res.ok()) throw new Error(`dev login for ${email}: ${res.status()} ${await res.text()}`);
   // a clean floor: no side pane, no tabs, no search (what's remembered is per context anyway)
   await context.addInitScript(() => localStorage.setItem("foundation-floor", JSON.stringify({ pane: false, tabs: [], tab: null, search: false })));
+  // these specs were written when the wheel moved the paper: they keep that setting (Settings → General).
+  // The default, a wheel that zooms, has its own spec (wheel-zoom.spec.ts)
+  await context.addInitScript(() => localStorage.getItem("foundation-wheel") ?? localStorage.setItem("foundation-wheel", "pan"));
   const page = await context.newPage();
   await page.goto(`/?board=${encodeURIComponent(board)}`);
   await waitLive(page);

@@ -657,6 +657,45 @@
   border-top: 1px solid var(--color-line);
   border-bottom: 1px solid var(--color-line);
 }
+/* Settings and the server pill in one band: Settings takes the room, the pill sits at the right */
+.side-pane .pane-low-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.side-pane .pane-low-row .pane-row {
+  flex: 1 0 auto;
+  width: auto;
+}
+/* the row is still the band's whole width under the pointer and when it's the place you're in: its wash (and the
+   2 px bar) is drawn across the band, behind the pill, and pressing beside the pill is pressing Settings (2026-11-19) */
+.side-pane .pane-low-row .pane-row::before {
+  content: "";
+  position: absolute;
+  inset: var(--space-2) 0;
+}
+.side-pane .pane-low-row .pane-row:hover,
+.side-pane .pane-low-row .pane-place.is-current,
+.side-pane .pane-low-row .pane-place.is-current:hover {
+  background: transparent;
+  box-shadow: none;
+}
+.side-pane .pane-low-row .pane-row:hover::before {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.side-pane .pane-low-row .pane-place.is-current::before {
+  background: var(--color-pulse-dim);
+  box-shadow: inset 2px 0 0 var(--color-pulse);
+}
+.side-pane .pane-low-row .pane-place.is-current:hover::before {
+  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+}
+/* the pill stays over the wash (a flex item takes a z-index without becoming what its panel is placed against) */
+.side-pane .pane-low-row .server-switch-place {
+  z-index: 1;
+  /* its padding is Settings' to press; the pill inside takes the pointer itself (server.css) */
+  pointer-events: none;
+}
 .side-pane .pane-pick {
   flex: none;
   display: flex;
@@ -742,6 +781,19 @@
   position: absolute;
   right: var(--space-3);
 }
+/* "New grid inside" shows over the row's right end, where its status dot or its count sits: while it shows
+   (the pointer on the row, or the keyboard in it) they step left to give it room, and step back after */
+.side-pane .space-row .space-open {
+  transition: padding-right var(--dur-quick) var(--ease-out-soft);
+}
+.side-pane .space-row:has(.space-move):is(:hover, :focus-within) .space-open {
+  padding-right: calc(var(--space-3) + 24px + var(--space-2));
+}
+@media (prefers-reduced-motion: reduce) {
+  .side-pane .space-row .space-open {
+    transition: none;
+  }
+}
 /* Today: no longer a pill; a row in its own lined-off section */
 .side-pane .pane-today {
   width: 100%;
@@ -757,7 +809,7 @@
 }
 .side-pane .pane-foot {
   border-top: 0;
-  /* the orb, then you, from the Settings icon's left edge (2026-11-17) */
+  /* you, from the Settings icon's left edge, and the orb at the other end (2026-11-18) */
   padding-left: var(--space-4);
 }
 .pane-empty.is-create {
@@ -944,4 +996,9 @@
 /* the bottom bar's search pill: its key chip keeps clear of the pill's rounded end */
 .hud-search {
   padding-right: var(--space-4);
+}
+/* the server switch's panel, when open (server.css): in flow between the grids and the Settings band */
+.side-pane .pane-server-slot {
+  flex: none;
+  min-height: 0;
 }

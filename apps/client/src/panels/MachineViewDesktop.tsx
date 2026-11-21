@@ -20,8 +20,9 @@
  */
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { MACHINE_AGENT_ACTIVE_MS, type MachineAgentAct, type MachineState } from "@foundation/protocol";
-import { onNight } from "@foundation/ui";
+import { MACHINE_AGENT_ACTIVE_MS, boardMaps, type DesktopLeave, type MachineAgentAct, type MachineState } from "@foundation/protocol";
+import { activeBoard } from "../sync/board";
+import { onLook } from "@foundation/ui";
 import type { PanelMeta } from "../state/store";
 import { SERVER_NAME, api } from "../lib/api";
 import { desktopRefusal as refusalWords, olderServer } from "./machineWords";
@@ -246,7 +247,7 @@ export function DesktopWell({ state, detail, name, viewer, busy, onAdd, onStop, 
  * screen stays whole. `alone`: in a window of its own (machineWindow.tsx), where the desktop has the keys from
  * the start and there is no grid to zoom, card to use or ring to draw.
  */
-export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onFull, children }: { panelId: string; name: string; viewer: boolean; onKeys: (on: boolean) => void; alone?: boolean; board?: string; onFull?: () => void; children?: ReactNode }) {
+export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onFull, children, nativeVm }: { panelId: string; name: string; viewer: boolean; onKeys: (on: boolean) => void; alone?: boolean; board?: string; onFull?: () => void; children?: ReactNode; nativeVm?: boolean }) {
   const bid = board ?? boardId();
   const wrap = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
@@ -268,7 +269,7 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
   // the machine's screen as it came (1280×800): the ring goes round the picture, not the letterbox
   const [shape, setShape] = useState<{ w: number; h: number } | null>(null);
   useRingWidth(wrap, hasKeys && !viewer && !alone);
-  const src = `${import.meta.env.BASE_URL}desktop.html#board=${encodeURIComponent(bid)}&panel=${encodeURIComponent(panelId)}${viewer ? "&view=1" : ""}`;
+  const src = `${import.meta.env.BASE_URL}desktop.html#board=${encodeURIComponent(bid)}&panel=${encodeURIComponent(panelId)}${viewer ? "&view=1" : ""}${nativeVm ? "&vm=1" : ""}`;
   const tell = (cmd: string, more: object = {}) => frame.current?.contentWindow?.postMessage({ type: "foundation:desktop", cmd, ...more }, window.location.origin);
   // the frame's ground is the card's, in day and night (a frame can't read our tokens)
   const paint = () => wrap.current && tell("paint", { background: getComputedStyle(wrap.current).backgroundColor });
@@ -307,9 +308,8 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
       }
     };
     window.addEventListener("message", onMsg);
-    const offNight = onNight(() => {
-      setTimeout(paint, 700);
-      setTimeout(paint, 1500);
+    const offNight = onLook(() => {
+      for (const ms of [0, 700, 1500]) setTimeout(paint, ms);
     });
     return () => {
       window.removeEventListener("message", onMsg);
@@ -374,7 +374,7 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
         </div>
       )}
     </div>
-    <MachineTools view="desktop" canType={!viewer} canCopy={Boolean(clip)} flash={flash} onCopy={() => void copy()} onPaste={() => void paste()} onFull={onFull} onPopOut={alone ? undefined : () => void openMachineWindow(bid, panelId, "desktop", name, viewer)}>
+    <MachineTools view="desktop" canType={!viewer} canCopy={Boolean(clip)} flash={flash} onCopy={() => void copy()} onPaste={() => void paste()} onFull={onFull} onPopOut={alone || nativeVm ? undefined : () => void openMachineWindow(bid, panelId, "desktop", name, viewer)}>
       {children}
     </MachineTools>
     </>
@@ -383,7 +383,24 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
 
 // ---------- agents: leave, and who is driving ----------
 
-function AgentsMay({ panelId, m, viewer }: { panelId: string; m: MachineState; viewer: boolean }) {
+/** agents' leave to use this desktop, and an agent's ask for it: the board's `desktopLeave`, written by the server alone */
+export function useDesktopLeave(panelId: string): DesktopLeave {
+  const [leave, setLeave] = useState<DesktopLeave>({});
+  useEffect(() => {
+    const b = activeBoard();
+    if (!b) return;
+    const map = boardMaps(b.doc).desktopLeave;
+    const read = () => setLeave(map.get(panelId) ?? {});
+    read();
+    const onChange = (e: { keysChanged: Set<string> }) => e.keysChanged.has(panelId) && read();
+    map.observe(onChange);
+    return () => map.unobserve(onChange);
+  }, [panelId]);
+  return leave;
+}
+
+function AgentsMay({ panelId, viewer }: { panelId: string; m: MachineState; viewer: boolean }) {
+  const leave = useDesktopLeave(panelId);
   const [busy, setBusy] = useState(false);
   const set = async (allow: boolean) => {
     setBusy(true);
@@ -395,11 +412,11 @@ function AgentsMay({ panelId, m, viewer }: { panelId: string; m: MachineState; v
       setBusy(false);
     }
   };
-  return <AgentsMayLine may={m.agentsMay} viewer={viewer} busy={busy} onSet={(allow) => void set(allow)} />;
+  return <AgentsMayLine may={leave.agentsMay} viewer={viewer} busy={busy} onSet={(allow) => void set(allow)} />;
 }
 
 /** the leave agents have (or don't) to use this desktop. Also drawn on #/design. */
-export function AgentsMayLine({ may, viewer, busy, onSet, now = Date.now() }: { may?: MachineState["agentsMay"]; viewer: boolean; busy?: boolean; onSet?: (allow: boolean) => void; now?: number }) {
+export function AgentsMayLine({ may, viewer, busy, onSet, now = Date.now() }: { may?: DesktopLeave["agentsMay"]; viewer: boolean; busy?: boolean; onSet?: (allow: boolean) => void; now?: number }) {
   return (
     <div className={`machine-may${may ? " is-on" : ""}`}>
       {may ? (
@@ -434,8 +451,9 @@ export function AgentsMayLine({ may, viewer, busy, onSet, now = Date.now() }: { 
  * ask for leave with the person's button.
  */
 export function AgentUse({ panelId, m, viewer, view, onWatch }: { panelId: string; m: MachineState; viewer: boolean; view: MachineViewName; onWatch: () => void }) {
+  const leave = useDesktopLeave(panelId);
   const last = m.agentActs?.at(-1);
-  const asked = m.agentAsked && !m.agentsMay ? m.agentAsked : undefined;
+  const asked = leave.agentAsked && !leave.agentsMay ? leave.agentAsked : undefined;
   const now = useNow(Boolean(last && Date.now() - last.at < MACHINE_AGENT_ACTIVE_MS + 2000) || Boolean(asked));
   const [busy, setBusy] = useState(false);
   const driving = last && now - last.at < MACHINE_AGENT_ACTIVE_MS;
@@ -455,7 +473,7 @@ export function AgentUse({ panelId, m, viewer, view, onWatch }: { panelId: strin
 }
 
 /** Also drawn on #/design. */
-export function AgentUseLine({ acts, asked, viewer, now, watching, busy, onWatch, onAllow }: { acts: MachineAgentAct[]; asked?: MachineState["agentAsked"]; viewer: boolean; now: number; watching?: boolean; busy?: boolean; onWatch?: () => void; onAllow?: () => void }) {
+export function AgentUseLine({ acts, asked, viewer, now, watching, busy, onWatch, onAllow }: { acts: MachineAgentAct[]; asked?: DesktopLeave["agentAsked"]; viewer: boolean; now: number; watching?: boolean; busy?: boolean; onWatch?: () => void; onAllow?: () => void }) {
   const last = acts.at(-1);
   if (!last && asked) {
     return (

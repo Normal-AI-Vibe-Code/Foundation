@@ -13,10 +13,15 @@
 import { useSyncExternalStore } from "react";
 import { api } from "./api";
 
-/** what a grid's canvas is: sections and cards, a deck of slides (a grid whose sections are the slides), or a web page */
-export type SpaceKind = "grid" | "deck" | "page";
-export const KIND_GLYPH: Record<SpaceKind, string> = { grid: "▦", deck: "▶", page: "◳" };
-export const KIND_NAME: Record<SpaceKind, string> = { grid: "Grid", deck: "Presentation", page: "Web page" };
+/**
+ * what a grid's canvas is: sections and cards, a deck of slides (a grid whose sections are the slides), a web page,
+ * or an app opened as a tab of its own (2026-11-18: T3, Vision, anything that was a tool or a card and was expanded)
+ */
+export type SpaceKind = "grid" | "deck" | "page" | "app";
+export const KIND_GLYPH: Record<SpaceKind, string> = { grid: "▦", deck: "▶", page: "◳", app: "◈" };
+export const KIND_NAME: Record<SpaceKind, string> = { grid: "Grid", deck: "Presentation", page: "Web page", app: "App" };
+/** a space with no grid to look at: its canvas is a page (it holds no grids, and has no sections to count) */
+export const isPageKind = (k?: SpaceKind) => k === "page" || k === "app";
 
 export interface BoardRow {
   id: string;
@@ -27,8 +32,12 @@ export interface BoardRow {
   parent?: string | null;
   /** before grids of grids, a grid could be filed in a named folder; no longer shown */
   folder?: string | null;
-  /** a page's address */
+  /** a page's address (an app's too, unless it is one Foundation opens itself) */
   url?: string | null;
+  /** an app space's built-in app ("t3": its address is minted each time it opens) */
+  app?: string | null;
+  /** the look this grid pins for everyone on it; absent: paper, following the orb (the themes: DESIGN.md §2.1) */
+  theme?: "day" | "night" | null;
   updated_at?: number;
 }
 
@@ -102,6 +111,22 @@ export async function fileGrid(id: string, parent: string | null): Promise<strin
     return null;
   } catch (e) {
     setGrids(before);
+    return (e as Error).message;
+  }
+}
+
+/**
+ * Open an app as a tab of its own: it becomes a space (kind "app") listed in All Grids like any grid, and
+ * opening it again goes to the tab it already has. `app: "t3"` is Foundation's own; anything else is its address.
+ * Returns what went wrong, or null.
+ */
+export async function openAppTab(what: { app?: string; url?: string; name?: string }): Promise<string | null> {
+  try {
+    const { id } = await api<{ id: string }>("/api/boards", { method: "POST", json: { kind: "app", ...what } });
+    await loadGrids();
+    openGrid(id);
+    return null;
+  } catch (e) {
     return (e as Error).message;
   }
 }

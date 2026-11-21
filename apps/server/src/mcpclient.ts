@@ -6,7 +6,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-async function withClient<T>(url: string, headers: Record<string, string>, fn: (c: Client) => Promise<T>): Promise<T> {
+/** one MCP session with a server, closed after `fn`: what is listed in it and what is called in it go to the same session */
+export async function withMcpClient<T>(url: string, headers: Record<string, string>, fn: (c: Client) => Promise<T>): Promise<T> {
   const client = new Client({ name: "foundation", version: "0.1.0" });
   const transport = new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers } });
   await client.connect(transport);
@@ -17,11 +18,16 @@ async function withClient<T>(url: string, headers: Record<string, string>, fn: (
   }
 }
 
+const withClient = withMcpClient;
+
+/** a session's tools, as compared and hashed (apptools.ts toolHash) */
+export async function mcpToolsOf(c: Client) {
+  const { tools } = await c.listTools();
+  return tools.map((t) => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema }));
+}
+
 export async function listMcpTools(url: string, headers: Record<string, string> = {}) {
-  return withClient(url, headers, async (c) => {
-    const { tools } = await c.listTools();
-    return tools.map((t) => ({ name: t.name, description: t.description ?? "", inputSchema: t.inputSchema }));
-  });
+  return withClient(url, headers, mcpToolsOf);
 }
 
 export async function callMcpTool(url: string, name: string, args: Record<string, unknown>, headers: Record<string, string> = {}) {

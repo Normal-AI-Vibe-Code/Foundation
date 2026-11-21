@@ -309,5 +309,24 @@ test("a link into T3's own page is minted per press; a local model server that i
   assert.match(b, /&next=%2Fenv1%2Fthread-1$/);
   assert.notEqual(a.split("token=")[1], b.split("token=")[1].split("&")[0]);
   assert.deepEqual(await localModels("http://127.0.0.1:9"), { baseUrl: "http://127.0.0.1:9", up: false, models: [] });
-  await rejects(localModels("https://example.com"), /Only an address on this computer/);
+  await rejects(localModels("https://example.com"), /Only a model server on this computer can be asked/);
+  // exactly a loopback origin: scheme, loopback host, port, and nothing after it (no path, query, fragment or user)
+  for (const base of [
+    "http://127.0.0.1:9/x?",
+    "http://127.0.0.1:9/admin",
+    "http://127.0.0.1:9?",
+    "http://127.0.0.1:9/?a=1",
+    "http://127.0.0.1:9#x",
+    "http://user:pw@127.0.0.1:9",
+    "http://127.0.0.1",
+    "http://127.0.0.2:9",
+    "http://0.0.0.0:9",
+    "http://localhost.evil.example:9",
+    "file:///etc/passwd",
+    "ftp://127.0.0.1:21",
+    "http://127.0.0.1:9\\@evil.example",
+  ]) {
+    await assert.rejects(localModels(base), /Only a model server on this computer can be asked/, base);
+  }
+  for (const base of ["http://localhost:9", "http://[::1]:9", "https://127.0.0.1:9/"]) assert.equal((await localModels(base)).up, false, base);
 });

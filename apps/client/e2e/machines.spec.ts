@@ -178,6 +178,18 @@ test("Ctrl+C, pipes, a desktop, and an agent using it with a person's leave", as
     await expect.poll(() => termText(page), { timeout: 8000 }).toContain("after-130");
 
     // ---- pipes: a note in, a command in the machine, a note out ----
+    // the pipes are the card's Ins & outs, a view beside Terminal and Desktop (2026-11-17)
+    const showIo = async () => {
+      await page.locator(".machine-view-tab", { hasText: "Ins & outs" }).click();
+      await expect(page.locator(".machine-io-view")).toBeVisible();
+    };
+    const backToTerminal = async () => {
+      await page.locator(".machine-view-tab", { hasText: "Terminal" }).click();
+      await page.locator(".machine-term .xterm").waitFor();
+      await settle(page, 600);
+      await clickTerminal(page);
+    };
+    await showIo();
     await expect(page.locator(".machine-io")).toContainText("/foundation/in");
     await expect(page.locator(".machine-io-row").first()).toContainText("nothing wired");
     const wired = await tool("connect", { from_panel: input, from_port: "text", to_panel: card, to_port: "in" });
@@ -187,14 +199,17 @@ test("Ctrl+C, pipes, a desktop, and an agent using it with a person's leave", as
     await expect(page.locator(".machine-io-row").first()).toContainText("Note “Input”");
     await expect(page.locator(".machine-io-row").first()).toContainText("hello from a note", { timeout: 15_000 });
     await expect(page.locator(".machine-io-row").nth(1)).toContainText("Note “Result”");
+    await backToTerminal();
     await page.keyboard.type("cat /foundation/in", { delay: 15 });
     await page.keyboard.press("Enter");
     await expect.poll(() => termText(page)).toContain("hello from a note");
     await page.keyboard.type("tr a-z A-Z </foundation/in >/foundation/out", { delay: 15 });
     await page.keyboard.press("Enter");
     await expect.poll(() => noteText(result), { timeout: 15_000 }).toBe("HELLO FROM A NOTE");
+    await showIo();
     await expect(page.locator(".machine-io-row").nth(1)).toContainText("HELLO FROM A NOTE");
     await page.screenshot({ path: `${SHOTS}/03_piped-through-the-machine.png` });
+    await backToTerminal();
     // it keeps flowing: a loop in the machine, the note changed, the other note follows; JSON comes out as JSON
     await page.keyboard.type("while sleep 1; do tr a-z A-Z </foundation/in >/foundation/out; done &", { delay: 10 });
     await page.keyboard.press("Enter");
@@ -210,7 +225,9 @@ test("Ctrl+C, pipes, a desktop, and an agent using it with a person's leave", as
       .toBe('{"parts":3,"ok":true}');
     // the two notes, in their own section: what went in, and what came out the other side
     await tool("update_card", { id: input, markdown: "hello from a note" });
+    await showIo();
     await expect(page.locator(".machine-io-row").first()).toContainText("hello from a note", { timeout: 15_000 });
+    await backToTerminal();
     await page.keyboard.type("tr a-z A-Z </foundation/in >/foundation/out", { delay: 10 });
     await page.keyboard.press("Enter");
     await expect.poll(() => noteText(result), { timeout: 20_000 }).toBe("HELLO FROM A NOTE");

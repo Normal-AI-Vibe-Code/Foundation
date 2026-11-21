@@ -24,7 +24,7 @@
 
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import { writeFileSync, mkdirSync } from "node:fs";
-import { CLIENT, settle, waitLive } from "./helpers";
+import { CLIENT, FRAME as FRAME_PAGE, settle, waitLive } from "./helpers";
 
 const GPU = !!process.env.PERF_GPU;
 const DPR = Number(process.env.PERF_DPR ?? 2);
@@ -258,7 +258,7 @@ test("every surface at 60 fps on this machine's GPU", async ({ browser }) => {
     await tool("add_section", { name: section });
     const note = (n: number) => tool("add_note", { section, title: `Note ${s}.${n}`, markdown: `## Note ${s}.${n}\n\n- a line of text\n- **another** with \`code\`\n- and a [link](https://example.com)` });
     await note(0);
-    for (let f = 0; f < 2; f++) await tool("add_panel", { section, panel: "app", name: `Live ${s}.${f}`, url: `${CLIENT}/e2e/frame.html` });
+    for (let f = 0; f < 2; f++) await tool("add_panel", { section, panel: "app", name: `Live ${s}.${f}`, url: FRAME_PAGE });
     for (let n = 1; n < 18; n++) await note(n);
   }
   await page.goto(`/?board=${board}`);

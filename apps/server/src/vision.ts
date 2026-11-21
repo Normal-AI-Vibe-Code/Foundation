@@ -18,7 +18,7 @@
  * archives what lands (searchable, never deleted) and puts it on the board.
  */
 
-import { spawn } from "node:child_process";
+import { childOptions, spawnChild, type SpawnOptions } from "./child.ts";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, extname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -61,12 +61,13 @@ function cli(args: string[]): Promise<string> {
     } catch (e) {
       return fail(e as Error);
     }
-    // no shell: the arguments go to the program as they are
-    const child = spawn(cmd, [...pre, ...args, "--base-dir", where.home, "--log-level", "error"], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    // no shell: the arguments go to the program as they are. Minting or revoking a session only reads and
+    // writes Vision Code's home, which it's told with --base-dir: the allowlist only (child.ts), no extras
+    const child = spawnChild(cmd, [...pre, ...args, "--base-dir", where.home, "--log-level", "error"], childOptions<SpawnOptions>({ extras: [] }, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true }));
     let out = "";
     let err = "";
-    child.stdout.on("data", (b: Buffer) => (out += b));
-    child.stderr.on("data", (b: Buffer) => (err += b));
+    child.stdout!.on("data", (b: Buffer) => (out += b));
+    child.stderr!.on("data", (b: Buffer) => (err += b));
     child.on("error", (e) => fail(new Error(`Vision Code's CLI at ${where.cli} wouldn't start (${e.message}). If it lives elsewhere, set T3_CLI to its t3 program (t3.exe on Windows) where Foundation's server starts.`)));
     child.on("close", (code) => (code === 0 ? ok(out) : fail(new Error(`t3 ${args.slice(0, 3).join(" ")} failed: ${(err || out).slice(-400)}`))));
   });
@@ -363,4 +364,88 @@ export async function pollHandoffs(ask: Ask, threadStatus: (threadId: string) =>
 
 async function defaultStatus(threadId: string) {
   return (await t3Thread(threadId))?.thread.status ?? null;
+}
+
+// ---------- the Vision Archive: read-only, for attaching its files in ChatForm (R1, 2026-11-18) ----------
+//
+// Vision's Archive (its local studio website, `apps/web` in the Vision repo) lists its catalog on
+// `GET /api/bridge` — `{ version, items, assets, reviews, storyboard, seed }`, each item a design study
+// (project, title, revision, kind, its assets) — and serves one asset's bytes on
+// `GET /api/bridge?asset=<id>`. Foundation only ever reads, and only from the address configured here
+// (VISION_ARCHIVE_URL, default http://127.0.0.1:63727): never an address a request names.
+
+const archiveUrl = () => (process.env.VISION_ARCHIVE_URL || "http://127.0.0.1:63727").replace(/\/+$/, "");
+const ASSET_ID = /^[a-zA-Z0-9_-]{1,180}$/;
+
+interface ArchiveAsset {
+  id: string;
+  name: string;
+  kind: string;
+  mime: string;
+  size: number;
+}
+interface ArchiveItem {
+  id: string;
+  project: string;
+  title: string;
+  category?: string;
+  kind: string;
+  revision: number;
+  author?: string;
+  createdAt?: string;
+  archived?: boolean;
+  assets: ArchiveAsset[];
+}
+
+async function archiveCatalog(): Promise<{ items: ArchiveItem[]; assets: ArchiveAsset[]; seed: boolean }> {
+  const r = await fetch(`${archiveUrl()}/api/bridge`, { signal: AbortSignal.timeout(4000) });
+  const body = (await r.json().catch(() => ({}))) as { items?: ArchiveItem[]; assets?: ArchiveAsset[]; seed?: boolean; error?: string };
+  if (!r.ok) throw new Error(body.error ?? `the Archive answered ${r.status}`);
+  return { items: Array.isArray(body.items) ? body.items : [], assets: Array.isArray(body.assets) ? body.assets : [], seed: Boolean(body.seed) };
+}
+
+export interface VisionArchiveListing {
+  available: boolean;
+  origin: string;
+  /** why it isn't available, in words a person can act on */
+  why?: string;
+  /** the Archive is showing its built-in sample studies, not this studio's */
+  seed?: boolean;
+  projects: Array<{ name: string; items: Array<{ id: string; title: string; kind: string; category?: string; revision: number; author?: string; createdAt?: string; assets: ArchiveAsset[] }> }>;
+}
+
+/** the Archive's projects and their studies' files, or why it can't be read */
+export async function visionArchiveListing(): Promise<VisionArchiveListing> {
+  const origin = archiveUrl();
+  try {
+    const c = await archiveCatalog();
+    const projects = new Map<string, VisionArchiveListing["projects"][number]>();
+    for (const it of c.items) {
+      if (it.archived) continue;
+      const p = projects.get(it.project) ?? { name: it.project, items: [] };
+      p.items.push({ id: it.id, title: it.title, kind: it.kind, category: it.category, revision: it.revision, author: it.author, createdAt: it.createdAt, assets: (it.assets ?? []).map(({ id, name, kind, mime, size }) => ({ id, name, kind, mime, size })) });
+      projects.set(it.project, p);
+    }
+    return { available: true, origin, seed: c.seed, projects: [...projects.values()] };
+  } catch (e) {
+    const msg = (e as Error).message;
+    const refused = /fetch failed|ECONNREFUSED|timeout|aborted/i.test(msg) || (e as Error).name === "TimeoutError";
+    return { available: false, origin, why: refused ? `The Vision Archive isn't answering at ${origin}. Start Vision's Archive (its local studio website) on this computer, or set VISION_ARCHIVE_URL.` : `The Vision Archive at ${origin} couldn't be read: ${msg}`, projects: [] };
+  }
+}
+
+/** one asset's bytes from the Archive, with its name, type and a line saying where it came from */
+export async function visionArchiveAsset(assetId: string): Promise<{ body: Buffer; name: string; mime: string; about: string }> {
+  if (!ASSET_ID.test(assetId)) throw new Error("not an Archive asset id");
+  const origin = archiveUrl();
+  const c = await archiveCatalog();
+  const item = c.items.find((i) => (i.assets ?? []).some((a) => a.id === assetId));
+  const asset = item?.assets.find((a) => a.id === assetId) ?? c.assets.find((a) => a.id === assetId);
+  if (!asset) throw new Error("no such asset in the Archive");
+  if (asset.size > 512 * 1024 * 1024) throw new Error(`${asset.name} is ${Math.round(asset.size / 1048576)} MB; the most that can be attached is 512 MB`);
+  const r = await fetch(`${origin}/api/bridge?asset=${encodeURIComponent(assetId)}`, { signal: AbortSignal.timeout(60_000) });
+  if (!r.ok) throw new Error(`the Archive wouldn't give ${asset.name} (${r.status})`);
+  const body = Buffer.from(await r.arrayBuffer());
+  const name = asset.name.replace(/[\/:*?"<>|\u0000-\u001f]/g, "_").slice(0, 200) || "vision-asset";
+  return { body, name, mime: asset.mime || "application/octet-stream", about: `From the Vision Archive (${origin}): ${item ? `“${item.title}”, ${item.project}, revision ${item.revision}` : "an asset"} · ${asset.name}` };
 }

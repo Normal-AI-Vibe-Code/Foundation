@@ -10,8 +10,10 @@
  * once engaged (click), so panning the grid over them stays smooth.
  */
 
+import { JobWhat, type JobShown } from "./JobWhat";
 import { PipelineBody } from "./PipelineView";
 import { CollectionBody } from "./CollectionView";
+import { LocalBody } from "./LocalView";
 import { UploaderBody } from "./UploaderView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
@@ -32,18 +34,20 @@ import { activeBoard } from "../sync/board";
 import { StageBody } from "./StageView";
 import { onConnectorChange } from "../lib/connectorEvents";
 import { HuddleBody } from "./HuddleView";
+import { ReplayBody } from "./ReplayView";
 import { SlackBody } from "./SlackView";
 import { CrewCardBody } from "../components/SectionAgents";
-import { MachineBody, machineAction } from "./MachineView";
+import { AppToolAsks, MachineBody, machineAction } from "./MachineView";
 import { CharacterBody } from "./CharacterView";
 import { machinePage, type FromMachine, type MachinePage } from "./machinePage";
-import { sandboxFor } from "./frameSandbox";
-import { SERVER as FOUNDATION_SERVER } from "../lib/api";
+import { bridgeAccepts, bridgeTarget, frameAllow, frameFor, type FrameDecision } from "./frameSandbox";
+import { useFrameContext } from "../lib/frames";
 import { countRender } from "../state/renders";
 import { putInUse, modHeld } from "../lib/cardUse";
 import { useCalmAdmit } from "../lib/calm";
 import { keys } from "../lib/keys";
 import { FullscreenBar, useFullscreenCard } from "../components/Fullscreen";
+import { HostPage } from "./HostPage";
 
 interface Props {
   panel: PanelMeta;
@@ -73,7 +77,9 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   design: "◐",
   pipeline: "⇢",
   collection: "❖",
+  replay: "◷",
   uploader: "⇪",
+  local: "⌂",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -112,8 +118,10 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
   const extras = <PanelActions panel={panel} />;
 
   const body =
-    panel.panel === "machine" && panel.machine ? (
+    panel.panel === "machine" && (panel.machine || panel.vm) ? (
       <MachineBody panel={panel} />
+    ) : (panel.panel === "app" || panel.panel === "link") && panel.via === "browser" && panel.url && !panel.fromMachine ? (
+      <BrowserPage panel={panel} />
     ) : panel.panel === "app" || panel.panel === "link" || panel.panel === "machine" ? (
       <LiveFrame panel={panel} />
     ) : panel.panel === "file" ? (
@@ -138,8 +146,12 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <DesignBody panel={panel} />
     ) : panel.panel === "pipeline" ? (
       <PipelineBody panel={panel} />
+    ) : panel.panel === "local" ? (
+      <LocalBody panel={panel} />
     ) : panel.panel === "collection" ? (
       <CollectionBody panel={panel} />
+    ) : panel.panel === "replay" ? (
+      <ReplayBody panel={panel} />
     ) : panel.panel === "uploader" ? (
       <UploaderBody panel={panel} />
     ) : panel.panel === "crew" ? (
@@ -322,6 +334,24 @@ export function useOnScreen(ref: React.RefObject<HTMLElement | null>, minScale =
   return visible && bigEnough;
 }
 
+/** a page shown by the built-in browser (HostPage.tsx): live when it's on screen, big enough to read and the camera is calm */
+function BrowserPage({ panel }: { panel: PanelMeta }) {
+  const host = useRef<HTMLDivElement>(null);
+  const on = useOnScreen(host);
+  const admitted = useCalmAdmit(on);
+  const [near, setNear] = useState(false);
+  // once near it stays near while it's on screen (a pan doesn't drop the page); it goes far when it leaves or shrinks
+  useEffect(() => {
+    if (!on) setNear(false);
+    else if (admitted) setNear(true);
+  }, [on, admitted]);
+  return (
+    <div ref={host} className={`live-frame${useUi().engaged === panel.id ? " is-engaged" : ""}`}>
+      <HostPage panel={panel} near={near} />
+    </div>
+  );
+}
+
 function LiveFrame({ panel }: { panel: PanelMeta }) {
   const ui = useUi();
   const host = useRef<HTMLDivElement>(null);
@@ -353,12 +383,19 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
     if (held || waiting) setLoaded(false);
   }, [held, waiting]);
 
+  // what this frame may be (frameSandbox.ts): never Foundation itself; its own origin only for a saved app
+  const frameCtx = useFrameContext();
+  const decision: FrameDecision | null = useMemo(() => (url ? frameFor(url, frameCtx) : null), [url, frameCtx, frameCtx.saved]);
+  const decided = useRef(decision);
+  decided.current = decision;
+
   // Foundation bridge: apps talk to the grid with postMessage
   //   app → grid  { type: "foundation:output", port, value }
   //   grid → app  { type: "foundation:input", port, value } and { type: "foundation:hello", panel, ports }
+  // only this frame's window, from its own origin, is heard; and what's sent names that origin (never "*")
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
-      if (!frame.current || e.source !== frame.current.contentWindow) return;
+      if (!frame.current || !decided.current || !bridgeAccepts(decided.current, e, frame.current.contentWindow)) return;
       const d = e.data as { type?: string; port?: string; value?: unknown; ports?: Array<{ name: string; dir: "in" | "out"; type?: string }> };
       if (d?.type === "foundation:output" && d.port) {
         const cur = getState().panels[panel.id];
@@ -385,25 +422,29 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
   const inputKey = JSON.stringify(inputs.map(([p, v]) => [p.name, v]));
   useEffect(() => {
     const w = frame.current?.contentWindow;
-    if (!w || !loaded) return;
-    w.postMessage({ type: "foundation:hello", panel: panel.id, ports: panel.ports.map(({ name, dir, type }) => ({ name, dir, type })) }, "*");
-    for (const [p, v] of inputs) if (v !== undefined) w.postMessage({ type: "foundation:input", port: p.name, value: v }, "*");
-  }, [inputKey, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+    // an opaque frame (not a saved app) has no origin to name, so it is sent nothing
+    const target = decision ? bridgeTarget(decision) : null;
+    if (!w || !loaded || !target) return;
+    w.postMessage({ type: "foundation:hello", panel: panel.id, ports: panel.ports.map(({ name, dir, type }) => ({ name, dir, type })) }, target);
+    for (const [p, v] of inputs) if (v !== undefined) w.postMessage({ type: "foundation:input", port: p.name, value: v }, target);
+  }, [inputKey, loaded, decision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shown = url ?? panel.url ?? "";
   const [domain, favicon] = useMemo(() => {
     try {
       const u = new URL(shown);
-      // the site's own icon — never a third-party favicon service (internal URLs stay internal)
-      return [u.host, `${u.origin}/favicon.ico`];
+      // the site's own icon, and only a saved app's: any other address isn't asked for anything until it's opened
+      return [u.host, decision?.ok && decision.trusted ? `${u.origin}/favicon.ico` : ""];
     } catch {
       return [shown, ""];
     }
-  }, [shown]);
+  }, [shown, decision]);
 
   // a page starts once the camera is calm, one at a time (lib/calm.ts): never mid-pan, mid-pinch or mid-glide
   const admitted = useCalmAdmit(live);
-  const mount = Boolean(url) && !held && !waiting && ((live && admitted) || (everLive && loaded));
+  // a frame waits for the saved apps (so it never loads with less than it gets), and Foundation itself is never framed
+  const refused = decision && !decision.ok ? decision.reason : null;
+  const mount = Boolean(url) && frameCtx.ready && Boolean(decision?.ok) && !held && !waiting && ((live && admitted) || (everLive && loaded));
   const hold: Exclude<MachinePage, { kind: "live" }> | null =
     page && page.kind !== "live"
       ? page
@@ -412,17 +453,19 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
         : null;
   return (
     <div ref={host} className={`live-frame${engaged ? " is-engaged" : ""}`}>
-      {mount && (
+      {mount && decision?.ok && (
         <iframe
           key={url}
           ref={frame}
-          src={url}
+          src={decision.url}
           title={panel.name}
           loading="lazy"
           onLoad={() => setLoaded(true)}
-          allow="clipboard-read; clipboard-write; fullscreen; camera; microphone"
-          // our own pages can't lift their sandbox; others keep their origin (frameSandbox.ts, #80)
-          sandbox={sandboxFor(url!, [window.location.origin, FOUNDATION_SERVER || window.location.origin])}
+          // camera, microphone and reading the clipboard only for a saved app (frameSandbox.ts)
+          allow={frameAllow(decision, "fullscreen")}
+          // always sandboxed; its own origin only for a saved app (frameSandbox.ts, #80)
+          sandbox={decision.sandbox}
+          referrerPolicy="no-referrer"
         />
       )}
       {(!mount || !loaded) && (
@@ -430,7 +473,7 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
           {favicon && !hold && <img className="frame-favicon" alt="" src={favicon} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />}
           <div className="frame-poster-name">{panel.name}</div>
           <div className="frame-poster-domain">{domain || "no address yet"}</div>
-          {panel.text && <div className="frame-poster-text">{panel.text}</div>}
+          {refused ? <div className="frame-poster-text" data-frame-refused>{refused}</div> : panel.text && <div className="frame-poster-text">{panel.text}</div>}
           {mount && !loaded && <div className="frame-poster-loading" />}
           {hold && from && <MachineHold page={hold} from={from} viewer={viewer} />}
         </div>
@@ -451,6 +494,7 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
           </span>
         </div>
       )}
+      {panel.mcp && <AppToolAsks panelId={panel.id} viewer={viewer} />}
     </div>
   );
 }
@@ -603,6 +647,9 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
       ) : mime.startsWith("video/") ? (
         <video src={shown} muted loop playsInline controls preload="metadata" />
       ) : mime === "application/pdf" ? (
+        // no sandbox attribute: Chromium's PDF viewer shows nothing in a sandboxed frame. The server answers every
+        // file with a CSP sandbox and nosniff, and anything that isn't a passive type (a page, an SVG, a script) as a
+        // download of opaque bytes, so this frame can only ever hold the browser's PDF viewer or a download (files.ts)
         live && shown ? <iframe src={shown} title={name} /> : <div className="file-card-glyph">PDF</div>
       ) : CAD.test(name) ? (
         <div className="cad-card">
@@ -830,6 +877,20 @@ function AskBody({ panel }: { panel: PanelMeta }) {
 
 function AgentBody({ panel }: { panel: PanelMeta }) {
   const [output, setOutput] = useState<string>("");
+  const [what, setWhat] = useState<JobShown | null>(null);
+  const [asking, setAsking] = useState(false);
+  const waiting = Boolean(panel.sessionId) && panel.status !== "running" && panel.status !== "done";
+  // before Run: what will run, from the job itself
+  useEffect(() => {
+    if (!panel.sessionId || !waiting) return;
+    let live = true;
+    api<JobShown>(`/api/jobs/${panel.sessionId}`)
+      .then((r) => live && setWhat({ target: r.target, goal: r.goal, program: r.program, shown: r.shown }))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [panel.sessionId, waiting]);
   useEffect(() => {
     if (!panel.sessionId || panel.status !== "running") return;
     const t = setInterval(() => {
@@ -839,30 +900,37 @@ function AgentBody({ panel }: { panel: PanelMeta }) {
     }, 1500);
     return () => clearInterval(t);
   }, [panel.sessionId, panel.status]);
-  const run = () =>
-    api(`/api/jobs/${panel.sessionId}/run`, { method: "POST" })
+  // Run asks first, showing the whole target and goal; the press names what it showed, and the server runs only that
+  const run = () => {
+    if (!what) return;
+    setAsking(false);
+    api(`/api/jobs/${panel.sessionId}/run`, { method: "POST", json: { shown: what.shown } })
       .then(() => toast("Starting…", "agent"))
       .catch((e) => toast((e as Error).message, "bad"));
+  };
   return (
     <div className="agent-body">
       <div className="agent-status">
         <span className={`f-dot ${panel.status === "running" ? "is-agent is-live" : panel.status === "done" ? "is-ok" : panel.status === "error" ? "is-bad" : ""}`} />
         <span>{panel.status ?? "idle"}</span>
-        {panel.sessionId && panel.status !== "running" && panel.status !== "done" && (
-          <button className="f-pill is-agent" onClick={run}>
+        {panel.sessionId && panel.status !== "running" && panel.status !== "done" && !asking && (
+          <button className="f-pill is-agent" disabled={!what} onClick={() => setAsking(true)}>
             Run
           </button>
         )}
       </div>
+      {waiting && what ? (
+        <JobWhat what={what} ask={asking ? { onRun: run, onCancel: () => setAsking(false) } : undefined} />
+      ) : null}
       {/^https?:\/\/\S+$/.test(output.trim()) ? (
         // a hand-off: the job's output is where the work is happening
         <div className="agent-handoff">
           <p>{panel.text}</p>
-          <a className="f-pill is-agent" href={output.trim()} target="_blank" rel="noopener">
+          <a className="f-pill is-agent" href={output.trim()} target="_blank" rel="noopener noreferrer">
             Open in Vision Code ↗
           </a>
         </div>
-      ) : (
+      ) : waiting && what && panel.status !== "error" ? null : (
         <pre className="agent-output">{panel.status === "running" ? output.slice(-4000) || "…" : panel.text}</pre>
       )}
     </div>

@@ -11,7 +11,7 @@ import { defineConfig } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { standinLauncher } from "../../server/test/t3-standin.ts";
 
 const data = mkdtempSync(join(tmpdir(), "foundation-e2e-"));
 // Ports can move: Windows (Hyper-V/WSL) reserves blocks of the dynamic range at
@@ -22,6 +22,8 @@ const SLACK_PORT = process.env.E2E_SLACK_PORT ?? "4440";
 const MESHY_PORT = process.env.E2E_MESHY_PORT ?? "4445";
 process.env.E2E_MESHY_PORT = MESHY_PORT;
 process.env.E2E_CLIENT_PORT = CLIENT_PORT;
+// the stand-in Slack also serves the stand-in live app (helpers.ts FRAME): on its own origin, not Foundation's
+process.env.E2E_SLACK_PORT = SLACK_PORT;
 export const CLIENT = `http://localhost:${CLIENT_PORT}`;
 
 export default defineConfig({
@@ -36,6 +38,9 @@ export default defineConfig({
     deviceScaleFactor: 1,
     colorScheme: "dark",
     actionTimeout: 10_000,
+    // the checks' own calls (context.request) sign in by cookie like the page does, and say they come from the
+    // client's page as the browser would: the server refuses a cookie change from any other page (origins.ts)
+    extraHTTPHeaders: { origin: CLIENT },
   },
   webServer: [
     {
@@ -63,6 +68,10 @@ export default defineConfig({
         FOUNDATION_CLIENT_URL: CLIENT,
         FOUNDATION_ADMIN_EMAILS: "admin@normal.dev",
         FOUNDATION_DEV_LOGIN: "1",
+        // the Browser tool opens on an empty tab here: a check never opens the real HyperForm
+        FOUNDATION_BROWSER_HOME: "about:blank",
+        // DeployForm here is a stand-in page (slack-standin.mjs): a check never opens the real one (pages.spec.ts)
+        DEPLOYFORM_URL: `http://127.0.0.1:${SLACK_PORT}/e2e/page.html`,
         // a stand-in Slack (e2e/slack-standin.mjs); no agent runtime, so a check never spends an agent turn
         SLACK_API_BASE: `http://127.0.0.1:${SLACK_PORT}`,
         SLACK_USER_TOKEN: "xoxp-standin",
@@ -83,12 +92,10 @@ export default defineConfig({
         T3_URL: "http://127.0.0.1:9",
         T3CODE_HOME: "/nonexistent/t3home",
         // Foundation's own T3 (the agents pane) is a stand-in that speaks T3's start, sign-in and streams; no model runs
-        FOUNDATION_T3_CLI: fileURLToPath(new URL("../../server/test/t3-standin.mjs", import.meta.url)),
-        FOUNDATION_T3_PORT: process.env.E2E_T3_PORT ?? "15790",
-        T3_STANDIN_DIR: data,
-        T3_STANDIN_FINISH_MS: "6000",
+        // (its settings ride in its launcher: T3 is started with the allowlisted environment only, never the server's)
         // and it uses its pass to the board once, as an agent would (a note in the section it was sent to)
-        T3_STANDIN_USE_TOOLS: "1",
+        FOUNDATION_T3_CLI: standinLauncher(data, { T3_STANDIN_DIR: data, T3_STANDIN_FINISH_MS: "6000", T3_STANDIN_USE_TOOLS: "1" }),
+        FOUNDATION_T3_PORT: process.env.E2E_T3_PORT ?? "15790",
         ANTHROPIC_API_KEY: "",
       },
       url: `http://127.0.0.1:${SERVER_PORT}/api/me`,

@@ -155,8 +155,11 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
 
 export const me = () => api<{ user: UserInfo | null }>("/api/me");
 export const authConfig = () => api<{ google: boolean; devLogin: boolean; flowform?: { url: string }; version?: string; minClient?: string | null }>("/auth/config");
-/** desktop: Google through flowform in the system browser; the window polls with a secret only it holds */
-export const flowformBegin = () => api<{ url: string; poll: string; expiresIn: number }>("/auth/flowform/begin", { method: "POST" });
+/**
+ * desktop: Google through flowform in the system browser; the window polls with a secret only it holds, and
+ * shows `code`, which the browser shows back before the person presses "This is me"
+ */
+export const flowformBegin = () => api<{ url: string; poll: string; code: string; expiresIn: number }>("/auth/flowform/begin", { method: "POST" });
 export async function flowformPoll(poll: string) {
   // the poll secret is this request's Authorization (it replaces any bearer); with a bearer transport, ask for the session in the body
   const r = await api<{ status: "pending" | "ok" | "error"; user?: UserInfo; error?: string; session?: string }>(`/auth/flowform/poll${BEARER ? "?bearer=1" : ""}`, {

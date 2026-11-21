@@ -1,0 +1,7 @@
+# the check's proxy: the same as deploy/Caddyfile, with a certificate from Caddy's own local authority
+# (no public name to get a real one for)
+{$FOUNDATION_DOMAIN} {
+	tls internal
+	encode zstd gzip
+	reverse_proxy foundation:4410
+}

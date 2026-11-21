@@ -9,7 +9,8 @@
  * person presses Sync.
  */
 
-import { spawn } from "node:child_process";
+import { childOptions, spawnChild, type SpawnOptions } from "./child.ts";
+import { GH_ENV } from "./github.ts";
 import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -155,15 +156,17 @@ export async function syncPlan(by: UserInfo): Promise<{ plan: Plan; summary: Syn
   if (!readPlan()) throw new HttpError(404, "There's no plan file on this server (docs/plan.json)");
   if (syncing) return syncing;
   syncing = new Promise<{ plan: Plan; summary: SyncSummary; log: string }>((ok, fail) => {
-    const child = spawn(process.execPath, [scriptFile(), "sync"], {
-      env: { ...process.env, FOUNDATION_PLAN_FILE: planFile() },
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
+    // the script runs gh, so it gets gh's own credential and settings (GH_ENV), FOUNDATION_GH when a person
+    // named another gh, and the plan file it works on; no other key
+    const child = spawnChild(
+      process.execPath,
+      [scriptFile(), "sync"],
+      childOptions<SpawnOptions>({ extras: [...GH_ENV, "FOUNDATION_GH"], set: { FOUNDATION_PLAN_FILE: planFile() } }, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true }),
+    );
     let out = "";
     let err = "";
-    child.stdout.on("data", (d) => (out += d));
-    child.stderr.on("data", (d) => (err += d));
+    child.stdout!.on("data", (d) => (out += d));
+    child.stderr!.on("data", (d) => (err += d));
     const timer = setTimeout(() => child.kill(), 120_000);
     child.on("error", (e) => {
       clearTimeout(timer);

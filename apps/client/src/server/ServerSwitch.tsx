@@ -13,6 +13,7 @@
  * over everything, the sign-in page included. `ServerSwitchView` is presentational for `#/design`.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { springs } from "@foundation/ui";
 import { BEARER, SERVER, chooseServer } from "../lib/api";
@@ -74,6 +75,11 @@ export interface ServerSwitchViewProps {
   still?: boolean;
   /** in the top bar: the panel drops down from the pill instead of rising from the corner */
   drop?: boolean;
+  /** in the side menu (2026-11-18): the panel is drawn into this element, in the menu's own flow above the
+   * Settings band, on the menu's paper instead of glass */
+  host?: HTMLElement | null;
+  /** #/design: the side menu's open panel alone, drawn where it stands (its pill is drawn in the band) */
+  panelOnly?: boolean;
   onToggle?: () => void;
   onStart?: () => void;
   onStop?: () => void;
@@ -90,7 +96,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
   const pill = pillState(p.reach, p.local, currentIsLocal);
   const starting = p.local === "starting";
   const panel = (
-    <section className="server-switch-panel f-glass" aria-label="Server" id="server-switch-panel">
+    <section className={`server-switch-panel${p.host !== undefined ? " is-inline" : " f-glass"}`} aria-label="Server" id="server-switch-panel">
       <header className="server-switch-head">
         <span className="f-eyebrow">Server</span>
         <span className="server-switch-now">
@@ -217,16 +223,41 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
     </section>
   );
 
+  // in the side menu: the panel grows in place above the Settings band, pushing the grids up
+  const inline = p.host !== undefined;
+  if (p.panelOnly) return <div className="server-switch-inline">{panel}</div>;
+  const inlinePanel =
+    inline &&
+    (p.still ? (
+      p.open && panel
+    ) : (
+      <AnimatePresence initial={false}>
+        {p.open && (
+          <motion.div
+            key="panel"
+            className="server-switch-inline"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0, transition: { duration: 0.16 } }}
+            transition={{ type: "spring", ...springs.camera }}
+          >
+            {panel}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    ));
   return (
-    <div className="server-switch" data-open={p.open || undefined} data-still={p.still || undefined} data-drop={p.drop || undefined}>
-      {p.still ? (
+    <div className="server-switch" data-open={p.open || undefined} data-still={p.still || undefined} data-drop={p.drop || undefined} data-inline={inline || undefined}>
+      {inline ? (
+        p.host ? createPortal(inlinePanel, p.host) : null
+      ) : p.still ? (
         p.open && panel
       ) : (
         <AnimatePresence>
           {p.open && (
             <motion.div
               key="panel"
-              className="server-switch-lift"
+              className="server-switch-lift f-paper"
               initial={{ opacity: 0, y: p.drop ? -8 : 10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.14 } }}
@@ -274,12 +305,12 @@ const keep = (k: string, v: string) => {
 let launchChecked = false;
 
 /**
- * The switch itself. Signed in, it sits in the side menu's foot above Settings (`where="pane"`, 2026-11-17;
+ * The switch itself. Signed in, it is a small pill right of Settings in the side menu's foot (`where="pane"`, 2026-11-17;
  * from 2026-11-15 it was in the top bar, `where="bar"`: always there, so the server this app talks to is
  * never a mystery); before that there is no bar, and it keeps the bottom-right
  * corner wherever the app can point at another server. `day` pins day tokens over the sign-in page.
  */
-export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean; where?: "corner" | "bar" | "pane" }) {
+export function ServerSwitch({ day = false, where = "corner", host }: { day?: boolean; where?: "corner" | "bar" | "pane"; host?: HTMLElement | null }) {
   const current = (SERVER || window.location.origin).replace(/\/$/, "");
   // signed in: in the side menu's foot, above Settings (2026-11-17), or in the top bar
   const bar = where !== "corner";
@@ -357,7 +388,8 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
     if (!open) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     const down = (e: PointerEvent) => {
-      if (root.current && !root.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (root.current && !root.current.contains(t) && !host?.contains(t)) setOpen(false);
     };
     window.addEventListener("keydown", key);
     window.addEventListener("pointerdown", down, true);
@@ -365,7 +397,7 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
       window.removeEventListener("keydown", key);
       window.removeEventListener("pointerdown", down, true);
     };
-  }, [open]);
+  }, [open, host]);
 
   const goLocal = () => (isLocalServer(current) ? window.location.reload() : chooseServer(LOCAL_SERVER));
 
@@ -473,6 +505,7 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
     <div ref={root} className={`server-switch-place${bar ? " is-bar" : ""}${where === "pane" ? " is-pane" : ""}${day ? " f-day" : ""}`} style={bar ? undefined : { right }} data-server-where={where}>
       <ServerSwitchView
         drop={where === "bar"}
+        host={where === "pane" ? (host ?? null) : undefined}
         open={open}
         current={current}
         reach={reach}

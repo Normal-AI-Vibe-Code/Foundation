@@ -3,6 +3,7 @@
 // For the Slack board it also has channels with top-level messages (some with
 // those pictures), a channel the app isn't in, and POST /_post, which says
 // something in a channel (with a new picture when file=1), as a person would.
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { deflateSync } from "node:zlib";
 
@@ -87,6 +88,22 @@ const TINTS = [[[143, 118, 238], [50, 91, 180]], [[228, 87, 78], [200, 122, 28]]
 
 createServer((req, res) => {
   const url = new URL(req.url ?? "/", base);
+  // the stand-in live app the checks put on cards (helpers.ts FRAME): a page on another origin than Foundation's
+  if (url.pathname === "/e2e/frame.html") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    return res.end(readFileSync(new URL("./frame.html", import.meta.url)));
+  }
+  // a stand-in for an app behind a sign-in (pages.spec.ts): a still page with words, a link and a field
+  if (url.pathname === "/e2e/page.html") {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    return res.end(
+      `<!doctype html><meta charset="utf-8"><title>DeployForm (stand-in)</title><style>body{margin:0;font:16px system-ui;background:#f4f1ea;color:#1c2330}header{padding:20px 28px;background:#1c2330;color:#f4f1ea;font-weight:600}main{padding:28px}td,th{padding:8px 18px 8px 0;text-align:left}input{font:inherit;padding:6px 10px}</style>` +
+        `<header>DeployForm</header><main><h1>Customers</h1><p>Three customers are being deployed.</p>` +
+        `<table><tr><th>Customer</th><th>Stage</th></tr><tr><td>Kapaa Works</td><td>Installing</td></tr><tr><td>Hilo Air</td><td>Commissioned</td></tr><tr><td>Lanai Cold</td><td>Quoted</td></tr></table>` +
+        `<p><input id="q" placeholder="Find a customer"> <a href="/e2e/page.html?all=1">Show all</a></p><p id="typed"></p>` +
+        `<script>q.addEventListener("input", () => (typed.textContent = "Finding: " + q.value))</script></main>`,
+    );
+  }
   // the stand-in's own door, for checks: someone says something in a channel
   if (url.pathname === "/_post") {
     const ch = CHANNELS.find((c) => c.id === url.searchParams.get("channel") || c.name === url.searchParams.get("channel"));

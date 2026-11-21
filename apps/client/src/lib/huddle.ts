@@ -1,25 +1,38 @@
 /**
- * A huddle room in the browser: the WebRTC mesh behind a video portal.
+ * A huddle room in the browser: the WebRTC mesh behind a video call.
  *
  * People who **join** send their camera and mic to everyone in the room;
- * people who only have the portal on screen **watch** (receive only, sound
- * off until they ask). Every pair where at least one side sends gets one
+ * people who only have it on screen **watch** (receive only, sound off until
+ * they ask). Every pair where at least one side sends gets one
  * RTCPeerConnection, negotiated with the "perfect negotiation" pattern
  * (polite/impolite by connection id), so offers that cross never deadlock.
  * The server only relays signalling (/huddle/:board/:huddle) and keeps the
  * roster and archive; media never touches it.
  *
+ * A room is named by `{board, huddleId}`: a grid's card (`board` is the grid),
+ * or a ChatForm channel's huddle (`board` is "chat", wherever it is shown: its
+ * grid cards are views of the same room, so taking it to a grid never
+ * renegotiates). `meta` carries what the call is called and its channel.
+ *
  * While joined, this browser transcribes its own mic (Web Speech) and sends
  * each finished phrase as a transcript line under the person's name, with
  * interim words as live captions. When someone presses Record, every
- * participant's browser records its own camera + mic and uploads it to the
- * huddle's archive when recording stops or they leave.
+ * participant's browser records its own camera + mic — unless they said
+ * "don't record me" — and uploads it to the huddle's archive when recording
+ * stops or they leave; a screen they share while recording is recorded too,
+ * as a second file.
  *
- * One joined room at a time (module singleton), so a call survives panning
- * away from the portal; watch rooms belong to the portal on screen.
+ * One screen share at a time (the server arbitrates): a second video track on
+ * its own MediaStream, announced first so receivers know which stream is the
+ * screen. Agents seated in the room answer what's said to them: every client
+ * speaks the answer aloud itself (speechSynthesis), which can be muted.
+ *
+ * One joined room at a time (module singleton), so a call survives moving
+ * around Foundation; watch rooms belong to whatever is on screen.
  *
  * `?fakecam` (dev) sends a drawn test pattern and a quiet tone instead of the
- * camera and mic, so two headless tabs can prove the path end to end.
+ * camera and mic (and a drawn screen instead of getDisplayMedia), so two
+ * headless tabs can prove the path end to end.
  */
 
 import { useSyncExternalStore } from "react";
@@ -34,8 +47,18 @@ export interface PeerView {
   sending: boolean;
   muted: boolean;
   camOff: boolean;
+  /** said "don't record me" */
+  noRec: boolean;
   stream: MediaStream | null;
+  /** the screen they share, when they do */
+  screen: MediaStream | null;
   state: RTCPeerConnectionState | "new";
+}
+
+export interface AgentSeat {
+  name: string;
+  by: string;
+  state: "listening" | "thinking" | "talking";
 }
 
 export interface RoomView {
@@ -53,6 +76,27 @@ export interface RoomView {
   recordingSelf: boolean;
   uploads: number;
   speech: "on" | "off" | "unsupported" | "blocked" | "test";
+  /** who shares a screen now (one at a time) */
+  sharing: { id: string; by: string; stream?: string } | null;
+  /** my own shared screen */
+  screen: MediaStream | null;
+  /** I said "don't record me" */
+  noRec: boolean;
+  agents: AgentSeat[];
+  /** the agent this browser is speaking aloud right now */
+  talking: string | null;
+  /** agents' answers spoken aloud here */
+  voice: boolean;
+  captionsOn: boolean;
+  /** a channel's huddle that ended (the last person left) */
+  ended: boolean;
+}
+
+/** what a call is called and where it lives, for the chip that follows you (and Back) */
+export interface HuddleMeta {
+  name?: string;
+  /** a ChatForm channel's huddle: its channel */
+  channel?: string;
 }
 
 interface Peer extends PeerView {
@@ -60,6 +104,8 @@ interface Peer extends PeerView {
   polite: boolean;
   makingOffer: boolean;
   ignoreOffer: boolean;
+  /** stream ids announced as this peer's screen */
+  screenIds: Set<string>;
 }
 
 type SpeechRec = {
@@ -81,6 +127,8 @@ function speechCtor(): (new () => SpeechRec) | null {
 
 export const fakeCam = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("fakecam");
 
+type Recorder = { rec: MediaRecorder; chunks: Blob[]; startedAt: number; t0: number; kind: "camera" | "screen" };
+
 export class HuddleRoom {
   private ws: WebSocket | null = null;
   private peers = new Map<string, Peer>();
@@ -90,16 +138,23 @@ export class HuddleRoom {
   private speechRec: SpeechRec | null = null;
   private captionTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private lastCaption = 0;
-  private recorder: { rec: MediaRecorder; chunks: Blob[]; startedAt: number; t0: number } | null = null;
+  private recorders = new Map<Recorder["kind"], Recorder>();
   private stopFake: (() => void) | null = null;
+  private stopFakeScreen: (() => void) | null = null;
+  private shareWait: { resolve: () => void; reject: (e: Error) => void } | null = null;
+  private screenSenders = new Map<string, RTCRtpSender[]>();
+  private signals: Promise<void> = Promise.resolve();
   private closed = false;
+  meta: HuddleMeta;
 
   constructor(
     public readonly board: string,
     public readonly huddleId: string,
     public readonly sending: boolean,
     private readonly me: { name: string },
+    meta: HuddleMeta = {},
   ) {
+    this.meta = meta;
     this.view = {
       status: "connecting",
       sending,
@@ -113,6 +168,14 @@ export class HuddleRoom {
       recordingSelf: false,
       uploads: 0,
       speech: "off",
+      sharing: null,
+      screen: null,
+      noRec: false,
+      agents: [],
+      talking: null,
+      voice: sending,
+      captionsOn: true,
+      ended: false,
     };
   }
 
@@ -127,7 +190,7 @@ export class HuddleRoom {
     this.view = {
       ...this.view,
       ...patch,
-      peers: [...this.peers.values()].map(({ id, name, color, sending, muted, camOff, stream, state }) => ({ id, name, color, sending, muted, camOff, stream, state })),
+      peers: [...this.peers.values()].map(({ id, name, color, sending, muted, camOff, noRec, stream, screen, state }) => ({ id, name, color, sending, muted, camOff, noRec, stream, screen, state })),
     };
     for (const fn of this.subs) fn();
   }
@@ -159,7 +222,7 @@ export class HuddleRoom {
     void this.connect();
     if (this.sending) {
       this.startSpeech();
-      if (opts.recording) this.startRecorder();
+      if (opts.recording) this.startRecorder("camera");
     }
   }
 
@@ -176,6 +239,8 @@ export class HuddleRoom {
     ws.onmessage = (e) => void this.onWire(JSON.parse(String(e.data)) as HuddleWire);
     ws.onclose = (e) => {
       if (this.closed) return;
+      if (e.code === 4410 || this.view.ended) return this.emit({ status: "closed", ended: true, error: "This huddle has ended" });
+      if (e.code === 4403) return this.emit({ status: "error", error: "This huddle belongs to a conversation you're not in" });
       this.emit({ status: e.code === 4404 ? "error" : "closed", error: e.code === 4404 ? "This huddle was removed" : "Connection lost" });
     };
   }
@@ -185,13 +250,16 @@ export class HuddleRoom {
     this.closed = true;
     this.stopSpeech();
     this.stopRecorder();
+    this.hush();
     for (const p of this.peers.values()) p.pc?.close();
     this.peers.clear();
     for (const t of this.view.local?.getTracks() ?? []) t.stop();
+    for (const t of this.view.screen?.getTracks() ?? []) t.stop();
     this.stopFake?.();
+    this.stopFakeScreen?.();
     for (const t of this.captionTimers.values()) clearTimeout(t);
     this.ws?.close();
-    this.emit({ status: "closed", local: null });
+    this.emit({ status: "closed", local: null, screen: null });
   }
 
   private send(m: Record<string, unknown>) {
@@ -205,8 +273,9 @@ export class HuddleRoom {
       case "welcome":
         this.ice = m.ice as RTCIceServer[];
         this.emit({ status: "live", you: m.you });
-        for (const p of m.peers) this.addPeer(p.id, p.name, p.color, p.sending);
+        for (const p of m.peers) this.addPeer(p.id, p.name, p.color, p.sending, p.noRec);
         this.send({ t: "state", sending: this.sending, muted: this.view.muted, camOff: this.view.camOff });
+        if (this.view.noRec) this.send({ t: "optout", on: true });
         break;
       case "peer-joined":
         this.addPeer(m.id, m.name, m.color, m.sending);
@@ -223,31 +292,55 @@ export class HuddleRoom {
         if (p) {
           p.muted = Boolean(m.muted);
           p.camOff = Boolean(m.camOff);
+          if (m.noRec !== undefined) p.noRec = Boolean(m.noRec);
           this.emit();
         }
         break;
       }
-      case "signal":
-        await this.onSignal(m.from, m.data as { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit });
+      case "signal": {
+        // one at a time, in order: a candidate handled while the description before it is still being set is lost
+        const data = m.data as { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit };
+        this.signals = this.signals.then(() => this.onSignal(m.from, data)).catch(() => {});
         break;
+      }
       case "line":
         if (!this.view.lines.some((l) => l.id === m.line.id)) this.emit({ lines: [...this.view.lines, m.line] });
-        // a finished phrase replaces that speaker's caption
         break;
       case "caption":
         this.showCaption(m.from, m.name, m.text);
         break;
       case "recording":
         this.emit({ recording: m.on ? { by: m.by } : null });
-        if (this.sending) (m.on ? this.startRecorder() : this.stopRecorder());
+        if (this.sending) {
+          if (m.on) {
+            this.startRecorder("camera");
+            if (this.view.screen) this.startRecorder("screen");
+          } else this.stopRecorder();
+        }
+        break;
+      case "sharing":
+        this.onSharing(m);
+        break;
+      case "agents":
+        this.emit({ agents: m.agents });
+        break;
+      case "agent-says":
+        this.speakAloud(m.name, m.text);
+        break;
+      case "agent-hush":
+        this.hush();
+        break;
+      case "ended":
+        this.emit({ ended: true });
         break;
     }
   }
 
-  private addPeer(id: string, name: string, color: string, sending: boolean) {
+  private addPeer(id: string, name: string, color: string, sending: boolean, noRec = false) {
     if (this.peers.has(id)) return;
     const you = this.view.you ?? "";
-    const p: Peer = { id, name, color, sending, muted: false, camOff: false, stream: null, state: "new", pc: null, polite: you < id, makingOffer: false, ignoreOffer: false };
+    const p: Peer = { id, name, color, sending, muted: false, camOff: false, noRec, stream: null, screen: null, state: "new", pc: null, polite: you < id, makingOffer: false, ignoreOffer: false, screenIds: new Set() };
+    if (this.view.sharing?.id === id && this.view.sharing.stream) p.screenIds.add(this.view.sharing.stream);
     this.peers.set(id, p);
     // a connection only where media flows one way or the other
     if (this.sending || sending) this.connectPeer(p);
@@ -270,8 +363,17 @@ export class HuddleRoom {
     };
     pc.onicecandidate = ({ candidate }) => candidate && this.send({ t: "signal", to: p.id, data: { candidate } });
     pc.ontrack = ({ track, streams }) => {
-      p.stream = streams[0] ?? p.stream ?? new MediaStream();
-      if (!p.stream.getTracks().includes(track)) p.stream.addTrack(track);
+      const s = streams[0];
+      if (s && p.screenIds.has(s.id)) {
+        p.screen = s;
+        track.onended = () => {
+          if (p.screen === s) p.screen = null;
+          this.emit();
+        };
+      } else {
+        p.stream = s ?? p.stream ?? new MediaStream();
+        if (!p.stream.getTracks().includes(track)) p.stream.addTrack(track);
+      }
       this.emit();
     };
     pc.onconnectionstatechange = () => {
@@ -280,6 +382,9 @@ export class HuddleRoom {
       this.emit();
     };
     for (const t of this.view.local?.getTracks() ?? []) pc.addTrack(t, this.view.local!);
+    // a screen I'm sharing reaches whoever arrives later too
+    const scr = this.view.screen;
+    if (scr) this.screenSenders.set(p.id, scr.getTracks().map((t) => pc.addTrack(t, scr)));
   }
 
   private async onSignal(from: string, data: { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit }) {
@@ -330,11 +435,146 @@ export class HuddleRoom {
     this.send({ t: "recording", on });
   }
 
+  /** "don't record me": my recorder never starts (and stops now if it runs); everyone sees I opted out */
+  setNoRec(on: boolean) {
+    this.emit({ noRec: on });
+    this.send({ t: "optout", on });
+    if (on) this.stopRecorder();
+    else if (this.view.recording && this.sending) {
+      this.startRecorder("camera");
+      if (this.view.screen) this.startRecorder("screen");
+    }
+  }
+
   /** a typed line in the transcript */
   say(text: string) {
     if (!text.trim()) return;
     if (this.ws?.readyState === WebSocket.OPEN) this.send({ t: "line", text, source: "typed" });
     else void api(`/api/huddles/${this.huddleId}/lines`, { method: "POST", json: { board: this.board, text } });
+  }
+
+  setCaptions(on: boolean) {
+    this.emit({ captionsOn: on });
+  }
+
+  /** agents' answers, spoken aloud in this browser (or not) */
+  setVoice(on: boolean) {
+    if (!on) this.hush();
+    this.emit({ voice: on });
+  }
+
+  // ---------- screen share ----------
+
+  /** share a screen (one per room: refused while someone else shares, with who) */
+  async startShare(): Promise<void> {
+    if (!this.sending || this.view.screen) return;
+    const screen = fakeCam ? this.fakeScreen() : await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15 } }, audio: false });
+    if (this.closed) return void screen.getTracks().forEach((t) => t.stop());
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this.shareWait = { resolve, reject };
+        this.send({ t: "share", on: true, stream: screen.id });
+        setTimeout(() => reject(new Error("The server didn't answer")), 5000);
+      });
+    } catch (e) {
+      screen.getTracks().forEach((t) => t.stop());
+      this.stopFakeScreen?.();
+      throw e;
+    } finally {
+      this.shareWait = null;
+    }
+    for (const t of screen.getVideoTracks()) t.onended = () => this.stopShare();
+    this.emit({ screen });
+    for (const p of this.peers.values()) {
+      if (!p.pc) continue;
+      this.screenSenders.set(p.id, screen.getTracks().map((t) => p.pc!.addTrack(t, screen)));
+    }
+    if (this.view.recording && !this.view.noRec) this.startRecorder("screen");
+  }
+
+  stopShare() {
+    const screen = this.view.screen;
+    if (!screen) return;
+    const r = this.recorders.get("screen");
+    if (r) {
+      this.recorders.delete("screen");
+      if (r.rec.state !== "inactive") r.rec.stop();
+    }
+    for (const [id, senders] of this.screenSenders) {
+      const pc = this.peers.get(id)?.pc;
+      for (const s of senders) {
+        try {
+          pc?.removeTrack(s);
+        } catch {
+          /* closed */
+        }
+      }
+    }
+    this.screenSenders.clear();
+    screen.getTracks().forEach((t) => t.stop());
+    this.stopFakeScreen?.();
+    this.stopFakeScreen = null;
+    this.send({ t: "share", on: false });
+    this.emit({ screen: null });
+  }
+
+  private onSharing(m: Extract<HuddleWire, { t: "sharing" }>) {
+    const you = this.view.you;
+    if (this.shareWait) {
+      if (m.id === you) this.shareWait.resolve();
+      else if (m.id) this.shareWait.reject(new Error(`${m.by} is sharing their screen`));
+    }
+    if (m.id && m.stream) this.peers.get(m.id)?.screenIds.add(m.stream);
+    if (!m.id) for (const p of this.peers.values()) p.screen = null;
+    this.emit({ sharing: m.id && m.by ? { id: m.id, by: m.by, ...(m.stream ? { stream: m.stream } : {}) } : null });
+  }
+
+  // ---------- agents ----------
+
+  /** seat an agent in the room (a person's press) */
+  inviteAgent(name: string) {
+    return api(`/api/huddles/${this.huddleId}/agents`, { method: "POST", json: { board: this.board, name } });
+  }
+  dismissAgent(name: string) {
+    return api(`/api/huddles/${this.huddleId}/agents`, { method: "POST", json: { board: this.board, name, remove: true } });
+  }
+  /** Stop: the agent's turn ends and everyone stops speaking it */
+  stopAgents() {
+    this.hush();
+    this.send({ t: "agent-stop" });
+  }
+
+  private speakAloud(name: string, text: string) {
+    const synth = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+    if (!this.view.voice || !synth || typeof SpeechSynthesisUtterance === "undefined") {
+      // no voice here: the avatar still talks for as long as it would take to say
+      this.emit({ talking: name });
+      const ms = Math.min(20_000, 800 + (text.split(/\s+/).length / 2.6) * 1000);
+      setTimeout(() => this.view.talking === name && this.emit({ talking: null }), ms);
+      return;
+    }
+    const u = new SpeechSynthesisUtterance(text);
+    const voices = synth.getVoices();
+    if (voices.length) {
+      // each agent its own voice, the same one every time
+      let h = 0;
+      for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const local = voices.filter((v) => v.lang?.startsWith((navigator.language || "en").slice(0, 2)));
+      const pool = local.length ? local : voices;
+      u.voice = pool[h % pool.length];
+    }
+    u.onstart = () => this.emit({ talking: name });
+    u.onend = u.onerror = () => this.view.talking === name && this.emit({ talking: null });
+    synth.speak(u);
+  }
+
+  private hush() {
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      /* no voice */
+    }
+    if (this.view.talking) this.emit({ talking: null });
   }
 
   // ---------- captions and transcript (this browser's own mic) ----------
@@ -416,45 +656,45 @@ export class HuddleRoom {
     if (this.view.speech === "on") this.emit({ speech: "off" });
   }
 
-  // ---------- recording: each person records themselves ----------
+  // ---------- recording: each person records themselves (and the screen they share) ----------
 
-  private startRecorder() {
-    const local = this.view.local;
-    if (this.recorder || !local || typeof MediaRecorder === "undefined") return;
+  private startRecorder(kind: Recorder["kind"]) {
+    const stream = kind === "camera" ? this.view.local : this.view.screen;
+    if (this.view.noRec || this.recorders.has(kind) || !stream || typeof MediaRecorder === "undefined") return;
     const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
-    const rec = new MediaRecorder(local, { mimeType, videoBitsPerSecond: 700_000 });
+    const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: kind === "screen" ? 1_200_000 : 700_000 });
     // t0 is the monotonic clock at start; start to stop is the recording's length
     // (it's never paused), written into the WebM so the archive's player can seek.
-    const r = { rec, chunks: [] as Blob[], startedAt: Date.now(), t0: performance.now() };
+    const r: Recorder = { rec, chunks: [], startedAt: Date.now(), t0: performance.now(), kind };
     rec.onstart = () => (r.t0 = performance.now());
     rec.ondataavailable = (e) => e.data.size && r.chunks.push(e.data);
-    rec.onstop = () => void this.upload(r.chunks, rec.mimeType || "video/webm", r.startedAt, performance.now() - r.t0);
+    rec.onstop = () => void this.upload(r.chunks, rec.mimeType || "video/webm", r.startedAt, performance.now() - r.t0, kind);
     rec.start(5000);
-    this.recorder = r;
+    this.recorders.set(kind, r);
     this.emit({ recordingSelf: true });
   }
 
   private stopRecorder() {
-    const r = this.recorder;
-    this.recorder = null;
-    if (r && r.rec.state !== "inactive") r.rec.stop();
+    for (const r of this.recorders.values()) if (r.rec.state !== "inactive") r.rec.stop();
+    this.recorders.clear();
     if (this.view.recordingSelf) this.emit({ recordingSelf: false });
   }
 
-  private async upload(chunks: Blob[], mime: string, startedAt: number, durationMs: number) {
+  private async upload(chunks: Blob[], mime: string, startedAt: number, durationMs: number, kind: Recorder["kind"]) {
     if (!chunks.length) return;
     const endedAt = Date.now();
     const ext = mime.includes("mp4") ? "mp4" : "webm";
     const type = mime.split(";")[0];
     const stamp = new Date(startedAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
-    const name = `huddle-${this.me.name.replace(/\W+/g, "-").toLowerCase()}-${stamp}.${ext}`;
+    const name = `huddle-${this.me.name.replace(/\W+/g, "-").toLowerCase()}${kind === "screen" ? "-screen" : ""}-${stamp}.${ext}`;
     this.emit({ uploads: this.view.uploads + 1 });
     try {
       // Chrome's WebM has no Duration; write one in. On any failure this is the original bytes.
       const raw = new Blob(chunks, { type });
       const file = new File([ext === "webm" ? await withWebmDuration(raw, durationMs) : raw], name, { type });
+      // a channel's huddle: a chat upload (it opens for the channel's readers); a grid's: that grid's
       const up = await uploadFile(file, this.board);
-      await api(`/api/huddles/${this.huddleId}/recordings`, { method: "POST", json: { board: this.board, fileId: up.id, startedAt, endedAt } });
+      await api(`/api/huddles/${this.huddleId}/recordings`, { method: "POST", json: { board: this.board, fileId: up.id, startedAt, endedAt, kind } });
     } catch (e) {
       console.warn("huddle: recording upload failed", e);
     } finally {
@@ -462,7 +702,7 @@ export class HuddleRoom {
     }
   }
 
-  // ---------- dev: a drawn camera ----------
+  // ---------- dev: a drawn camera, a drawn screen ----------
 
   private fakeStream(): MediaStream {
     const c = document.createElement("canvas");
@@ -505,6 +745,34 @@ export class HuddleRoom {
     };
     return new MediaStream([...video.getVideoTracks(), ...dest.stream.getAudioTracks()]);
   }
+
+  private fakeScreen(): MediaStream {
+    const c = document.createElement("canvas");
+    c.width = 1280;
+    c.height = 720;
+    const g = c.getContext("2d")!;
+    const css = getComputedStyle(document.documentElement);
+    const tone = (v: string, d: string) => css.getPropertyValue(v).trim() || d;
+    const t0 = performance.now();
+    let timer = 0;
+    const draw = () => {
+      const t = (performance.now() - t0) / 1000;
+      g.fillStyle = tone("--color-abyss", "white");
+      g.fillRect(0, 0, 1280, 720);
+      g.strokeStyle = tone("--color-line-strong", "gray");
+      for (let x = 0; x < 1280; x += 80) g.strokeRect(x, 0, 80, 720);
+      g.fillStyle = tone("--color-agent", "purple");
+      g.fillRect(140 + Math.sin(t) * 60, 200, 420, 240);
+      g.fillStyle = tone("--color-frost", "black");
+      g.font = "600 40px system-ui";
+      g.fillText(`${this.me.name}'s screen`, 60, 100);
+      timer = window.setTimeout(draw, 100) as unknown as number;
+    };
+    draw();
+    const s = c.captureStream(10);
+    this.stopFakeScreen = () => clearTimeout(timer);
+    return s;
+  }
 }
 
 function cameraError(e: unknown): string {
@@ -534,14 +802,20 @@ export function onJoinedChange(fn: () => void) {
   return () => joinedSubs.delete(fn);
 }
 
+// the browser checks read the joined call's state (like __chatform)
+if (typeof window !== "undefined") (window as unknown as { __huddle?: () => RoomView | null }).__huddle = () => joined?.snapshot() ?? null;
+
 export function useJoinedRoom(): HuddleRoom | null {
   return useSyncExternalStore(onJoinedChange, joinedRoom);
 }
 
-export async function joinHuddle(board: string, huddleId: string, me: { name: string }, opts: { recording?: boolean } = {}) {
-  if (joined?.huddleId === huddleId && joined.board === board) return joined;
+export async function joinHuddle(board: string, huddleId: string, me: { name: string }, opts: { recording?: boolean; meta?: HuddleMeta } = {}) {
+  if (joined?.huddleId === huddleId && joined.board === board) {
+    if (opts.meta) joined.meta = { ...joined.meta, ...opts.meta };
+    return joined;
+  }
   leaveHuddle();
-  const room = new HuddleRoom(board, huddleId, true, me);
+  const room = new HuddleRoom(board, huddleId, true, me, opts.meta);
   joined = room;
   emitJoined();
   await room.start(opts);
@@ -553,6 +827,11 @@ export function leaveHuddle() {
   joined = null;
   r?.stop();
   emitJoined();
+}
+
+/** the room a grid's huddle card stands for: its own, or (a view of a channel's huddle) the channel's on board "chat" */
+export function roomOfCard(panel: { id: string; home?: "chat" }, boardId: string): { board: string; huddleId: string } {
+  return { board: panel.home === "chat" ? "chat" : boardId, huddleId: panel.id };
 }
 
 const closedView: RoomView = {
@@ -568,6 +847,14 @@ const closedView: RoomView = {
   recordingSelf: false,
   uploads: 0,
   speech: "off",
+  sharing: null,
+  screen: null,
+  noRec: false,
+  agents: [],
+  talking: null,
+  voice: false,
+  captionsOn: true,
+  ended: false,
 };
 const noop = () => () => {};
 

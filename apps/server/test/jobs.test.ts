@@ -13,17 +13,22 @@
 
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { EventEmitter } from "node:events";
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { checkTarget, claudeCommand, here, npxCommand, reaCommand, REA_DEFAULT_GOAL, type Runtime } from "../src/rea.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "foundation-test-"));
-process.env.FOUNDATION_DATA_DIR = dir;
+process.env.FOUNDATION_DATA_DIR = join(dir, "data");
+process.env.FOUNDATION_WORK_DIR = join(dir, "work");
 
-/** a runtime over a made-up file system: `files` (path → text), `dirs` */
-function rt(platform: NodeJS.Platform, o: { files?: Record<string, string>; dirs?: string[]; env?: Record<string, string>; execPath?: string; cwd?: string } = {}): Runtime {
+/** folders a person approved, in the made-up file systems below (a local target must be inside one) */
+const PLACES = ["C:\\Apps", "C:\\Users\\Ada\\a & calc", "C:\\Program Files (x86)\\App", "/Applications", "/srv/foundation/apps", "/Users/ada/a & calc"];
+
+/** a runtime over a made-up file system: `files` (path → text), `dirs`; links are not followed here (real is the path itself) */
+function rt(platform: NodeJS.Platform, o: { files?: Record<string, string>; dirs?: string[]; env?: Record<string, string>; execPath?: string; cwd?: string; places?: string[]; home?: string; links?: Record<string, string> } = {}): Runtime {
   const files = o.files ?? {};
   const dirs = new Set(o.dirs ?? []);
   return {
@@ -37,6 +42,9 @@ function rt(platform: NodeJS.Platform, o: { files?: Record<string, string>; dirs
       if (!(f in files)) throw new Error(`ENOENT ${f}`);
       return files[f];
     },
+    real: (f) => o.links?.[f] ?? (f in files || dirs.has(f) ? f : null),
+    home: o.home ?? (platform === "win32" ? "C:\\Users\\Ada" : "/Users/ada"),
+    places: o.places ?? PLACES,
   };
 }
 
@@ -44,7 +52,7 @@ const NPX_CLI = "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npx-cli.js";
 const NPM_SHIM = (script: string) => `@ECHO off\r\nGOTO start\r\n:start\r\nSETLOCAL\r\nCALL :find_dp0\r\nIF EXIST "%dp0%\\node.exe" (\r\n  SET "_prog=%dp0%\\node.exe"\r\n) ELSE (\r\n  SET "_prog=node"\r\n)\r\nendLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${script}" %*\r\n`;
 const APP_WIN = "C:\\Apps\\Slack\\resources\\app.asar";
 const APP_MAC = "/Applications/Slack.app/Contents/Resources/app.asar";
-const REA = (target: string) => ["-y", "rea-agents@latest", "analyze-javascript-application", target, "--json"];
+const REA = (target: string) => ["--registry=https://registry.npmjs.org/", "-y", "rea-agents@6.9.0", "analyze-javascript-application", target, "--json"];
 
 test("npx on Windows: npm's npx-cli.js under this Node, never npx.cmd", () => {
   // next to the running Node (an ordinary install)
@@ -98,7 +106,7 @@ test("the exact REA command on win32 and darwin", () => {
   const job = { target: APP_WIN, goal: "How does it sync?" };
   assert.deepEqual(reaCommand(job, "claude", win), { ok: true, route: "rea-agents", target: APP_WIN, cmd: "C:\\Program Files\\nodejs\\node.exe", argv: [NPX_CLI, ...REA(APP_WIN)] });
   assert.deepEqual(reaCommand({ ...job, target: APP_MAC }, "claude", mac), { ok: true, route: "rea-agents", target: APP_MAC, cmd: "npx", argv: REA(APP_MAC) });
-  // a directory is an app too, and a relative path is made absolute (the job runs in the data folder, not here)
+  // a directory is an app too, and a relative path is made absolute (the job runs in its own work folder, not here)
   const macDir = rt("darwin", { dirs: ["/srv/foundation/apps/web"] });
   assert.deepEqual(reaCommand({ target: "apps/web", goal: "" }, "claude", macDir), { ok: true, route: "rea-agents", target: "/srv/foundation/apps/web", cmd: "npx", argv: REA("/srv/foundation/apps/web") });
   // a URL goes to Claude Code with REA's MCP: the target is inside the one prompt argument
@@ -163,14 +171,14 @@ test("a refused job says why on its card and doesn't run", async () => {
   runSql("insert or ignore into users (id, email, name, color, role, created_at) values (?, ?, ?, ?, 'member', ?)", "u", "u@formindustries.com", "Tester", "#325bb4", Date.now());
   const { runTool } = await import("../src/tools.ts");
   const { getBoard, closeBoards } = await import("../src/boards.ts");
-  const { startJob, getJob } = await import("../src/jobs.ts");
+  const { startJob, getJob, jobShown } = await import("../src/jobs.ts");
   const { boardMaps, appendSection } = await import("@foundation/protocol");
   after(() => closeBoards());
   const board = getBoard("jobs-board");
   board.doc.transact(() => appendSection(board.doc, "Research"));
   const ctx = { boardId: "jobs-board", actor: "test", userId: "u" };
   const q = (await runTool(ctx, "reverse_engineer", { target: "--foo", goal: "map it" })) as { job: string; card: string };
-  const job = startJob(q.job, "jobs-board", "Tester");
+  const job = startJob(q.job, "jobs-board", "Tester", jobShown(getJob(q.job)!).shown);
   assert.equal(job.status, "error");
   assert.match(job.output, /starts with "-"/);
   const card = boardMaps(board.doc).objects.get(q.card) as { status: string; text: string };
@@ -200,4 +208,296 @@ test("on Windows: the resolved npx starts without a shell, and a claude.cmd's ar
   const res = spawnSync(plan.cmd, plan.argv, { encoding: "utf8", windowsHide: true });
   assert.equal(res.status, 0, res.stderr);
   assert.deepEqual(JSON.parse(res.stdout), plan.argv.slice(1));
+});
+
+// ---------- ADR-001 G13: a pinned rea-agents, checked before it starts, with no keys and outside data/ ----------
+
+// the boards these checks open are closed once the file is done (the refused-job check closes its own after itself)
+after(async () => (await import("../src/boards.ts")).closeBoards());
+
+const SECRET = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL/i;
+const SECRETS = { ANTHROPIC_API_KEY: "sk-ant-not-real", SLACK_BOT_TOKEN: "xoxb-not-real", GITHUB_TOKEN: "ghp-not-real", FOUNDATION_SERVICE_TOKEN: "s".repeat(40), MESHY_API_KEY: "msy-not-real", GOOGLE_CLIENT_SECRET: "g-not-real", FOO_PASSWORD: "hunter2" };
+const isUnder = (child: string, parent: string) => {
+  const r = relative(resolve(parent), resolve(child));
+  return r === "" || (!r.startsWith("..") && !isAbsolute(r));
+};
+
+/** a child process that ran and finished at once (nothing really starts) */
+function fakeChild(code = 0, out = "") {
+  const c = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter };
+  c.stdout = new EventEmitter();
+  c.stderr = new EventEmitter();
+  setImmediate(() => {
+    if (out) c.stdout.emit("data", Buffer.from(out));
+    c.emit("close", code);
+  });
+  return c as unknown as ChildProcess;
+}
+
+/** a REA job on a local app folder (the rea-agents route) */
+async function queueAppJob() {
+  const { run: runSql } = await import("../src/db.ts");
+  runSql("insert or ignore into users (id, email, name, color, role, created_at) values (?, ?, ?, ?, 'member', ?)", "u", "u@formindustries.com", "Tester", "#325bb4", Date.now());
+  const { runTool } = await import("../src/tools.ts");
+  const { getBoard } = await import("../src/boards.ts");
+  const { appendSection, boardMaps } = await import("@foundation/protocol");
+  const board = getBoard("jobs-board");
+  if (boardMaps(board.doc).sections.size === 0) board.doc.transact(() => appendSection(board.doc, "Research"));
+  const app = join(dir, "places", "an-app");
+  mkdirSync(app, { recursive: true });
+  // the folder it is in is one a person approved (jobs.ts asks places.ts; here, a stand-in)
+  const { setJobDeps } = await import("../src/jobs.ts");
+  setJobDeps({ places: () => [realpathSync.native(join(dir, "places"))] });
+  return (await runTool({ boardId: "jobs-board", actor: "test", userId: "u" }, "reverse_engineer", { target: app, goal: "map it" })) as { job: string; card: string };
+}
+
+async function until(what: string, ok: () => boolean) {
+  for (let i = 0; i < 300 && !ok(); i++) await new Promise((r) => setTimeout(r, 10));
+  assert.ok(ok(), what);
+}
+
+test("the pinned rea-agents: a matching integrity passes, a different one or no answer refuses (no network)", async () => {
+  const { checkReaIntegrity, REA_AGENTS } = await import("../src/rea.ts");
+  assert.equal(REA_AGENTS.version, "6.9.0");
+  let asked: string[] = [];
+  assert.equal(
+    await checkReaIntegrity(async (n, v) => {
+      asked = [n, v];
+      return REA_AGENTS.integrity;
+    }),
+    null,
+  );
+  assert.deepEqual(asked, ["rea-agents", "6.9.0"], "it asks for the exact pinned version");
+  assert.match((await checkReaIntegrity(async () => "sha512-somethingElse==")) ?? "", /npm's registry says rea-agents@6\.9\.0 is sha512-somethingElse==, not .* Foundation pinned, so it didn't start/);
+  assert.match((await checkReaIntegrity(async () => undefined)) ?? "", /is missing/);
+  assert.match(
+    (await checkReaIntegrity(async () => {
+      throw new Error("offline");
+    })) ?? "",
+    /Couldn't check rea-agents@6\.9\.0.*offline.*didn't start/,
+  );
+});
+
+test("a REA job starts the pinned version in a folder of its own, with no keys (ADR-001 G13)", async () => {
+  const { startJob, getJob, setJobDeps, jobShown } = await import("../src/jobs.ts");
+  const { checkReaIntegrity, REA_AGENTS } = await import("../src/rea.ts");
+  const spawned: Array<{ cmd: string; argv: string[]; opts: SpawnOptions }> = [];
+  Object.assign(process.env, SECRETS);
+  try {
+    setJobDeps({
+      spawn: (cmd, argv, opts) => {
+        spawned.push({ cmd, argv, opts });
+        return fakeChild(0, '{"ok":true}');
+      },
+      integrity: () => checkReaIntegrity(async () => REA_AGENTS.integrity),
+    });
+    const q = await queueAppJob();
+    startJob(q.job, "jobs-board", "Tester", jobShown(getJob(q.job)!).shown);
+    await until("the job ran", () => getJob(q.job)!.status === "done");
+  } finally {
+    for (const k of Object.keys(SECRETS)) delete process.env[k];
+  }
+  assert.equal(spawned.length, 1);
+  const { argv, opts } = spawned[0];
+  assert.ok(argv.includes("rea-agents@6.9.0"), argv.join(" "));
+  assert.ok(!argv.some((a) => a.includes("@latest")));
+  const env = opts.env as Record<string, string>;
+  for (const k of Object.keys(env)) assert.ok(!SECRET.test(k), `the job was given ${k}`);
+  assert.ok(Object.keys(env).some((k) => k.toUpperCase() === "PATH"), "it can find programs");
+  const cwd = String(opts.cwd);
+  assert.ok(!isUnder(cwd, process.env.FOUNDATION_DATA_DIR!), `${cwd} is in data/`);
+  assert.ok(isUnder(cwd, process.env.FOUNDATION_WORK_DIR!), `${cwd} is under the work folder`);
+});
+
+test("a REA job whose pinned version doesn't match the registry fails with a plain sentence and starts nothing", async () => {
+  const { startJob, getJob, setJobDeps, jobShown } = await import("../src/jobs.ts");
+  const { checkReaIntegrity } = await import("../src/rea.ts");
+  const spawned: string[] = [];
+  setJobDeps({
+    spawn: (cmd) => {
+      spawned.push(cmd);
+      return fakeChild();
+    },
+    integrity: () => checkReaIntegrity(async () => "sha512-swapped=="),
+  });
+  const q = await queueAppJob();
+  startJob(q.job, "jobs-board", "Tester", jobShown(getJob(q.job)!).shown);
+  await until("the job failed", () => getJob(q.job)!.status === "error");
+  assert.match(getJob(q.job)!.output, /npm's registry says rea-agents@6\.9\.0 is sha512-swapped==.*didn't start/);
+  assert.equal(spawned.length, 0, "nothing started");
+});
+
+test("the Claude Code route of a REA job gets only Claude Code's own extras, in its own folder", async () => {
+  const { jobSpawnOptions } = await import("../src/jobs.ts");
+  Object.assign(process.env, SECRETS, { CLAUDE_CONFIG_DIR: join(dir, "claude-home") });
+  try {
+    const o = jobSpawnOptions({ id: "job_abc123" }, { route: "claude" });
+    const env = o.env as Record<string, string>;
+    assert.equal(env.ANTHROPIC_API_KEY, undefined, "never the API key: claude -p would bill it");
+    assert.equal(env.CLAUDE_CONFIG_DIR, join(dir, "claude-home"));
+    for (const k of Object.keys(env)) assert.ok(!SECRET.test(k), k);
+    assert.equal(resolve(String(o.cwd)), resolve(process.env.FOUNDATION_WORK_DIR!, "jobs", "job_abc123"));
+    assert.equal((jobSpawnOptions({ id: "job_abc123" }, { route: "rea-agents" }).env as Record<string, string>).CLAUDE_CONFIG_DIR, undefined, "rea-agents doesn't get Claude Code's");
+  } finally {
+    for (const k of [...Object.keys(SECRETS), "CLAUDE_CONFIG_DIR"]) delete process.env[k];
+  }
+});
+
+// ---------- what runs is what a person saw, on a folder a person approved ----------
+
+test("a local target must be inside an approved folder, on its real path, and never home's or any hidden file, key or credential", () => {
+  for (const platform of ["win32", "darwin"] as const) {
+    const W = platform === "win32";
+    const P = (s: string) => (W ? `C:\\Users\\Ada\\${s.replace(/\//g, "\\")}` : `/Users/ada/${s}`);
+    const place = P("Projects");
+    const inside = P("Projects/app.asar");
+    const file = P("Projects/notes.txt");
+    const outside = P("Elsewhere/app.asar");
+    const dotted = [P("Projects/.env"), P("Projects/.git/config"), P(".ssh/id_ed25519"), P(".aws/credentials"), P(".claude/settings.json"), P(".config/gh/hosts.yml"), P(".npmrc"), P("Projects/keys/server.pem")];
+    const home = W ? "C:\\Users\\Ada" : "/Users/ada";
+    const above = W ? "C:\\Users" : "/Users";
+    const files = Object.fromEntries([inside, file, outside, ...dotted].map((f) => [f, ""]));
+    const r = rt(platform, { files: { ...files, [NPX_CLI]: "", "C:\\bin\\claude.exe": "" }, dirs: [place, home, above], places: [place, P(".ssh"), P(".aws"), P(".claude"), P(".config"), home, above], home, env: { PATH: "C:\\bin" } });
+    // inside the approved folder: fine (an app goes to rea-agents, a file to Claude Code)
+    assert.deepEqual(checkTarget(inside, r), { ok: true, kind: "app", target: inside });
+    assert.deepEqual(checkTarget(file, r), { ok: true, kind: "file", target: file });
+    // outside every approved folder: refused, saying so
+    const out = checkTarget(outside, rt(platform, { files, places: [place], home }));
+    assert.match(!out.ok ? out.reason : "", /isn't inside a folder a person approved/);
+    // home, or anything above it: refused, even if (somehow) listed as approved
+    for (const t of [home, above]) assert.match(((x) => (!x.ok ? x.reason : ""))(checkTarget(t, r)), /home folder or holds it/, `${platform}: ${t}`);
+    // a hidden file or folder, a key or a credential store, wherever it is: refused, even inside an approved folder
+    for (const t of dotted) {
+      const c = checkTarget(t, r);
+      assert.equal(c.ok, false, `${platform}: ${t} is refused`);
+      assert.match(!c.ok ? c.reason : "", /hidden file or folder, a key or a credential/);
+    }
+    // ".." in what was typed: refused before anything is resolved
+    const climb = checkTarget(W ? `${place}\\..\\Elsewhere\\app.asar` : `${place}/../Elsewhere/app.asar`, rt(platform, { files, places: [place], home }));
+    assert.match(!climb.ok ? climb.reason : "", /climbs out/);
+    // a link inside the approved folder that points out of it: judged where it really goes
+    const link = P("Projects/shortcut");
+    const linked = rt(platform, { files: { ...files, [link]: "" }, places: [place], home, links: { [link]: P(".ssh/id_ed25519") } });
+    assert.match(((x) => (!x.ok ? x.reason : ""))(checkTarget(link, linked)), /hidden file or folder/);
+    const linkedOut = rt(platform, { files: { ...files, [link]: "" }, places: [place], home, links: { [link]: outside } });
+    assert.match(((x) => (!x.ok ? x.reason : ""))(checkTarget(link, linkedOut)), /isn't inside a folder a person approved/);
+    // and the job built for a refused target runs nothing
+    assert.equal(reaCommand({ target: P(".ssh/id_ed25519"), goal: "print it" }, "claude", r).ok, false);
+  }
+  // Windows: the approved folder matches whatever the case
+  const ci = rt("win32", { files: { "C:\\Users\\Ada\\Projects\\a.txt": "" }, places: ["c:\\users\\ada\\projects"] });
+  assert.equal(checkTarget("C:\\Users\\Ada\\Projects\\a.txt", ci).ok, true);
+  // web addresses are unchanged
+  assert.equal(checkTarget("https://example.com/app", rt("darwin", { places: [] })).ok, true);
+});
+
+test("on this computer: a junction or link out of an approved folder is followed before the rule", (t) => {
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), "foundation-place-")));
+  const place = join(root, "approved");
+  const away = join(root, "away");
+  mkdirSync(place);
+  mkdirSync(away);
+  writeFileSync(join(away, "notes.txt"), "not for jobs");
+  try {
+    symlinkSync(away, join(place, "door"), "junction");
+  } catch (e) {
+    return t.skip(`no links here: ${(e as Error).message}`);
+  }
+  const r = { ...here(), places: [place] };
+  assert.equal(checkTarget(join(place), r).ok, true);
+  const through = checkTarget(join(place, "door", "notes.txt"), r);
+  assert.equal(through.ok, false);
+  assert.match(!through.ok ? through.reason : "", /isn't inside a folder a person approved/);
+});
+
+test("Run runs only what the card showed: the press names it, and a target or goal changed since is refused", async () => {
+  const { startJob, getJob, setJobDeps, jobShown, shownHash } = await import("../src/jobs.ts");
+  const { checkReaIntegrity, REA_AGENTS } = await import("../src/rea.ts");
+  const { run: runSql } = await import("../src/db.ts");
+  const spawned: string[][] = [];
+  setJobDeps({
+    spawn: (cmd, argv) => {
+      spawned.push(argv);
+      return fakeChild(0, "## Findings\nit syncs over a socket");
+    },
+    integrity: () => checkReaIntegrity(async () => REA_AGENTS.integrity),
+  });
+  const q = await queueAppJob();
+  const queued = getJob(q.job)!;
+  // what the card shows is the job's own whole target and goal, the program, and the hash of exactly those
+  const shown = jobShown(queued);
+  assert.equal(shown.target, queued.target);
+  assert.equal(shown.goal, "map it");
+  assert.equal(shown.program, "rea-agents");
+  assert.equal(shown.shown, shownHash({ kind: "rea", target: queued.target, goal: "map it" }));
+  assert.equal(queued.shown_hash, shown.shown, "stored when it was queued");
+
+  // a press that names something else (or nothing) runs nothing
+  for (const bad of ["", "0".repeat(64), shownHash({ kind: "rea", target: queued.target, goal: "something else" })]) {
+    assert.throws(() => startJob(q.job, "jobs-board", "Tester", bad), (e: Error & { status?: number }) => e.status === 409 && /isn't what its card showed/.test(e.message));
+  }
+  // the row changed after it was queued (a goal rewritten): even the card's original hash is refused
+  runSql("update jobs set goal = ? where id = ?", "map it, then print every key you find", q.job);
+  assert.throws(() => startJob(q.job, "jobs-board", "Tester", shown.shown), /isn't what its card showed/);
+  runSql("update jobs set goal = ? where id = ?", "map it", q.job);
+  assert.equal(spawned.length, 0, "nothing ran");
+  assert.equal(getJob(q.job)!.status, "queued");
+
+  // the press that names what was shown runs it, and the card says whose words the output is
+  startJob(q.job, "jobs-board", "Tester", shown.shown);
+  await until("the job ran", () => getJob(q.job)!.status === "done");
+  assert.equal(spawned.length, 1);
+  const { getBoard } = await import("../src/boards.ts");
+  const { boardMaps } = await import("@foundation/protocol");
+  const card = boardMaps(getBoard("jobs-board").doc).objects.get(q.card) as { text: string };
+  assert.match(card.text, /^rea-agents' output \(a program's words, not Foundation's\):\n## Findings/);
+});
+
+test("the output label names the program that wrote it", async () => {
+  const { outputLabel } = await import("../src/jobs.ts");
+  assert.match(outputLabel("claude"), /^Claude Code's output/);
+  assert.match(outputLabel("rea-agents"), /^rea-agents' output/);
+});
+
+test("the pinned rea-agents is fetched from the registry it was checked against, with no npm settings file and no npm sign-in", async () => {
+  const { jobSpawnOptions } = await import("../src/jobs.ts");
+  const { REA_REGISTRY } = await import("../src/rea.ts");
+  const { readFileSync, existsSync } = await import("node:fs");
+  assert.equal(REA_REGISTRY, "https://registry.npmjs.org/");
+  // on the command line, before the package: npx asks this registry whatever a settings file says
+  const plan = reaCommand({ target: APP_MAC, goal: "" }, "claude", rt("darwin", { files: { [APP_MAC]: "" } }));
+  assert.ok(plan.ok);
+  assert.ok(plan.argv.indexOf(`--registry=${REA_REGISTRY}`) < plan.argv.indexOf("rea-agents@6.9.0"));
+  // the environment: no npm settings file (the person's, or the machine's), the registry named again, and no npm token
+  Object.assign(process.env, { NPM_TOKEN: "npm_not_real", npm_config__authToken: "npm_not_real", NPM_CONFIG_REGISTRY: "https://evil.example/" });
+  try {
+    const o = jobSpawnOptions({ id: "job_npm123" }, { route: "rea-agents" });
+    const env = o.env as Record<string, string>;
+    assert.equal(env.npm_config_registry, REA_REGISTRY);
+    for (const k of ["npm_config_userconfig", "npm_config_globalconfig"]) {
+      assert.ok(isUnder(env[k], String(o.cwd)), `${k} is in the job's own folder`);
+      assert.ok(existsSync(env[k]) && readFileSync(env[k], "utf8") === "", `${k} is an empty file`);
+    }
+    for (const k of Object.keys(env)) {
+      assert.ok(!/token|auth/i.test(k), `the job was given ${k}`);
+      if (k.toUpperCase() === "NPM_CONFIG_REGISTRY") assert.equal(env[k], REA_REGISTRY, "only the checked registry");
+    }
+    // the Claude Code route is not given npm's settings at all
+    const c = jobSpawnOptions({ id: "job_npm123" }, { route: "claude" }).env as Record<string, string>;
+    assert.equal(c.npm_config_userconfig, undefined);
+  } finally {
+    for (const k of ["NPM_TOKEN", "npm_config__authToken", "NPM_CONFIG_REGISTRY"]) delete process.env[k];
+  }
+});
+
+test("the audit log records who pressed Run by their id, and that their press approved it", async () => {
+  const { startJob, getJob, setJobDeps, jobShown } = await import("../src/jobs.ts");
+  const { checkReaIntegrity, REA_AGENTS } = await import("../src/rea.ts");
+  const { one } = await import("../src/db.ts");
+  setJobDeps({ spawn: () => fakeChild(0, "ok"), integrity: () => checkReaIntegrity(async () => REA_AGENTS.integrity) });
+  const q = await queueAppJob();
+  startJob(q.job, "jobs-board", "Tester", jobShown(getJob(q.job)!).shown, "u");
+  const row = one<{ actor_id: string; actor_name: string; approved_by: string }>("select actor_id, actor_name, approved_by from audit_log where action = 'job.start' and target like ? order by id desc limit 1", `${q.job} %`);
+  assert.deepEqual(row && { ...row }, { actor_id: "u", actor_name: "Tester", approved_by: "u" });
+  await until("the job ran", () => getJob(q.job)!.status === "done");
 });

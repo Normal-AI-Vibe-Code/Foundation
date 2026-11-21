@@ -1,6 +1,7 @@
 import { keys } from "../lib/keys";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { SectionCouncilChip } from "../characters/SectionCouncilChip";
+import { LocalSectionChip } from "../panels/LocalView";
 import { openCouncil, toggleCouncil } from "../lib/councilOpen";
 import { Suspense, lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,6 +12,7 @@ import {
   Section,
   addNote,
   startMachine,
+  startVm,
   addTextBox,
   addSectionAdjacent,
   getState,
@@ -26,6 +28,8 @@ import {
   openLevel,
   subscribe,
   holdSectionFit,
+  pinnedScale,
+  setActiveObject,
   liveFit,
   moveSectionTo,
   objectPixelSize,
@@ -56,9 +60,11 @@ import { isHostable } from "@foundation/protocol";
 import { isPanel } from "../state/store";
 import { ingest, ingestDrop } from "../lib/ingest";
 import { SectionEmpty } from "../panels/SectionEmpty";
+import { SectionRewind } from "../panels/ReplayView";
 import { setUi } from "../state/ui";
 import { openContextMenu } from "./ContextMenu";
 import { sectionMenuItems } from "./sectionMenu";
+import { cardMenuItems } from "./cardMenu";
 import { countRender } from "../state/renders";
 import { askGrid, gridOfSection, makeSectionAGrid, openAsGrid, staysBehind, useGridAsk } from "../lib/subgrid";
 import { openGrid } from "../lib/grids";
@@ -190,6 +196,8 @@ export const SectionView = memo(function SectionView({
   const rect = sectionRestRect(grid, section);
   // a section that hosts an app is that app; any other cards sit over it
   const { host, objects } = view;
+  // a section of the This computer grid: the project its cards show
+  const localKey = objects.map((o) => (isPanel(o) && o.panel === "local" ? o.source : undefined)).find(Boolean);
   const hostable = !host && objects.length === 1 && isPanel(objects[0]) && isHostable(objects[0].panel) ? objects[0] : null;
   const lastLayout = useRef(new Map<string, { x: number; y: number }>());
   const layout = useMemo(
@@ -304,6 +312,22 @@ export const SectionView = memo(function SectionView({
     },
     [section.id, canRemove, host, hostable, worldPoint, section, isOpen, isGrid],
   );
+
+  // ----- right-click on a card: the card's own menu (components/cardMenu.ts) -----
+  // A table's cells answer with their own (rows, columns) and stop the event before it gets here
+  const onCardContextMenu = useCallback((e: React.MouseEvent, id: string) => {
+    const items = cardMenuItems(id);
+    if (!items) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveObject(id);
+    openContextMenu(e.clientX, e.clientY, items);
+  }, []);
+
+  // the card pinned to this section: it spans it, on the section's own paper, under the flow
+  const pinned = view.pinned;
+  const pinK = pinned ? pinnedScale(section, pinned) : 1;
+  const getPinnedScale = useCallback(() => getScale() * pinK, [getScale, pinK]);
 
   // ⤢ on a section makes it a grid of its own (lib/subgrid.ts): asked once, in place. One that stands for a grid opens it
   const gridAsk = useGridAsk(section.id);
@@ -431,6 +455,7 @@ export const SectionView = memo(function SectionView({
         {/* at rest, what a section is: somewhere agents build with you, and a grid of its own to open */}
         {!mini && (
           <span className="section-rest">
+            {localKey && <LocalSectionChip projectKey={localKey} />}
             <SectionCouncilChip sectionId={section.id} sectionName={section.name} />
             {(!host || childGrid) && (
               <button
@@ -468,6 +493,7 @@ export const SectionView = memo(function SectionView({
             {tool("Add a note", "▤", () => addNote(section.id))}
             {tool("Upload an image or video", "⇪", () => fileRef.current?.click(), "", keys("mod+U"))}
             {tool("Start a machine here: Linux on Kiri or Docker", "▣", () => startMachine(section.id))}
+            {tool("Add a full operating system here: WildOS VM", "▣", () => startVm(section.id))}
           </div>
           <div className="sec-group">
             {tool("Split into two columns", "◫", () => splitSection(section.id, "h"))}
@@ -578,12 +604,19 @@ export const SectionView = memo(function SectionView({
             onOpen={() => openLevel(section.id)}
           />
         )}
+        {pinned && "cols" in pinned && (
+          <div className="obj-slot pinned-slot" data-obj-id={pinned.id} data-pinned style={{ transform: `scale(${pinK})` }} onContextMenu={mini ? undefined : (e) => onCardContextMenu(e, pinned.id)}>
+            <TableView table={pinned} framePos={PIN_POS} isActive={view.activeObjectId === pinned.id} getScale={getPinnedScale} />
+          </div>
+        )}
         <div ref={contentRef} className="section-content">
+          {/* a clock card off "now": this section as it was, for this viewer only (ReplayView.tsx) */}
+          {!mini && <SectionRewind sectionId={section.id} />}
           {objects.map((o) => {
             const pos = layout.get(o.id) ?? { x: o.x, y: o.y };
             const isObjActive = view.activeObjectId === o.id;
             const slot = (child: React.ReactNode) => (
-              <div key={o.id} className="obj-slot" data-obj-id={o.id} style={{ left: CONTENT_PAD, top: CONTENT_PAD }}>
+              <div key={o.id} className="obj-slot" data-obj-id={o.id} style={{ left: CONTENT_PAD, top: CONTENT_PAD }} onContextMenu={mini ? undefined : (e) => onCardContextMenu(e, o.id)}>
                 {child}
               </div>
             );
@@ -615,7 +648,7 @@ export const SectionView = memo(function SectionView({
           })}
         </div>
 
-        {objects.length === 0 && !host && !isGrid && !mini && (
+        {objects.length === 0 && !host && !pinned && !isGrid && !mini && (
           <SectionEmpty
             name={section.name}
             onUpload={() => fileRef.current?.click()}
@@ -701,6 +734,9 @@ function MiniGrid({
     </div>
   );
 }
+
+/** a pinned card sits at its section body's own corner */
+const PIN_POS = { x: 0, y: 0 };
 
 const ADD_EDGES: Array<{ side: "right" | "below" | "left" | "above"; label: string }> = [
   { side: "right", label: "Add a section to the right" },

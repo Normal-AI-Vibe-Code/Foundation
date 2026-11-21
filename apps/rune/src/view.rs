@@ -11,7 +11,7 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use rune::{Cursor, Cx, Drag, El, Family, Image, ImageCache, Key, KeyEvent, Live, Phase, PointerPress, Shape, TextEdit, TextStyle, Tx, canvas, col, effect, el, row, text, text_input};
-use pulldown_cmark::{Event as MdEvent, HeadingLevel, Options, Parser, Tag};
+use pulldown_cmark::{Event as MdEvent, HeadingLevel, Options, Parser, Tag, TagEnd};
 use rune_kit::markdown::{Markdown, MarkdownStyle};
 
 use crate::bridge::{Event, emit};
@@ -617,54 +617,121 @@ fn block_margins(tag: &Tag) -> (f32, f32) {
     }
 }
 
+/// Where an http(s) address really goes: its host (and port), lower-cased, as the browser reads it
+/// (`utils/markdown.ts` `hostOf`). Whatever stands before an `@` is a name, not the host, and a
+/// backslash ends the host as a slash does. Empty for anything that isn't http(s).
+pub fn host_of(url: &str) -> String {
+    let url = url.trim();
+    let lower = url.to_ascii_lowercase();
+    let Some(rest) = lower.strip_prefix("https://").or_else(|| lower.strip_prefix("http://")) else { return String::new() };
+    let authority = rest.split(['/', '?', '#', '\\']).next().unwrap_or("");
+    let host = authority.rsplit('@').next().unwrap_or("");
+    if host.is_empty() || host.chars().any(|c| c.is_whitespace() || c == '`') { String::new() } else { host.to_owned() }
+}
+
+/// What a link wears after it: its real host, unless its own words already say it (the web note's
+/// `.md-link-host`: a link's words can say one place and go to another). In the code face, held to
+/// the link by no-break spaces so the two wrap together, as the web's do.
+fn host_mark(words: &str, url: &str) -> Option<String> {
+    let host = host_of(url);
+    if host.is_empty() {
+        return None;
+    }
+    let bare = host.strip_prefix("www.").unwrap_or(&host);
+    if words.to_lowercase().contains(bare) { None } else { Some(format!("\u{a0}`\u{2197}\u{a0}{host}`")) }
+}
+
+/// where a host mark "goes" when pressed: nowhere
+const HOST_MARK: &str = "host:";
+
+type Blocks = Rc<Vec<(String, f32, f32)>>;
+
 thread_local! {
-    /// a note's text, cut into its top-level blocks (their byte ranges and margins): kept between views
-    static BLOCKS: RefCell<HashMap<String, Rc<Vec<(Range<usize>, f32, f32)>>>> = RefCell::new(HashMap::new());
+    /// a note's text, cut into its top-level blocks (each one's markdown, with its links' hosts, and its margins): kept between views
+    static BLOCKS: RefCell<HashMap<String, Blocks>> = RefCell::new(HashMap::new());
 }
 
 /// The note's top-level blocks. Rune's kit spaces blocks for a reading page (28 above a heading,
 /// 12 below a paragraph); a note is tighter, so each block is rendered by the kit on its own and
-/// spaced here with the web note's margins, collapsing as CSS does.
-fn note_blocks(src: &str) -> Rc<Vec<(Range<usize>, f32, f32)>> {
+/// spaced here with the web note's margins, collapsing as CSS does. Each link is followed by where
+/// it really goes (`host_mark`).
+pub fn note_blocks(src: &str) -> Blocks {
     BLOCKS.with_borrow_mut(|cache| {
         if let Some(hit) = cache.get(src) {
             return hit.clone();
         }
         // the kit's own parser options, so a block here is a block there
         let opts = Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES | Options::ENABLE_TASKLISTS;
-        let mut blocks = Vec::new();
+        let mut blocks: Vec<(Range<usize>, f32, f32)> = Vec::new();
+        // after which byte a host goes, in order
+        let mut marks: Vec<(usize, String)> = Vec::new();
+        // the link being read: where it ends, its address, its words so far
+        let mut link: Option<(usize, String, String)> = None;
         let mut depth = 0usize;
         for (ev, range) in Parser::new_ext(src, opts).into_offset_iter() {
             match ev {
                 MdEvent::Start(tag) => {
                     if depth == 0 {
                         let (above, below) = block_margins(&tag);
-                        blocks.push((range, above, below));
+                        blocks.push((range.clone(), above, below));
+                    }
+                    if let Tag::Link { dest_url, .. } = &tag
+                        && link.is_none()
+                    {
+                        link = Some((range.end, dest_url.to_string(), String::new()));
                     }
                     depth += 1;
                 }
-                MdEvent::End(_) => depth = depth.saturating_sub(1),
+                MdEvent::End(end) => {
+                    depth = depth.saturating_sub(1);
+                    if end == TagEnd::Link
+                        && let Some((at, url, words)) = link.take()
+                        && let Some(mark) = host_mark(&words, &url)
+                    {
+                        marks.push((at, mark));
+                    }
+                }
+                MdEvent::Text(t) | MdEvent::Code(t) => {
+                    if let Some((_, _, words)) = link.as_mut() {
+                        words.push_str(&t);
+                    }
+                }
                 MdEvent::Rule if depth == 0 => blocks.push((range, 10.0, 10.0)),
                 _ => {}
             }
         }
+        let blocks = blocks.into_iter().map(|(range, above, below)| {
+            let mut text = String::with_capacity(range.len());
+            let mut from = range.start;
+            for (at, mark) in marks.iter().filter(|(at, _)| *at > range.start && *at <= range.end) {
+                text.push_str(&src[from..*at]);
+                text.push_str(mark);
+                from = *at;
+            }
+            text.push_str(&src[from..range.end]);
+            (text, above, below)
+        }).collect();
         if cache.len() > 512 {
             cache.clear();
         }
         let blocks = Rc::new(blocks);
-        cache.insert(src.to_owned(), blocks.clone());
+        cache.insert(src.to_owned(), Rc::clone(&blocks));
         blocks
     })
 }
 
 /// A note at rest: its markdown, rendered (headings, emphasis, lists, tasks, code, quotes, links,
-/// tables). A link says where it goes and the client opens it; a task's box doesn't tick here.
+/// tables). A link wears its real host and the client opens it; a task's box doesn't tick here.
 fn note(c: &Card, t: &Tokens) -> El {
     let style = note_style(t);
     let mut body = col().key("md").w_full();
     let mut below = None;
-    for (i, (range, above, next_below)) in note_blocks(&c.text).iter().enumerate() {
-        let block = Markdown::new(&c.text[range.clone()]).tasks_read_only().on_link(|_: &mut Board, url| emit(Event::Link { url })).render(&style);
+    for (i, (md, above, next_below)) in note_blocks(&c.text).iter().enumerate() {
+        let block = Markdown::new(md.as_str()).tasks_read_only()
+            // a link's host (`host_mark`) is quiet: dim, in the code face, no chip, and a press on it goes nowhere
+            .code_link(color(t.dim), |code| code.starts_with('\u{2197}').then(|| HOST_MARK.to_owned()))
+            .on_link(|_: &mut Board, url| if url != HOST_MARK { emit(Event::Link { url }) })
+            .render(&style);
         body = body.child(block.key(format!("b{i}")).mt(below.map_or(*above, |b: f32| b.max(*above))));
         below = Some(*next_below);
     }
@@ -751,4 +818,32 @@ fn table(c: &Card, t: &Tokens) -> El {
         sheet = sheet.child(slot.child(label));
     }
     sheet
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{host_of, note_blocks};
+
+    #[test]
+    fn a_host_is_where_the_browser_would_go() {
+        assert_eq!(host_of("https://Example.com/a?b#c"), "example.com");
+        assert_eq!(host_of("http://example.com:8080"), "example.com:8080");
+        // a name before @ is not the host, and a backslash ends it
+        assert_eq!(host_of("https://good.example@evil.example/x"), "evil.example");
+        assert_eq!(host_of("https://evil.example\\@good.example/"), "evil.example");
+        for not in ["javascript:alert(1)", "mailto:a@b.c", "/files/f_1", "ftp://x.y", "https://"] {
+            assert_eq!(host_of(not), "");
+        }
+    }
+
+    #[test]
+    fn a_link_wears_its_host_unless_its_words_say_it() {
+        let b = note_blocks("# T\n\nGo to [my bank](https://evil.example/login) or [www.good.example](https://www.good.example/x).\n\n- [one](http://a.example)\n");
+        assert_eq!(b.len(), 3);
+        assert_eq!(b[0].0.trim_end(), "# T");
+        assert_eq!(b[1].0.trim_end(), "Go to [my bank](https://evil.example/login)\u{a0}`\u{2197}\u{a0}evil.example` or [www.good.example](https://www.good.example/x).");
+        assert!(b[2].0.contains("[one](http://a.example)\u{a0}`\u{2197}\u{a0}a.example`"));
+        // an address inside code is not a link
+        assert_eq!(note_blocks("`[x](https://a.example)`")[0].0.trim_end(), "`[x](https://a.example)`");
+    }
 }

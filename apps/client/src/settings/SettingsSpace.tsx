@@ -13,6 +13,7 @@
  *  - **Services**, **Places**, **Renderer**, **Releases** — as before.
  */
 
+import { setWheelMode, wheelMode } from "../lib/wheel";
 import { useEffect, useState } from "react";
 import type { UserInfo } from "@foundation/protocol";
 import { chooseNight, nightChoice, onNight } from "@foundation/ui";
@@ -136,6 +137,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
   const ui = useUi();
   const [scheme, setScheme] = useState(nightChoice);
   const [start, setStart] = useState(startsOn);
+  const [wheel, setWheel] = useState(wheelMode());
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   // the orb in the top bar changes the scheme too
   useEffect(() => onNight(() => setScheme(nightChoice())), []);
@@ -184,6 +186,20 @@ function GeneralTab({ user }: { user: UserInfo }) {
             onChange={(v) => {
               setStartsOn(v);
               setStart(v);
+            }}
+          />
+        </Row>
+        <Row name="The wheel on a grid" detail={wheel === "zoom" ? "Zooms around the pointer. Drag the paper to move it; Shift+wheel slides it sideways. Two fingers on a trackpad still pan." : "Moves the paper. Ctrl+wheel (⌘ on a Mac) zooms."}>
+          <Seg
+            label="The wheel on a grid"
+            value={wheel}
+            options={[
+              { id: "zoom", label: "Zooms" },
+              { id: "pan", label: "Pans" },
+            ]}
+            onChange={(v) => {
+              setWheelMode(v);
+              setWheel(v);
             }}
           />
         </Row>

@@ -10,6 +10,7 @@ import { randomBytes } from "node:crypto";
 import type { Port } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
 import { discoverRepo } from "./github.ts";
+import { audit } from "./audit.ts";
 
 export interface AppRow {
   id: string;
@@ -49,6 +50,8 @@ export function saveApp(a: { name: string; url?: string; repo?: string; mcp?: st
       id, a.name, a.url ?? null, a.repo ?? null, a.mcp ?? null, a.description ?? null, JSON.stringify(a.ports ?? []), by, Date.now(),
     );
   }
+  // a saved app's address is one Foundation will dial (apptools.ts): who saved it is recorded (the route asks requirePerson)
+  audit({ actor_kind: "person", actor_id: by, board_id: null, door: "route", action: existing ? "app.update" : "app.save", target: `${id} ${a.name}`, provenance: "external", service: a.name, decision: "allowed", approved_by: by, result: "ok" });
   return one<AppRow>("select * from apps where id = ?", id)!;
 }
 

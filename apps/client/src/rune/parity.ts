@@ -57,7 +57,7 @@ export const PARITY: ParityGroup[] = [
   {
     name: "Cards",
     rows: [
-      { what: "Note at rest", status: "partial", note: "Markdown by Rune's kit, in the web note's sizes, tokens and margins. Bullets are smaller, a task's box doesn't tick, and code is IBM Plex Mono where the web's is the system's code face; tables and pictures in a note are unchecked" },
+      { what: "Note at rest", status: "partial", note: "Markdown by Rune's kit, in the web note's sizes, tokens and margins. Bullets are smaller, a task's box doesn't tick, and code is IBM Plex Mono where the web's is the system's code face; tables and pictures in a note are unchecked. A link wears its real host as the web's does, and a press opens it through Foundation's own link handling" },
       { what: "Note: writing", status: "partial", note: "Rune's own field (caret, selection, undo, IME, clipboard), each keystroke to the board; no markdown highlighting, no shared carets" },
       { what: "Image", status: "partial", note: "Bare, at rest; no hover icons, no invert on dark. One Rune can't fetch by address (a hosted server's file) stays the web's" },
       { what: "Move within its section", status: "partial", note: "Lifts and follows; no lean, and it can't be carried to another section or tab" },
@@ -85,6 +85,7 @@ export const PARITY: ParityGroup[] = [
   {
     name: "Everywhere",
     rows: [
+      { what: "Motion: what eases and what lands", status: "partial", note: "By rule (rune/transitions.ts): another board, the floor's panes and places from the store land at once; a let-go and a change of look ease. The web renderer settles a section's place over 0.5 s where Rune lands it, and eases the floor's edge" },
       { what: "Tokens: every colour from tokens.css, day and night", status: "partial", note: "Night fades on Rune's colour spring, not the tokens' 1.4 s mix" },
       { what: "Type: Hanken Grotesk", status: "partial", note: "Latin and Latin Extended, upright and italic. Cyrillic and Vietnamese fall back to Inter, and so does everything for the moment before the face arrives" },
       { what: "Speed", status: "partial", note: "On 300 notes the web renderer holds 60 fps and Rune doesn't: panning fitted, half its frames run long (p95 100 ms against 16.7). Level on a board of web content. Measured, not yet fixed" },

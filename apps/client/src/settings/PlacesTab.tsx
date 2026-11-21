@@ -9,6 +9,8 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { longDate } from "./releases";
+import { openGrid } from "../lib/grids";
+import { LocalConnect } from "../panels/LocalView";
 
 interface Place {
   id: string;
@@ -72,6 +74,7 @@ export function PlacesTab() {
         Folders on this computer that Foundation may read. Approve one and it can be browsed from the search pane (<b>This computer</b>) and dragged from onto a board, and agents can look in it and bring files in. Foundation reads only inside these
         folders, never writes to them, and leaves hidden files, keys and credentials where they are.
       </p>
+      <LocalConnect onOpen={openGrid} />
       {canApprove ? (
         <form className="places-form" onSubmit={approve}>
           <input className="places-field is-path" value={path} onChange={(e) => setPath(e.target.value)} placeholder={"The folder's full path, like C:\\Users\\you\\Documents\\Drawings"} aria-label="Folder path" spellCheck={false} />

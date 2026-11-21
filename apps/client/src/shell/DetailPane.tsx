@@ -8,6 +8,7 @@ import { useState } from "react";
 import { closeDetail, useDetail } from "../lib/detail";
 import { WIDTHS, setUi, useUi } from "../state/ui";
 import { FloorEdge } from "./FloorEdge";
+import { CardWiring } from "../components/CardWiring";
 
 export function DetailPane() {
   const ui = useUi();
@@ -57,6 +58,7 @@ export function DetailPane() {
             ))}
           </ol>
         )}
+        {d.kind === "ports" && <CardWiring id={d.id} />}
         {d.kind === "plan" && (
           <>
             {d.goal && <p className="detail-goal">{d.goal}</p>}

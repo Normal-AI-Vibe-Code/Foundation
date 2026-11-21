@@ -31,6 +31,7 @@ import { config } from "./config.ts";
 import { db, one, run } from "./db.ts";
 import { HttpError } from "./http.ts";
 import { callMcpTool, listMcpTools } from "./mcpclient.ts";
+import { guardEgress } from "./egressguard.ts";
 
 /** what Foundation asks Flowform for: reading, never writing */
 export const SCOPE = "search:read canvas:read";
@@ -269,6 +270,7 @@ const unauthorized = (e: unknown) => /\b401\b|unauthori[sz]ed/i.test((e as Error
 
 /** run something against Flowform's MCP as this person; an access token Flowform no longer takes is refreshed once */
 async function asPerson<T>(userId: string, fn: (headers: Record<string, string>) => Promise<T>): Promise<T> {
+  guardEgress("Flowform"); // an agent's call reaches Flowform only where a person allowed it (egress.ts)
   const go = async (force: boolean) => fn({ authorization: `Bearer ${await accessToken(userId, force)}` });
   try {
     return await go(false);

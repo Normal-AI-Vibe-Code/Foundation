@@ -1,0 +1,53 @@
+[
+    {
+        "client_msg_id": "cm-1772614800.000100",
+        "type": "message",
+        "text": "hey Ada, a private question about pay",
+        "user": "U02NOA",
+        "ts": "1772614800.000100",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/noa_72.png",
+            "first_name": "Noa",
+            "real_name": "Noa Kim",
+            "display_name": "noa",
+            "team": "T0FORM",
+            "name": "noa",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        }
+    },
+    {
+        "client_msg_id": "cm-1772614860.000101",
+        "type": "message",
+        "text": "sure, call me",
+        "user": "U01ADA",
+        "ts": "1772614860.000101",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "reactions": [
+            {
+                "name": "heart",
+                "users": [
+                    "U02NOA"
+                ],
+                "count": 1
+            }
+        ]
+    }
+]

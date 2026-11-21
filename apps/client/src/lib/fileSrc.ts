@@ -10,7 +10,8 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { BEARER, fetchFile, serverUrl } from "./api";
 
 // a character's pictures are the server's files too (/api/characters/:id/files/:role): with a bearer they need the header like any other
-const isServerFile = (src: string) => src.startsWith("/files/") || /^\/api\/characters\/[^/]+\/files\//.test(src);
+// so is the picture kept of a page card (/api/boards/:id/pages/:panel/picture)
+const isServerFile = (src: string) => src.startsWith("/files/") || /^\/api\/characters\/[^/]+\/files\//.test(src) || /^\/api\/boards\/[^/]+\/pages\/[^/]+\/picture/.test(src);
 
 /**
  * The URL an element should load `src` from. Anything that isn't a server

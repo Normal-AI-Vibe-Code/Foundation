@@ -11,7 +11,7 @@ import { api, ApiError, streamAgent } from "../lib/api";
 
 export interface FocusItem {
   id: string;
-  kind: "ask" | "mention" | "stage" | "file" | "changes" | "related";
+  kind: "ask" | "goal" | "mention" | "stage" | "file" | "changes" | "related";
   title: string;
   why: string;
   board: string;
@@ -32,6 +32,19 @@ export interface Goal {
   objectId: string | null;
   source: string;
 }
+/** one of the company's goals: the same for everyone; set by whoever can change the company board */
+export interface CompanyGoal {
+  id: string;
+  title: string;
+  detail: string;
+  /** who carries it ("" = everyone) */
+  owner: string;
+  status: "active" | "done" | "dropped";
+  progress: number;
+  dueAt: number | null;
+  board: string;
+  objectId: string | null;
+}
 export interface CompanyApp {
   id: string;
   name: string;
@@ -40,10 +53,13 @@ export interface CompanyApp {
   repo?: string | null;
   connector?: string;
   glyph: string;
+  /** whose sign-in stands in front of it: "hyperform" opens in Foundation as a page of the server's browser */
+  signIn?: "hyperform";
 }
 export interface TodayState {
   person: { name: string; email: string; first: string };
   profile: { title: string; team: string; focus: string };
+  company: { goals: CompanyGoal[]; canSet: boolean };
   goals: Goal[];
   focus: FocusItem[];
   apps: CompanyApp[];
@@ -105,6 +121,11 @@ export async function loadToday() {
 
 export async function saveGoal(g: Partial<Goal> & { id?: string }) {
   await api("/api/today/goals", { method: "POST", json: g });
+  await loadToday();
+}
+
+export async function saveCompanyGoal(g: Partial<CompanyGoal> & { id?: string }) {
+  await api("/api/today/company-goals", { method: "POST", json: { ...g, request_id: `cg_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}` } });
   await loadToday();
 }
 

@@ -7,7 +7,7 @@
 
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { CLIENT, settle, waitLive } from "./helpers";
+import { CLIENT, FRAME, settle, waitLive } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-15_one-interface";
 let ctx: BrowserContext;
@@ -97,7 +97,7 @@ test("the plan is a kanban card on a grid, the design language a grid of chapter
   await expect.poll(() => boardId(ada)).toBe("foundation-design");
   await waitLive(ada);
   const chapters = await state(ada, (s) => Object.values(s.panels).filter((p) => p.panel === "design").map((p) => p.source));
-  expect(chapters).toHaveLength(12);
+  expect(chapters).toHaveLength(13);
   expect(await state(ada, (s) => Object.values(s.sections).every((x) => !!x.host))).toBe(true);
   await expect(ada.locator("[data-design-chapter]").first()).toBeVisible({ timeout: 15_000 });
   await settle(ada, 2500);
@@ -162,8 +162,8 @@ test("a port under the pointer says what's on it and where it goes, and lights i
   const tool = async (name: string, data: object) => ((await (await ctx.request.post(`${CLIENT}/api/boards/${board}/tools/${name}`, { data })).json()) as { result: unknown }).result;
   await tool("add_section", { name: "Flow" });
   await tool("add_note", { section: "Flow", title: "Keep them cards", markdown: "so the apps are cards, not the section's app" });
-  await tool("add_panel", { section: "Flow", panel: "app", name: "Maker", url: `${CLIENT}/e2e/frame.html`, ports: [{ name: "parts", dir: "out", type: "bom" }] });
-  await tool("add_panel", { section: "Flow", panel: "app", name: "Taker", url: `${CLIENT}/e2e/frame.html`, ports: [{ name: "bom", dir: "in", type: "bom" }] });
+  await tool("add_panel", { section: "Flow", panel: "app", name: "Maker", url: FRAME, ports: [{ name: "parts", dir: "out", type: "bom" }] });
+  await tool("add_panel", { section: "Flow", panel: "app", name: "Taker", url: FRAME, ports: [{ name: "bom", dir: "in", type: "bom" }] });
   await ada.goto(`/?board=${board}&rafshim`);
   await waitLive(ada);
   const ids = await state(ada, (s) => Object.fromEntries(Object.values(s.panels).map((p) => [p.name, p.id])));

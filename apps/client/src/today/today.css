@@ -287,6 +287,20 @@
   grid-template-columns: 28px minmax(0, 1fr) 8px;
   align-items: center;
 }
+/* a linked app: the row opens it in your browser, the press beside it opens it in Foundation */
+.today-app-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+.today-app-open {
+  opacity: 0.55;
+}
+.today-app-pair:hover .today-app-open,
+.today-app-open:focus-visible {
+  opacity: 1;
+}
 .today-app[data-unlinked] {
   opacity: 0.62;
 }
@@ -984,49 +998,9 @@ a.today-chip:active {
   position: absolute;
   inset: 0;
 }
-/* the floor's panes over it: no fill of their own, white type, white hairlines */
-.shell.is-place-today :is(.top-bar, .floor-pane) {
-  --color-frost: var(--color-over-room);
-  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
-  --color-dim: color-mix(in srgb, var(--color-over-room) 62%, transparent);
-  --color-moss: color-mix(in srgb, var(--color-over-room) 74%, transparent);
-  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
-  --color-raise: color-mix(in srgb, var(--color-over-room) 16%, transparent);
-  --color-abyss: color-mix(in srgb, var(--color-over-room) 8%, transparent);
-  --color-void: transparent;
-  --color-line: color-mix(in srgb, var(--color-over-room) 24%, transparent);
-  --color-line-strong: color-mix(in srgb, var(--color-over-room) 44%, transparent);
-  --color-pulse: var(--color-over-room);
-  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
-  --color-agent: var(--color-over-room);
-  --color-agent-dim: color-mix(in srgb, var(--color-over-room) 18%, transparent);
-  --color-on-fill: var(--color-room-shade);
-  --shadow-sheet: none;
-  background: transparent;
-  color: var(--color-over-room);
-}
+/* the floor's panes over it wear the room theme (tokens.css, html[data-theme="room"]): clear, white type, white hairlines */
 .shell.is-place-today .side-pane .me-avatar {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-over-room) 60%, transparent);
 }
-.shell.is-place-today .server-switch-lift {
-  --color-frost: initial;
-}
 
-/* the window's own buttons (minimize, maximize, close) over Today: white like the bar, with a shadow under each so
-   they read over any part of the room (2026-11-17, Josh: "should contrast with the rest of the ui in the today mode").
-   They are drawn outside the shell (App.tsx), so they are reached through the page */
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn {
-  color: var(--color-over-room);
-  filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--color-room-shade) 70%, transparent));
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn:hover {
-  background: color-mix(in srgb, var(--color-over-room) 20%, transparent);
-  color: var(--color-over-room);
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn.is-close:hover {
-  background: var(--color-bad);
-  filter: none;
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo)::before {
-  background: color-mix(in srgb, var(--color-over-room) 34%, transparent);
-}
+/* the window's own buttons (minimize, maximize, close) wear the room theme too: tokens.css and shell.css */

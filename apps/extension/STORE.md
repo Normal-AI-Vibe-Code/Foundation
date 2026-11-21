@@ -11,16 +11,17 @@ What to paste into the Chrome Web Store Developer Dashboard, field by field. Val
 ## Store listing
 
 - **Name** (from the manifest): Foundation — Today
-- **Summary** (the manifest's description, 132 characters at most): Form Industries' first stop: each new tab opens Today — the Shiba, what wants you, your goals, and every company app.
+- **Summary** (the manifest's description, 132 characters at most): Form Industries' first stop: each new tab opens Today — the company's goals, what wants you, the Shiba, and every company app.
 - **Category:** Workflow & Planning
 - **Language:** English
 - **Description:**
 
   > Foundation is Form Industries' shared workspace. With this extension, every new tab opens your Today page:
   >
+  > • The company's goals: the few things everyone here is working towards, with progress and who carries each.
   > • The Shiba, Foundation's agent: ask it about your day, your goals and what to do next, by typing or by voice.
   > • What wants you: things your teammates asked of you, notes that tag you, design stages you own, new files and changes on your boards, and work that matches your job, each linking to its place.
-  > • Your goals, with progress, that you and the Shiba keep up to date.
+  > • Your own goals, with progress, that you and the Shiba keep up to date.
   > • Every company app (BomForm, FactoryForm, HyperForm, Vision, the Data Room and more), one click away.
   >
   > The toolbar button shows the same at a glance. You sign in to Foundation with your work Google account as usual; the extension keeps nothing but Foundation's address.
@@ -48,7 +49,7 @@ The store images are made by `STORE_ASSETS=1 npm run e2e -w @foundation/client -
 - **Remote code:** No. Every script is in the package; the pages allow only `script-src 'self'`.
 - **Data usage** (what to tick):
   - *Personally identifiable information:* yes, the person's name and work email, as shown by Foundation (read from the company's own server to show them; not collected by the extension).
-  - *Website content:* yes, the person's Today (tasks, goals) from the company's Foundation, shown in the popup.
+  - *Website content:* yes, the person's Today (tasks, their goals and the company's) from the company's Foundation, shown in the popup.
   - Everything else (health, financial, authentication, personal communications, location, web history, user activity): no.
   - Certify: not sold to third parties; not used or transferred for purposes unrelated to the single purpose; not used to determine creditworthiness or for lending.
 - **Privacy policy URL:** https://foundation.formindustries.com/#/privacy ⟨placeholder⟩. The reviewers must be able to open it from the internet; if Foundation isn't public, publish the same text (Foundation's `#/privacy`) on a public page.

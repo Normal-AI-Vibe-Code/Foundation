@@ -10,7 +10,9 @@ import { setUi } from "../state/ui";
 export type Detail =
   | { kind: "code"; title: string; lang: string; text: string }
   | { kind: "steps"; title: string; steps: Array<{ name: string; words: string; input?: unknown }> }
-  | { kind: "plan"; title: string; goal: string; steps: Array<{ text: string; status: "pending" | "active" | "done" }> };
+  | { kind: "plan"; title: string; goal: string; steps: Array<{ text: string; status: "pending" | "active" | "done" }> }
+  /** a card's inputs and outputs in full, live (the card menu: components/CardWiring.tsx) */
+  | { kind: "ports"; title: string; id: string };
 
 let detail: Detail | null = null;
 const subs = new Set<() => void>();

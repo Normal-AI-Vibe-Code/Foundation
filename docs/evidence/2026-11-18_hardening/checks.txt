@@ -1,0 +1,59 @@
+The hardening slice, 2026-11-18: what was checked, and how
+
+Commits (one per fix, on the worktree branch, on top of 28ec637):
+  1 d4dd64d  Uploaded files can't run as the app
+  2 a826359  Terminal and desktop input from a person only; desktop leave server-only
+  3 c895c8d  Only our own pages use the session cookie; Host must name the server
+  4 83141a1  Repo reads stay inside a repository's name (FOUNDATION_GITHUB_OWNERS)
+  5 8f04774  Local model lookup: a person, an exact loopback origin
+  6 b222ba4  Members-only boards: files, pictures, settings; roles and transcripts need a person
+  7 bdb4d68  Sending to Slack as a person needs the person; board/sync is a person's press
+  8 3802251  The board agent: --strict-mcp-config, --setting-sources ""
+
+Per fix (node --test, server):
+  1 hardening.test.ts (files part 4 tests); files-text, files-text-limits, places, carry,
+    characters, collections, flowformfiles, flowform-import, construct, flowform-live:
+    65 tests, 59 pass, 0 fail, 6 skipped (as before)
+  2 tickets.test.ts 11/11, machines-desktop + server-maps + machines (39/39 with tickets),
+    hardening.test.ts 6/6 at that commit
+  3 hardening.test.ts 11/11 at that commit; person-gate, app-tool-doors, desktop-server,
+    tickets, hostterm, clientversion, huddle, flowform, sessions: 58/58
+  4 github-repos.test.ts 4/4; construct, core 11/11
+  5 t3threads.test.ts 12/12, hardening 12/12, t3host 7/7
+  6 hardening.test.ts 17/17; construct, roles, collections, pipeline, person-gate,
+    app-tool-doors, spaces, subgrids, huddle, today: 63/63
+  7 hardening.test.ts 18/18; slacklive, today 13/13
+  8 agent-claude.test.ts 5/5, agent-claude-missing 1/1
+
+Full suites at 3802251 (no reruns were needed):
+  npm test -w @foundation/server   tests 343, pass 337, fail 0, skipped 6
+  npm test -w @foundation/client   tests 184, pass 183, fail 0, todo 1 (the repository-rules
+                                   todo, which was a todo before this slice)
+  npm run typecheck                clean (client and server)
+
+Security check (node scripts/check-security.mjs --summary):
+  190 problems (4 waived by the allowlist), the same list line for line as at 28ec637
+  (compared in a temporary checkout of 28ec637): nothing added by this slice. What it
+  reports is the child-process environment, an unpinned fetch and the decision documents.
+
+e2e (fix 3 needed a harness setting: the checks' own calls send Origin = their client,
+playwright.config.ts extraHTTPHeaders; Playwright's request context sends no Origin):
+  npx playwright test -c e2e/playwright.config.ts today.spec.ts -g "Today is home"
+  (own ports 167xx)   1 passed (16.9 s): signs in by dev login, a cookie POST /api/asks,
+  Today, the sync socket to a grid and back.
+  The screenshot that spec writes was put back as it was (not part of this slice).
+
+Browser pane (Chromium), for fix 1's PDF frame: a PDF served with the sandbox CSP header
+renders in Chromium's PDF viewer in a plain iframe; the same PDF in an iframe with a
+sandbox attribute (empty, or allow-scripts allow-popups) shows nothing. So the PDF frame
+keeps no sandbox attribute and relies on the header and the server's choice of type.
+
+Claude Code flags (fix 8) checked against the installed claude 2.1.288 --help:
+  --strict-mcp-config  "Only use MCP servers from --mcp-config, ignoring all other MCP
+                        configurations"
+  --setting-sources    "Comma-separated list of setting sources to load (user, project,
+                        local)"; passed as one empty argument (no sources).
+  No real turn was run (it spends the plan).
+
+Not checked: the packaged desktop app against the origin and host rules; real Slack; a
+real Claude Code turn with the new flags; the rest of the e2e suite.
