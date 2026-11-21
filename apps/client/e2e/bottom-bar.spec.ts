@@ -228,12 +228,10 @@ test("day and night reach the grid's paper, even when the browser has taken the 
 test("the tools: a terminal that runs a line for an admin, the change log, the files, a browser, and T3", async ({ browser }) => {
   // the member signs in first: dev sign-in is refused while the built-in terminal (a shell here) is open
   const m = await person(browser, "Ada Test", "ada@normal.dev");
-  // terminal: nothing runs until Start; then a line in, its answer and the folder back
+  // terminal: pressing its button starts the shell (no second press); then a line in, its answer and the folder back
   await admin.locator('[data-tool-open="terminal"]').click();
   const pane = admin.locator(".tool-pane");
   await expect(pane).toBeVisible();
-  await expect(pane.locator("[data-term-start]")).toBeVisible();
-  await pane.locator("[data-term-start]").click();
   const screen = pane.locator("[data-term-screen]");
   await expect(screen).toContainText("❯", { timeout: 15_000 });
   await screen.click();

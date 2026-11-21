@@ -23,6 +23,7 @@ const dataDir = mkdtempSync(join(tmpdir(), "foundation-test-"));
 process.env.FOUNDATION_DATA_DIR = dataDir;
 process.env.FOUNDATION_WORK_DIR = mkdtempSync(join(tmpdir(), "foundation-test-work-"));
 process.env.FOUNDATION_ADMIN_EMAILS = "boss@formindustries.com";
+process.env.FOUNDATION_BROWSER_HOME = "about:blank";
 for (const k of ["HYPERFORM_URL", "PARTFORM_URL", "BOMFORM_URL", "DEPLOYFORM_URL", "FACTORYFORM_APP_URL"]) delete process.env[k];
 
 const auth = await import("../src/auth.ts");

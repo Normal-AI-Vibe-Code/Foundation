@@ -92,7 +92,6 @@ test("the terminal's ink follows the place: white in the room, ink on a grid's p
   await toToday(admin);
   await settle(admin, 800);
   await admin.locator('[data-tool-open="terminal"]').click();
-  await admin.locator("[data-term-start]").click();
   await expect(admin.locator(".tool-term-screen .xterm-rows")).toBeVisible({ timeout: 20_000 });
   await settle(admin, 800);
   const fg = async () => luma(await rgb(admin, await css(admin, ".tool-term-screen .xterm-rows", "color")));

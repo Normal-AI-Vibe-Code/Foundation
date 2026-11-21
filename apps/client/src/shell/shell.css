@@ -4876,6 +4876,103 @@ body.is-viewer .port {
 .places a {
   color: var(--color-pulse);
 }
+/* approving, in the panel: each approved folder can be taken away (asked first), and a new one approved by its path */
+.places-item {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.places-item > .search-row {
+  flex: 1;
+  min-width: 0;
+}
+.places-remove {
+  position: absolute;
+  top: 10px;
+  right: var(--space-2);
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  cursor: pointer;
+  opacity: 0;
+}
+.places-item:hover .places-remove,
+.places-remove:focus-visible {
+  opacity: 1;
+}
+.places-remove:hover {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+/* the row's own end ("folder") steps left while the ✕ shows */
+.places-item:has(.places-remove):is(:hover, :focus-within) > .search-row {
+  padding-right: calc(var(--space-2) + 24px + var(--space-2));
+}
+.places-ask {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.places-ask span {
+  flex: 1 1 100%;
+}
+.places-ask .f-pill.is-danger {
+  color: var(--color-bad);
+}
+.places-approve {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+}
+.places-approve > .pane-eyebrow {
+  padding: 0;
+}
+.places-approve-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.places-approve-field {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1 var(--font-sans);
+  outline: 0;
+}
+.places-approve-field.is-path {
+  flex: none;
+  font-family: var(--font-code);
+  font-size: var(--text-12);
+}
+.places-approve-field:focus {
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.places-approve-field::placeholder {
+  color: var(--color-dim);
+}
+.places-approve-note {
+  margin: 0;
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
 
 /* ---------- Flowform, in the search pane (FlowformBrowser) ---------- */
 
