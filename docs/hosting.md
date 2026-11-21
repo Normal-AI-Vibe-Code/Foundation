@@ -34,7 +34,16 @@ agents (/mcp) ──────┘            │
 
 ## Start it
 
-On the machine, in a checkout of this repo:
+**On a cloud VM (Josh's choice, 2026-11-20).** Make an Ubuntu 24.04 VM (2 vCPU, 4 GB, 40 GB) with a fixed public address, then on it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/joshleong/Foundation/main/deploy/setup-vm.sh -o setup-vm.sh
+sudo bash setup-vm.sh
+```
+
+`deploy/setup-vm.sh` installs Docker from Ubuntu's packages, opens only SSH, 80 and 443 in the firewall, puts the repo in `/opt/foundation`, makes `deploy/.env` from the template (root only), and prints what is left. It starts nothing. Its syntax and package names were checked on 2026-11-20; **it has not been run on a real VM**.
+
+By hand, on any machine with Docker, in a checkout of this repo:
 
 ```sh
 cp deploy/foundation.env.example deploy/.env      # then fill it in (it is never committed)

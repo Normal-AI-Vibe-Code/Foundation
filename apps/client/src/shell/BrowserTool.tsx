@@ -38,7 +38,7 @@ function HostBrowser() {
       <div className="tool-browser btool">
         <div className="tool-empty">
           <b>A browser on the server's computer</b>
-          <p>A real browser (Edge or Chrome), run on the computer Foundation's server is on and shown here, so any site works, and what you sign in to stays signed in. Nothing runs until you start it, and it ends when you close this pane.</p>
+          <p>A real browser (Edge or Chrome), run on the computer Foundation's server is on and shown here, so any site works, and what you sign in to stays signed in. It opens on HyperForm, where our apps are. Nothing runs until you start it, and it ends when you close this pane.</p>
           {why && <p className="tool-note is-bad">{why}</p>}
           <button className="f-pill is-accent" onClick={() => void start()} disabled={state === "opening"} data-browser-start>
             {state === "opening" ? "Starting…" : "Start the browser"}
