@@ -78,3 +78,11 @@ in **Review**, not marked Done. Prior `.codex/config.toml` changes untouched.
 Repository hand-off: `plan:push` could not connect to GitHub. Commit/staging
 was denied creating `.git/index.lock`; this session has read-only repository
 metadata. The implementation remains in the working tree, uncommitted.
+
+## Host check, 2026-11-20/21
+
+`local-vms.spec.ts` ran on this Windows host from the source checkout (ports
+above 15000). The setup screens rendered and were captured day and night at
+three card widths: `setup-day.png`, `setup-night.png`. The real-QEMU test
+skipped: QEMU was not installed and no verified WildOS ISO was present.
+`apps/server/test/local-vms.test.ts` passed 7/7 against the stand-in QEMU.
