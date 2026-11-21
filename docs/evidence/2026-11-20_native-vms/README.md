@@ -83,6 +83,23 @@ metadata. The implementation remains in the working tree, uncommitted.
 
 `local-vms.spec.ts` ran on this Windows host from the source checkout (ports
 above 15000). The setup screens rendered and were captured day and night at
-three card widths: `setup-day.png`, `setup-night.png`. The real-QEMU test
-skipped: QEMU was not installed and no verified WildOS ISO was present.
-`apps/server/test/local-vms.test.ts` passed 7/7 against the stand-in QEMU.
+three card widths: `setup-day.png`, `setup-night.png`. The first run's
+real-QEMU test skipped: QEMU was not installed and no verified WildOS ISO was
+present. `apps/server/test/local-vms.test.ts` passed 7/7 against the stand-in
+QEMU.
+
+2026-11-21: QEMU 11.1.0 installed with winget
+(`SoftwareFreedomConservancy.QEMU`, installer hash verified by winget) at
+`C:\Program Files\qemu`. Its accelerators are `tcg` and `whpx`; a bare
+`-accel whpx` VM started and stayed up, so Windows Hypervisor Platform works.
+
+With `VM_E2E_ISO` set to a **blank ISO9660 test disc** (36 KB, no boot image,
+no OS; made for this check, not WildOS), both tests passed (18.7 s). The real
+test archived the disc, added the VM card, started QEMU under software
+emulation and streamed its real framebuffer through Foundation's socket:
+`real-iso-console.png` shows SeaBIOS in the card's Desktop. The guest command
+step matched the "no guest agent" answer, since there is no OS to run one.
+No QEMU process remained afterwards.
+
+Still to check: a verified WildOS ISO to the desktop, a WHPX start from the
+card, and `uname -a` through the guest agent after installing it in WildOS.
