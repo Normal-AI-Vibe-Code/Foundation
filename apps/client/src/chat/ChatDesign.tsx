@@ -22,6 +22,8 @@ import { ChatMark, IconSearch } from "./Icons";
 import "./chat.css";
 import { HuddleDemo } from "../panels/HuddleDesign";
 import { ReplayDemo } from "../panels/ReplayDesign";
+import { InboxDemo } from "./tabs/InboxDesign";
+import { SideMenuDemo } from "./SideMenuDesign";
 
 const NOW = Date.now();
 const MIN = 60_000;
@@ -191,8 +193,10 @@ export function ChatFormDemo() {
           </div>
         </div>
       </div>
+      <SideMenuDemo />
       <HuddleDemo />
       <ReplayDemo />
+      <InboxDemo />
     </div>
   );
 }

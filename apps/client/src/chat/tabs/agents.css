@@ -206,33 +206,59 @@
   padding: var(--space-3) var(--space-6);
   border-bottom: 1px solid var(--color-line);
 }
+/* 2026-11-20 (Josh: "not in a circle … render on the bottom line"): the agent stands behind the head's own
+   bottom hairline, chest up, the figure taller than its window and cut by it; no disc, no ring. The words
+   sit in the middle of the head beside it; the figure rises above them */
+.cfa-head:has(> .cfa-face) {
+  align-items: flex-end;
+  min-height: 96px;
+  padding-top: var(--space-2);
+  padding-bottom: 0;
+}
+.cfa-head:has(> .cfa-face) > :not(.cfa-face) {
+  align-self: center;
+}
 .cfa-face {
+  --figure-line: color-mix(in srgb, var(--color-agent) 62%, var(--color-line-strong));
   position: relative;
   flex: none;
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-pill);
+  width: 80px;
+  height: 88px;
   overflow: hidden;
-  background: var(--color-agent-dim);
-  box-shadow: 0 0 0 2px var(--color-agent);
-  display: grid;
-  place-items: center;
+  /* under the figure the hairline is the agent's */
+  box-shadow: 0 1px 0 var(--figure-line);
 }
-.cfa-face .avatar {
+/* the figure: a 3:4 picture (a portrait's, a mesh face's) framed from just over the head to the chest */
+.cfa-face-body {
+  position: absolute;
+  left: -22.5%;
+  width: 145%;
+  top: -16%;
+  height: 175%;
+}
+.cfa-face-body .avatar {
   width: 100%;
   height: 100%;
 }
-.cfa-face img.avatar {
-  object-fit: cover;
-  object-position: 50% 12%;
+.cfa-face-body img.avatar {
+  object-fit: contain;
+  object-position: 50% 0;
+  border-radius: 0;
 }
+.cfa-face.is-none .cfa-face-body {
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding-bottom: var(--space-3);
+}
+/* working: the line under it breathes in violet (the figure plays its own mood) */
 .cfa-face.is-thinking,
 .cfa-face.is-talking {
-  animation: cfa-ring 1.4s var(--ease-out-soft) infinite;
+  animation: cfa-line 1.4s var(--ease-out-soft) infinite;
 }
-@keyframes cfa-ring {
+@keyframes cfa-line {
   50% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-agent) 45%, transparent);
+    box-shadow: 0 1px 0 var(--color-agent), 0 3px 6px -3px var(--color-agent);
   }
 }
 @media (prefers-reduced-motion: reduce) {

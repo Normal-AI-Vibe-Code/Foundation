@@ -53,6 +53,7 @@ import {
 } from "./model";
 import { layoutTimeline, parseRest, restOf, type ChatRest } from "./logic";
 import { Sidebar } from "./Sidebar";
+import { setListFolded, usePins } from "./pins";
 import { ChannelHead } from "./ChannelHead";
 import { Timeline } from "./Timeline";
 import { Composer, type ComposerHandle } from "./Composer";
@@ -62,6 +63,8 @@ import { BrowseView, ChannelIntro, SearchView, ThreadsView, type ThreadRow } fro
 import { api } from "../lib/api";
 import { ChatMark, IconClose, IconSearch } from "./Icons";
 import type { MessageActions } from "./Message";
+import { SlackNudge } from "./tabs/SlackGuide";
+import { ServerNote } from "../server/ServerAbout";
 import "./chat.css";
 
 const AgentsTab = lazy(() => import("./tabs/Agents"));
@@ -117,7 +120,7 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
         </h1>
         <nav className="settings-tabs chat-tabs" aria-label="ChatForm">
           {CHAT_TABS.map((t) => (
-            <a key={t} href={`#/chat/${t}`} className={`settings-tab${place.tab === t ? " is-current" : ""}`} aria-current={place.tab === t ? "page" : undefined} data-chat-tab-link={t}>
+            <a key={t} href={`#/chat/${t}`} className={`settings-tab${place.tab === t ? " is-current" : ""}`} aria-current={place.tab === t ? "page" : undefined} data-chat-tab-link={t} onClick={t === "chat" ? () => setListFolded(false) : undefined}>
               {LABEL[t]}
             </a>
           ))}
@@ -146,6 +149,7 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
             </button>
           )}
         </label>
+        <ServerNote />
       </header>
       <div className="chat-body">
         {place.tab === "chat" ? (
@@ -156,6 +160,7 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
           </Suspense>
         )}
       </div>
+      <SlackNudge user={user} tab={place.tab} />
       <AnimatePresence>
         {switcher && (
           <QuickSwitcher
@@ -400,6 +405,8 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
   }, [route.view]);
 
   const pinned = useMemo(() => (tl?.messages ?? []).filter((m) => m.pinned && !m.deletedAt), [tl]);
+  // opened from the side menu: the conversation takes the whole area and the channel list folds away (chat/pins.ts)
+  const folded = usePins().listFolded && !!channel && !route.view;
   const fail = (x: Error) => toast(x.message, "bad");
 
   let main: React.ReactNode;
@@ -464,6 +471,7 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
           onLeave={() => void leaveChannel(channel.id).catch(fail)}
           onArchive={() => void archiveChannel(channel.id).then(() => toast(`#${channel.name} is archived`), fail)}
           onJoin={!viewer ? () => void joinChannel(channel.id).catch(fail) : undefined}
+          onUnfold={folded ? () => setListFolded(false) : undefined}
         />
         {s.status === "offline" && <div className="chat-offline">Offline · {s.why}</div>}
         {loadErr && !tl?.messages.length ? (
@@ -524,8 +532,8 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
   }
 
   return (
-    <div className={`chat-tab-chat${route.thread && channel ? " has-thread" : ""}`}>
-      <Sidebar channels={channels} meId={meId} online={s.online} current={channelId} view={route.view} onOpen={(id) => go({ channel: id })} onView={(v) => go({ view: v })} onNew={setDialog} typing={typingIn} />
+    <div className={`chat-tab-chat${route.thread && channel ? " has-thread" : ""}${folded ? " is-list-folded" : ""}`}>
+      {!folded && <Sidebar channels={channels} meId={meId} online={s.online} current={channelId} view={route.view} onOpen={(id) => go({ channel: id })} onView={(v) => go({ view: v })} onNew={setDialog} typing={typingIn} carry />}
       {main}
       <AnimatePresence>
         {route.thread && channel && (

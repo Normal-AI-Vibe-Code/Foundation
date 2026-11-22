@@ -485,6 +485,13 @@ export interface BridgeMessage {
   event?: { type?: string; channel?: string | { id?: string }; subtype?: string };
 }
 
+const eventListeners = new Set<(ev: NonNullable<BridgeMessage["event"]>) => void>();
+/** another listener for what the Slack app forwards (ChatForm's Slack bridge, bridges/slack.ts): the event's type and channel only */
+export function onSlackEvent(fn: (ev: NonNullable<BridgeMessage["event"]>) => void): () => void {
+  eventListeners.add(fn);
+  return () => eventListeners.delete(fn);
+}
+
 /** A word from the Slack app's process: it's there, and maybe something happened. */
 export function fromBridge(msg: BridgeMessage, opts: { loopback: boolean }): { ok: true; boards: number } {
   const wasLive = bridgeLive();
@@ -500,6 +507,13 @@ export function fromBridge(msg: BridgeMessage, opts: { loopback: boolean }): { o
     if (boards.length) soon("refresh", 200, () => void refreshChannels().then(() => boards.forEach((b) => void fill(b.board_id, sectionRows(b.board_id).filter((r) => slackSectionOf(getBoard(b.board_id).doc, r.section_id)?.state !== "waiting").map((r) => r.channel)))));
   }
   const ev = msg.type === "event" ? msg.event : undefined;
+  if (ev) for (const fn of eventListeners) {
+    try {
+      fn(ev);
+    } catch (e) {
+      console.error("slack: an event listener failed", e);
+    }
+  }
   if (ev?.type === "message") {
     const channel = typeof ev.channel === "string" ? ev.channel : ev.channel?.id;
     if (channel) for (const b of boards) if (sectionRow(b.board_id, channel)) soon(`sync:${b.board_id}:${channel}`, num("FOUNDATION_SLACK_EVENT_MS", 600), () => void syncChannel(b.board_id, channel).catch(() => {}));

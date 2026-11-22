@@ -163,7 +163,7 @@ export default function AgentsTab({ user, rest }: { user: UserInfo; rest: string
           <Part title="Talk to" count={list?.agents.length}>
             {(list?.agents ?? []).map((a) => (
               <button key={a.name} className={`cfa-row is-agent${a.state !== "ready" ? " is-off" : ""}`} onClick={() => talk(a)} data-agent-row={a.name} data-tip={a.why ? `${a.service} · ${a.why}` : a.service}>
-                <PartyAvatar party={agentPartyOf(a.name, a.via)} size={32} />
+                <PartyAvatar party={agentPartyOf(a.name, a.via)} size={28} />
                 <span className="cfa-row-words">
                   <span className="cfa-row-name">{a.name}</span>
                   <span className="cfa-row-sub">{a.host === "t3" ? "T3 · " : ""}{a.where === "this computer" ? "on this computer" : "in the cloud"}</span>
@@ -267,8 +267,9 @@ function AgentHead({ name, via, provider, where, line, mood, children }: { name:
   const { live, take } = useStage(Boolean(character));
   return (
     <header className="cfa-head" data-agent-head={name} data-mood={mood}>
-      <div className={`cfa-face is-${mood}`} onPointerEnter={take} aria-hidden>
-        {character ? <Avatar character={character} mood={mood} framing="bust" still={!live} /> : <span className="cfa-face-none">✦</span>}
+      {/* the agent stands behind the head's own bottom hairline, chest up: no disc, no ring (2026-11-20) */}
+      <div className={`cfa-face is-${mood}${character ? "" : " is-none"}`} onPointerEnter={take} aria-hidden data-agent-figure={name} data-figure-form="figure">
+        <div className="cfa-face-body">{character ? <Avatar character={character} mood={mood} framing="bust" still={!live} /> : <span className="cfa-face-none">✦</span>}</div>
       </div>
       <div className="cfa-head-words">
         <div className="cfa-head-name">

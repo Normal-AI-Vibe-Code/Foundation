@@ -8,6 +8,7 @@
 import { useEffect, useMemo } from "react";
 import { goChat } from "../lib/place";
 import { startChat, useChat } from "./model";
+import { setListFolded } from "./pins";
 import { chatTotals, totalsWords } from "./logic";
 import { ChatMark } from "./Icons";
 import "./chat.css";
@@ -17,7 +18,7 @@ export function ChatButton({ on }: { on: boolean }) {
   const s = useChat();
   const t = useMemo(() => chatTotals(Object.values(s.channels)), [s.channels]);
   const tip = s.status === "unavailable" ? "ChatForm: this server doesn't have it yet" : t.total ? `ChatForm: ${totalsWords(t)}` : "ChatForm: channels, direct messages, agents";
-  return <ChatButtonView on={on} total={t.total} tip={tip} words={totalsWords(t)} onClick={() => goChat()} />;
+  return <ChatButtonView on={on} total={t.total} tip={tip} words={totalsWords(t)} onClick={() => (setListFolded(false), goChat())} />;
 }
 
 export function ChatButtonView({ on, total, tip, words, onClick }: { on: boolean; total: number; tip: string; words: string; onClick?(): void }) {

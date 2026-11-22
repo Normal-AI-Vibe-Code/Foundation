@@ -90,6 +90,13 @@ function set(next: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) 
 
 export const getChat = () => state;
 
+const bridgeSubs = new Set<(b: Extract<ChatEvent, { t: "bridge" }>["bridge"]) => void>();
+/** hear a bridge's state as the server publishes it (`{t:"bridge"}` on the chat socket) */
+export function onBridge(fn: (b: Extract<ChatEvent, { t: "bridge" }>["bridge"]) => void): () => void {
+  bridgeSubs.add(fn);
+  return () => void bridgeSubs.delete(fn);
+}
+
 function subscribe(fn: () => void) {
   subs.add(fn);
   return () => void subs.delete(fn);
@@ -360,7 +367,9 @@ function apply(ev: ChatEvent) {
       if (ev.online.some((id) => !state.people.some((p) => p.id === id))) refreshList();
       return;
     case "bridge":
-      return; // the Inbox tab's
+      // the Inbox tab's (and the Slack guide's): they follow a bridge's state live
+      for (const fn of bridgeSubs) fn(ev.bridge);
+      return;
   }
 }
 

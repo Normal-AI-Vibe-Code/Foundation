@@ -12,7 +12,7 @@ import { channelMark } from "./Sidebar";
 import { PartyAvatar } from "./Avatar";
 import { Pop, PeoplePicker } from "./Pop";
 import { timeOf } from "./Message";
-import { IconBell, IconDownload, IconMore, IconPeople, IconPin, IconStar } from "./Icons";
+import { IconBell, IconSideList, IconDownload, IconMore, IconPeople, IconPin, IconStar } from "./Icons";
 import { isDirect } from "./logic";
 import { ChannelHuddleButton, ChannelHuddleDock } from "./HuddleCard";
 
@@ -34,6 +34,8 @@ export interface ChannelHeadProps {
   onLeave?(): void;
   onArchive?(): void;
   onJoin?(): void;
+  /** the channel list is folded away (opened from the side menu): a small control at the far left brings it back */
+  onUnfold?(): void;
 }
 
 export function ChannelHead(p: ChannelHeadProps) {
@@ -50,6 +52,11 @@ export function ChannelHead(p: ChannelHeadProps) {
   return (
     <>
     <header className="chat-head" data-channel-head={c.id}>
+      {p.onUnfold && (
+        <button className="chat-unfold" onClick={p.onUnfold} aria-label="Show the conversations" data-tip="Show the conversations" data-chat-unfold>
+          <IconSideList />
+        </button>
+      )}
       <span className="chat-head-mark">{channelMark(c, p.meId, p.online, 22)}</span>
       <h2 className="chat-head-name">{chatTitle(c, p.meId)}</h2>
       {c.archivedAt && <span className="chat-head-tag">Archived</span>}

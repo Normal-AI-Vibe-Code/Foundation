@@ -20,6 +20,7 @@ import { CallControls, CallStage, goToCard, PlacePicker, Portrait } from "../pan
 import { Transcript } from "../panels/HuddleView";
 import { getChat, useChat } from "./model";
 import { BringFileToGrid } from "./CadAttachment";
+import { AgentFigure } from "./AgentFigure";
 import "../panels/huddlecall.css";
 
 export interface HuddleCardProps {
@@ -162,8 +163,8 @@ export function HuddleCard({ message, live, onJoin, onReplay, brief: given }: Hu
             <Portrait key={n} name={n} size={28} />
           ))}
           {(live?.agents ?? []).map((a) => (
-            <span key={a} className="huddle-face" style={{ width: 28, height: 28, color: "var(--color-agent)" }} aria-label={`${a} (agent)`}>
-              ✦
+            <span key={a} className="hcard-agent" aria-label={`${a} (agent)`}>
+              <AgentFigure name={a} size={28} />
             </span>
           ))}
         </span>

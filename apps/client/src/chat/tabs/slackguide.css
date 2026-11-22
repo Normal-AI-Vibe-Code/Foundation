@@ -1,0 +1,599 @@
+/* The Inbox's cards (the one-line state, the forward button), the setup wizard, the Slack guide and its nudge
+   (tabs/Inbox.tsx, SetupWizard.tsx, SlackGuide.tsx). On tokens only. Service marks are monograms in ink. */
+
+/* ---------- a card's head: monogram, name, dot, one line, the forward button ---------- */
+.fx-mono {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 700 var(--text-12) / 1 var(--font-display);
+  letter-spacing: 0.02em;
+}
+.inbox-head h2 {
+  font-size: var(--text-13);
+  font-weight: 600;
+}
+.inbox-line {
+  min-width: 0;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.35 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+.inbox-forward {
+  display: inline-flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.inbox-server {
+  background: var(--color-panel);
+}
+.inbox-server code,
+.inbox-detail code {
+  font: 400 var(--text-12) / 1 var(--font-code);
+}
+.inbox-explain {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in srgb, var(--color-warn) 40%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-warn) 8%, transparent);
+}
+.inbox-explain .inbox-detail {
+  flex: 1 1 280px;
+}
+.inbox-inline-input {
+  width: 9em;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-paper);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1 var(--font-sans);
+}
+.inbox-inline-input:focus {
+  outline: none;
+  border-color: var(--color-pulse);
+}
+.inbox-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-pulse);
+  font: 500 var(--text-12) / 1.3 var(--font-sans);
+  cursor: pointer;
+}
+.inbox-link:hover {
+  text-decoration: underline;
+}
+.inbox-settings-body {
+  display: flex;
+  flex-direction: column;
+}
+@container (max-width: 560px) {
+  .inbox-head .chat-head-gap {
+    display: none;
+  }
+  .inbox-line {
+    flex-basis: 100%;
+  }
+}
+
+/* ---------- the sheet (wizard and guide) ---------- */
+.fx-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: color-mix(in srgb, var(--color-void) 62%, transparent);
+  animation: fx-in var(--dur-quick) var(--ease-out-soft);
+}
+@keyframes fx-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fx-rise {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+    scale: 0.98;
+  }
+}
+.fx-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+  color: var(--color-frost);
+  box-shadow: var(--shadow-pane);
+  animation: fx-rise var(--dur-pane) var(--ease-spring);
+  container-type: inline-size;
+}
+.fx-sheet.is-wide {
+  width: min(720px, 100%);
+}
+.fx-sheet.is-inline {
+  max-height: none;
+  box-shadow: var(--shadow-sheet);
+  animation: none;
+}
+.fx-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+.fx-head h2 {
+  flex: 1;
+  margin: 0;
+  font: 600 var(--text-16) / 1.25 var(--font-sans);
+}
+.fx-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+.fx-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-line-strong);
+}
+.fx-dot.is-done {
+  background: var(--color-mist);
+}
+.fx-dot.is-on {
+  width: 18px;
+  background: var(--color-pulse);
+}
+.fx-close {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: none;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.fx-close:hover {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  color: var(--color-frost);
+}
+.fx-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+.fx-eyebrow {
+  margin: 0;
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.fx-title {
+  margin: 0;
+  font: 600 var(--text-20) / 1.2 var(--font-display);
+  letter-spacing: -0.01em;
+}
+.fx-text {
+  margin: 0;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.55 var(--font-sans);
+}
+.fx-text code,
+.fx-ways code,
+.fx-quiet code {
+  font: 400 var(--text-12) / 1 var(--font-code);
+}
+.fx-quiet {
+  margin: 0;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  line-height: 1.45;
+}
+.fx-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.fx-copy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+}
+.fx-label {
+  flex: none;
+  color: var(--color-mist);
+  font: 600 var(--text-12) / 1.3 var(--font-sans);
+}
+.fx-label code {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-code);
+}
+.fx-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 var(--text-12) / 1.4 var(--font-code);
+}
+.fx-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.fx-input-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.fx-field input,
+.fx-body select {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.4 var(--font-code);
+  transition: border-color var(--dur-quick) var(--ease-out-soft);
+}
+.fx-body select {
+  flex: 0 1 auto;
+  font-family: var(--font-sans);
+}
+.fx-field input:focus,
+.fx-body select:focus {
+  outline: none;
+  border-color: var(--color-pulse);
+  box-shadow: 0 0 0 1px var(--color-pulse);
+}
+.fx-field input:disabled {
+  opacity: 0.6;
+}
+.fx-keystate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+.fx-keystate.is-set {
+  color: var(--color-mist);
+}
+.fx-said {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+}
+.fx-said.is-ok {
+  background: color-mix(in srgb, var(--color-ok) 10%, transparent);
+}
+.fx-said.is-bad {
+  background: color-mix(in srgb, var(--color-bad) 10%, transparent);
+  color: var(--color-frost);
+}
+.fx-address {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+}
+.fx-address.is-warn {
+  border-color: color-mix(in srgb, var(--color-warn) 45%, transparent);
+}
+.fx-ways {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+}
+.fx-ways b {
+  color: var(--color-frost);
+}
+.fx-ask {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-line);
+}
+.fx-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+.fx-gap {
+  flex: 1;
+}
+
+/* the guide's first screen: two paths */
+.fx-paths {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+.fx-path {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out-soft), border-color var(--dur-quick) var(--ease-out-soft);
+}
+.fx-path b {
+  color: var(--color-frost);
+  font: 600 var(--text-14) / 1.3 var(--font-sans);
+}
+.fx-path:hover {
+  border-color: var(--color-pulse);
+  transform: translateY(-1px);
+}
+.fx-path:active {
+  transform: scale(0.98);
+}
+
+/* the scopes ✓/✗ */
+.fx-scopes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-12);
+}
+.fx-scopes li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-dim);
+  flex-wrap: wrap;
+}
+.fx-scopes li.is-ok span:first-child {
+  color: var(--color-ok);
+}
+.fx-scopes li.is-bad span:first-child {
+  color: var(--color-bad);
+}
+.fx-scopes li.is-bad code {
+  color: var(--color-frost);
+}
+.fx-scopes code {
+  font: 400 var(--text-12) / 1.3 var(--font-code);
+  color: var(--color-mist);
+}
+.fx-status {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+}
+.fx-pre {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 400 var(--text-11) / 1.5 var(--font-code);
+  white-space: pre;
+}
+
+/* the channels table */
+.fx-table {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.fx-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  font-size: var(--text-13);
+}
+.fx-row:last-child {
+  border-bottom: 0;
+}
+.fx-cell {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fx-cell.is-act {
+  justify-self: end;
+}
+.fx-arrow {
+  color: var(--color-dim);
+  text-align: center;
+}
+.fx-ok {
+  color: var(--color-ok);
+  font-weight: 600;
+  font-size: var(--text-12);
+}
+@container (max-width: 520px) {
+  .fx-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: var(--space-2) var(--space-3);
+  }
+  .fx-arrow {
+    display: none;
+  }
+}
+
+/* the links, with their actions */
+.fx-links-list {
+  display: flex;
+  flex-direction: column;
+}
+.fx-link-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  min-height: 44px;
+  border-top: 1px solid var(--color-line);
+}
+.fx-link-row:first-child {
+  border-top: 0;
+}
+.fx-link-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+  cursor: pointer;
+}
+.fx-link-name:hover {
+  text-decoration: underline;
+}
+.fx-link-when {
+  flex: 1;
+  min-width: 120px;
+}
+.fx-link-acts {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+.fx-people {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-13);
+}
+.fx-people li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* ---------- the nudge: a quiet card in ChatForm's corner ---------- */
+.fx-nudge {
+  position: absolute;
+  right: var(--space-5);
+  /* above the composer: it never sits on the send button */
+  bottom: calc(var(--space-5) + 108px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: min(440px, calc(100% - 32px));
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-lift);
+  animation: fx-rise var(--dur-lift) var(--ease-spring);
+  flex-wrap: wrap;
+}
+.fx-nudge.is-still {
+  position: static;
+  animation: none;
+}
+.fx-nudge-text {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  color: var(--color-mist);
+}
+.fx-nudge-text b {
+  color: var(--color-frost);
+  font-size: var(--text-13);
+}
+.fx-nudge-acts {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-veil,
+  .fx-sheet,
+  .fx-nudge {
+    animation-duration: 1ms;
+  }
+}
+
+/* #/design: the Inbox's demo (InboxDesign.tsx) */
+.design-chat-inbox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+.design-chat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+.design-chat-inbox .inbox {
+  background: transparent;
+}
+.design-chat-inbox .design-sub {
+  margin: var(--space-4) 0 0;
+  color: var(--color-mist);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}

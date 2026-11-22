@@ -454,6 +454,11 @@ export const gmailAdapter: BridgeAdapter = {
     return { events: [] };
   },
 
+  async check() {
+    if (!clientId() || !clientSecret()) return { ok: false, said: `Still missing: ${[!clientId() && "the client id", !clientSecret() && "the client secret"].filter(Boolean).join(" and ")}.` };
+    return { ok: true, said: `Both are set. Google checks them the first time someone presses Connect your Gmail: its page opens, or names what's wrong. The redirect URI it must list is ${redirectUri()}.` };
+  },
+
   async send(portal, out) {
     const acct = accountFor(portal);
     const meta = portal.meta as { subject?: string; lastMessageId?: string; references?: string; replyTo?: string; cc?: string };
@@ -601,5 +606,5 @@ export const gmailAdapter: BridgeAdapter = {
 
 /** for the Inbox: the mailboxes connected (address, owner, label, last sync), never their tokens */
 export function gmailAccounts() {
-  return accounts().map((a) => ({ email: a.email, userId: a.user_id, label: a.label, labelFound: Boolean(a.label_id), lastSyncAt: a.last_sync_at, error: a.last_error }));
+  return accounts().map((a) => ({ email: a.email, userId: a.user_id, label: a.label, labelFound: Boolean(a.label_id), lastSyncAt: a.last_sync_at, connectedAt: a.connected_at, error: a.last_error }));
 }

@@ -69,8 +69,9 @@ import { addWorker, clusterStatus, deletePod, kubeconfig, layCluster, openPodCar
 import { addMachineStep, functionWiring, installExamples, readFunctions, runFunction } from "./machinefunctions.ts";
 import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
 import { startMachineIo, tryOut } from "./machineio.ts";
-import { prefsOf, setPref } from "./prefs.ts";
-import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
+import { listPrefsOf, prefsOf, setPref } from "./prefs.ts";
+import { cookieOriginRefusal, hostRefusal, originAllowed, originAllowedFor } from "./origins.ts";
+import { attachNetwork, networkFront, networkRoutes, networkUpgradeRefusal, signInDoors } from "./network.ts";
 import { gridOutline } from "./subgrids.ts";
 import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
@@ -92,7 +93,11 @@ r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
 // ---------- auth ----------
 
 // public: also what this server is, and the oldest client it still works with (clientversion.ts)
-r.get("/auth/config", () => ({ google: Boolean(config.google.clientId), devLogin: config.devLogin, flowform: { url: flowform.flowformUrl() }, version: SERVER_VERSION, minClient: minClient() || null }));
+// asked by a network name (network.ts), Google and dev sign-in can't finish there: an invitation can
+r.get("/auth/config", (req) => {
+  const doors = signInDoors(req);
+  return { google: doors.google, devLogin: doors.devLogin, flowform: doors.flowform ? { url: flowform.flowformUrl() } : undefined, invite: doors.invite, version: SERVER_VERSION, minClient: minClient() || null };
+});
 r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
 /** what on this computer has a shell now, if anything: dev sign-in waits until it stops (auth.ts devSignInRefusal) */
 function shellRunning(): string | false {
@@ -422,11 +427,16 @@ function requireFileBoard(user: UserInfo, fileId: string) {
   requireBoard(user, board);
 }
 
+// ---------- which server this is, and the office network (network.ts) ----------
+
+networkRoutes(r);
+
 // ---------- ChatForm (chat.ts) ----------
 
 chatRoutes(r);
 (await import("./chatimport.ts")).chatImportRoutes(r); // history: Slack export zip and API pull in, ChatForm export out
 (await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
+(await import("./bridges/slack.ts")).chatSlackRoutes(r); // the live Slack bridge: linked channels in step both ways, the token, the transition guide
 (await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
@@ -900,7 +910,7 @@ r.post("/api/boards/:id/machines/load", async (req) => {
 
 // ---------- a person's own preferences (prefs.ts) ----------
 
-r.get("/api/prefs", (req) => ({ prefs: prefsOf(requireUser(req).id) }));
+r.get("/api/prefs", (req) => ({ prefs: prefsOf(requireUser(req).id), lists: listPrefsOf(requireUser(req).id) }));
 // theirs to change, from their own browser: an agent's token reads them and can't set them
 r.post("/api/prefs", async (req) => {
   const u = requirePerson(req, "Changing your preferences");
@@ -1291,7 +1301,7 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
   // exactly the client (FOUNDATION_CLIENT_URL), the desktop app's window (http://localhost:31440, tauri://localhost)
   // and FOUNDATION_CORS_ORIGINS. The app on a hosted server sends a bearer (Authorization), so preflights are kept 10 minutes
   const origin = req.headers.origin;
-  if (origin && originAllowed(origin)) {
+  if (origin && originAllowedFor(origin, req)) {
     res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("access-control-allow-headers", "content-type, authorization, range, mcp-session-id, mcp-protocol-version");
@@ -1303,6 +1313,8 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     res.writeHead(204);
     return res.end();
   }
+  // the page on network names, and the doors that open only at this computer (network.ts)
+  if (networkFront(req, res, url.pathname)) return;
   // a machine's web port, relayed for anyone signed in here who can see its board (machineshare.ts): a viewer
   // may read it, writing to it (any other method) needs someone who can edit
   if (url.pathname.startsWith("/m/")) {
@@ -1352,6 +1364,7 @@ server.on("upgrade", (req, socket, head) => {
     socket.destroy();
     return;
   }
+  if (networkUpgradeRefusal(req, socket)) return; // this computer's sockets, and who is connected (network.ts)
   handleUpgrade(wss, req, socket, head);
 });
 
@@ -1405,6 +1418,7 @@ server.on("error", (e: NodeJS.ErrnoException) => {
 });
 
 server.listen(config.port, config.host, () => {
+  attachNetwork(server); // on your network: its listeners open now if a person left it on (network.ts)
   const rt = runtimes();
   console.log(`\n  Foundation server  ${config.publicUrl}`);
   console.log(`  data               ${config.dataDir}`);

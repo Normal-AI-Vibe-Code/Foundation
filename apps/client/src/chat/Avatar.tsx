@@ -1,6 +1,7 @@
 /**
- * Who spoke, as a face. A person: their initials on their own colour. An agent: the character it wears
- * (Settings → Avatars; the roster), ringed in violet, or the ✦ on the agent wash when it wears none. A
+ * Who spoke, as a face. A person: their initials on their own colour, round. An agent: the character it
+ * wears (Settings → Avatars; the roster) standing behind a violet baseline, chest up, no disc and no ring,
+ * or the ✦ on that line when it wears none; under 20 px the ✦ on the agent tint (AgentFigure.tsx). A
  * ghost (someone on the far side of a bridge): their picture when the service gave one, else the
  * service's monogram on the panel well. A presence dot when it's asked for.
  */
@@ -10,6 +11,7 @@ import { useFileSrc } from "../lib/fileSrc";
 import { initials } from "../shell/Presence";
 import { stillRole } from "../characters/Avatar";
 import { characterFilePath, readyCharacters, useRoster } from "../characters/roster";
+import { AgentFigure } from "./AgentFigure";
 
 export const SERVICE_NAME: Record<ChatService, string> = { slack: "Slack", gmail: "Mail", whatsapp: "WhatsApp", instagram: "Instagram", wechat: "WeChat" };
 const MONOGRAM: Record<ChatService, string> = { slack: "S", gmail: "M", whatsapp: "W", instagram: "Ig", wechat: "Wc" };
@@ -26,7 +28,7 @@ export function useAgentFace(name: string): string | undefined {
 export function PartyAvatar({ party, size = 32, online }: { party: ChatParty; size?: number; online?: boolean }) {
   const dot = online !== undefined && <span className={`chat-presence${online ? " is-on" : ""}`} aria-label={online ? "online" : "away"} />;
   const style = { width: size, height: size, fontSize: size >= 28 ? 12 : 10 };
-  if (party.kind === "agent") return <AgentFace party={party} size={size} dot={dot} />;
+  if (party.kind === "agent") return <AgentFace party={party} size={size} online={online} />;
   if (party.kind === "ghost") return <GhostFace party={party} style={style} dot={dot} />;
   if (party.kind === "system") {
     return (
@@ -43,14 +45,9 @@ export function PartyAvatar({ party, size = 32, online }: { party: ChatParty; si
   );
 }
 
-function AgentFace({ party, size, dot }: { party: ChatParty; size: number; dot: React.ReactNode }) {
-  const src = useAgentFace(party.name);
-  return (
-    <span className={`chat-avatar is-agent${src ? " has-face" : ""}`} style={{ width: size, height: size }} aria-hidden>
-      {src ? <img src={src} alt="" draggable={false} /> : <span className="chat-agent-spark">✦</span>}
-      {dot}
-    </span>
-  );
+/** an agent is never a disc (2026-11-20): its figure cut by a baseline, or under 20 px the ✦ on its tint (AgentFigure.tsx) */
+function AgentFace({ party, size, online }: { party: ChatParty; size: number; online?: boolean }) {
+  return <AgentFigure name={party.name} size={size} online={online} className="chat-avatar-agent" />;
 }
 
 function GhostFace({ party, style, dot }: { party: ChatParty; style: React.CSSProperties; dot: React.ReactNode }) {

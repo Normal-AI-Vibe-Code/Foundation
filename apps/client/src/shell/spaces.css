@@ -709,6 +709,14 @@
   /* 2026-11-17: outlined, so the pill reads as a control and its left edge is the line the rows start on */
   box-shadow: inset 0 0 0 1px var(--color-line-strong);
 }
+/* three segments since 2026-11-20 (Recent · All Grids · Chats): each as wide as its word, the rest shared, so the
+   words stay whole at the menu's narrowest (220) */
+.side-pane .pane-pick .pane-seg-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 2px;
+  white-space: nowrap;
+}
 .pane-new {
   flex: none;
   width: 28px;

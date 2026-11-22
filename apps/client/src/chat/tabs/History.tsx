@@ -26,7 +26,7 @@ interface Progress {
   skipped: Array<{ why: string; count: number }>;
 }
 type JobState = "running" | "done" | "failed" | "interrupted";
-interface Job {
+export interface Job {
   id: string;
   kind: "export" | "api";
   dryRun: boolean;
@@ -37,7 +37,7 @@ interface Job {
   progress: Progress;
   error?: string;
 }
-interface Report {
+export interface Report {
   kind: "export" | "api";
   dryRun: boolean;
   source: string;
@@ -108,7 +108,8 @@ async function download(path: string, fallback: string) {
   setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-export default function History({ user }: { user: UserInfo }) {
+/** bringing a Slack export in, as a hook: the upload, the rehearsal, Bring it in, the job and its report. The History panel and the Slack guide (SlackGuide.tsx) both use it */
+export function useSlackImport() {
   const [ov, setOv] = useState<Overview | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [upload, setUpload] = useState<Upload | null>(null);
@@ -116,10 +117,7 @@ export default function History({ user }: { user: UserInfo }) {
   const [job, setJob] = useState<Job | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const [withFiles, setWithFiles] = useState(true);
-  const [exportFiles, setExportFiles] = useState(false);
-  const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
-  const pick = useRef<HTMLInputElement>(null);
   const poll = useRef<number | null>(null);
 
   const load = useCallback(() => api<Overview>("/api/chat/history").then(setOv, (e: Error) => setErr(e.message)), []);
@@ -197,17 +195,71 @@ export default function History({ user }: { user: UserInfo }) {
     setReport(null);
     follow(j.id);
   };
-
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    setOver(false);
-    void take(e.dataTransfer.files[0]);
-  };
-
   const can = Boolean(ov?.canImport);
   const running = job?.state === "running";
   const locked = !can || running || busy || sending !== null;
-  const dryDone = job && job.dryRun && job.kind === "export" && job.state === "done" && upload && report;
+  const dryDone = Boolean(job && job.dryRun && job.kind === "export" && job.state === "done" && upload && report);
+  return { ov, err, setErr, upload, sending, job, report, withFiles, setWithFiles, busy, take, bringIn, topUp, open, can, running, locked, dryDone, load };
+}
+export type SlackImport = ReturnType<typeof useSlackImport>;
+
+/** the dashed place the export zip is dropped (or picked) */
+export function ExportDrop({ imp }: { imp: SlackImport }) {
+  const [over, setOver] = useState(false);
+  const pick = useRef<HTMLInputElement>(null);
+  const { locked, can, sending, upload } = imp;
+  const onDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setOver(false);
+    void imp.take(e.dataTransfer.files[0]);
+  };
+  return (
+    <div
+      className={`hist-drop ${over ? "is-over" : ""} ${!can ? "is-locked" : ""}`}
+      onDragOver={(e) => {
+        if (locked) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => (locked ? e.preventDefault() : onDrop(e))}
+      aria-disabled={locked}
+      data-export-drop
+    >
+      {sending !== null ? (
+        <div className="hist-sending">
+          <span>Sending the export… {Math.round(sending * 100)}%</span>
+          <div className="hist-bar" role="progressbar" aria-valuenow={Math.round(sending * 100)} aria-valuemin={0} aria-valuemax={100}>
+            <span style={{ width: `${sending * 100}%` }} />
+          </div>
+        </div>
+      ) : (
+        <>
+          <span className="hist-drop-title">{upload ? `${upload.name} · ${size(upload.size)}` : "Drop Slack's export zip here"}</span>
+          <button className="f-pill" disabled={locked} onClick={() => pick.current?.click()}>
+            {upload ? "Choose another…" : "Choose the zip…"}
+          </button>
+        </>
+      )}
+      <input ref={pick} type="file" accept=".zip,application/zip" hidden onChange={(e) => void imp.take(e.target.files?.[0] ?? undefined)} />
+    </div>
+  );
+}
+
+/** Bring files too */
+export function FilesCheck({ imp }: { imp: SlackImport }) {
+  return (
+    <label className="hist-check">
+      <input type="checkbox" checked={imp.withFiles} disabled={!imp.can} onChange={(e) => imp.setWithFiles(e.target.checked)} data-import-files />
+      Bring files too (Slack's links in an export expire after a while; a file that won't come is kept as a named placeholder with its Slack link)
+    </label>
+  );
+}
+
+export default function History({ user }: { user: UserInfo }) {
+  const imp = useSlackImport();
+  const { ov, err, job, report, locked, can, dryDone } = imp;
+  const [exportFiles, setExportFiles] = useState(false);
 
   return (
     <div className="hist" data-history>
@@ -231,47 +283,16 @@ export default function History({ user }: { user: UserInfo }) {
 
       {ov && (
         <>
-          <div
-            className={`hist-drop ${over ? "is-over" : ""} ${!can ? "is-locked" : ""}`}
-            onDragOver={(e) => {
-              if (locked) return;
-              e.preventDefault();
-              setOver(true);
-            }}
-            onDragLeave={() => setOver(false)}
-            onDrop={(e) => (locked ? e.preventDefault() : onDrop(e))}
-            aria-disabled={locked}
-          >
-            {sending !== null ? (
-              <div className="hist-sending">
-                <span>Sending the export… {Math.round(sending * 100)}%</span>
-                <div className="hist-bar" role="progressbar" aria-valuenow={Math.round(sending * 100)} aria-valuemin={0} aria-valuemax={100}>
-                  <span style={{ width: `${sending * 100}%` }} />
-                </div>
-              </div>
-            ) : (
-              <>
-                <span className="hist-drop-title">{upload ? `${upload.name} · ${size(upload.size)}` : "Drop Slack's export zip here"}</span>
-                <button className="f-pill" disabled={locked} onClick={() => pick.current?.click()}>
-                  {upload ? "Choose another…" : "Choose the zip…"}
-                </button>
-              </>
-            )}
-            <input ref={pick} type="file" accept=".zip,application/zip" hidden onChange={(e) => void take(e.target.files?.[0] ?? undefined)} />
-          </div>
+          <ExportDrop imp={imp} />
           {!can && <p className="hist-why">{ov.why ?? "Only an admin brings in Slack history."}</p>}
-
-          <label className="hist-check">
-            <input type="checkbox" checked={withFiles} disabled={!can} onChange={(e) => setWithFiles(e.target.checked)} />
-            Bring files too (Slack's links in an export expire after a while; a file that won't come is kept as a named placeholder with its Slack link)
-          </label>
+          <FilesCheck imp={imp} />
 
           {job && <JobView job={job} />}
-          {report && <ReportView report={report} jobId={job?.id ?? ""} onError={setErr} />}
+          {report && <ReportView report={report} jobId={job?.id ?? ""} onError={imp.setErr} />}
 
           {dryDone && (
             <div className="inbox-acts">
-              <button className="f-pill is-primary" disabled={locked} onClick={() => void bringIn()}>
+              <button className="f-pill is-primary" disabled={locked} onClick={() => void imp.bringIn()}>
                 Bring it in
               </button>
               <span className="inbox-quiet">Writes the messages above into ChatForm, in their authors' names.</span>
@@ -286,17 +307,17 @@ export default function History({ user }: { user: UserInfo }) {
                   The server has a Slack {ov.token.kind} token. It can bring in what the export left out (direct messages and private channels {ov.token.kind === "bot" ? "the Foundation app was invited to" : "you're in"}) and anything said since. Nothing is doubled.
                 </p>
                 <div className="inbox-acts">
-                  <button className="f-pill" disabled={locked} onClick={() => void topUp(true)}>
+                  <button className="f-pill" disabled={locked} onClick={() => void imp.topUp(true)}>
                     See what's new
                   </button>
-                  <button className="f-pill" disabled={locked} onClick={() => void topUp(false)}>
+                  <button className="f-pill" disabled={locked} onClick={() => void imp.topUp(false)}>
                     Top up now
                   </button>
                 </div>
               </>
             ) : (
               <p className="inbox-detail">
-                No Slack token on this server, so only an export comes in. To bring in direct messages and private channels, set <code>SLACK_USER_TOKEN</code> (a user token with the history, users and files read scopes) in the server's <code>.env</code> and restart it.
+                No Slack token on this server, so only an export comes in. To bring in direct messages and private channels, an admin pastes the Slack app's bot token in the Slack guide (or sets <code>SLACK_USER_TOKEN</code>, a user token with the history, users and files read scopes, in the server's <code>.env</code>).
               </p>
             )}
             {!can && ov.token.configured && <p className="hist-why">{ov.why ?? "Only an admin tops up from Slack."}</p>}
@@ -306,7 +327,7 @@ export default function History({ user }: { user: UserInfo }) {
             <div className="hist-jobs" aria-label="Earlier imports">
               <h3>Earlier</h3>
               {ov.jobs.map((j) => (
-                <button key={j.id} className={`hist-job ${job?.id === j.id ? "is-on" : ""}`} onClick={() => open(j)}>
+                <button key={j.id} className={`hist-job ${job?.id === j.id ? "is-on" : ""}`} onClick={() => imp.open(j)}>
                   <span className={`f-dot ${j.state === "done" ? "is-ok" : j.state === "running" ? "is-warn is-live" : j.state === "failed" ? "is-bad" : "is-warn"}`} />
                   <span className="hist-job-what">
                     {j.kind === "api" ? "Slack API" : j.source}
@@ -325,7 +346,7 @@ export default function History({ user }: { user: UserInfo }) {
         <h3>Download everything</h3>
         <p className="inbox-detail">Every conversation you can see in ChatForm, {user.name.split(" ")[0]}, as one zip: each one as JSON and as Markdown, with who's who.</p>
         <div className="inbox-acts">
-          <button className="f-pill" onClick={() => void download(`/api/chat/history/export${exportFiles ? "?files=1" : ""}`, "chatform.zip").catch((e: Error) => setErr(e.message))}>
+          <button className="f-pill" onClick={() => void download(`/api/chat/history/export${exportFiles ? "?files=1" : ""}`, "chatform.zip").catch((e: Error) => imp.setErr(e.message))}>
             Download everything
           </button>
           <label className="hist-check is-inline">
@@ -338,7 +359,7 @@ export default function History({ user }: { user: UserInfo }) {
   );
 }
 
-function JobView({ job }: { job: Job }) {
+export function JobView({ job }: { job: Job }) {
   const p = job.progress;
   const frac = p.total ? p.done / p.total : 0;
   const what = job.dryRun ? "Reading the export" : job.kind === "api" ? "Bringing in from Slack" : "Bringing it in";
@@ -366,7 +387,7 @@ function JobView({ job }: { job: Job }) {
   );
 }
 
-function ReportView({ report: r, jobId, onError }: { report: Report; jobId: string; onError: (e: string) => void }) {
+export function ReportView({ report: r, jobId, onError }: { report: Report; jobId: string; onError: (e: string) => void }) {
   const t = r.totals;
   return (
     <div className="hist-report">

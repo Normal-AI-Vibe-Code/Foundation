@@ -38,8 +38,8 @@ export interface UiState {
   paneW: number;
   /** "spaces": every space, by recent or by project folder · "info": the open space's own people and activity */
   paneView: "spaces" | "info";
-  /** how the side menu lists grids: by when this device last opened each, or all of them as a tree (grids inside grids) */
-  spacesView: "recent" | "all";
+  /** how the side menu lists grids: by when this device last opened each, or all of them as a tree (grids inside grids); or the ChatForm conversations kept there (chat/SideChats.tsx) */
+  spacesView: "recent" | "all" | "chats";
   /** a strip the open place lays under the top bar (Settings' tabs over a grid): the grid frames itself below it */
   strip: number;
   /** the grid's council, open as a band under the top bar (characters/Council.tsx): the grid starts below it */
@@ -125,7 +125,7 @@ let ui: UiState = {
   pane: s0.pane ?? true,
   paneW: clampW(s0.paneW, WIDTHS.pane),
   paneView: s0.paneView === "info" ? "info" : "spaces",
-  spacesView: s0.spacesView === "recent" ? "recent" : "all",
+  spacesView: s0.spacesView === "recent" ? "recent" : s0.spacesView === "chats" ? "chats" : "all",
   strip: 0,
   councilH: 0,
   councilW: 0,

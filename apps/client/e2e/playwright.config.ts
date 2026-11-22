@@ -74,6 +74,12 @@ export default defineConfig({
         SLACK_API_BASE: `http://127.0.0.1:${SLACK_PORT}`,
         SLACK_USER_TOKEN: "xoxp-standin",
         SLACK_BOT_TOKEN: "xoxb-standin",
+        // ChatForm's Slack bridge reads linked channels this often here (chatform-slack.spec.ts), and Google's consent
+        // and Gmail are the stand-in's too: a check never reaches the real ones (the OAuth client is set in the wizard)
+        FOUNDATION_SLACK_BRIDGE_POLL_MS: "1200",
+        GOOGLE_ACCOUNTS_BASE: `http://127.0.0.1:${SLACK_PORT}/accounts`,
+        GOOGLE_OAUTH_BASE: `http://127.0.0.1:${SLACK_PORT}/oauth`,
+        GMAIL_API_BASE: `http://127.0.0.1:${SLACK_PORT}/google`,
         MESHY_API_BASE: `http://127.0.0.1:${MESHY_PORT}`,
         MESHY_API_KEY: "msy-standin",
         // the checks make their own characters: no starter set (E2E_STARTER names a folder to bring one in)

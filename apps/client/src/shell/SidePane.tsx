@@ -8,7 +8,8 @@
  * device last opened it, a grid inside another saying which) and **All Grids** (the tree: a grid
  * can hold grids). Drag a grid onto another and it becomes its child, here and on the parent grid
  * itself, where a section stands for it (the server keeps that link: boards.ts). Drag it onto
- * "All Grids" to bring it back to the top. Then **Settings**, and you.
+ * "All Grids" to bring it back to the top. The third segment, **Chats**, lists the ChatForm conversations
+ * kept here (chat/SideChats.tsx; pulled out of ChatForm's list, 2026-11-20). Then **Settings**, and you.
  *
  * What belongs to the open grid (its people, its activity) is the other pane (SpaceInfo.tsx),
  * opened from the grid's tab.
@@ -28,6 +29,8 @@ import { ServerSwitch } from "../server/ServerSwitch";
 import { NightOrb } from "./NightOrb";
 import { SpaceGlyph } from "./SpaceGlyph";
 import { isNight, setNight } from "@foundation/ui";
+import { SideChats } from "../chat/SideChats";
+import { usePins } from "../chat/pins";
 
 interface Props {
   user: UserInfo;
@@ -47,6 +50,8 @@ const DRAG = "application/x-foundation-grid";
 
 export function SidePane({ user, boards, current, place, onSwitch, onNew }: Props) {
   const ui = useUi();
+  /** a ChatForm conversation in the hand (chat/carryChat.ts): this menu can keep it, under Chats */
+  const held = usePins().held;
   const viewer = user.role === "viewer";
   const [shut, setShut] = useState<Set<string>>(() => new Set());
   /** the grid being dragged, and the row (or "top") it's over */
@@ -171,9 +176,9 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           {/* how the grids are listed, at the top of them; the rows start at the selector's own left edge */}
           <div className="pane-pick">
             <div className="pane-seg" role="tablist" aria-label="How grids are listed">
-              {(["recent", "all"] as const).map((v) => (
-                <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${v === "all" && over === "top" ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} {...(v === "all" ? dropProps(null) : {})}>
-                  {v === "recent" ? "Recent" : "All Grids"}
+              {(["recent", "all", "chats"] as const).map((v) => (
+                <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${(v === "all" && over === "top") || (v === "chats" && held) ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} data-pane-seg={v} {...(v === "all" ? dropProps(null) : {})}>
+                  {v === "recent" ? "Recent" : v === "all" ? "All Grids" : "Chats"}
                 </button>
               ))}
             </div>
@@ -184,7 +189,12 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             )}
           </div>
 
-          <div className="pane-scroll">
+          <div className={`pane-scroll${held ? " is-chat-target" : ""}${held?.over ? " is-chat-over" : ""}`}>
+            {ui.spacesView === "chats" ? (
+              <section className="pane-group">
+                <SideChats place={place} />
+              </section>
+            ) : (
             <section className="pane-group">
               {ui.spacesView === "recent" ? recent.map((b) => row(b, 0, false)) : childrenOf(null, listed).map((b) => row(b, 0, true))}
               {listed.length === 0 && (
@@ -203,6 +213,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
                 </div>
               )}
             </section>
+            )}
           </div>
 
           {/* Settings, and the server this app talks to as a small pill to its right in the same band (2026-11-17) */}

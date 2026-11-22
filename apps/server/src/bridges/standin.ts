@@ -146,6 +146,10 @@ export async function startStandin(port = 0): Promise<Standin> {
       return send(200, { messaging_product: "whatsapp", contacts: [{ input: json?.to, wa_id: json?.to }], messages: [{ id: `wamid.standin.${++n}` }] });
     }
     if ((m = /^\/graph\/([^/]+)\/media$/.exec(p)) && req.method === "POST") return send(200, { id: `media.${++n}` });
+    if ((m = /^\/graph\/([^/]+)$/.exec(p)) && req.method === "GET" && url.searchParams.get("fields")) {
+      if (!bearer) return send(401, { error: { message: "no token" } });
+      return send(200, { id: m[1], display_phone_number: "+1 555-0100", verified_name: "Form Industries (stand-in)" });
+    }
     if ((m = /^\/graph\/([^/]+)$/.exec(p)) && req.method === "GET") {
       const f = media.get(m[1]);
       if (!bearer || !f) return send(404, { error: { message: "no such media" } });

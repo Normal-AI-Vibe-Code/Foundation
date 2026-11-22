@@ -22,6 +22,8 @@ import { EmojiPicker } from "./EmojiPicker";
 import { emojiName } from "./emoji";
 import { markMentions, type PendingMessage } from "./logic";
 import { HuddleCard } from "./HuddleCard";
+import { AgentFigure } from "./AgentFigure";
+import { getChat } from "./model";
 import { DraftBar } from "./tabs/DraftBar";
 import { IconEdit, IconLink, IconMore, IconPin, IconReact, IconThread, IconTrash, IconUnread } from "./Icons";
 
@@ -101,7 +103,7 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
             {timeOf(m.createdAt)}
           </time>
         ) : (
-          <PartyAvatar party={m.author} size={32} />
+          <PartyAvatar party={m.author} size={m.author.kind === "agent" ? 36 : 32} />
         )}
       </div>
       <div className="chat-msg-main">
@@ -141,11 +143,16 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
         {!inThread && m.replyCount > 0 && (
           <button className="chat-thread-summary" onClick={() => actions?.reply(m)} data-thread-summary={m.id}>
             <span className="chat-thread-faces" aria-hidden>
-              {(m.repliers ?? []).slice(-3).map((n) => (
-                <span key={n} className="chat-thread-face">
-                  {n.slice(0, 1).toUpperCase()}
-                </span>
-              ))}
+              {(m.repliers ?? []).slice(-3).map((n) =>
+                // an agent among the repliers stands on its line, as everywhere (AgentFigure.tsx)
+                getChat().agents.some((a) => a.name === n) ? (
+                  <AgentFigure key={n} name={n} size={20} className="chat-thread-figure" />
+                ) : (
+                  <span key={n} className="chat-thread-face">
+                    {n.slice(0, 1).toUpperCase()}
+                  </span>
+                ),
+              )}
             </span>
             <span className="chat-thread-count">
               {m.replyCount} {m.replyCount === 1 ? "reply" : "replies"}

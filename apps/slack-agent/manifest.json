@@ -36,7 +36,10 @@
         "channels:read",
         "groups:read",
         "files:read",
-        "channels:join"
+        "channels:join",
+        "chat:write.customize",
+        "users:read.email",
+        "files:write"
       ],
       "user": [
         "channels:history",
@@ -82,7 +85,9 @@
         "group_rename",
         "group_archive",
         "group_left",
-        "member_joined_channel"
+        "member_joined_channel",
+        "reaction_added",
+        "reaction_removed"
       ]
     },
     "token_rotation_enabled": false,

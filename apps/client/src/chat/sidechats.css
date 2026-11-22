@@ -1,0 +1,241 @@
+/* The side menu's Chats (chat/SideChats.tsx; 2026-11-20). The rows are the grids' rows (spaces.css: 34 tall,
+   full width, hover a quiet ink wash, current the accent's tint and a 2 px bar); this adds what a
+   conversation says on its row. Tokens only. */
+
+.chat-pins {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.chat-pin-mark {
+  display: inline-grid;
+  place-items: center;
+  height: 18px;
+  color: var(--color-dim);
+}
+.chat-pin .pane-label {
+  color: var(--color-mist);
+}
+.chat-pin.is-unread .pane-label,
+.chat-pin.is-current .pane-label {
+  color: var(--color-frost);
+}
+/* unread is the name in ink at 700, as in ChatForm's own list */
+.chat-pin.is-unread .pane-label {
+  font-weight: 700;
+}
+.chat-pin.is-unread .chat-pin-mark,
+.chat-pin.is-current .chat-pin-mark {
+  color: var(--color-frost);
+}
+.chat-pin.is-muted .pane-label {
+  color: var(--color-dim);
+}
+.chat-pin.is-agent .pane-label {
+  color: var(--color-agent);
+}
+.chat-pin .chat-count {
+  flex: none;
+}
+/* a live huddle: the ok dot, as on the channel head's headset */
+.chat-pin-huddle {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-ok);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-ok) 24%, transparent);
+}
+/* the ✕ takes the count's corner under the pointer */
+.chat-pin:hover .chat-count,
+.chat-pin:focus-within .chat-count,
+.chat-pin:hover .chat-pin-huddle {
+  visibility: hidden;
+}
+.side-pane .chat-pin .chat-pin-off {
+  display: inline-grid;
+  place-items: center;
+  top: 5px;
+}
+.chat-pins.is-sorting .chat-pin-off {
+  opacity: 0;
+}
+.chat-pins.is-sorting .space-open {
+  cursor: grabbing;
+}
+/* where a pulled row will land: a 2 px accent line between rows (it takes no room, so the rows don't move) */
+.chat-pin-gap {
+  position: relative;
+  height: 0;
+}
+.chat-pin-gap::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  left: var(--space-3);
+  right: var(--space-3);
+  top: -1px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+}
+.side-pane .chat-pins-browse {
+  color: var(--color-dim);
+}
+.side-pane .chat-pins-browse .pane-glyph {
+  display: inline-grid;
+  place-items: center;
+  color: var(--color-dim);
+}
+.side-pane .chat-pins-browse:hover {
+  color: var(--color-frost);
+}
+.chat-pins-empty span {
+  max-width: 30ch;
+}
+
+/* a conversation held anywhere: the side menu can take it. Its list rings (2 px pulse + the dim, inside the
+   pane's edges), the Chats segment rings (spaces.css .pane-seg-btn.is-over); over it, the dim fills */
+.side-pane .pane-scroll.is-chat-target {
+  box-shadow:
+    inset 0 0 0 2px var(--color-pulse),
+    inset 0 0 0 8px var(--color-pulse-dim);
+  animation: chat-pins-pulse 1.4s var(--ease-out-soft) infinite;
+}
+.side-pane .pane-scroll.is-chat-over {
+  background: var(--color-pulse-dim);
+  animation: none;
+}
+@keyframes chat-pins-pulse {
+  50% {
+    box-shadow:
+      inset 0 0 0 2px var(--color-pulse),
+      inset 0 0 0 12px var(--color-pulse-dim);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .side-pane .pane-scroll.is-chat-target {
+    animation: none;
+  }
+}
+
+/* the slip in the hand: the held card (shell.css .held-face) with the conversation's mark */
+.chat-held-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+body.is-carrying-chat,
+body.is-carrying-chat * {
+  cursor: grabbing !important;
+}
+
+/* ---------- a conversation opened from the side menu: ChatForm's list folded to nothing (ChatForm.tsx) ---------- */
+.chat-tab-chat.is-list-folded {
+  grid-template-columns: minmax(0, 1fr);
+}
+.chat-tab-chat.is-list-folded.has-thread {
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+@container chat (max-width: 1040px) {
+  .chat-tab-chat.is-list-folded.has-thread {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* the unfold control, at the far left of the channel head: 28 px, mist, the pulse tint under the pointer */
+.chat-head:has(> .chat-unfold) {
+  padding-left: var(--space-3);
+}
+.chat-unfold {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  margin-right: var(--space-1);
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-mist);
+  cursor: pointer;
+}
+.chat-unfold:hover,
+.chat-unfold:focus-visible {
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+}
+
+/* ---------- #/design (SideMenuDesign.tsx): the side menu, the slip and the figures, drawn in place ---------- */
+.side-pane.chat-demo-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 340px;
+  border-radius: var(--radius-pane);
+  overflow: hidden;
+  background: var(--color-void);
+  box-shadow: 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+}
+.held.chat-demo-held {
+  position: relative;
+  z-index: auto;
+  width: 248px;
+  height: 64px;
+}
+.chat-demo-folded {
+  height: 360px;
+}
+.chat-demo-folded .chat-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.chat-demo-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-void);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.chat-demo-head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  padding-right: var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+.chat-demo-head > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-self: center;
+}
+.chat-demo-head b {
+  color: var(--color-agent);
+  font: 600 var(--text-16) / 1.2 var(--font-sans);
+}
+.chat-demo-head small {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+}
+.chat-demo-fig {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+.chat-demo-fig figcaption {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}

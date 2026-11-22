@@ -11,6 +11,10 @@ import { chatTitle, type ChatChannelView, type ChatParty } from "@foundation/pro
 import { PartyAvatar } from "./Avatar";
 import { isDirect } from "./logic";
 import { IconChevron, IconHash, IconLock, IconPlus, IconThread } from "./Icons";
+import { carryHandlers } from "./carryChat";
+import { isKept, keepInSideMenu, takeOutOfSideMenu } from "./pins";
+import { openContextMenu } from "../components/ContextMenu";
+import { setUi } from "../state/ui";
 
 export interface SidebarProps {
   channels: ChatChannelView[];
@@ -23,6 +27,8 @@ export interface SidebarProps {
   onNew(kind: "channel" | "direct"): void;
   /** channels someone is typing in */
   typing?: Set<string>;
+  /** rows can be pulled out into the side menu, and kept there from their menu (the live place; not the design page) */
+  carry?: boolean;
 }
 
 const FOLD = "chatform-folds";
@@ -53,7 +59,7 @@ export function Sidebar(p: SidebarProps) {
   const channels = live.filter((c) => !c.me?.starred && (c.kind === "open" || c.kind === "private")).sort(byName);
   const direct = live.filter((c) => !c.me?.starred && isDirect(c)).sort(byRecent);
 
-  const row = (c: ChatChannelView, where: string) => <Row key={`${where}-${c.id}`} c={c} meId={p.meId} online={p.online} current={p.current === c.id && !p.view} onOpen={p.onOpen} typing={p.typing?.has(c.id)} />;
+  const row = (c: ChatChannelView, where: string) => <Row key={`${where}-${c.id}`} c={c} meId={p.meId} online={p.online} current={p.current === c.id && !p.view} onOpen={p.onOpen} typing={p.typing?.has(c.id)} carry={p.carry} />;
 
   return (
     <nav className="chat-sidebar" aria-label="Conversations">
@@ -122,22 +128,43 @@ export function channelMark(c: Pick<ChatChannelView, "kind" | "members" | "agent
   return <PartyAvatar party={who} size={size} online={c.kind === "dm" && who.kind === "person" ? !!online?.includes(who.id) : undefined} />;
 }
 
-export function Row({ c, meId, online, current, onOpen, typing }: { c: ChatChannelView; meId?: string; online: string[]; current: boolean; onOpen(id: string): void; typing?: boolean }) {
+/** what a conversation is, in a word (the slip in the hand says it) */
+export const kindWord = (c: Pick<ChatChannelView, "kind">) => (c.kind === "open" || c.kind === "private" ? "channel" : c.kind === "dm" ? "direct message" : c.kind === "group" ? "group" : c.kind === "agent" ? "agent" : "conversation");
+
+/**
+ * `carry`: the row can be pulled out into the side menu (chat/carryChat.ts) and its right-click (or the
+ * menu key, Shift+F10) menu keeps it there or takes it out (2026-11-20).
+ */
+export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: ChatChannelView; meId?: string; online: string[]; current: boolean; onOpen(id: string): void; typing?: boolean; carry?: boolean }) {
   const mentions = c.me?.mentions ?? 0;
   const muted = c.me?.notify === "none";
   const unread = c.unread > 0 && !muted;
   const direct = isDirect(c);
   const n = direct ? c.unread : mentions;
+  const title = chatTitle(c, meId);
+  const hand = carry ? carryHandlers(() => ({ id: c.id, title: c.kind === "open" || c.kind === "private" ? `#${title}` : title, kind: kindWord(c) })) : null;
   return (
     <button
       className={`chat-side-row${current ? " is-current" : ""}${unread ? " is-unread" : ""}${muted ? " is-muted" : ""}${c.kind === "agent" ? " is-agent" : ""}`}
       onClick={() => onOpen(c.id)}
+      onPointerDown={hand?.onPointerDown}
+      onContextMenu={
+        carry
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              const at = e.clientX || e.clientY ? { x: e.clientX, y: e.clientY } : { x: r.left + 24, y: r.bottom };
+              openContextMenu(at.x, at.y, [isKept(c.id) ? { label: "Take out of the side menu", action: () => takeOutOfSideMenu(c.id) } : { label: "Keep in the side menu", action: () => (keepInSideMenu(c.id), setUi({ spacesView: "chats", pane: true, paneView: "spaces" })) }]);
+            }
+          : undefined
+      }
       data-channel-row={c.id}
-      data-channel-name={chatTitle(c, meId)}
+      data-channel-name={title}
       aria-current={current ? "page" : undefined}
     >
       <span className="chat-side-mark">{channelMark(c, meId, online)}</span>
-      <span className="chat-side-name">{chatTitle(c, meId)}</span>
+      <span className="chat-side-name">{title}</span>
       {typing && !current && <span className="chat-side-typing" aria-label="typing" />}
       {n > 0 && !muted ? (
         <span className="chat-count is-accent" data-tip={direct ? `${n} unread` : `${n} ${n === 1 ? "mention" : "mentions"} of you`}>

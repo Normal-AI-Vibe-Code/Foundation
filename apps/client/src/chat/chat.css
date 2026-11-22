@@ -403,17 +403,7 @@
   object-fit: cover;
   object-position: 50% 18%;
 }
-.chat-avatar.is-agent {
-  background: var(--color-agent-dim);
-  box-shadow: inset 0 0 0 1.5px var(--color-agent);
-  color: var(--color-agent);
-}
-.chat-avatar.is-agent.has-face {
-  box-shadow: 0 0 0 1.5px var(--color-agent);
-}
-.chat-agent-spark {
-  font-size: 0.95em;
-}
+/* an agent is not drawn here: it's a figure on a baseline (figure.css, AgentFigure.tsx) */
 .chat-avatar.is-ghost {
   border-radius: var(--radius-card);
   background: var(--color-panel);

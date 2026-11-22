@@ -24,6 +24,8 @@ import { Mark } from "../brand/Mark";
 import { UpdateCard } from "../update/UpdateCard";
 import { ServerSwitchView, type ServerSwitchViewProps } from "../server/ServerSwitch";
 import { FOLDER_DEFAULT } from "../server/model";
+import { ServerNoteView, type NetworkSectionProps } from "../server/ServerAbout";
+import type { NetworkSession, ServerInfo } from "../server/info";
 import type { UpdatePhase } from "../update/updater";
 import { NightOrb } from "../shell/NightOrb";
 import { InfoGlyph } from "../shell/TopBar";
@@ -1209,7 +1211,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <UpdateDemo />
       </Section>
 
-      <Section title="Server switch" note="Bottom right, wherever the app can point at another server (the desktop app, or a page on another site's server), over the sign-in page too: a glass pill with a dot for whether the server this app uses answers (green), is starting or being checked (amber, breathing) or can't be reached (red), and its address. Pressed, it opens upward into both ways to have a server, on paper: This computer, where Start the server is the one blue action (the desktop app runs Foundation's server from a checkout; once it answers, the app uses it and reloads), and a remote server by address, where Connect reloads onto it to sign in. The one in use is ringed and tagged. A server that won't start says why in its own words, in red. Esc or a press outside puts it away. The call chip and the upload tray move up while it's there.">
+      <Section title="Server switch" note="Bottom right, wherever the app can point at another server (the desktop app, or a page on another site's server), over the sign-in page too: a glass pill with a dot for whether the server this app uses answers (green), is starting or being checked (amber, breathing) or can't be reached (red), and its address. Pressed, it opens upward into both ways to have a server, on paper: This computer, where Start the server is the one blue action (the desktop app runs Foundation's server from a checkout; once it answers, the app uses it and reloads), and a remote server by address, where Connect reloads onto it to sign in. The one in use is ringed and tagged. A server that won't start says why in its own words, in red. Esc or a press outside puts it away. The call chip and the upload tray move up while it's there. Signed in (2026-11-20), the panel first says which server this is: This computer, Another computer on your network or A hosted Foundation, with its address, version, what it serves (grids, files and ChatForm: conversations are kept on it), since when it's up, who's here, and its data folder to an admin; then On your network, a switch only an admin at the server's computer can press, with the addresses to copy, the page, Invite someone (a code and a link, once, for 15 minutes) and who is signed in from other computers, each with Sign out; the honest notes (plain http, huddles' camera and microphone) in dim; and the two ways to change server fold under Use another server while this one answers. ChatForm's strip ends in a dim note saying which server it is on; pressed, this panel opens.">
         <ServerSwitchDemo />
       </Section>
 
@@ -2500,9 +2502,86 @@ const SWITCH_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps
   { label: "In a browser on another site's server (can't start one)", props: { desktop: false, builtIn: false, current: "https://server.formresearch.ai", local: "stopped", localListening: false, localOurs: false } },
 ];
 
+// which server this is, and On your network (2026-11-20; server/ServerAbout.tsx): a still clock so the stills don't move
+const NET_NOW = Date.UTC(2026, 10, 20, 15, 30);
+const INFO_BASE: ServerInfo = {
+  name: "Foundation",
+  version: "0.3.24",
+  kind: "local",
+  you: "this-computer",
+  serves: ["grids", "files", "chat"],
+  signIn: { google: true, invite: false, email: false },
+  secure: false,
+  address: "http://localhost:4410",
+  startedAt: NET_NOW - 3 * 3600_000 - 16 * 60_000,
+  people: 1,
+  chat: { channels: 6 },
+  data: String.raw`C:\Dev\Foundation\data`,
+  canManage: true,
+  network: { on: false, active: false, setBy: "switch", wide: false, urls: [], listening: [], page: { built: true, canBuild: true } },
+};
+const NET_ON: ServerInfo = {
+  ...INFO_BASE,
+  kind: "network",
+  people: 3,
+  network: {
+    on: true,
+    active: true,
+    setBy: "switch",
+    wide: false,
+    urls: [
+      { url: "http://192.168.1.20:4410", label: "Wi-Fi" },
+      { url: "http://JOSH-PC.local:4410", label: "this computer's name" },
+    ],
+    listening: [{ address: "192.168.1.20", iface: "Wi-Fi", ok: true, answers: true, error: null }],
+    page: { built: true, canBuild: true },
+  },
+};
+const NET_BASE: Omit<NetworkSectionProps, "info"> = { invite: null, sessions: [], draft: { name: "", email: "" } };
+const SESSIONS: NetworkSession[] = [
+  { id: "ns_1", user_id: "u_1", name: "Kai Moreno", email: "kai@formindustries.com", addr: "192.168.1.31", ua: "Edge on Windows", via: "invite", created_at: NET_NOW - 42 * 60_000, live: 2, seen: NET_NOW },
+  { id: "ns_2", user_id: "u_2", name: "Noa Berg", email: "noa@formindustries.com", addr: "192.168.1.44", ua: "Safari on macOS", via: "invite", created_at: NET_NOW - 5 * 60_000, live: 0, seen: NET_NOW - 60_000 },
+];
+const NET_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps> }> = [
+  { label: "Signed in: which server this is (this computer; the network off)", props: { info: INFO_BASE, network: NET_BASE, now: NET_NOW } },
+  { label: "On your network: on, the page built, two teammates signed in", props: { info: NET_ON, network: { ...NET_BASE, sessions: SESSIONS, draft: { name: "Lin", email: "lin@formindustries.com" } }, now: NET_NOW } },
+  {
+    label: "Invite someone: the code and the link",
+    props: {
+      info: NET_ON,
+      now: NET_NOW,
+      network: {
+        ...NET_BASE,
+        copied: "http://192.168.1.20:4410/#/join/q3Vx0d…",
+        invite: { id: "inv_1", email: "lin@formindustries.com", name: "Lin", code: "HQ7RT-M4KWA", expiresAt: NET_NOW + 15 * 60_000, links: [{ url: "http://192.168.1.20:4410/#/join/q3Vx0d…", label: "Wi-Fi" }] },
+      },
+    },
+  },
+  { label: "On, the page not built (a person presses Build)", props: { info: { ...NET_ON, network: { ...NET_ON.network!, page: { built: false, canBuild: true, build: { state: "idle", at: null, error: null } } } }, network: NET_BASE, now: NET_NOW } },
+  {
+    label: "A teammate's view: another computer on your network",
+    props: { current: "http://192.168.1.20:4410", info: { ...NET_ON, you: "network", canManage: false, data: undefined, address: "http://192.168.1.20:4410" }, network: NET_BASE, now: NET_NOW, desktop: false },
+  },
+  { label: "Use another server, unfolded", props: { info: INFO_BASE, network: NET_BASE, optionsOpen: true, now: NET_NOW } },
+];
+
 function ServerSwitchDemo() {
   return (
     <div className="update-demo server-switch-demo">
+      <div style={{ width: 360 }}>
+        <div className="f-eyebrow update-demo-label">ChatForm strip's note (right end)</div>
+        <div className="server-note-demo">
+          <ServerNoteView where="this-computer" address="http://localhost:4410" />
+          <ServerNoteView where="network" address="http://192.168.1.20:4410" />
+          <ServerNoteView where="hosted" address="https://foundation.formindustries.com" />
+        </div>
+      </div>
+      {NET_STATES.map((d, i) => (
+        <div key={`n${i}`} style={{ width: 360 }} data-server-demo={i}>
+          <div className="f-eyebrow update-demo-label">{d.label}</div>
+          <ServerSwitchView {...SWITCH_BASE} {...d.props} />
+        </div>
+      ))}
       {SWITCH_STATES.map((d, i) => (
         <div key={i} style={{ width: 360 }}>
           <div className="f-eyebrow update-demo-label">{d.label}</div>

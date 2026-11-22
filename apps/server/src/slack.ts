@@ -16,6 +16,7 @@
 
 import { config } from "./config.ts";
 import { guardEgress } from "./egressguard.ts";
+import { storedSecret } from "./bridgesecrets.ts";
 
 const READ_TTL = 4000;
 
@@ -45,8 +46,16 @@ export function lendToken(t: string) {
   }
 }
 
+/** the bot token: one an admin stored in ChatForm's Slack guide (sealed, bridgesecrets.ts), else .env's, else the app's lent one */
 function token() {
-  return process.env.SLACK_BOT_TOKEN || lent;
+  return storedSecret("SLACK_BOT_TOKEN") || process.env.SLACK_BOT_TOKEN || lent;
+}
+export const slackBotToken = () => token();
+/** where the bot token comes from, for ChatForm's Slack card (never the token) */
+export const slackTokenSource = (): "stored" | "env" | "app" | null => (storedSecret("SLACK_BOT_TOKEN") ? "stored" : process.env.SLACK_BOT_TOKEN ? "env" : lent ? "app" : null);
+/** the token changed: what was cached about it goes */
+export function forgetSlackStatus() {
+  statusCache = null;
 }
 
 export function slackConfigured() {

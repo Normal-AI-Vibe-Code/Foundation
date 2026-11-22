@@ -11,6 +11,12 @@
  *    reloads, to sign in on that server.
  * Shown where the app can point elsewhere (the desktop app, or a page on another site's server),
  * over everything, the sign-in page included. `ServerSwitchView` is presentational for `#/design`.
+ *
+ * 2026-11-20 (Josh: "It's unclear to what server ChatForm is being connected to"): the panel first says which
+ * server this is (ServerAbout.tsx: this computer, another on your network, or a hosted Foundation; its
+ * address, version, what it serves, since when it's up, who's here, its data folder to an admin), then
+ * **On your network** (the switch, the addresses, Invite someone, who's signed in from where), and folds
+ * the two ways to change server under **Use another server** while the one in use answers.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -35,6 +41,8 @@ import {
   type LocalPhase,
   type Reach,
 } from "./model";
+import { NetworkSectionView, ServerAboutView, takeServerPanelWish, type NetworkSectionProps } from "./ServerAbout";
+import { OPEN_SERVER_PANEL, buildPage, copyText, listSessions, makeInvite, setNetwork, signOutSession, useServerInfo, type Invite, type NetworkSession, type ServerInfo } from "./info";
 import "./server.css";
 
 const FOLDER_KEY = "foundation-server-folder";
@@ -83,6 +91,14 @@ export interface ServerSwitchViewProps {
   onFolder?: (v: string) => void;
   onRemote?: (v: string) => void;
   onConnect?: () => void;
+  /** what the server says it is (GET /api/server); none: it isn't answering, or not asked yet */
+  info?: ServerInfo | null;
+  /** On your network, when the server says (signed in) */
+  network?: Omit<NetworkSectionProps, "info"> | null;
+  /** the two ways to change server are shown (else folded under "Use another server") */
+  optionsOpen?: boolean;
+  onOptions?: () => void;
+  now?: number;
 }
 
 export function ServerSwitchView(p: ServerSwitchViewProps) {
@@ -100,6 +116,16 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
         </span>
       </header>
 
+      {p.info && <ServerAboutView info={p.info} current={p.current} now={p.now} />}
+      {p.info?.network && p.network && <NetworkSectionView info={p.info} {...p.network} now={p.now} />}
+      {p.info && !p.optionsOpen && (
+        <button type="button" className="server-switch-more" aria-expanded={false} onClick={p.onOptions}>
+          Use another server <span aria-hidden>›</span>
+        </button>
+      )}
+
+      {(!p.info || p.optionsOpen) && (
+      <>
       <div className="server-switch-option" data-current={currentIsLocal || undefined}>
         <div className="server-switch-option-head">
           <strong>This computer</strong>
@@ -214,6 +240,8 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
         </div>
         {p.remoteError ? <p className="server-switch-error">{p.remoteError}</p> : <p className="server-switch-hint">Foundation reloads and signs in on that server.</p>}
       </form>
+      </>
+      )}
     </section>
   );
 
@@ -301,6 +329,77 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const startingRef = useRef(false);
+  // what the server says it is, and On your network (ServerAbout.tsx)
+  const { info, setInfo, refresh: refreshInfo } = useServerInfo(shown && open && reach !== "down", 5000);
+  const [optionsOpen, setOptionsOpen] = useState(!bar);
+  const [invite, setInvite] = useState<Invite | null>(null);
+  const [sessions, setSessions] = useState<NetworkSession[]>([]);
+  const [netBusy, setNetBusy] = useState<string | null>(null);
+  const [netError, setNetError] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ name: "", email: "" });
+  const [copied, setCopied] = useState<string | null>(null);
+  const managing = Boolean(info?.canManage && info.network?.on);
+  useEffect(() => {
+    if (!open || !managing) return;
+    const load = () => void listSessions().then((r) => setSessions(r.sessions)).catch(() => null);
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, [open, managing]);
+  // asked from elsewhere (ChatForm's strip): open, now or as the switch mounts in the side menu's foot
+  useEffect(() => {
+    if (!shown) return;
+    if (takeServerPanelWish()) setOpen(true);
+    const go = () => {
+      takeServerPanelWish();
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_SERVER_PANEL, go);
+    return () => window.removeEventListener(OPEN_SERVER_PANEL, go);
+  }, [shown]);
+  const netDo = async (what: string, fn: () => Promise<unknown>) => {
+    setNetBusy(what);
+    setNetError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setNetError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setNetBusy(null);
+    }
+  };
+  const network: Omit<NetworkSectionProps, "info"> = {
+    invite,
+    sessions,
+    busy: netBusy,
+    error: netError,
+    draft,
+    copied,
+    onToggle: (on) => void netDo("switch", async () => setInfo(await setNetwork(on))),
+    onDraft: setDraft,
+    onInvite: () =>
+      void netDo("invite", async () => {
+        setInvite(await makeInvite(draft.email.trim(), draft.name.trim()));
+        setDraft({ name: "", email: "" });
+      }),
+    onDoneInvite: () => setInvite(null),
+    onSignOut: (id) =>
+      void netDo(id, async () => {
+        await signOutSession(id);
+        setSessions((list) => list.filter((s) => s.id !== id));
+      }),
+    onBuild: () =>
+      void netDo("build", async () => {
+        await buildPage();
+        await refreshInfo();
+      }),
+    onCopy: (text) =>
+      void copyText(text).then((ok) => {
+        if (!ok) return;
+        setCopied(text);
+        setTimeout(() => setCopied((c) => (c === text ? null : c)), 1600);
+      }),
+  };
 
   // the corner is shared: the call chip and the upload tray move up while the switch is there (server.css)
   useEffect(() => {
@@ -508,6 +607,10 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
           setRemoteError(null);
         }}
         onConnect={connect}
+        info={reach === "down" ? null : info}
+        network={network}
+        optionsOpen={optionsOpen || reach === "down"}
+        onOptions={() => setOptionsOpen(true)}
       />
     </div>
   );

@@ -3,6 +3,9 @@
 // For the Slack board it also has channels with top-level messages (some with
 // those pictures), a channel the app isn't in, and POST /_post, which says
 // something in a channel (with a new picture when file=1), as a person would.
+// For ChatForm's Slack bridge (chatform-slack.spec.ts) it also takes chat.postMessage / update / delete
+// (GET /_sent lists what Foundation posted), answers conversations.replies, auth.test with its scopes,
+// and plays Google's OAuth and a small Gmail under /accounts, /oauth and /google (never the real ones).
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { deflateSync } from "node:zlib";
@@ -84,6 +87,8 @@ say("C0FACTORY1", "U2", "Line 2 is back up after the bearing swap.");
 say("C0FACTORY1", "U1", "Vane stock arrives Thursday: 400 blanks.", { reply_count: 1 });
 say("C0RANDOM01", "U2", "Surf's up.");
 let made = 0;
+/** what Foundation posted (chat.postMessage, update, delete), for checks */
+const SENT = [];
 const TINTS = [[[143, 118, 238], [50, 91, 180]], [[228, 87, 78], [200, 122, 28]], [[42, 176, 190], [46, 125, 84]], [[84, 184, 238], [100, 116, 139]]];
 
 createServer((req, res) => {
@@ -115,9 +120,38 @@ createServer((req, res) => {
       FILES.push(f);
       Object.assign(extra, { subtype: "file_share", files: [shared(f)] });
     }
+    // said now (the seeded history sits in the past; a linked channel only takes what's said after the link)
+    clock = Math.max(clock, Math.floor(Date.now() / 1000));
     say(ch.id, url.searchParams.get("user") ?? "U2", url.searchParams.get("text") ?? "", extra);
     res.setHeader("content-type", "application/json");
     return res.end(JSON.stringify({ ok: true, channel: ch.id, ts: HISTORY.get(ch.id)[0].ts }));
+  }
+  // what Foundation posted to Slack (checks read it)
+  if (url.pathname === "/_sent") {
+    res.setHeader("content-type", "application/json");
+    return res.end(JSON.stringify({ ok: true, sent: SENT }));
+  }
+  // ----- a stand-in Google: the consent page approves at once and sends the browser back with a code -----
+  if (url.pathname === "/accounts/o/oauth2/v2/auth") {
+    const back = new URL(url.searchParams.get("redirect_uri") ?? "http://127.0.0.1:9/");
+    back.searchParams.set("code", "standin-code");
+    back.searchParams.set("state", url.searchParams.get("state") ?? "");
+    res.writeHead(302, { location: back.toString() });
+    return res.end();
+  }
+  if (url.pathname === "/oauth/token" || url.pathname === "/oauth/revoke") {
+    req.resume();
+    res.setHeader("content-type", "application/json");
+    return res.end(JSON.stringify(url.pathname === "/oauth/revoke" ? {} : { access_token: "ya29.standin", refresh_token: "1//standin-refresh", expires_in: 3600, scope: "https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send" }));
+  }
+  if (url.pathname.startsWith("/google/gmail/v1/users/me/")) {
+    res.setHeader("content-type", "application/json");
+    const rest = url.pathname.slice("/google/gmail/v1/users/me".length);
+    if (rest === "/profile") return res.end(JSON.stringify({ emailAddress: "admin@normal.dev", historyId: "1000" }));
+    if (rest === "/labels") return res.end(JSON.stringify({ labels: [{ id: "Label_7", name: "Foundation" }] }));
+    if (rest === "/threads") return res.end(JSON.stringify({ threads: [] }));
+    if (rest === "/history") return res.end(JSON.stringify({ history: [], historyId: "1000" }));
+    return res.writeHead(404).end(JSON.stringify({ error: { message: "not here" } }));
   }
   if (!/^Bearer xox[bp]-/.test(req.headers.authorization ?? "")) return res.writeHead(401).end();
   res.setHeader("content-type", "application/json");
@@ -130,7 +164,10 @@ createServer((req, res) => {
     const ch = CHANNELS.find((c) => c.id === url.searchParams.get("channel"));
     if (!ch) return res.end(JSON.stringify({ ok: false, error: "channel_not_found" }));
     if (!ch.is_member) return res.end(JSON.stringify({ ok: false, error: "not_in_channel" }));
-    return res.end(JSON.stringify({ ok: true, messages: HISTORY.get(ch.id) }));
+    let top = HISTORY.get(ch.id).filter((m) => !m.thread_ts || m.thread_ts === m.ts);
+    const latest = url.searchParams.get("latest");
+    if (latest) top = top.filter((m) => (url.searchParams.get("inclusive") ? Number(m.ts) <= Number(latest) : Number(m.ts) < Number(latest)));
+    return res.end(JSON.stringify({ ok: true, messages: top }));
   }
   if (url.pathname === "/conversations.join") {
     let body = "";
@@ -139,6 +176,33 @@ createServer((req, res) => {
       const ch = CHANNELS.find((c) => c.id === JSON.parse(body || "{}").channel);
       if (ch) ch.is_member = true;
       res.end(JSON.stringify(ch ? { ok: true } : { ok: false, error: "channel_not_found" }));
+    });
+    return;
+  }
+  if (url.pathname === "/conversations.replies") {
+    const ch = CHANNELS.find((c) => c.id === url.searchParams.get("channel"));
+    const root = url.searchParams.get("ts");
+    return res.end(JSON.stringify({ ok: true, messages: (HISTORY.get(ch?.id) ?? []).filter((m) => m.ts === root || m.thread_ts === root).reverse() }));
+  }
+  if (/^\/chat\.(postMessage|update|delete)$/.test(url.pathname)) {
+    let body = "";
+    req.on("data", (d) => (body += d));
+    req.on("end", () => {
+      const b = JSON.parse(body || "{}");
+      const ch = CHANNELS.find((c) => c.id === b.channel);
+      if (!ch) return res.end(JSON.stringify({ ok: false, error: "channel_not_found" }));
+      if (!ch.is_member) return res.end(JSON.stringify({ ok: false, error: "not_in_channel" }));
+      const method = url.pathname.slice(1);
+      SENT.push({ method, channel: ch.id, ...b });
+      if (method === "chat.postMessage") {
+        clock = Math.max(clock + 1, Math.floor(Date.now() / 1000));
+        const ts = `${clock}.000200`;
+        HISTORY.get(ch.id).unshift({ ts, bot_id: "B0FDN", subtype: "bot_message", username: b.username, text: b.text, metadata: b.metadata, ...(b.thread_ts ? { thread_ts: b.thread_ts } : {}) });
+        return res.end(JSON.stringify({ ok: true, channel: ch.id, ts }));
+      }
+      if (method === "chat.update") for (const m of HISTORY.get(ch.id)) if (m.ts === b.ts) m.text = b.text;
+      if (method === "chat.delete") HISTORY.set(ch.id, HISTORY.get(ch.id).filter((m) => m.ts !== b.ts));
+      return res.end(JSON.stringify({ ok: true }));
     });
     return;
   }
@@ -156,7 +220,10 @@ createServer((req, res) => {
     const f = FILES.find((x) => x.id === url.searchParams.get("file"));
     return res.end(JSON.stringify(f ? { ok: true, file: meta(f) } : { ok: false, error: "file_not_found" }));
   }
-  if (url.pathname === "/auth.test") return res.end(JSON.stringify({ ok: true, team: "Form Industries (stand-in)", user: "foundation" }));
+  if (url.pathname === "/auth.test") {
+    res.setHeader("x-oauth-scopes", "channels:read,groups:read,channels:history,groups:history,channels:join,chat:write,chat:write.customize,users:read,users:read.email,files:read,reactions:read");
+    return res.end(JSON.stringify({ ok: true, team: "Form Industries (stand-in)", user: "foundation", bot_id: "B0FDN" }));
+  }
   const d = /^\/download\/(\w+)$/.exec(url.pathname);
   if (d) {
     const f = FILES.find((x) => x.id === d[1]);
