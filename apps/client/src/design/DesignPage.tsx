@@ -2230,6 +2230,11 @@ function CouncilDemo() {
   return (
     <div data-design-council>
       <CouncilView title="Supply" kind="section" seats={seats} ghosts={[undefined]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline hot="b" />
+      {/* 2026-11-21: nobody on it yet, three silhouettes close together; from the first agent on, one to add another */}
+      <div className="f-eyebrow update-demo-label">Nobody yet: three silhouettes, close together</div>
+      <div data-design-council-empty>
+        <CouncilView title="Tooling" kind="section" seats={[]} ghosts={[undefined, undefined, undefined]} canAsk onSay={() => {}} onAdd={() => {}} onPanel={() => {}} onClose={() => {}} inline />
+      </div>
       <div className="design-council-talk agents-pane" style={{ height: 360, display: "flex", flexDirection: "column" }}>
         <CouncilTalkView title="Supply" seats={seats} said={[{ id: 1, at: Date.UTC(2026, 10, 17, 9, 30), text: "Which of the parts are we still short of?", to: seats.map((s) => s.name), all: true }]} viewer={false} onSay={() => {}} onAdd={() => {}} onAbout={() => {}} />
       </div>

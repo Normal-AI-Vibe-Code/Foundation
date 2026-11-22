@@ -268,17 +268,42 @@
   color: var(--color-agent);
 }
 
-/* a place nobody has taken: a character's outline */
+/* a place nobody has taken: a character's outline. The silhouettes fade as one group (2026-11-21), so where a council
+   nobody has joined stands them close together, one in front of another, the overlap doesn't darken */
+.council-ghosts {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+}
+.council-ghost-fade {
+  display: flex;
+  align-items: flex-end;
+  opacity: 0.13;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.is-night .council-ghost-fade {
+  opacity: 0.2;
+}
+/* nobody yet: three, shoulder to shoulder, a little in front of one another (each place is 104 wide) */
+.council-ghosts.is-group .council-ghost + .council-ghost {
+  margin-left: -32px;
+}
 .council-ghost .council-figure .avatar-still,
 .council-ghost-plain {
   filter: brightness(0);
-  opacity: 0.13;
-  transition: opacity var(--dur-quick) var(--ease-out-soft);
 }
 .is-night .council-ghost .council-figure .avatar-still,
 .is-night .council-ghost-plain {
   filter: brightness(0) invert(1);
-  opacity: 0.2;
+}
+/* the + over the last silhouette, outside the fade: centred on that figure, in the marks' row */
+.council-ghost-plus {
+  position: absolute;
+  top: 0;
+  right: 52px;
+  translate: 50% 0;
+  pointer-events: none;
 }
 .council-ghost-plain {
   position: absolute;
@@ -308,9 +333,8 @@
     transform: translateY(-1px) rotate(0.8deg) scale(1.004);
   }
 }
-.council-ghost:hover .council-figure .avatar-still,
-.council-ghost:hover .council-ghost-plain,
-.council-ghost .council-figure:focus-visible .avatar-still {
+.council-ghosts:hover .council-ghost-fade,
+.council-ghosts:focus-within .council-ghost-fade {
   opacity: 0.34;
 }
 

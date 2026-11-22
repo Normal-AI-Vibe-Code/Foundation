@@ -45,6 +45,7 @@ import { AvatarStage } from "./actor";
 import { useMoods } from "./mood";
 import { ProviderMark, providerOf, type Provider } from "./providers";
 import { characterBytes, readyCharacters, seats as seatCharacters, useRoster, type Roster, type RosterCharacter } from "./roster";
+import { ghostCount } from "./places";
 import "./council.css";
 
 export interface CouncilSeat {
@@ -86,8 +87,7 @@ export interface CouncilSeat {
 
 /** how much of a figure shows above the edge it stands behind (px of the grid for a section's, of the screen for the grid's) */
 export const COUNCIL_H = 148;
-/** places shown at least (2026-11-17: three): agents first, the rest silhouettes; once all three are taken, one silhouette more to add another */
-export const COUNCIL_PLACES = 3;
+export { COUNCIL_PLACES } from "./places";
 /** the room a council takes above its edge: the figures and the marks over their heads */
 export const COUNCIL_ROOM = 170;
 
@@ -430,27 +430,28 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
               )}
             </div>
           ))}
-          {canAsk &&
-            onAdd &&
-            ghosts.map((g, k) => {
-              const last = k === ghosts.length - 1;
-              return (
-                <div key={`ghost-${k}`} role="listitem" className={`council-seat council-ghost${last ? " is-add" : ""}`} style={{ ["--i" as string]: seats.length + k } as CSSProperties}>
-                  <span className="council-marks">
-                    {last && (
-                      <span className="council-mark is-plus">
-                        <PlusGlyph size={11} />
-                      </span>
-                    )}
-                  </span>
-                  <div className="council-crop">
-                    <button type="button" className="council-figure" aria-label="Add an agent to this council" data-tip="Add an agent here" data-council-add onClick={onAdd}>
-                      {g ? <Still character={g} role={stillRole(g, "bust") ?? "thumb"} /> : <PlainGhost />}
-                    </button>
+          {canAsk && onAdd && ghosts.length > 0 && (
+            // the silhouettes fade together, so where a group of them overlaps it doesn't darken; the + over the last stays bright
+            <div className={`council-ghosts${ghosts.length > 1 ? " is-group" : ""}`} role="none" data-council-ghosts={ghosts.length}>
+              <div className="council-ghost-fade" role="none">
+                {ghosts.map((g, k) => (
+                  <div key={`ghost-${k}`} role="listitem" className={`council-seat council-ghost${k === ghosts.length - 1 ? " is-add" : ""}`} style={{ ["--i" as string]: seats.length + k } as CSSProperties}>
+                    <span className="council-marks" />
+                    <div className="council-crop">
+                      <button type="button" className="council-figure" aria-label="Add an agent to this council" data-tip="Add an agent here" data-council-add onClick={onAdd}>
+                        {g ? <Still character={g} role={stillRole(g, "bust") ?? "thumb"} /> : <PlainGhost />}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                ))}
+              </div>
+              <span className="council-marks council-ghost-plus" style={{ ["--i" as string]: seats.length + ghosts.length - 1 } as CSSProperties} aria-hidden>
+                <span className="council-mark is-plus">
+                  <PlusGlyph size={11} />
+                </span>
+              </span>
+            </div>
+          )}
           {!seats.length && !canAsk && <p className="council-none">No agents are on this council.</p>}
         </div>
 
@@ -531,8 +532,8 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
   const sections = useSyncExternalStore(subscribe, sectionsOf);
   const section = sectionId ? sections[sectionId] : undefined;
   const canAsk = ui.role !== "viewer";
-  // agents first, silhouettes to fill the row, and always one more to add another
-  const ghostN = canAsk ? Math.max(1, COUNCIL_PLACES - seats.length) : 0;
+  // agents first, then one silhouette to add another; nobody yet: three, close together
+  const ghostN = ghostCount(seats.length, canAsk);
   const ghostKey = seats.map((s) => s.character?.id ?? "").join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const ghosts = useMemo(() => ghostsFor(roster, seats, ghostN), [roster, ghostKey, ghostN]);
