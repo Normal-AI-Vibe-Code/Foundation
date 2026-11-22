@@ -789,6 +789,19 @@
   position: absolute;
   right: var(--space-3);
 }
+/* "New grid inside" shows over the row's right end, where its status dot or its count sits: while it shows
+   (the pointer on the row, or the keyboard in it) they step left to give it room, and step back after */
+.side-pane .space-row .space-open {
+  transition: padding-right var(--dur-quick) var(--ease-out-soft);
+}
+.side-pane .space-row:has(.space-move):is(:hover, :focus-within) .space-open {
+  padding-right: calc(var(--space-3) + 24px + var(--space-2));
+}
+@media (prefers-reduced-motion: reduce) {
+  .side-pane .space-row .space-open {
+    transition: none;
+  }
+}
 /* Today: no longer a pill; a row in its own lined-off section */
 .side-pane .pane-today {
   width: 100%;
@@ -991,4 +1004,9 @@
 /* the bottom bar's search pill: its key chip keeps clear of the pill's rounded end */
 .hud-search {
   padding-right: var(--space-4);
+}
+/* the server switch's panel, when open (server.css): in flow between the grids and the Settings band */
+.side-pane .pane-server-slot {
+  flex: none;
+  min-height: 0;
 }

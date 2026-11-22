@@ -21,6 +21,7 @@ import { randomBytes } from "node:crypto";
 import type { WebSocket } from "ws";
 import type { UserInfo } from "@foundation/protocol";
 import { requirePerson } from "./auth.ts";
+import { requireLocalFeature } from "./hosted.ts";
 import { HttpError, type Req } from "./http.ts";
 import { TermTidy } from "./termtidy.ts";
 
@@ -43,6 +44,7 @@ export const HOST_TERM_PATH = /^\/host\/terminal\/([A-Za-z0-9_-]{8,64})$/;
 export function requestHostTerminal(req: Req) {
   const u = requirePerson(req, "Opening a terminal");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can open a terminal on the server's computer.");
+  requireLocalFeature("terminal", "The built-in terminal");
   return openHostTerminal(u);
 }
 

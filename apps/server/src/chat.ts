@@ -673,8 +673,18 @@ export function getMessage(id: string): ChatMessage | undefined {
 function fileRefs(ids: string[]): ChatFile[] {
   const out: ChatFile[] = [];
   for (const id of [...new Set(ids)].slice(0, CHAT_FILES_MAX)) {
-    const f = one<{ id: string; name: string; mime: string; size: number }>("select id, name, mime, size from files where id = ?", id);
-    if (f) out.push({ id: f.id, name: f.name, mime: f.mime, size: f.size });
+    const f = one<{ id: string; name: string; mime: string; size: number; width: number | null; height: number | null }>(
+      "select id, name, mime, size, width, height from files where id = ?",
+      id,
+    );
+    if (f) {
+      const ref: ChatFile = { id: f.id, name: f.name, mime: f.mime, size: f.size };
+      if (f.width && f.height) {
+        ref.w = f.width;
+        ref.h = f.height;
+      }
+      out.push(ref);
+    }
   }
   return out;
 }

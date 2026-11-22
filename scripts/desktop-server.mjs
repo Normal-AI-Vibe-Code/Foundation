@@ -5,6 +5,7 @@
 //   node scripts/desktop-server.mjs            build it (run by `npm run build:desktop`, so by `tauri build`)
 //   node scripts/desktop-server.mjs --check    build it, start it on a spare port with a throwaway data
 //                                              folder, ask /api/health, stop it
+//   node scripts/desktop-server.mjs --bundle-to <folder>   only the bundle, for the hosted server's image
 //
 // Two parts:
 //   index.mjs, extract-worker.mjs   apps/server bundled by esbuild (its dependencies inside; no node_modules)
@@ -38,7 +39,10 @@ const NODE = {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TAURI = join(root, "apps/client/src-tauri");
-const OUT = join(TAURI, "server");
+// `--bundle-to <folder>`: only the two bundled files and the starter set, there, with no Node beside them
+// (the hosted server's image has its own Node at the same pinned version; Dockerfile)
+const bundleTo = process.argv.includes("--bundle-to") ? process.argv[process.argv.indexOf("--bundle-to") + 1] : "";
+const OUT = bundleTo ? resolve(bundleTo) : join(TAURI, "server");
 const CACHE = join(TAURI, "target", "node-cache");
 const win = process.platform === "win32";
 const NODE_NAME = win ? "node.exe" : "node";
@@ -169,12 +173,13 @@ async function check() {
   console.log(`  check    answered /api/health on :${port} after ${up} ms; stopped ${Date.now() - t1} ms after stdin closed (exit ${exited})`);
 }
 
-const node = await pinnedNode();
+const node = bundleTo ? "" : await pinnedNode();
 mkdirSync(OUT, { recursive: true });
 await bundle();
 // the characters every install starts with (apps/server/starter; the server looks for them beside index.mjs)
 rmSync(join(OUT, "starter"), { recursive: true, force: true });
 if (existsSync(join(root, "apps/server/starter"))) cpSync(join(root, "apps/server/starter"), join(OUT, "starter"), { recursive: true });
+if (bundleTo) process.exit(0);
 copyFileSync(node, join(OUT, NODE_NAME));
 if (!win) chmodSync(join(OUT, NODE_NAME), 0o755);
 probe(join(OUT, NODE_NAME));

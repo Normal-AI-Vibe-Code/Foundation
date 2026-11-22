@@ -27,9 +27,12 @@
     "plan:check": "node scripts/plan.mjs check",
     "kiri": "node scripts/kiri.mjs",
     "kiri:install": "node scripts/kiri.mjs install",
+    "wildos": "pwsh -NoProfile -File scripts/wildos.ps1",
     "release": "node scripts/release.mjs",
     "rune:build": "node scripts/rune.mjs",
-    "desktop:server": "node scripts/desktop-server.mjs --check"
+    "desktop:server": "node scripts/desktop-server.mjs --check",
+    "hosted:check": "node scripts/hosted-preflight.mjs",
+    "hosted:restore": "node scripts/hosted-restore.mjs"
   },
   "engines": {
     "node": ">=22.16"

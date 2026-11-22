@@ -1,0 +1,140 @@
+# Hosting Foundation for the company
+
+One Foundation server that everyone signs in to: the same boards, the same ChatForm, from the desktop app or a browser. This is how company-wide chat works (Josh, 2026-11-20: Foundation's own server, hosted; not Mattermost, and not Tailscale as the way in).
+
+Built and checked on 2026-11-20 against a local copy of this exact setup with a stand-in Google (`docs/evidence/2026-11-20_hosted/`). **It has not met a real domain, a real certificate or a real Google client yet**: those are the three things below that only a person can bring.
+
+## What you get
+
+```
+people's browsers ──┐
+desktop apps ───────┼──▶ https://foundation.<company>  (Caddy: the certificate)
+agents (/mcp) ──────┘            │
+                                 ▼
+                         foundation  (one container: the server + the web client, :4410)
+                                 │
+                         volume `data`  → /foundation/data  (SQLite, the file archive, secret.key)
+                         volume `backups` ← nightly copy (backup service)
+```
+
+- **One program at one address.** The server serves the web client itself (`FOUNDATION_CLIENT_DIR`), so pages and API are one origin and the sign-in cookie is same-origin.
+- **Sign-in is Google, with Foundation's own Google client.** Flowform's sign-in only returns to a loopback address, so a hosted server can't use it; with `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` set, every Google button (browser and desktop app, old releases included) goes to Google and comes back to `https://<address>/auth/google/callback`.
+- **Who may join** is `FOUNDATION_ALLOWLIST` (emails or `@domains`), checked against the address Google verified. Anyone else gets a page that says so and no session. A person new to the server arrives as a **member**; the addresses in `FOUNDATION_ADMIN_EMAILS` arrive as **admins**.
+- **The desktop app** signs in the same way it does on a local server: it shows a code, opens Google in the system browser, the browser shows the same code and asks *This is me*, and only then does the app get its session (a bearer it keeps itself; never a cookie, never in a URL).
+
+## What a person brings
+
+1. **A machine and a name.** A small Linux VM (2 vCPU, 4 GB, 40 GB disk is plenty to start) with Docker, reachable on ports 80 and 443, and a DNS name pointed at it (for example `foundation.formindustries.co`). Or an always-on office computer with no open ports and a Cloudflare Tunnel (below).
+2. **A Google OAuth client.** Google Cloud console, in the company's Workspace organisation:
+   - *APIs & Services → OAuth consent screen*: user type **Internal** (only the company's Workspace accounts can use it), app name *Foundation*.
+   - *Credentials → Create credentials → OAuth client ID*: type **Web application**; authorized redirect URI `https://<address>/auth/google/callback`.
+   - Copy the client ID and secret into `deploy/.env`. The secret lives only there.
+   - People in a second Workspace (another domain) can't use an Internal client: either make the consent screen External (the allowlist is still the fence) or keep to one organisation.
+3. **The allowlist and the admins**, in `deploy/.env`.
+
+## Start it
+
+**On a cloud VM (Josh's choice, 2026-11-20).** Make an Ubuntu 24.04 VM (2 vCPU, 4 GB, 40 GB) with a fixed public address, then on it:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/joshleong/Foundation/main/deploy/setup-vm.sh -o setup-vm.sh
+sudo bash setup-vm.sh
+```
+
+`deploy/setup-vm.sh` installs Docker from Ubuntu's packages, opens only SSH, 80 and 443 in the firewall, puts the repo in `/opt/foundation`, makes `deploy/.env` from the template (root only), and prints what is left. It starts nothing. Its syntax and package names were checked on 2026-11-20; **it has not been run on a real VM**.
+
+By hand, on any machine with Docker, in a checkout of this repo:
+
+```sh
+cp deploy/foundation.env.example deploy/.env      # then fill it in (it is never committed)
+docker compose -f deploy/compose.yml up -d --build
+docker compose -f deploy/compose.yml logs -f foundation
+```
+
+The server's first lines say its address, `sign-in  Google`, and where the web client is. If it says `sign-in  NOT SET UP for this address`, the Google client is missing. Open `https://<address>`: the first person on `FOUNDATION_ADMIN_EMAILS` to sign in is an admin.
+
+To update: `git pull`, then the same `up -d --build`. The data volume is untouched.
+
+**No open ports (a tunnel instead of Caddy).** Create a Cloudflare Tunnel for the name, set its public hostname's service to `http://foundation:4410`, put its token in `deploy/.env` as `CLOUDFLARE_TUNNEL_TOKEN`, and start `docker compose -f deploy/compose.yml --profile tunnel up -d --build foundation backup cloudflared`. Cloudflare holds the certificate. Uploads over 100 MB don't pass a free tunnel.
+
+## Everyone else
+
+- **Desktop (Windows):** install from <https://github.com/joshleong/Foundation/releases/latest> (`Foundation_<version>_x64-setup.exe`). On the sign-in page press **Server ·** at the bottom, enter `https://<address>`, then **Continue with Google**. The app remembers the server and updates itself from then on.
+- **Any browser (Mac, Linux, phones):** open `https://<address>`. There is no Mac or Linux installer yet.
+- **Agents** (Claude Code, Codex, Vision): `https://<address>/mcp?board=company` with a token a person makes in Settings.
+
+## Settings
+
+All in `deploy/.env` (`deploy/foundation.env.example` lists them with what each is for):
+
+| Setting | What it is |
+|---|---|
+| `FOUNDATION_DOMAIN` | The name, without `https://`. The compose file sets `FOUNDATION_PUBLIC_URL=https://<it>` from it |
+| `FOUNDATION_ALLOWLIST` | Who may sign in |
+| `FOUNDATION_ADMIN_EMAILS` | Who arrives as an admin |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Foundation's own Google client |
+| `ANTHROPIC_API_KEY` | Agent turns on the hosted server (there is no signed-in Claude Code on it). Each turn spends credits, and each starts from a person |
+| `FOUNDATION_ICE_SERVERS` | A TURN server for huddles across strict networks (huddles connect browsers directly; STUN only by default) |
+| `FOUNDATION_SERVICE_TOKEN` | A bearer for other services (32+ characters) |
+| `FOUNDATION_MIN_CLIENT` | The oldest desktop release the server still works with, once that release is published |
+| `FOUNDATION_BACKUP_KEEP` | Nightly database copies kept (default 14) |
+| `FOUNDATION_IMAGE_CACHE_MB` | Disk LRU budget for regenerable resized image tiers in `data/cache/images` (default 512 MB; excluded from backups) |
+| `FOUNDATION_ALLOW_HOST_TOOLS` | Leave `0` (default) so host terminal, built-in browser, machines, local VMs, T3 and Places stay turned off on a hosted server |
+
+Before starting the stack, validate `deploy/.env` with:
+
+```sh
+npm run hosted:check -- --env deploy/.env
+# Once live:
+npm run hosted:check -- --env deploy/.env --url https://<address>
+```
+
+The image sets the rest: `FOUNDATION_HOST=0.0.0.0`, `FOUNDATION_ROOT=/foundation`, `FOUNDATION_CLIENT_DIR=/app/client`. The server answers only to its own name (`FOUNDATION_PUBLIC_URL`'s host; add others with `FOUNDATION_HOSTS`), and admits the desktop app's window as a caller because it is hosted. **Never set `FOUNDATION_DEV_LOGIN` on a hosted server.**
+
+## Backups and restore
+
+The `backup` service copies, a minute after start and then every 24 hours (`scripts/hosted-backup.mjs`):
+
+- `backups:/db/<date_time>/foundation.db`: the database as one consistent file (`vacuum into`, integrity-checked), with `secret.key` beside it when there is one. The newest 14 are kept.
+- `backups:/files/`: the file archive. Files are named by their content, so each is copied once; nothing is ever removed from it.
+
+A backup holds `secret.key` and the tokens it unseals: keep it as private as the server. **The backups volume is on the same disk as the data until you move it**: copy it off the machine (a bucket, another disk) or it protects against mistakes, not against losing the machine.
+
+Take one now: `docker compose -f deploy/compose.yml exec backup node /app/backup.mjs`
+
+Restore (the server stopped, so nothing writes meanwhile):
+
+```sh
+docker compose -f deploy/compose.yml stop foundation
+# Verified restore script (checks pragma integrity_check before touching destination, preserves archived files):
+node scripts/hosted-restore.mjs --from /path/to/backups --to /path/to/data --confirm
+# Or inside the compose volumes:
+docker compose -f deploy/compose.yml run --rm --user root -v foundation_backups:/backups:ro foundation sh -c '
+  cp /backups/db/<date_time>/foundation.db /foundation/data/foundation.db &&
+  rm -f /foundation/data/foundation.db-wal /foundation/data/foundation.db-shm &&
+  ( [ ! -f /backups/db/<date_time>/secret.key ] || cp /backups/db/<date_time>/secret.key /foundation/data/secret.key ) &&
+  mkdir -p /foundation/data/files && cp -rn /backups/files/. /foundation/data/files/ &&
+  chown -R node:node /foundation/data'
+docker compose -f deploy/compose.yml start foundation
+```
+
+Checked 2026-11-21: `scripts/hosted-backup.mjs` and `scripts/hosted-restore.mjs` are tested end-to-end (`apps/server/test/hosted-features.test.ts`: backup → mutate → refuse without `--confirm` → restore → `pragma integrity_check` + chat messages + archived files intact, `data/cache/images` excluded from backups).
+
+**People & roles.** Once signed in as an admin, open **Settings → General → People on this server** to view everyone who has signed in and promote or demote roles (Admin / Member / View only). At least one admin always stays on the server, and every change is logged to the tamper-evident audit log.
+
+**Moving a computer's Foundation to the hosted one.** The same shape as a restore: a `vacuum into` copy of that computer's `data/foundation.db`, its `data/files/` and `data/secret.key`, into the data volume before the first start. People are matched by email, so someone who signed in there with the address Google gives them is the same person on the hosted server.
+
+## What a hosted server doesn't do (yet)
+
+These run on the server's own computer, which here is the hosted machine, not anyone's desk, so a hosted server turns them off by default (`GET /api/capabilities`, 403 at the routes, and honest notices in the UI):
+
+- **Machines (Kiri, Docker), local VMs, the desktop in a section:** disabled on hosted servers (plan: *hosted-hardware-policy*).
+- **The built-in browser, built-in terminal, Places, and local projects watch:** disabled on hosted servers unless explicitly opted in.
+- **Vision Code hand-offs and T3 threads:** disabled on hosted servers (plan: *vision-pairing*).
+- **The crew on a Claude subscription:** there is no signed-in `claude` in the image; agent turns need `ANTHROPIC_API_KEY`.
+- **Huddles across networks** need a TURN server (`FOUNDATION_ICE_SERVERS`).
+- **ChatForm's bridges** (mail, WhatsApp, Instagram, WeChat) need exactly this: a public HTTPS address. Their redirect and webhook addresses become `https://<address>/api/chat/bridges/gmail/callback` and `https://<address>/api/chat/hooks/<service>`; the Gmail bridge can use the same Google Cloud project (plan: *chatform-bridge-keys*).
+
+## Checking a change to this setup
+
+`apps/client/e2e/hosted-chat.spec.ts` runs the full hosted ChatForm check in real browsers (cookie browser + desktop bearer window, `#general`, DM, thread, reaction, cached image, unread badges, offline drop & catch-up, hosted 403 tool boundaries, and Admin People role management; evidence in `docs/evidence/2026-11-21_images-hosted-chat/`). `docs/evidence/2026-11-20_hosted/` holds the Caddy TLS compose check (`compose.check.yml` + `check.mjs`). Server tests live in `apps/server/test/hosted-signin.test.ts` and `apps/server/test/hosted-features.test.ts`.

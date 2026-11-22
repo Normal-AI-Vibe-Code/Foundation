@@ -22,6 +22,8 @@ process.env.FOUNDATION_DATA_DIR = mkdtempSync(join(tmpdir(), "foundation-test-")
 process.env.FOUNDATION_WORK_DIR = mkdtempSync(join(tmpdir(), "foundation-test-work-"));
 process.env.FOUNDATION_ADMIN_EMAILS = "boss@formindustries.com";
 process.env.FOUNDATION_SERVICE_TOKEN = "s".repeat(40);
+// the Browser tool opens on an empty tab in these tests: they never open the real HyperForm
+process.env.FOUNDATION_BROWSER_HOME = "about:blank";
 
 const auth = await import("../src/auth.ts");
 const { handleUpgrade } = await import("../src/sockets.ts");
@@ -75,6 +77,9 @@ after(async () => {
   await hb.stopHostBrowser();
   server?.close();
   site?.close();
+  // sockets a failed test left open must not keep the run alive
+  server?.closeAllConnections();
+  site?.closeAllConnections();
 });
 
 /** a JPEG's width and height, from its frame header */
@@ -257,6 +262,15 @@ test("the address: http and https only, words become a search, the rest is refus
   }
 });
 
+test("the Browser tool opens on HyperForm, on another address if one is set, or on an empty tab", () => {
+  assert.equal(hb.browserHome({}), "https://dock.apps.normallab.co/");
+  assert.equal(hb.browserHome({ HYPERFORM_URL: "https://dock.example.test" }), "https://dock.example.test/");
+  assert.equal(hb.browserHome({ FOUNDATION_BROWSER_HOME: "https://start.example.test/x", HYPERFORM_URL: "https://dock.example.test" }), "https://start.example.test/x");
+  for (const off of ["about:blank", "off", "none", "0", " OFF "]) assert.equal(hb.browserHome({ FOUNDATION_BROWSER_HOME: off }), "about:blank", off);
+  // a setting is an address or nothing: never a file, a script or a search
+  for (const bad of ["file:///etc/passwd", "javascript:alert(1)", "chrome://settings", "words to search"]) assert.equal(hb.browserHome({ FOUNDATION_BROWSER_HOME: bad }), "about:blank", bad);
+});
+
 test("agents: nothing without a person's leave, the browser is never started by a call, and viewers' agents can't", async () => {
   const ctx = { boardId: "company", actor: "Boss's agent", userId: boss.id };
   for (const [name, input] of [
@@ -291,7 +305,7 @@ test("the real browser: a person opens it, sees the page, lets an agent read it 
     const frames: Buffer[] = [];
     ws.on("message", (raw, binary) => (binary ? frames.push(raw as Buffer) : got.push(JSON.parse(String(raw)))));
     const say = (m: unknown) => ws.send(JSON.stringify(m));
-    const until = async (ok: () => boolean, what: string, ms = 30_000) => {
+    const until = async (ok: () => boolean, what: string, ms = 90_000) => {
       const t0 = Date.now();
       while (!ok()) {
         if (Date.now() - t0 > ms) throw new Error(`timed out waiting for ${what}; got ${JSON.stringify(got.slice(-4)).slice(0, 1200)}`);

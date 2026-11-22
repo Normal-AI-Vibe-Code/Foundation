@@ -38,6 +38,7 @@ import { attachHuddle } from "./huddles.ts";
 import { attachChat, CHAT_SOCKET_PATH, chatSocketIsPerson } from "./chatsock.ts";
 import { attachTerminal } from "./machines.ts";
 import { attachDesktop } from "./machinedesktop.ts";
+import { attachVmConsole } from "./localvms.ts";
 import { portTarget, relayUpgrade } from "./machineshare.ts";
 import { canSeeBoard } from "./members.ts";
 import { canWrite } from "./roles.ts";
@@ -52,12 +53,13 @@ const SYNC = new RegExp(`^/sync/(${ID})$`);
 const HUDDLE = new RegExp(`^/huddle/(${ID})/(${ID})$`);
 const TTY = new RegExp(`^/machines/(${ID})/(${ID})/tty$`);
 const VNC = new RegExp(`^/machines/(${ID})/(${ID})/vnc$`);
+const VM_CONSOLE = new RegExp(`^/vms/(${ID})/(${ID})/vnc$`);
 
 /** the board a socket path belongs to, or null if it isn't one of ours */
 export function socketBoard(path: string): string | null {
   // ChatForm's one socket: the reserved board "chat" (open to everyone signed in); chat.ts decides what each event reaches
   if (path === CHAT_SOCKET_PATH) return "chat";
-  return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path) ?? VNC.exec(path))?.[1] ?? null;
+  return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path) ?? VNC.exec(path) ?? VM_CONSOLE.exec(path))?.[1] ?? null;
 }
 
 /** `POST /api/ws-ticket { path }`: a one-time ticket for that one socket */
@@ -167,6 +169,15 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
   }
   const who = socketWho(req, url);
   const user = who?.user ?? null;
+  const nativeVm = VM_CONSOLE.exec(url.pathname);
+  if (nativeVm) {
+    // noVNC's viewOnly flag is not a security boundary: first slice admits only people with input rights.
+    if (!who || !canSeeBoard(who.user, nativeVm[1]) || !machineInput(who, nativeVm[1])) {
+      socket.write("HTTP/1.1 403 Forbidden\r\n\r\n"); socket.destroy(); return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachVmConsole(nativeVm[1], nativeVm[2], ws, who.user));
+    return;
+  }
   // ChatForm (chatsock.ts): a person's socket speaks as that person, anything else as an agent
   if (url.pathname === CHAT_SOCKET_PATH) {
     if (!who) {

@@ -20,6 +20,8 @@ import { chooseNight, nightChoice, onNight } from "@foundation/ui";
 import { api, logout } from "../lib/api";
 import { TOP_BAR, floorInsets, toast, useUi } from "../state/ui";
 import { SETTINGS_TABS, goSettings, setStartsOn, startsOn, type Place, type SettingsTab } from "../lib/place";
+import { useCapabilities } from "../lib/capabilities";
+import { PeopleSection } from "./PeopleSection";
 import { PlacesTab } from "./PlacesTab";
 import { POSTS, ReleasesTab, ServicesTab } from "./SettingsPage";
 import { RendererTab } from "../rune/RendererTab";
@@ -90,7 +92,7 @@ export function SettingsSpace({ place, user }: { place: Extract<Place, { kind: "
 
 // ---------------------------------------------------------------- parts
 
-export function Group({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+export function Group({ title, note, children }: { title: React.ReactNode; note?: string; children: React.ReactNode }) {
   return (
     <section className="set-group">
       <div className="set-group-head">
@@ -262,6 +264,8 @@ function GeneralTab({ user }: { user: UserInfo }) {
           </button>
         </Row>
       </Group>
+
+      {user.role === "admin" && <PeopleSection user={user} />}
     </div>
   );
 }
@@ -274,6 +278,7 @@ interface Integrations {
 
 function AgentsTab({ user }: { user: UserInfo }) {
   const [s, setS] = useState<Integrations | null>(null);
+  const caps = useCapabilities();
   useEffect(() => {
     api<Integrations>("/api/integrations").then(setS, () => {});
   }, []);
@@ -301,9 +306,15 @@ function AgentsTab({ user }: { user: UserInfo }) {
           <h2>This computer's agents</h2>
           <p>Claude, Codex and the rest, each on its own sign-in; Kimi and DeepSeek on a key or a local model. Assign any of them to a section from that section's council.</p>
         </div>
-        <div className="set-t3">
-          <T3Block viewer={user.role === "viewer"} admin={user.role === "admin"} section={null} />
-        </div>
+        {!caps.local.t3 ? (
+          <div className="set-rows">
+            <Row name="Hosted server" detail="Local T3 agents run on a local computer and are turned off on a hosted Foundation server. Connect your own local agent over MCP above, or set ANTHROPIC_API_KEY for the server's own agent." />
+          </div>
+        ) : (
+          <div className="set-t3">
+            <T3Block viewer={user.role === "viewer"} admin={user.role === "admin"} section={null} />
+          </div>
+        )}
       </section>
     </div>
   );

@@ -38,7 +38,7 @@ import { colName, gutterRuns } from "../lib/gridLines";
 import { formatValue } from "../lib/cellText";
 import { cardChrome, removeQuestion, sectionTools, type SceneTool } from "./tools";
 
-export const SCENE_VERSION = 4;
+export const SCENE_VERSION = 5;
 
 /** sRGB, straight alpha, 0..1 */
 export type Rgba = [number, number, number, number];

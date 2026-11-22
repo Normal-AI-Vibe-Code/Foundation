@@ -23,13 +23,21 @@
 // CI (2026-11-13, Josh: "all future improvements get installed … without having to be built by claude"):
 // .github/workflows/desktop-release.yml runs on every push to main and, once tests pass, runs
 //
-//   node scripts/release.mjs ci       stamp <major>.<minor>.<patch + run number>, notes from the commits
-//                                     since the last release, build, publish (a draft until complete)
+//   node scripts/release.mjs ci build <run>     on each platform (Windows, and macOS on Apple silicon since
+//                                               2026-11-20): stamp <major>.<minor>.<patch + run number>, notes
+//                                               from the commits since the last release, build into dist/release/
+//   node scripts/release.mjs ci publish <run> <dir>...   once every platform is built: one release with all
+//                                               their files and one latest.json naming every platform's
+//                                               installer (a draft until complete)
 //
 // It commits nothing: the stamped version and docs/blog/<version>.md live only in that build.
+//
+// macOS builds are ad-hoc signed, not with an Apple Developer ID, and not notarized. The updater installs
+// them without a word, but the first install from a downloaded .dmg is stopped by Gatekeeper: open it from
+// System Settings → Privacy & Security → Open Anyway (or `xattr -dr com.apple.quarantine` on the app).
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -120,21 +128,29 @@ function signingEnv() {
   };
 }
 
-/** the installers `tauri build` made for this version, with their signatures */
-function artifacts(version) {
-  const find = (sub, test) => {
+/** this computer's architecture as `tauri build` writes it in file names, and as the updater's platform keys say it */
+const ARCH = { x64: { file: "x64", feed: "x86_64" }, arm64: { file: "aarch64", feed: "aarch64" } }[process.arch] ?? { file: process.arch, feed: process.arch };
+
+/** the installers `tauri build` made for this version, with their signatures, under the names they're published as */
+function artifacts(version, arch = ARCH) {
+  const find = (sub, test, name) => {
     const d = join(BUNDLE, sub);
     if (!existsSync(d)) return null;
-    const f = readdirSync(d).find((n) => test(n) && n.includes(`_${version}_`));
+    const f = readdirSync(d).find(test);
     if (!f) return null;
     const sig = join(d, `${f}.sig`);
-    return { file: f, path: join(d, f), sig: existsSync(sig) ? readFileSync(sig, "utf8").trim() : null, sigPath: sig };
+    return { file: name ? name(f) : f, path: join(d, f), sig: existsSync(sig) ? readFileSync(sig, "utf8").trim() : null, sigPath: sig, arch: arch.feed };
   };
+  const versioned = (test) => (n) => test(n) && n.includes(`_${version}_`);
   return {
-    nsis: find("nsis", (n) => n.endsWith("-setup.exe")),
-    msi: find("msi", (n) => n.endsWith(".msi")),
-    appTar: find("macos", (n) => n.endsWith(".app.tar.gz")),
-    appimage: find("appimage", (n) => n.endsWith(".AppImage")),
+    nsis: find("nsis", versioned((n) => n.endsWith("-setup.exe"))),
+    msi: find("msi", versioned((n) => n.endsWith(".msi"))),
+    // macOS: the updater's archive is named for the product alone (Foundation.app.tar.gz), so it's published
+    // under a name with the version and architecture, as the other installers are
+    appTar: find("macos", (n) => n.endsWith(".app.tar.gz"), () => `Foundation_${version}_${arch.file}.app.tar.gz`),
+    // the disk image a person downloads to install the first time (the updater uses appTar, so it has no .sig)
+    dmg: find("dmg", versioned((n) => n.endsWith(".dmg"))),
+    appimage: find("appimage", versioned((n) => n.endsWith(".AppImage"))),
   };
 }
 
@@ -147,9 +163,26 @@ export function feed(version, notes, a, now = new Date()) {
   };
   add(["windows-x86_64", "windows-x86_64-nsis"], a.nsis);
   add(["windows-x86_64-msi"], a.msi);
-  add(["darwin-aarch64", "darwin-x86_64", "darwin-aarch64-app", "darwin-x86_64-app"], a.appTar);
+  // a Mac build is for the architecture it was built on: an Intel Mac must never be offered an Apple silicon app
+  if (a.appTar) add([`darwin-${a.appTar.arch}`, `darwin-${a.appTar.arch}-app`], a.appTar);
   add(["linux-x86_64", "linux-x86_64-appimage"], a.appimage);
   return { version, notes: notes.body, pub_date: now.toISOString().replace(/\.\d{3}Z$/, "Z"), platforms };
+}
+
+/** one latest.json from each platform's build (CI builds Windows and macOS on separate machines) */
+export function mergeFeeds(feeds, now = new Date()) {
+  if (!feeds.length) throw new Error("no feeds to merge");
+  const version = feeds[0].version;
+  const platforms = {};
+  for (const f of feeds) {
+    if (f.version !== version) throw new Error(`the builds disagree on the version: ${version} and ${f.version}`);
+    for (const [k, v] of Object.entries(f.platforms)) {
+      if (platforms[k]) throw new Error(`two builds both offer ${k}`);
+      platforms[k] = v;
+    }
+  }
+  if (!Object.keys(platforms).length) throw new Error("no build made a signed installer");
+  return { version, notes: feeds[0].notes, pub_date: now.toISOString().replace(/\.\d{3}Z$/, "Z"), platforms };
 }
 
 function build() {
@@ -161,14 +194,30 @@ function build() {
   });
   const a = artifacts(version);
   if (!a.nsis?.sig && !a.appTar?.sig && !a.appimage?.sig) die("the build made no signed installer (is createUpdaterArtifacts on?)");
-  mkdirSync(OUT, { recursive: true });
+  // everything this build publishes, under its published name, in one folder: dist/release/files/
+  const files = join(OUT, "files");
+  rmSync(files, { recursive: true, force: true });
+  mkdirSync(files, { recursive: true });
+  for (const art of Object.values(a)) {
+    if (!art || (!art.sig && art !== a.dmg)) continue;
+    copyFileSync(art.path, join(files, art.file));
+    if (art.sig) copyFileSync(art.sigPath, join(files, `${art.file}.sig`));
+  }
   const latest = feed(version, notes, a);
   writeFileSync(join(OUT, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
   writeFileSync(join(OUT, "notes.md"), notes.body + "\n");
+  writeFileSync(join(OUT, "release.json"), JSON.stringify({ version, title: notes.title }, null, 2) + "\n");
   console.log(`\n  Built Foundation ${version}:`);
   for (const [k, v] of Object.entries(a)) if (v) console.log(`    ${k.padEnd(9)} ${v.file}${v.sig ? " (signed)" : " (no .sig)"}`);
   console.log(`    feed      dist/release/latest.json (${Object.keys(latest.platforms).join(", ")})\n  Next: npm run release -- publish\n`);
 }
+
+/** the files a build left in <dir>/files/, as paths */
+const builtFiles = (dir) => {
+  const d = join(dir, "files");
+  if (!existsSync(d)) die(`${d} is missing: run npm run release -- build first`);
+  return readdirSync(d).map((f) => join(d, f));
+};
 
 // ------------------------------------------------------------------ publish
 function publish() {
@@ -180,10 +229,7 @@ function publish() {
   if (!existsSync(latestPath)) die("no dist/release/latest.json: run npm run release -- build first");
   const latest = JSON.parse(readFileSync(latestPath, "utf8"));
   if (latest.version !== version) die(`dist/release/latest.json is for ${latest.version}, not ${version}: build again`);
-  const a = artifacts(version);
-  const files = [];
-  for (const art of Object.values(a)) if (art?.sig) files.push(art.path, art.sigPath);
-  files.push(latestPath);
+  const files = [...builtFiles(OUT), latestPath];
   // the tag must be on GitHub, at the commit that was built
   const tagged = spawnSync("git", ["ls-remote", "--tags", "origin", tag], { cwd: root, encoding: "utf8" }).stdout.trim();
   if (!tagged) die(`the tag ${tag} isn't on origin yet: push main and the tag first (git push origin main ${tag})`);
@@ -225,12 +271,36 @@ export function ciNotes(version, subjects, date) {
 
 const gh = (argv) => spawnSync("gh", argv, { cwd: root, encoding: "utf8" });
 
-function ci() {
-  const runNumber = args[0] ?? process.env.GITHUB_RUN_NUMBER;
+/** the version this CI run publishes */
+function ciRunVersion() {
+  const runNumber = args[1] ?? process.env.GITHUB_RUN_NUMBER;
+  return { runNumber, version: ciVersion(currentVersion(), runNumber) };
+}
+
+/** `ci build <run>`: stamp this run's version, write its notes, build this machine's installers into dist/release/ */
+function ciBuild() {
+  const { runNumber, version } = ciRunVersion();
   const sha = process.env.GITHUB_SHA ?? git("rev-parse", "HEAD");
   if (!process.env.TAURI_SIGNING_PRIVATE_KEY) die("ci: TAURI_SIGNING_PRIVATE_KEY isn't set (the repo's Actions secret)");
-  const version = ciVersion(currentVersion(), runNumber);
+  // the notes: a post a person wrote for this version, else the commits since the last release
+  if (!readNotes(version)) {
+    const prev = spawnSync("git", ["describe", "--tags", "--abbrev=0", "--match", "v*", `${sha}^`], { cwd: root, encoding: "utf8" });
+    const range = prev.status === 0 ? [`${prev.stdout.trim()}..${sha}`] : ["-15", sha];
+    const subjects = git("log", "--format=%s", ...range).split("\n");
+    const date = new Date().toISOString().slice(0, 10);
+    writeFileSync(join(root, "docs/blog", `${version}.md`), ciNotes(version, subjects, date));
+  }
+  stamp(version);
+  console.log(`\n  CI build v${version} from ${sha.slice(0, 7)} (run ${runNumber}, ${process.platform}-${process.arch})\n`);
+  build();
+}
+
+/** `ci publish <run> <dir>...`: one release from every platform's dist/release/ (the first dir's notes are the release's) */
+function ciPublish(dirs) {
+  const { version } = ciRunVersion();
   const tag = `v${version}`;
+  const sha = process.env.GITHUB_SHA ?? git("rev-parse", "HEAD");
+  if (!dirs.length) die("usage: release.mjs ci publish <run> <dist/release dir>...");
 
   // a re-run of a published run has nothing to do; a draft left by a cancelled one is cleared
   const existing = gh(["release", "view", tag, "-R", REPO, "--json", "isDraft"]);
@@ -242,25 +312,25 @@ function ci() {
     run("gh", ["release", "delete", tag, "-R", REPO, "--yes"]);
   }
 
-  // the notes: a post a person wrote for this version, else the commits since the last release
-  if (!readNotes(version)) {
-    const prev = spawnSync("git", ["describe", "--tags", "--abbrev=0", "--match", "v*", `${sha}^`], { cwd: root, encoding: "utf8" });
-    const range = prev.status === 0 ? [`${prev.stdout.trim()}..${sha}`] : ["-15", sha];
-    const subjects = git("log", "--format=%s", ...range).split("\n");
-    const date = new Date().toISOString().slice(0, 10);
-    writeFileSync(join(root, "docs/blog", `${version}.md`), ciNotes(version, subjects, date));
+  const read = (dir, f) => readFileSync(join(dir, f), "utf8");
+  const feeds = dirs.map((d) => JSON.parse(read(d, "latest.json")));
+  const { title } = JSON.parse(read(dirs[0], "release.json"));
+  let latest;
+  try {
+    latest = mergeFeeds(feeds);
+  } catch (e) {
+    die(e.message);
   }
-  stamp(version);
-  console.log(`\n  CI release ${tag} from ${sha.slice(0, 7)} (run ${runNumber})\n`);
-  build();
+  if (latest.version !== version) die(`the builds are of ${latest.version}, but run ${args[1]} publishes ${version}`);
+  const out = join(OUT, "publish");
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "latest.json"), JSON.stringify(latest, null, 2) + "\n");
+  writeFileSync(join(out, "notes.md"), read(dirs[0], "notes.md"));
+  const files = [...dirs.flatMap(builtFiles), join(out, "latest.json")];
+  console.log(`\n  Publishing ${tag} from ${sha.slice(0, 7)}: ${Object.keys(latest.platforms).join(", ")}\n`);
 
   // a draft until every file is up, so the feed never names an installer that isn't there yet
-  const notes = readNotes(version);
-  const a = artifacts(version);
-  const files = [];
-  for (const art of Object.values(a)) if (art?.sig) files.push(art.path, art.sigPath);
-  files.push(join(OUT, "latest.json"));
-  run("gh", ["release", "create", tag, "-R", REPO, "--draft", "--target", sha, "--title", `Foundation ${version}: ${notes.title}`, "--notes-file", join(OUT, "notes.md"), ...files]);
+  run("gh", ["release", "create", tag, "-R", REPO, "--draft", "--target", sha, "--title", `Foundation ${version}: ${title}`, "--notes-file", join(out, "notes.md"), ...files]);
   run("gh", ["release", "edit", tag, "-R", REPO, "--draft=false", "--latest"]);
   console.log(`\n  Published ${tag}. The feed: https://github.com/${REPO}/releases/latest/download/latest.json\n`);
 }
@@ -270,7 +340,8 @@ if (/release\.mjs$/.test(process.argv[1] ?? "")) {
   if (cmd === "bump") bump(args[0]);
   else if (cmd === "build") build();
   else if (cmd === "publish") publish();
-  else if (cmd === "ci") ci();
+  else if (cmd === "ci" && args[0] === "build") ciBuild();
+  else if (cmd === "ci" && args[0] === "publish") ciPublish(args.slice(2).map((d) => resolve(d)));
   else if (cmd === "notes") console.log(JSON.stringify(readNotes(args[0] ?? currentVersion()), null, 2));
-  else die("usage: npm run release -- bump <x.y.z> | build | publish [--replace] | notes [version] | ci [run number]");
+  else die("usage: npm run release -- bump <x.y.z> | build | publish [--replace] | notes [version] | ci build <run> | ci publish <run> <dir>...");
 }

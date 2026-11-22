@@ -4,7 +4,7 @@
  * - **Origins.** Pages that may call this server with credentials (CORS) are exactly: the client
  *   (FOUNDATION_CLIENT_URL), FOUNDATION_CORS_ORIGINS, and the desktop app's window (its fixed
  *   http://localhost:31440, and tauri://localhost) only when the desktop app started this server
- *   (startedForDesktop). Otherwise nothing tells that port's page from any other program's, so a
+ *   (startedForDesktop) or this server is hosted at another address (hosted: the cookie can't ride there). Otherwise nothing tells that port's page from any other program's, so a
  *   server started another way trusts it only if FOUNDATION_CORS_ORIGINS lists it. Not "any localhost port": a page another program
  *   serves on this computer (a dev server an agent started, T3's own UI, a machine's published port) is
  *   the same site as the server, so the SameSite cookie rides along with its requests.
@@ -29,6 +29,7 @@ import { hasSessionCookie } from "./auth.ts";
 /** the packaged desktop app's window (apps/client/src-tauri/src/lib.rs: fixed, it keys the device's offline copies) */
 export const DESKTOP_PAGE_ORIGINS = ["http://localhost:31440", "tauri://localhost"];
 
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const strip = (s: string) => s.trim().replace(/\/$/, "");
 function originOf(url: string): string | null {
   try {
@@ -50,10 +51,24 @@ export function originsFor(o: { clientUrl: string; corsOrigins: string[]; deskto
   return new Set([originOf(o.clientUrl) ?? strip(o.clientUrl), ...(o.desktop ? DESKTOP_PAGE_ORIGINS : []), ...o.corsOrigins.map(strip)].filter(Boolean));
 }
 
+/**
+ * A hosted server (FOUNDATION_PUBLIC_URL names an address that isn't this computer) is another site to the
+ * desktop app's window on each person's computer, so its SameSite cookie never rides that window's requests:
+ * the app signs in for a bearer it keeps itself. Admitting the window there lets the app read answers and
+ * hands no other program on that computer a sign-in.
+ */
+export function hosted(publicUrl: string): boolean {
+  try {
+    return !LOOPBACK.has(new URL(publicUrl).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 let origins: Set<string> | null = null;
 /** the pages that may call this server with credentials, exactly */
 export function allowedOrigins(): Set<string> {
-  origins ??= originsFor({ clientUrl: config.clientUrl, corsOrigins: config.corsOrigins, desktop: startedForDesktop() });
+  origins ??= originsFor({ clientUrl: config.clientUrl, corsOrigins: config.corsOrigins, desktop: startedForDesktop() || hosted(config.publicUrl) });
   return origins;
 }
 
@@ -76,7 +91,6 @@ export const isNetworkHost = (req: IncomingMessage) => networkNames.hosts.has(St
 export const originAllowedFor = (origin: string, req: IncomingMessage) =>
   originAllowed(origin) || (isNetworkHost(req) && (networkNames.origins.has(origin) || DESKTOP_PAGE_ORIGINS.includes(origin)));
 
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 const defaultPort = (protocol: string) => (protocol === "https:" ? "443" : "80");
 
 function hostOf(url: string): { host: string; port: string } | null {

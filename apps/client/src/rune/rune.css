@@ -12,6 +12,16 @@
   outline: none;
 }
 
+/* Rune mirrors what it draws into the page for screen readers (a see-through layer over the window,
+   `data-rune-a11y`), and on a canvas that fills the viewport it leaves each link's <a> taking the
+   pointer. A press on a link's letters then went to that <a>: the browser opened the address itself,
+   round Foundation's own handling of a link (http(s) only, through openExternal), and Rune never
+   heard the press. The mirror is for reading: the canvas takes every press. */
+[data-rune-a11y],
+[data-rune-a11y] * {
+  pointer-events: none !important;
+}
+
 /* the mark: a quiet glass pill in the bottom bar, like the zoom beside it */
 .rune-mark {
   height: 36px;

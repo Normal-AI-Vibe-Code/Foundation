@@ -28,6 +28,8 @@ import { FloorEdge } from "./FloorEdge";
 import { ServerSwitch } from "../server/ServerSwitch";
 import { NightOrb } from "./NightOrb";
 import { SpaceGlyph } from "./SpaceGlyph";
+import { LOCAL_GRID_ID } from "@foundation/protocol";
+import { LocalRowDot } from "../panels/LocalView";
 import { isNight, setNight } from "@foundation/ui";
 import { SideChats } from "../chat/SideChats";
 import { usePins } from "../chat/pins";
@@ -54,6 +56,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
   const held = usePins().held;
   const viewer = user.role === "viewer";
   const [shut, setShut] = useState<Set<string>>(() => new Set());
+  /** where the server switch draws its panel: above the Settings band */
+  const [serverSlot, setServerSlot] = useState<HTMLDivElement | null>(null);
   /** the grid being dragged, and the row (or "top") it's over */
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
@@ -155,6 +159,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
               <SpaceGlyph space={b} />
             </span>
             <span className="pane-label">{b.name}</span>
+            {b.id === LOCAL_GRID_ID && <LocalRowDot />}
             {!tree && parent && <span className="pane-when">{parent.name}</span>}
             {tree && kids.length > 0 && <span className="pane-when">{kids.length}</span>}
           </button>
@@ -216,6 +221,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             )}
           </div>
 
+          {/* the server pill's panel opens here, in the menu's flow right above the Settings band (2026-11-18) */}
+          <div className="pane-server-slot" ref={setServerSlot} />
           {/* Settings, and the server this app talks to as a small pill to its right in the same band (2026-11-17) */}
           <section className="pane-band pane-low pane-low-row">
             <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
@@ -224,7 +231,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
               </span>
               <span className="pane-label">Settings</span>
             </button>
-            <ServerSwitch where="pane" />
+            <ServerSwitch where="pane" host={serverSlot} />
           </section>
           <footer className="pane-foot">
             <span className="me-avatar" style={{ background: user.color }} title={user.email}>

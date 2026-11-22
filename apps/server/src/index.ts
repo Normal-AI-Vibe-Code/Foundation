@@ -11,9 +11,11 @@ import { createServer, type ServerResponse } from "node:http";
 import type { PanelDoc, UserInfo } from "@foundation/protocol";
 import { WebSocketServer } from "ws";
 import { config } from "./config.ts";
+import { registerVmRoutes } from "./vmroutes.ts";
+import { shutdownLocalVms } from "./localvms.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
-import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
+import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleSignIn, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
 import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
@@ -51,6 +53,7 @@ import { bringFlowformFile, listRooms as listFlowformRooms, liveRooms, pullRoom,
 import { beginGrant, downloadsStatus, dropSession, fileThumb } from "./flowformfiles.ts";
 import { isPerson, requirePerson } from "./auth.ts";
 import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
+import { connectLocal, localStatus, resumeLocal, stopLocal } from "./localdev.ts";
 import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
@@ -72,10 +75,12 @@ import { startMachineIo, tryOut } from "./machineio.ts";
 import { listPrefsOf, prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed, originAllowedFor } from "./origins.ts";
 import { attachNetwork, networkFront, networkRoutes, networkUpgradeRefusal, signInDoors } from "./network.ts";
+import { serveClient } from "./clientfiles.ts";
 import { gridOutline } from "./subgrids.ts";
 import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
 import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
+import { listServerUsers, requireLocalFeature, serverCapabilities, setServerUserRole, type ServerRole } from "./hosted.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -87,16 +92,32 @@ startSlackLive();
 setCurator((o) => startRun(o));
 
 const r = new Router();
+registerVmRoutes(r);
 
-r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
+r.get("/api/health", () => ({ ok: true, name: "foundation", version: SERVER_VERSION, hosted: flowform.hostedServer(), at: Date.now() }));
+r.get("/api/capabilities", () => serverCapabilities());
+
+// ---------- admin people (hosted.ts) ----------
+
+r.get("/api/admin/users", (req) => {
+  const u = requirePerson(req, "Viewing people on this server");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can view people on this server.");
+  return { users: listServerUsers() };
+});
+r.post("/api/admin/users/:id/role", async (req) => {
+  const u = requirePerson(req, "Changing someone's role on this server");
+  const { role } = await readJson<{ role?: ServerRole }>(req);
+  return { users: setServerUserRole(u, req.params.id, role as ServerRole) };
+});
 
 // ---------- auth ----------
 
 // public: also what this server is, and the oldest client it still works with (clientversion.ts)
-// asked by a network name (network.ts), Google and dev sign-in can't finish there: an invitation can
+// asked by a network name (network.ts), Google and dev sign-in can't finish there: an invitation can.
+// (`flowform` stays for the clients that read it to find the Google button: its routes sign in with this server's own Google client when it has one)
 r.get("/auth/config", (req) => {
   const doors = signInDoors(req);
-  return { google: doors.google, devLogin: doors.devLogin, flowform: doors.flowform ? { url: flowform.flowformUrl() } : undefined, invite: doors.invite, version: SERVER_VERSION, minClient: minClient() || null };
+  return { google: doors.google, devLogin: doors.devLogin, flowform: doors.flowform ? { url: flowform.flowformUrl() } : undefined, invite: doors.invite, provider: googleSignIn() ? "google" : "flowform", hosted: flowform.hostedServer(), version: SERVER_VERSION, minClient: minClient() || null };
 });
 r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
 /** what on this computer has a shell now, if anything: dev sign-in waits until it stops (auth.ts devSignInRefusal) */
@@ -129,9 +150,21 @@ r.get("/auth/google/start", (_req, res) => {
   res.end();
 });
 r.get("/auth/google/callback", async (req, res) => {
-  const user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "", parseCookies(req.headers.cookie)[GOOGLE_STATE_COOKIE] ?? "");
+  // an app's sign-in (it began one and is polling): the code and the press, as with Flowform (flowform.ts)
+  if (await flowform.googleDesktopDone(req, res)) return;
+  let user: UserInfo;
+  try {
+    if (req.query.get("error")) throw new HttpError(400, req.query.get("error") === "access_denied" ? "The sign-in was cancelled at Google." : "Google didn't finish the sign-in.");
+    user = await googleCallback(req.query.get("code") ?? "", req.query.get("state") ?? "", parseCookies(req.headers.cookie)[GOOGLE_STATE_COOKIE] ?? "");
+  } catch (e) {
+    // a person is looking at this in their browser: a page that says why, not JSON
+    if (!(e instanceof HttpError)) console.error("google sign-in:", (e as Error).message);
+    return flowform.page(res, e instanceof HttpError ? e.status : 500, "Sign-in didn't finish", e instanceof HttpError ? e.message : "Something went wrong finishing the sign-in. Try again.");
+  }
+  audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, door: "route", action: "sign_in.google", target: "browser session", decision: "allowed", result: "ok" });
   setSessionCookie(res, createSession(user.id));
-  res.writeHead(302, { location: config.clientUrl });
+  // `?arrive`: the sign-in page knows it is back from Google and goes straight through
+  res.writeHead(302, { location: `${config.clientUrl.replace(/\/$/, "")}/?arrive`, "cache-control": "no-store" });
   res.end();
 });
 // Google through flowform-server — the flowform client's sign-in (flowform.ts)
@@ -417,7 +450,7 @@ r.get("/api/files/:id/cad", async (req) => {
 });
 r.get("/files/:id", (req, res) => {
   requireFileBoard(requireUser(req), req.params.id);
-  serveFile(req, res, req.params.id);
+  return serveFile(req, res, req.params.id);
 });
 
 /** a file on a members-only board is that board's; a chat upload is its uploader's and its messages' readers' (chat.ts) */
@@ -438,6 +471,12 @@ chatRoutes(r);
 (await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
 (await import("./bridges/slack.ts")).chatSlackRoutes(r); // the live Slack bridge: linked channels in step both ways, the token, the transition guide
 (await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
+
+// ---------- this computer: the projects being built here, as a grid (localdev.ts) ----------
+
+r.get("/api/local", (req) => localStatus(requireUser(req), isPerson(req)));
+r.post("/api/local/connect", async (req) => connectLocal(requireUser(req), isPerson(req)));
+r.post("/api/local/stop", (req) => stopLocal(requireUser(req), isPerson(req)));
 
 // ---------- places: folders on this computer a person approved (places.ts) ----------
 
@@ -932,7 +971,7 @@ r.get("/api/characters/costs", async (req) => {
 /** a character's file by role (thumb, clips, mavatar, front …): characters are the company's, so this doesn't ask which board */
 r.get("/api/characters/:id/files/:role", (req, res) => {
   requireUser(req);
-  serveFile(req, res, characterFile(req.params.id, req.params.role));
+  return serveFile(req, res, characterFile(req.params.id, req.params.role));
 });
 // ---------- agents assigned to a section or a grid: who is on its council (posted.ts) ----------
 
@@ -1077,6 +1116,7 @@ r.post("/api/today/profile", async (req) => {
 
 // whole coding transcripts, on no board: an admin, in person
 function requireT3Reader(req: Req) {
+  requireLocalFeature("vision", "Vision Code on this computer");
   const u = requirePerson(req, "Reading Vision Code's threads");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can read Vision Code's threads.");
   return u;
@@ -1305,6 +1345,7 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("access-control-allow-headers", "content-type, authorization, range, mcp-session-id, mcp-protocol-version");
+    res.setHeader("access-control-expose-headers", "etag, x-image-level, x-image-natural-width, x-image-natural-height, x-image-width, x-image-height, x-image-alpha");
     res.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader("access-control-max-age", "600");
     res.setHeader("vary", "origin");
@@ -1341,6 +1382,8 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
       return await handleMcp(req, res, user);
     }
     const m = r.match(req.method ?? "GET", url.pathname);
+    // a hosted server serves the web client itself (FOUNDATION_CLIENT_DIR; clientfiles.ts): anything that isn't the server's own
+    if (!m && serveClient(req, res, url.pathname)) return;
     if (!m) throw new HttpError(404, "not found");
     req.params = m.params;
     gateWrites(req, url.pathname);
@@ -1383,6 +1426,7 @@ settleOrphanRuns();
 startHermes();
 startDigest();
 resumeCharacters();
+resumeLocal();
 // characters this build carries that this install hasn't had yet (a fresh install, or a studio made from an older set)
 void bringInStarter()
   .then((n) => n && console.log(`  characters         brought in ${n} from the starter set`))
@@ -1395,7 +1439,7 @@ void bringInStarter()
 // pipe closes. Stop the agents' child processes, then go.
 if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
   let leaving = false;
-  const leave = () => {
+  const leave = async () => {
     if (leaving) return;
     leaving = true;
     try {
@@ -1404,11 +1448,16 @@ if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
       /* going anyway */
     }
     server.close();
+    await shutdownLocalVms();
     setTimeout(() => process.exit(0), 150).unref();
   };
   process.stdin.on("end", leave).on("close", leave).on("error", leave);
   process.stdin.resume();
 }
+
+for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => {
+  void shutdownLocalVms().finally(() => process.exit(0));
+});
 
 server.on("error", (e: NodeJS.ErrnoException) => {
   // one plain line: the desktop app shows it to the person and keeps it in its log
@@ -1425,6 +1474,8 @@ server.listen(config.port, config.host, () => {
   const doors = [config.google.clientId ? "Google" : `Google through Flowform (${flowform.flowformUrl()})`, config.devLogin ? "dev login (this computer only)" : ""].filter(Boolean);
   console.log(`  sign-in            ${doors.join(" + ")}`);
   // never locked out without being told why: dev login is off unless asked for
+  if (flowform.hostedServer() && !googleSignIn()) console.log("  sign-in            NOT SET UP for this address: a hosted server needs GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET (docs/hosting.md)");
+  if (config.clientDir) console.log(`  web client         ${config.clientDir}`);
   if (!config.devLogin && !config.google.clientId) console.log("  dev login          off. To sign in by email on this computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart");
   console.log(`  agent              ${rt.subscription ? "Claude Code (subscription)" : rt.subscriptionNote ? `— (${rt.subscriptionNote.split("\n")[0]})` : "—"}${rt.api ? ` · API (${rt.model})` : ""}`);
   console.log(`  MCP                ${config.publicUrl}/mcp?board=company\n`);

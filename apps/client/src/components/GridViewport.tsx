@@ -41,6 +41,8 @@ import { TalkButton } from "../shell/Talk";
 import { SearchPop } from "../shell/SearchPane";
 import { PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
+import { useOnLocalGrid } from "../panels/LocalView";
+import { ComputerGlyph } from "../shell/glyphs";
 import { toggleCouncil, useCouncilOpen } from "../lib/councilOpen";
 import { COMMANDS_GLYPH } from "../lib/keys";
 import { PeerCursors } from "../shell/Presence";
@@ -126,6 +128,8 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
   const ui = useUi();
   // the grid's council stands at the bottom right: the bar steps aside to the bottom left
   const councilBoard = useCouncilOpen()?.kind === "board";
+  // the This computer grid: its council wears the computer's mark
+  const onLocal = useOnLocalGrid();
   const insets = floorInsets(ui);
   // Settings → Renderer: Rune draws the sections and cards on its own canvas (rune/); the camera, its
   // gestures and keys, and the layers above stay here for both engines. The handlers read it through a ref
@@ -1080,8 +1084,13 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
             <span className="hud-icon-text">{COMMANDS_GLYPH}</span>
           </button>
         </div>
-        <button className={`hud-icon hud-council f-glass${councilBoard ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-pressed={councilBoard} aria-label="Council" data-tip="Council: this grid's agents, as characters. Talk to them, add more" data-council-open>
+        <button className={`hud-icon hud-council f-glass${councilBoard ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-pressed={councilBoard} aria-label="Council" data-tip={onLocal ? "Council: this grid's agents. The grid is read from this computer, where its sessions run" : "Council: this grid's agents, as characters. Talk to them, add more"} data-council-open>
           <CouncilGlyph />
+          {onLocal && (
+            <span className="council-local-badge" aria-hidden>
+              <ComputerGlyph size={10} />
+            </span>
+          )}
         </button>
         <div className={`hud-ask-pill f-glass${ui.session ? " is-on" : ""}`}>
           <button className={`hud-ask${ui.session ? " is-on" : ""}`} onClick={toggleSession} aria-pressed={!!ui.session} data-tip={ui.session ? "Put the conversation away" : "Ask the agent: a conversation beside the canvas"} data-kbd={keys("mod+J")}>

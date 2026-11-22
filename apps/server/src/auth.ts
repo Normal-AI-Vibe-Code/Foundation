@@ -235,19 +235,63 @@ export function googleStart(): { url: string; cookie: string } {
   return { url, cookie: `${GOOGLE_STATE_COOKIE}=${state}; Path=/auth/google; HttpOnly; SameSite=Lax; Max-Age=600${secure}` };
 }
 
-export function googleAuthUrl(): string {
+/** Foundation has a Google client of its own (both halves): sign-in goes straight to Google, on any address, hosted included */
+export const googleSignIn = () => Boolean(config.google.clientId && config.google.clientSecret);
+
+// Google's three addresses; a stand-in for tests and e2e names its own (the mail bridge reads the same two names)
+const base = (key: string, fallback: string) => (process.env[key] || fallback).replace(/\/$/, "");
+const accountsBase = () => base("GOOGLE_ACCOUNTS_BASE", "https://accounts.google.com");
+const oauthBase = () => base("GOOGLE_OAUTH_BASE", "https://oauth2.googleapis.com");
+const userinfoUrl = () => process.env.GOOGLE_USERINFO_URL || "https://openidconnect.googleapis.com/v1/userinfo";
+
+/** Google's sign-in page for this state; it comes back to <public url>/auth/google/callback */
+export function googleUrlFor(state: string): string {
   if (!config.google.clientId) throw new HttpError(501, "Google sign-in is not configured (GOOGLE_CLIENT_ID)");
-  const state = randomBytes(16).toString("hex");
-  pendingStates.set(state, Date.now());
   const params = new URLSearchParams({
     client_id: config.google.clientId,
-    redirect_uri: `${config.publicUrl}/auth/google/callback`,
+    redirect_uri: `${config.publicUrl.replace(/\/$/, "")}/auth/google/callback`,
     response_type: "code",
     scope: "openid email profile",
     state,
     prompt: "select_account",
   });
-  return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  return `${accountsBase()}/o/oauth2/v2/auth?${params}`;
+}
+
+export function googleAuthUrl(): string {
+  if (!config.google.clientId) throw new HttpError(501, "Google sign-in is not configured (GOOGLE_CLIENT_ID)");
+  const state = randomBytes(16).toString("hex");
+  pendingStates.set(state, Date.now());
+  return googleUrlFor(state);
+}
+
+/**
+ * Who Google says this code is: a verified address on the allowlist, as a Foundation user (made on a
+ * first sign-in: a member, or an admin if FOUNDATION_ADMIN_EMAILS names them). The caller has already
+ * checked the state the code came back with.
+ */
+export async function googleIdentity(code: string): Promise<UserInfo> {
+  if (!code) throw new HttpError(400, "Google didn't return a sign-in. Try again.");
+  const tokenRes = await fetch(`${oauthBase()}/token`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: config.google.clientId,
+      client_secret: config.google.clientSecret,
+      redirect_uri: `${config.publicUrl.replace(/\/$/, "")}/auth/google/callback`,
+      grant_type: "authorization_code",
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!tokenRes.ok) throw new HttpError(502, "Google rejected the sign-in");
+  const tokens = (await tokenRes.json()) as { access_token: string };
+  const infoRes = await fetch(userinfoUrl(), { headers: { authorization: `Bearer ${tokens.access_token}` }, signal: AbortSignal.timeout(10_000) });
+  if (!infoRes.ok) throw new HttpError(502, "Google didn't say who signed in");
+  const info = (await infoRes.json()) as { email?: string; email_verified?: boolean; name?: string };
+  if (!info.email || !info.email_verified) throw new HttpError(403, "Google account has no verified email");
+  if (!isAllowed(info.email)) throw new HttpError(403, `${info.email} is not on Foundation's allowlist`);
+  return upsertUser(info.email, info.name ?? "");
 }
 
 /**
@@ -260,24 +304,5 @@ export async function googleCallback(code: string, state: string, presented: str
   pendingStates.delete(state);
   if (!issued || Date.now() - issued > 10 * 60_000) throw new HttpError(400, "sign-in expired, try again");
   if (!presented || !safeEq(presented, state)) throw new HttpError(400, "This sign-in was started in a different browser. Start again from Foundation.");
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: config.google.clientId,
-      client_secret: config.google.clientSecret,
-      redirect_uri: `${config.publicUrl}/auth/google/callback`,
-      grant_type: "authorization_code",
-    }),
-  });
-  if (!tokenRes.ok) throw new HttpError(502, "Google rejected the sign-in");
-  const tokens = (await tokenRes.json()) as { access_token: string };
-  const infoRes = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-    headers: { authorization: `Bearer ${tokens.access_token}` },
-  });
-  const info = (await infoRes.json()) as { email?: string; email_verified?: boolean; name?: string };
-  if (!info.email || !info.email_verified) throw new HttpError(403, "Google account has no verified email");
-  if (!isAllowed(info.email)) throw new HttpError(403, `${info.email} is not on Foundation's allowlist`);
-  return upsertUser(info.email, info.name ?? "");
+  return googleIdentity(code);
 }

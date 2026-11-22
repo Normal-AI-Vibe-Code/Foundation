@@ -68,6 +68,8 @@ export default defineConfig({
         FOUNDATION_CLIENT_URL: CLIENT,
         FOUNDATION_ADMIN_EMAILS: "admin@normal.dev",
         FOUNDATION_DEV_LOGIN: "1",
+        // the Browser tool opens on an empty tab here: a check never opens the real HyperForm
+        FOUNDATION_BROWSER_HOME: "about:blank",
         // DeployForm here is a stand-in page (slack-standin.mjs): a check never opens the real one (pages.spec.ts)
         DEPLOYFORM_URL: `http://127.0.0.1:${SLACK_PORT}/e2e/page.html`,
         // a stand-in Slack (e2e/slack-standin.mjs); no agent runtime, so a check never spends an agent turn

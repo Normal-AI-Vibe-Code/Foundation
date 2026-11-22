@@ -1,0 +1,21 @@
+# what the hosted image's build never needs (Dockerfile), and what must never be in an image
+.git
+.github
+.claude
+.private
+.env
+**/.env
+**/.env.local
+data
+work
+dist
+**/node_modules
+**/dist
+**/target
+apps/client/src-tauri/server
+apps/client/src-tauri/gen
+apps/client/public/rune
+apps/rune/target
+docs/evidence
+docs/reference
+deploy/.env

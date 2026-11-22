@@ -195,6 +195,22 @@ test("the side menu's foot: the server a small pill right of Settings in its ban
   // the orb is left of you
   expect(orb.x + orb.width).toBeLessThanOrEqual(me.x);
   await admin.screenshot({ path: `${SHOTS}/06_side-menu-foot.png` });
+  // pressed, its panel opens in the menu's own flow (2026-11-18): inside the menu, right above the band, on no glass
+  await admin.locator('.side-pane [data-server-where="pane"] .server-switch-pill').click();
+  const panel = admin.locator(".side-pane .pane-server-slot .server-switch-panel");
+  await expect(panel).toBeVisible();
+  await settle(admin, 700);
+  const p = await box(admin, ".side-pane .pane-server-slot .server-switch-panel");
+  const band = await box(admin, ".side-pane .pane-low-row");
+  expect(p.x).toBeGreaterThanOrEqual(paneBox.x - 1);
+  expect(p.x + p.width).toBeLessThanOrEqual(paneBox.x + paneBox.width + 1);
+  expect(Math.abs(p.y + p.height - band.y)).toBeLessThan(3);
+  expect(await panel.evaluate((el) => el.classList.contains("f-glass"))).toBe(false);
+  // its type is the menu's: the same colour as Settings
+  expect(await css(admin, ".side-pane .pane-server-slot .server-switch-option-head strong", "color")).toBe(await css(admin, '.side-pane [data-place="settings"] .pane-label', "color"));
+  await admin.screenshot({ path: `${SHOTS}/06b_side-menu-server-open.png` });
+  await admin.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
 });
 
 test("day and night reach the grid's paper, even when the browser has taken the paper's WebGL context", async () => {
@@ -228,12 +244,10 @@ test("day and night reach the grid's paper, even when the browser has taken the 
 test("the tools: a terminal that runs a line for an admin, the change log, the files, a browser, and T3", async ({ browser }) => {
   // the member signs in first: dev sign-in is refused while the built-in terminal (a shell here) is open
   const m = await person(browser, "Ada Test", "ada@normal.dev");
-  // terminal: nothing runs until Start; then a line in, its answer and the folder back
+  // terminal: pressing its button starts the shell (no second press); then a line in, its answer and the folder back
   await admin.locator('[data-tool-open="terminal"]').click();
   const pane = admin.locator(".tool-pane");
   await expect(pane).toBeVisible();
-  await expect(pane.locator("[data-term-start]")).toBeVisible();
-  await pane.locator("[data-term-start]").click();
   const screen = pane.locator("[data-term-screen]");
   await expect(screen).toContainText("❯", { timeout: 15_000 });
   await screen.click();

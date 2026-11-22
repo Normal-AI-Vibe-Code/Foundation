@@ -238,7 +238,7 @@ export function StageBody({ panel }: { panel: PanelMeta }) {
 
 function ArtifactTile({ a, onChoose }: { a: Artifact; onChoose(): void }) {
   const href = a.fileId ? `/files/${a.fileId}` : a.url;
-  const img = useFileSrc(a.kind === "image" ? href : undefined);
+  const img = useFileSrc(a.kind === "image" ? href : undefined, true, { width: 256 });
   return (
     <div className={`artifact kind-${a.kind}${a.chosen ? " is-chosen" : ""}`} title={`${a.name}${a.note ? ` — ${a.note}` : ""} · ${a.by}`}>
       <a className="artifact-face" {...(href ? fileLink(href) : {})} target="_blank" rel="noreferrer">

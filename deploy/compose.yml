@@ -1,0 +1,98 @@
+# A hosted Foundation on one machine (docs/hosting.md):
+#
+#   cp deploy/foundation.env.example deploy/.env     then fill it in
+#   docker compose -f deploy/compose.yml up -d --build
+#
+# foundation   the server and the web client, on :4410 inside the compose network only
+# caddy        HTTPS in front: it gets and renews the certificate for FOUNDATION_DOMAIN by itself
+#              (the machine must be reachable on ports 80 and 443 at that name)
+# backup       a nightly copy of the database and the file archive into the backups volume
+#
+# No public ports? `--profile tunnel` runs a Cloudflare Tunnel instead of opening 80/443 (set
+# CLOUDFLARE_TUNNEL_TOKEN, point the tunnel's public hostname at http://foundation:4410, and start with
+# `docker compose -f deploy/compose.yml --profile tunnel up -d --build foundation backup cloudflared`).
+
+name: foundation
+
+services:
+  foundation:
+    build:
+      context: ..
+    image: foundation:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      FOUNDATION_PUBLIC_URL: https://${FOUNDATION_DOMAIN:?set FOUNDATION_DOMAIN in deploy/.env}
+    volumes:
+      - data:/foundation
+    expose:
+      - "4410"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - foundation
+    environment:
+      FOUNDATION_DOMAIN: ${FOUNDATION_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  backup:
+    image: foundation:latest
+    restart: unless-stopped
+    depends_on:
+      - foundation
+    command: ["node", "--no-warnings", "/app/backup.mjs", "--every", "24"]
+    environment:
+      FOUNDATION_ROOT: /foundation
+      FOUNDATION_BACKUP_KEEP: ${FOUNDATION_BACKUP_KEEP:-14}
+    healthcheck:
+      disable: true
+    volumes:
+      - data:/foundation:ro
+      - backups:/backups
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - foundation
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  # everything Foundation keeps: data/ (SQLite, the file archive, secret.key) and work/
+  data:
+  # nightly copies (scripts/hosted-backup.mjs). Put this on another disk, or copy it off the machine
+  backups:
+  caddy_data:
+  caddy_config:

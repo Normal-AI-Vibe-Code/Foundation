@@ -5,7 +5,8 @@
  * right, on the floor like search and the agents (it takes their place, and they take its).
  *
  *  - **Terminal**: a shell on the computer Foundation's server runs on, in the server's folder. An admin's, and
- *    only after they press Start (the server mints a one-time key for the socket: apps/server/src/hostterm.ts).
+ *    started by their press on the Terminal's button or tab (2026-11-20; before, a second press on Start. The
+ *    server mints a one-time key for the socket: apps/server/src/hostterm.ts).
  *    Line-mode: the line is edited here, the shell runs it and answers with its folder as the prompt. What a
  *    command prints arrives without the blank lines a shell pads it with (server: termtidy.ts), and one empty
  *    line stands between a command and the next prompt, the same every time.
@@ -34,6 +35,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { onLook } from "@foundation/ui";
 import type { SearchHit } from "@foundation/protocol";
 import { api, wsUrl } from "../lib/api";
+import { useCapabilities } from "../lib/capabilities";
 import { refreshAvailable, useAvailable } from "../lib/agentsAvailable";
 import { HOLDS_KEYS } from "../lib/keysHeld";
 import { WIDTHS, setUi, toast, toggleTool, useUi, type ToolId } from "../state/ui";
@@ -119,6 +121,7 @@ type TermState = "idle" | "opening" | "open" | "closed";
 
 function TerminalTool({ shown }: { shown: boolean }) {
   const role = useUi().role;
+  const caps = useCapabilities();
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TermState>("idle");
   const [where, setWhere] = useState<{ shell: string; cwd: string } | null>(null);
@@ -261,12 +264,31 @@ function TerminalTool({ shown }: { shown: boolean }) {
     term.focus();
   };
 
+  // opening the Terminal (its button in the top bar, or its tab in the pane) is the press that starts the shell:
+  // the tool is only ever opened by a person, and never restored on load (state/ui.ts keeps `tool` out of what it
+  // saves). Once per opening of the pane: if it fails, the button below is how to try again
+  const auto = useRef(false);
+  useEffect(() => {
+    if (!shown || role !== "admin" || !caps.loaded || !caps.local.terminal || auto.current) return;
+    auto.current = true;
+    void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, role, caps.loaded, caps.local.terminal]);
+
   const again = () => {
     xt.current?.ws.close();
     xt.current?.term.dispose();
     xt.current = null;
     void start();
   };
+
+  if (!caps.local.terminal)
+    return (
+      <div className="tool-empty" data-hosted-terminal>
+        <b>A terminal on the server's computer</b>
+        <p>The built-in terminal runs on a local computer and is turned off on a hosted Foundation server.</p>
+      </div>
+    );
 
   if (role !== "admin")
     return (
@@ -280,7 +302,7 @@ function TerminalTool({ shown }: { shown: boolean }) {
       {state === "idle" || state === "opening" ? (
         <div className="tool-empty">
           <b>A terminal on the server's computer</b>
-          <p>A shell in the server's own folder. Nothing runs until you start it, and it ends when you close this pane. For programs that need a full terminal (an editor, a hidden password), use the computer's own.</p>
+          <p>A shell in the server's own folder. It starts when you open the Terminal, and ends when you close this pane. For programs that need a full terminal (an editor, a hidden password), use the computer's own.</p>
           <button className="f-pill is-accent" onClick={() => void start()} disabled={state === "opening"} data-term-start>
             {state === "opening" ? "Starting…" : "Start a shell"}
           </button>
@@ -508,6 +530,7 @@ function t3Origin(page: string): string | null {
  */
 export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean }) {
   const ui = useUi();
+  const caps = useCapabilities();
   const { t3, host } = useAvailable();
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState<string | null>(null);
@@ -516,20 +539,30 @@ export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean
   const frameCtx = useFrameContext();
   const t3Frame = page ? frameFor(page, { ...frameCtx, t3: t3Origin(page) }) : null;
   useEffect(() => {
+    if (!caps.loaded || !caps.local.t3) return;
     void refreshAvailable();
     const t = setInterval(() => void refreshAvailable(), t3 === "running" ? 8000 : 3000);
     return () => clearInterval(t);
-  }, [t3]);
+  }, [t3, caps.loaded, caps.local.t3]);
   // T3's own page, once it runs and someone (not a viewer) has the tool open: a link minted for this opening
   useEffect(() => {
-    if (!shown || t3 !== "running" || page || viewer) return;
+    if (!caps.loaded || !caps.local.t3 || !shown || t3 !== "running" || page || viewer) return;
     void api<{ url: string }>("/api/t3host/open", { method: "POST", json: {} })
       .then((r) => setPage(t3PageUrl(r.url)))
       .catch((e: Error) => setFailed(e.message));
-  }, [shown, t3, page, viewer]);
+  }, [caps.loaded, caps.local.t3, shown, t3, page, viewer]);
   useEffect(() => {
     if (t3 !== "running") setPage(null);
   }, [t3]);
+  if (!caps.local.t3)
+    return (
+      <div className={`tool-t3${full ? " is-full" : ""}`} data-hosted-t3>
+        <div className="tool-empty">
+          <b>This computer's agents</b>
+          <p>Local T3 agents run on a local computer and are turned off on a hosted Foundation server. Connect your own local agent over MCP in Settings → Agents, or use the server's API agent.</p>
+        </div>
+      </div>
+    );
   const press = (what: "start" | "stop") => {
     setBusy(true);
     setFailed(null);

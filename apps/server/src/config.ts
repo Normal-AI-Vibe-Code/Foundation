@@ -29,7 +29,14 @@ export const config = {
   port,
   host: env("FOUNDATION_HOST", "127.0.0.1"),
   publicUrl: env("FOUNDATION_PUBLIC_URL", `http://localhost:${port}`),
-  clientUrl: env("FOUNDATION_CLIENT_URL", "http://localhost:1430"),
+  /**
+   * a built web client (apps/client/dist) this server serves itself, at its own address: how a hosted
+   * server is one program behind one HTTPS name (clientfiles.ts; docs/hosting.md). Unset: the client is
+   * served elsewhere (Vite in dev, the desktop app's own window)
+   */
+  clientDir: env("FOUNDATION_CLIENT_DIR") ? resolve(root, env("FOUNDATION_CLIENT_DIR")) : "",
+  // where the client's pages are: the server's own address when it serves them, else the dev client
+  clientUrl: env("FOUNDATION_CLIENT_URL", env("FOUNDATION_CLIENT_DIR") ? env("FOUNDATION_PUBLIC_URL", `http://localhost:${port}`) : "http://localhost:1430"),
   /** the oldest client this server still works with (x.y.z; unset: any). Older ones get no board socket and are told to update (clientversion.ts) */
   minClient: env("FOUNDATION_MIN_CLIENT").trim(),
   /** more page origins that may call this server with credentials (comma-separated, exact), beyond the client and the desktop app's window (origins.ts) */

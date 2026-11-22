@@ -15,6 +15,7 @@
 
 import "./browser-tool.css";
 import { useState } from "react";
+import { useCapabilities } from "../lib/capabilities";
 import { HOLDS_KEYS } from "../lib/keysHeld";
 import { hostOf, useHostBrowser } from "./hostBrowser";
 import { toast, useUi } from "../state/ui";
@@ -24,6 +25,8 @@ import { frameAllow, frameFor } from "../panels/frameSandbox";
 import { useFrameContext } from "../lib/frames";
 
 export function BrowserTool() {
+  const caps = useCapabilities();
+  if (!caps.local.browser) return <FramedBrowser hosted />;
   return useUi().role === "admin" ? <HostBrowser /> : <FramedBrowser />;
 }
 
@@ -38,7 +41,7 @@ function HostBrowser() {
       <div className="tool-browser btool">
         <div className="tool-empty">
           <b>A browser on the server's computer</b>
-          <p>A real browser (Edge or Chrome), run on the computer Foundation's server is on and shown here, so any site works, and what you sign in to stays signed in. Nothing runs until you start it, and it ends when you close this pane.</p>
+          <p>A real browser (Edge or Chrome), run on the computer Foundation's server is on and shown here, so any site works, and what you sign in to stays signed in. It opens on HyperForm, where our apps are. Nothing runs until you start it, and it ends when you close this pane.</p>
           {why && <p className="tool-note is-bad">{why}</p>}
           <button className="f-pill is-accent" onClick={() => void start()} disabled={state === "opening"} data-browser-start>
             {state === "opening" ? "Starting…" : "Start the browser"}
@@ -250,7 +253,7 @@ const normal = (raw: string) => {
   return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`;
 };
 
-function FramedBrowser() {
+function FramedBrowser({ hosted = false }: { hosted?: boolean }) {
   const [stack, setStack] = useState<{ list: string[]; at: number }>({ list: [], at: -1 });
   const [text, setText] = useState("");
   const [nonce, setNonce] = useState(0);
@@ -307,7 +310,11 @@ function FramedBrowser() {
         <div className="tool-empty">
           <b>A page, beside the grid</b>
           <p>Type an address or a search. Some sites won't show inside another app (they say so with a blank page); ↗ opens those in your browser. "On the grid" makes the page a live card everyone on the grid sees.</p>
-          <p className="tool-note">An admin gets the full browser here: a real one on the server's computer, where every site works.</p>
+          <p className="tool-note" data-hosted-browser={hosted || undefined}>
+            {hosted
+              ? "The server's built-in browser runs on a local computer and is turned off on a hosted Foundation server. Pages that allow framing open here; use ↗ to open any other page in your own browser."
+              : "An admin gets the full browser here: a real one on the server's computer, where every site works."}
+          </p>
           <span className="tool-chips">
             {["localhost:1430/#/design", "github.com/joshleong/Foundation", "docs.anthropic.com"].map((u) => (
               <button key={u} className="f-pill" onClick={() => go(u)}>

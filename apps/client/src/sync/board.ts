@@ -35,7 +35,7 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import { IndexeddbPersistence } from "y-indexeddb";
-import { BOARD_SCHEMA, boardMaps, huddleStateOf, noteTextOf, setNoteText, setTableCells, tableCellMap, tableCellsOf, type HuddleState, type ObjectDoc, type SectionDoc, type UserInfo } from "@foundation/protocol";
+import { BOARD_SCHEMA, LOCAL_GRID_ID, boardMaps, huddleStateOf, noteTextOf, setNoteText, setTableCells, tableCellMap, tableCellsOf, type HuddleState, type ObjectDoc, type SectionDoc, type UserInfo } from "@foundation/protocol";
 import { ROOT, applyRemote, getState, setSyncHook, type AnyObject, type AppState, type GridTracks, type PanelMeta, type Section } from "../state/store";
 import { workbook } from "../engine/workbook";
 import { api, openSocket } from "../lib/api";
@@ -342,7 +342,8 @@ class BoardSync {
     if (this.ready) return;
     this.ready = true;
     const m = boardMaps(this.doc);
-    if (m.sections.size === 0 && seed) {
+    // the This computer grid is laid by the server as it finds projects: never seeded from the store's starter
+    if (m.sections.size === 0 && seed && this.boardId !== LOCAL_GRID_ID) {
       this.pushAll(getState());
     } else {
       this.pullGrid();

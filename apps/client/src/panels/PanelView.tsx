@@ -13,6 +13,7 @@
 import { JobWhat, type JobShown } from "./JobWhat";
 import { PipelineBody } from "./PipelineView";
 import { CollectionBody } from "./CollectionView";
+import { LocalBody } from "./LocalView";
 import { UploaderBody } from "./UploaderView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
@@ -27,6 +28,7 @@ import { landingsOf, toneOf } from "../shell/ports";
 import { CHARACTER_TYPE } from "@foundation/protocol";
 import { api, fetchFile, uploadFile } from "../lib/api";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
+import { ProgressiveImage } from "../components/ProgressiveImage";
 import { askAgent, toast, useUi } from "../state/ui";
 import { camera, onCamera } from "../state/camera";
 import { activeBoard } from "../sync/board";
@@ -78,6 +80,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   collection: "❖",
   replay: "◷",
   uploader: "⇪",
+  local: "⌂",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -116,7 +119,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
   const extras = <PanelActions panel={panel} />;
 
   const body =
-    panel.panel === "machine" && panel.machine ? (
+    panel.panel === "machine" && (panel.machine || panel.vm) ? (
       <MachineBody panel={panel} />
     ) : (panel.panel === "app" || panel.panel === "link") && panel.via === "browser" && panel.url && !panel.fromMachine ? (
       <BrowserPage panel={panel} />
@@ -144,6 +147,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <DesignBody panel={panel} />
     ) : panel.panel === "pipeline" ? (
       <PipelineBody panel={panel} />
+    ) : panel.panel === "local" ? (
+      <LocalBody panel={panel} />
     ) : panel.panel === "collection" ? (
       <CollectionBody panel={panel} />
     ) : panel.panel === "replay" ? (
@@ -611,8 +616,8 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
   useEffect(() => {
     if (live) setSeenLive(true);
   }, [live]);
-  // what an <img>, <video> or <iframe> loads: the server URL, or (bearer) a blob once it's been on screen
-  const shown = useFileSrc(url, (live || seenLive) && (mime.startsWith("image/") || mime.startsWith("video/") || mime === "application/pdf"));
+  // what a <video> or <iframe> loads: the server URL, or (bearer) a blob once it's been on screen (images use ProgressiveImage)
+  const shown = useFileSrc(url, (live || seenLive) && (mime.startsWith("video/") || mime === "application/pdf"));
 
   useEffect(() => {
     if (!live || text !== null || !url) return;
@@ -639,7 +644,7 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
           <span>Uploading {name}…</span>
         </div>
       ) : mime.startsWith("image/") ? (
-        <img src={shown} alt={name} loading="lazy" decoding="async" />
+        <ProgressiveImage src={url} alt={name} targetWidth={512} enabled={live || seenLive} fit="contain" />
       ) : mime.startsWith("video/") ? (
         <video src={shown} muted loop playsInline controls preload="metadata" />
       ) : mime === "application/pdf" ? (

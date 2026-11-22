@@ -5,6 +5,9 @@
  */
 
 import { CouncilTalkView } from "../shell/CouncilTalk";
+import { VmSetupView, VmStatusView } from "../panels/LocalVm";
+import { ProgressiveImageDemo } from "./ProgressiveImageDemo";
+import { PeopleSectionView, type ServerRole, type ServerUser } from "../settings/PeopleSection";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
 import { ShibaDot } from "../today/notices";
@@ -153,6 +156,7 @@ import { SubGridDemo } from "./SubGridDemo";
 import { PointerDemo } from "./PointerDemo";
 import { CharacterStudioDemo } from "./CharacterStudioDemo";
 import { CollectionDemo } from "./CollectionDemo";
+import { LocalDemo } from "./LocalDemo";
 import { ChatFormDemo } from "../chat/ChatDesign";
 import { UploaderDemo } from "./UploaderDemo";
 
@@ -176,7 +180,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
   floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
-  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Text box", "Writing together"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Progressive cached images", "Text box", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
   chat: ["ChatForm"],
@@ -184,7 +188,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
-  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Release page", "Rune renderer"],
+  own: ["Settings, and grids inside grids", "People on a hosted server", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
 const Only = createContext<Set<string> | null>(null);
@@ -224,7 +228,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       </>
       )}
 
-      <Section title="The mark" note="Four panels on a grid: two full rows over a row split in two. Blue on paper and glass; the white original on a solid fill or dark ground.">
+      <Section title="The mark" note="Two leaves, one over the other: a low one over one twice its height, each rounded at its top left and bottom right. Blue on paper and glass; the white original on a solid fill or dark ground.">
         <div className="mark-specimens">
           {[64, 32, 20, 16].map((n) => (
             <span key={n} className="mark-specimen">
@@ -823,6 +827,12 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       <Section title="Adding files" note={`Drop files or whole folders on a section, paste onto the board (${keys("mod+V")}: they land where the pointer is), or pick them (${keys("mod+U")}). A folder comes in as a group, in path order, under a note that names it. Every upload goes through one glass tray at the bottom right: how many and how much in its head, a 3 px meter (blue while sending, green when everything landed, red when something didn't), then a row per file (its folder in dim, a percentage while it goes, ✓ when it's there). Three go at a time. It folds to its head, and goes by itself a beat after the last one lands. A failure keeps it open with Retry; its card waits until Retry or Close. Documents (PDF, Word, PowerPoint, Excel, OpenDocument) are searchable by what's inside them a moment after they land, and a result shows the words that matched.`}>
         <UploadsDemo />
       </Section>
+      <Section
+        title="Progressive cached images"
+        note="Every image card, chat picture, search tile, collection and lightbox reads from one two-tier cache (L1 ref-counted RAM LRU + L2 persistent Cache Storage across cookie and bearer transports) backed by quantized server tiers (64, 256, 512, 1024, 2048 px) with ETag/304. Cold loads reveal a ~1.4 KB 64 px preview first and decode the target off the main thread before swapping via opacity; remounts and board switches hit L1 synchronously on frame 1; off-screen cards shed VRAM down to a tiny cached tier after 2.5 s."
+      >
+        <ProgressiveImageDemo />
+      </Section>
       <Section title="Huddles and Slack" note="A huddle is a video portal at a place on the board: Live (green) while people are in it, REC (red, the one convention read without a legend) while it records, tabs and controls along the bottom clear of the hover bar. A Slack card is a channel: posts carry the person's name, ours get a blue rule. Shown at 400 and 560 px; offline says why.">
         <div className="adapt-row">
           {[560, 400].map((w) => (
@@ -1034,6 +1044,9 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <MachineAsksDemo />
         <AppToolAsksDemo />
         <MachineUseDemo />
+        <h3>Full operating systems · native QEMU</h3>
+        <div className="adapt-row">{[260, 400, 560].map((width) => <div key={width} className="frame-card live-specimen" style={{ width, height: 700 }}><VmSetupView files={[{ id: "demo-iso", name: "wildos-amd64.iso", size: 3 * 1073741824, sha256: "a2b4c6d8".repeat(8) }]} host={{ available: true, note: "Native QEMU · no WSL or Docker required", maxMemoryMB: 16384, maxCpus: 8 }} /></div>)}</div>
+        <div className="adapt-row"><div className="frame-card live-specimen" style={{ width: 560 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "stopped", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "software", bootIso: false, detail: "VM stopped. Its disk is kept." }} /></div><div className="frame-card live-specimen" style={{ width: 400 }}><VmStatusView vm={{ name: "WildOS", os: "WildOS / Linux x86-64", state: "error", isoName: "wildos-amd64.iso", memoryMB: 4096, cpus: 2, diskGB: 64, acceleration: "native", bootIso: true }} viewer error="Not enough available host memory. Close other VMs/apps or configure a smaller VM." /></div></div>
         <MachineHeadSpecimens />
         <div className="adapt-row">
           <div className="frame-card live-specimen" style={{ width: 400, height: 220 }}>
@@ -1179,6 +1192,12 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <SettingsDemo />
         <SubGridDemo />
       </Section>
+      <Section
+        title="People on a hosted server"
+        note="In Settings → General for admins: everyone who has signed in to this Foundation server and their server-wide role (Admin, Member, View only). The last admin on the server cannot be demoted, so the server is never locked out, and every role change is written to the tamper-evident audit log."
+      >
+        <PeopleSectionDemo />
+      </Section>
 
       <Section
         title="What agents may send outside"
@@ -1244,6 +1263,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
 
       <Section title="Rune renderer" note="A second engine beside the web renderer (Settings → Renderer; it's this device's choice, and the web renderer is the default). While Rune draws the board, a quiet glass pill in the bottom bar says so, beside the zoom: a green dot when it's drawing, a breathing blue one while it starts, amber and Rune off when it was asked for and couldn't run (the label says why, and a toast says it once). A press opens the list of where Rune stands. In Settings the two engines are raised cards, the chosen one ringed blue; under them, whether WebGPU and the build are here, then the ledger: each part of the board with one of four words. Never violet: which engine draws is a person's choice.">
         <RuneDesign />
+      </Section>
+
+      <Section title="This computer" note="The projects being built on the computer the server runs on, as a grid of their own (Settings → Places → Connect this computer; an admin, in person). A section per git repository, its worktrees folded in, each holding three cards the server keeps: Preview (the newest screenshot a session saw, and the dev server the project declares, its port in the code face with a dot: ok when something answers, ↗ to open it), Progress (the lead session: its title 14/600, where it runs, its plan as a 4 px ok bar with n/m and its steps, done struck, the one under way 600 with a breathing agent-violet box, then its last wrap-up behind a strong hairline; the others as 24 px rows), and Changes (the branch in the code face, ↑↓ against upstream, the changed files with their status letter in warn, ok or bad, the last five commits). Every card wears the local pill: a computer, On this computer, and the watch's dot (ok while it looks, warn when it stopped). The same mark sits beside a section's council chip (Local, or n working here), on the grid's council button, on the grid's tab and its row in the side menu, with the dot at the row's right. Never violet but for a session at work: the computer isn't an agent.">
+        <LocalDemo />
       </Section>
 
       <Section title="Panels that adapt" note="Design for the narrowest width first; container queries, never the window. Check 260, 400 and 560 px.">
@@ -2415,7 +2438,7 @@ function HeldPageDemo(p: { width: number; word: string; tone: "ok" | "warn" | "b
   );
 }
 
-const UPDATE_NOTES = ["## Foundation 0.3.0", "- Desktop updates: this card", "- A new icon: four panels on a grid", "- Signed installers, checked before they run"].join("\n");
+const UPDATE_NOTES = ["## Foundation 0.3.0", "- Desktop updates: this card", "- A new icon: two leaves on a night tile", "- Signed installers, checked before they run"].join("\n");
 const UPDATE_PHASES: Array<{ phase: UpdatePhase; width: number; layout?: "floating" | "inline"; extra?: Record<string, unknown> }> = [
   { phase: "available", width: 400 },
   { phase: "available", width: 260 },
@@ -2582,6 +2605,13 @@ function ServerSwitchDemo() {
           <ServerSwitchView {...SWITCH_BASE} {...d.props} />
         </div>
       ))}
+      {/* signed in (2026-11-18): it opens in the side menu's own flow, right above the Settings band, on the menu's paper */}
+      <div style={{ width: 272 }}>
+        <div className="f-eyebrow update-demo-label">In the side menu, open above Settings</div>
+        <div className="server-switch-menu-demo">
+          <ServerSwitchView {...SWITCH_BASE} still open host={null} panelOnly />
+        </div>
+      </div>
       {SWITCH_STATES.map((d, i) => (
         <div key={i} style={{ width: 360 }}>
           <div className="f-eyebrow update-demo-label">{d.label}</div>
@@ -2742,6 +2772,22 @@ function PickupDemo() {
           </figure>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PeopleSectionDemo() {
+  const [users, setUsers] = useState<ServerUser[]>([
+    { id: "u_ada", name: "Ada Lovelace", email: "ada@formindustries.co", color: "var(--viz-1)", role: "admin", created_at: NOW - 18 * 864e5 },
+    { id: "u_kai", name: "Kai Moreno", email: "kai@formindustries.co", color: "var(--viz-2)", role: "member", created_at: NOW - 6 * 864e5 },
+    { id: "u_maya", name: "Maya Lin", email: "maya@normallab.co", color: "var(--viz-3)", role: "viewer", created_at: NOW - 2 * 864e5 },
+  ]);
+  const onRole = (id: string, role: ServerRole) => {
+    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
+  };
+  return (
+    <div style={{ maxWidth: 680 }}>
+      <PeopleSectionView users={users} meId="u_ada" onRole={onRole} />
     </div>
   );
 }

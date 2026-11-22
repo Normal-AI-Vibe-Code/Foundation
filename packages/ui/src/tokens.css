@@ -204,6 +204,16 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   color: var(--color-over-room);
 }
 
+/* A text box in the room: what's typed is white, and so are the words that stand in before anything is
+   (a placeholder is the browser's grey unless told, or a dimmed ink: both are lost on the picture).
+   Not a box on its own paper (a panel that is paper again, a character's speech line). Only the room:
+   paper, day and night keep theirs. */
+html[data-theme="room"] :is(.top-bar, .floor-pane, .today) :is(input, textarea):not(:is(.f-paper, .f-day, .f-night, .council-under) *),
+html[data-theme="room"] :is(.top-bar, .floor-pane, .today) :is(input, textarea):not(:is(.f-paper, .f-day, .f-night, .council-under) *)::placeholder {
+  color: var(--color-over-room);
+  opacity: 1;
+}
+
 /* Foundation's older names for the tokens (the grid's CSS uses them). Declared wherever the tokens
    are re-declared, so a themed surface re-resolves them too: declared on the root alone, they kept
    the root's ink inside the room (release notes drawn dark over Today). */

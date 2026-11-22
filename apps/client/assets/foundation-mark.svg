@@ -1,6 +1,4 @@
-<svg width="451" height="418" viewBox="0 0 451 418" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="451" height="124" rx="5" fill="white"/>
-<rect y="147" width="451" height="124" rx="5" fill="white"/>
-<rect y="294" width="216" height="124" rx="5" fill="white"/>
-<rect x="235" y="294" width="216" height="124" rx="5" fill="white"/>
+<svg width="1240" height="1240" viewBox="0 0 1240 1240" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M396 0H1240A396 396 0 0 1 844 396H0A396 396 0 0 1 396 0Z" fill="white"/>
+<path d="M396 448H1240V844A396 396 0 0 1 844 1240H0V844A396 396 0 0 1 396 448Z" fill="white"/>
 </svg>

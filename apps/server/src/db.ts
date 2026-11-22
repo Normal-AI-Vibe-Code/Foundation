@@ -4,7 +4,7 @@
  * full-text index, apps, asks and agent runs.
  */
 
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "./config.ts";
@@ -327,6 +327,8 @@ for (const sql of [
   "alter table flowform_attempts add column confirmed_at integer",
   // what a job's card showed when it was queued (jobs.ts shownHash): Run must name it, and the row must still match
   "alter table jobs add column shown_hash text",
+  "alter table files add column width integer",
+  "alter table files add column height integer",
   "create index if not exists files_sha on files(sha256)",
   `create table if not exists file_text (
      sha256 text primary key, v integer not null, status text not null,
@@ -342,16 +344,37 @@ for (const sql of [
 
 export type Row = Record<string, unknown>;
 
+/**
+ * Statements are compiled once and kept by their SQL text: compiling one on every call was 7.6 % of the
+ * server's busy time (profiled 2026-11-20). Each call below runs a statement to its end before returning,
+ * so one statement is never in use twice, and SQLite recompiles a kept statement itself when the schema
+ * changes. The oldest is dropped past STATEMENTS_KEPT, for SQL built with a varying number of placeholders.
+ */
+const STATEMENTS_KEPT = 500;
+const statements = new Map<string, StatementSync>();
+
+function statement(sql: string): StatementSync {
+  let st = statements.get(sql);
+  if (st) return st;
+  st = db.prepare(sql);
+  if (statements.size >= STATEMENTS_KEPT) statements.delete(statements.keys().next().value as string);
+  statements.set(sql, st);
+  return st;
+}
+
+/** how many statements are kept (for tests) */
+export const keptStatements = () => statements.size;
+
 export function one<T = Row>(sql: string, ...params: unknown[]): T | undefined {
-  return db.prepare(sql).get(...(params as never[])) as T | undefined;
+  return statement(sql).get(...(params as never[])) as T | undefined;
 }
 
 export function all<T = Row>(sql: string, ...params: unknown[]): T[] {
-  return db.prepare(sql).all(...(params as never[])) as T[];
+  return statement(sql).all(...(params as never[])) as T[];
 }
 
 export function run(sql: string, ...params: unknown[]) {
-  return db.prepare(sql).run(...(params as never[]));
+  return statement(sql).run(...(params as never[]));
 }
 
 /** Replace a document in the full-text index. */

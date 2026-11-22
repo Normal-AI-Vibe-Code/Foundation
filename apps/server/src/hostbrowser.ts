@@ -59,9 +59,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import type { WebSocket } from "ws";
-import type { UserInfo } from "@foundation/protocol";
+import { HYPERFORM_URL, type UserInfo } from "@foundation/protocol";
 import { requirePerson } from "./auth.ts";
 import { config } from "./config.ts";
+import { requireLocalFeature } from "./hosted.ts";
 import { HttpError, type Req } from "./http.ts";
 import { computerUseDefault } from "./prefs.ts";
 import { pageIdsOk, savePagePicture } from "./pagepictures.ts";
@@ -149,6 +150,24 @@ export function browserCandidates(platform: NodeJS.Platform = process.platform, 
   return [...at("Google Chrome", ["google-chrome", "google-chrome-stable", "chrome"]), ...at("Chromium", ["chromium", "chromium-browser"]), ...at("Microsoft Edge", ["microsoft-edge", "microsoft-edge-stable", "msedge"])];
 }
 
+/**
+ * Where the Browser tool opens: HyperForm (the dock the company's apps are deployed on, and whose sign-in they
+ * share), unless `FOUNDATION_BROWSER_HOME` names another address, or turns it off (`about:blank`, `off`, `none`:
+ * an empty tab, as before 2026-11-20). `HYPERFORM_URL` moves HyperForm itself, as it does on Today's shelf.
+ * Anything that isn't a plain http(s) address falls back to the empty tab: a setting never opens a search.
+ */
+export function browserHome(env: NodeJS.ProcessEnv = process.env): string {
+  const set = env.FOUNDATION_BROWSER_HOME?.trim();
+  if (set && /^(about:blank|off|none|0)$/i.test(set)) return "about:blank";
+  const raw = set || env.HYPERFORM_URL?.trim() || HYPERFORM_URL;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : "about:blank";
+  } catch {
+    return "about:blank";
+  }
+}
+
 /** the browser to drive: `FOUNDATION_BROWSER` if it is set (and there), else the first installed one; null when none */
 export function findBrowser(env: NodeJS.ProcessEnv = process.env, exists: (p: string) => boolean = existsSync, platform: NodeJS.Platform = process.platform): FoundBrowser | null {
   const named = env.FOUNDATION_BROWSER?.trim();
@@ -195,6 +214,7 @@ export const HOST_BROWSER_PATH = /^\/host\/browser\/([A-Za-z0-9_-]{8,64})$/;
 export function requestHostBrowser(req: Req, page?: CardPage) {
   const u = requirePerson(req, "Opening the browser");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can open the browser on the server's computer.");
+  requireLocalFeature("browser", "The server's built-in browser");
   const found = findBrowser();
   if (!found) throw new HttpError(503, noBrowserSentence());
   return { ...openHostBrowser(u, page), browser: found.name, running: hostBrowserRunning() };
@@ -354,6 +374,8 @@ interface Sock {
   page?: CardPage;
 }
 interface Run {
+  /** the Browser tool has been shown its opening page (browserHome) once: closing and opening the pane doesn't send it there again */
+  homed?: boolean;
   proc: ChildProcess;
   cdp: Cdp;
   name: string;
@@ -1162,6 +1184,13 @@ export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo, pa
     } else {
       const first = [...mine.tabs.values()].find((t) => !t.card) ?? [...mine.tabs.values()][0];
       if (first) look(mine, s, first.id);
+      // the tool's first opening of this browser: its empty tab goes to the opening page (HyperForm). A person
+      // opened the tool, so this is their press; a tab already somewhere is left where it is
+      if (first && !mine.homed) {
+        mine.homed = true;
+        const home = browserHome();
+        if (home !== "about:blank" && !first.card && first.url === "about:blank") void navigate(mine, first, home).catch(() => {});
+      }
     }
   })();
 }

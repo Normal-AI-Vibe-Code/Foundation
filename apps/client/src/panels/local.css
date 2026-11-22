@@ -1,0 +1,398 @@
+/* This computer's cards (LocalView.tsx): preview, progress, changes. Tokens only. */
+
+.local-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+  min-height: 0;
+}
+.local-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.local-eyebrow {
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-moss);
+}
+.local-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.local-empty {
+  margin: auto 0;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  text-align: center;
+}
+
+/* the local pill: read from this computer. Never violet: the computer isn't an agent */
+.local-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.local-pill .f-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* preview */
+.local-preview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.local-shot {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  overflow: hidden;
+}
+.local-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: top center;
+  display: block;
+}
+.local-shot-wait {
+  flex: 1;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-frost) 6%, transparent), transparent);
+  background-size: 200% 100%;
+  animation: local-wait 1.5s linear infinite;
+}
+@keyframes local-wait {
+  to {
+    background-position: -200% 0;
+  }
+}
+.local-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.local-caption {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.local-server {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1 var(--font-code);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  margin-left: auto;
+}
+.local-server .f-dot {
+  width: 6px;
+  height: 6px;
+}
+.local-server.is-live {
+  color: var(--color-frost);
+}
+.local-server.is-live:hover {
+  border-color: var(--color-pulse);
+  color: var(--color-pulse);
+}
+
+/* progress */
+.local-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.local-session-head,
+.local-others li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.local-session.is-lead .local-title {
+  font: 600 var(--text-14) / 1.3 var(--font-sans);
+}
+.local-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.local-claude {
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  width: 12px;
+  text-align: center;
+}
+.local-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 4px 0 0 20px;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.local-meta a,
+.local-recap a {
+  color: var(--color-pulse);
+  text-decoration: none;
+}
+.local-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  white-space: nowrap;
+}
+.local-state .f-dot {
+  width: 6px;
+  height: 6px;
+}
+.local-state.is-working {
+  color: var(--color-agent);
+}
+.local-state.is-waiting {
+  color: var(--color-warn);
+}
+.local-state.is-error {
+  color: var(--color-bad);
+}
+.local-steps {
+  margin: 8px 0 0 20px;
+}
+.local-bar {
+  position: relative;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  margin: 0 32px 8px 0;
+}
+.local-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-ok);
+}
+.local-bar > em {
+  position: absolute;
+  right: -32px;
+  top: -5px;
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-dim);
+}
+.local-steps ul,
+.local-others,
+.local-files,
+.local-commits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.local-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--text-12);
+  line-height: 1.6;
+  color: var(--color-mist);
+}
+.local-tick {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: 1px solid var(--color-line-strong);
+  flex-shrink: 0;
+  transform: translateY(-1px);
+}
+.local-steps li.is-done {
+  color: var(--color-dim);
+  text-decoration: line-through;
+}
+.local-steps li.is-done .local-tick {
+  background: var(--color-ok);
+  border-color: var(--color-ok);
+}
+.local-steps li.is-doing {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.local-steps li.is-doing .local-tick {
+  border-color: var(--color-agent);
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+.local-recap {
+  margin: 8px 0 0 20px;
+  padding-left: 8px;
+  border-left: 2px solid var(--color-line-strong);
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.local-others {
+  border-top: 1px solid var(--color-line);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.local-others li {
+  height: 24px;
+  font-size: var(--text-12);
+}
+.local-n {
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.local-code {
+  font: 500 var(--text-11) / 1.3 var(--font-code);
+  color: var(--color-mist);
+}
+
+/* changes */
+.local-changes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+.local-branch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.local-branch .local-code {
+  font-size: var(--text-12);
+  color: var(--color-frost);
+}
+.local-dirty {
+  margin-left: auto;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
+}
+.local-files li,
+.local-commits li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 22px;
+  font-size: var(--text-12);
+  min-width: 0;
+}
+.local-st {
+  width: 16px;
+  text-align: center;
+  font: 700 var(--text-11) / 1 var(--font-code);
+  color: var(--color-warn);
+}
+.local-st.is-new {
+  color: var(--color-ok);
+}
+.local-st.is-gone {
+  color: var(--color-bad);
+}
+.local-path,
+.local-subject {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: ltr;
+}
+.local-path {
+  font: 400 var(--text-12) / 1.3 var(--font-code);
+  color: var(--color-mist);
+}
+.local-more,
+.local-when {
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  white-space: nowrap;
+}
+
+/* a section of the This computer grid: the computer's mark beside its council (SectionView) */
+.sec-local-chip {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.sec-local-chip .f-dot {
+  width: 6px;
+  height: 6px;
+}
+
+/* the side menu's row for the This computer grid: the watch's dot at its right */
+.pane-local-dot {
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+}
+
+/* the grid's council, on the This computer grid: the computer's mark on its button */
+.council-local-badge {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  display: grid;
+  place-items: center;
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  color: var(--color-mist);
+  pointer-events: none;
+}

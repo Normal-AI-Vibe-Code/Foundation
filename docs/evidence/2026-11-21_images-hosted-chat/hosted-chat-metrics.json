@@ -1,0 +1,42 @@
+{
+  "hostedOrigin": "http://foundation.localhost:61912",
+  "desktopOrigin": "http://localhost:61911",
+  "adaRoleInitial": "admin",
+  "outsiderBlocked": true,
+  "deviceCodeFormatOk": true,
+  "bearerNeverInUrl": true,
+  "kaiRoleInitial": "member",
+  "chatImageCookieTier": "512",
+  "chatImageBearerTier": "512",
+  "bearerL2EntriesBeforeReload": 2,
+  "bearerReloadImageRequests": 0,
+  "offlineReconnectDelivered": true,
+  "capabilities": {
+    "hosted": true,
+    "allowHostTools": false,
+    "local": {
+      "terminal": false,
+      "browser": false,
+      "machines": false,
+      "vms": false,
+      "t3": false,
+      "vision": false,
+      "places": false,
+      "localDev": false
+    },
+    "chat": true,
+    "images": {
+      "serverLevels": true,
+      "widths": [
+        64,
+        256,
+        512,
+        1024,
+        2048
+      ]
+    }
+  },
+  "hostTerminalStatus": 403,
+  "hostBrowserStatus": 403,
+  "kaiRolePromoted": "admin"
+}

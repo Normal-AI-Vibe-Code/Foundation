@@ -42,7 +42,7 @@ import type { ServerResponse } from "node:http";
 import type { UserInfo } from "@foundation/protocol";
 import { config } from "./config.ts";
 import { all, db, one, run } from "./db.ts";
-import { createSession, fromLoopback, hashToken, isServiceToken, setSessionCookie, signIn, upsertUser, userFromSessionHash } from "./auth.ts";
+import { createSession, fromLoopback, googleIdentity, googleSignIn, googleStart, googleUrlFor, hashToken, isServiceToken, setSessionCookie, signIn, upsertUser, userFromSessionHash } from "./auth.ts";
 import { HttpError, parseCookies, type Req } from "./http.ts";
 import { finishGrant, keepSession, takeGrant } from "./flowformfiles.ts";
 
@@ -179,6 +179,8 @@ export function loopbackOrigin(req: Req): string {
   if (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) && /:\d+$/.test(host)) return `http://${host}`;
   const pub = new URL(config.publicUrl);
   if ((pub.hostname === "localhost" || pub.hostname === "127.0.0.1") && pub.port) return pub.origin;
+  // a hosted server: Flowform only returns to a loopback address, so this server needs a Google client of its own (docs/hosting.md)
+  if (hostedServer()) throw new HttpError(501, `Sign-in isn't set up on this server yet: at ${pub.host} it needs its own Google client (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET).`);
   throw new HttpError(500, "Flowform sign-in needs Foundation's server on this machine (a loopback address with a port)");
 }
 
@@ -189,6 +191,13 @@ function flowformStartUrl(origin: string, nonce: string) {
 
 /** web: redirect this browser to flowform's Google sign-in */
 export function startWeb(req: Req, res: ServerResponse) {
+  // a server with its own Google client signs in there (a hosted address can't use Flowform's loopback rule);
+  // every client's Google button comes here, so older ones are carried along
+  if (googleSignIn()) {
+    const { url, cookie } = googleStart();
+    res.writeHead(302, { location: url, "set-cookie": cookie, "cache-control": "no-store", "referrer-policy": "no-referrer" });
+    return res.end();
+  }
   sweep();
   const nonce = secret();
   const browser = secret();
@@ -211,10 +220,46 @@ export function beginDesktop(req: Req) {
   const nonce = secret();
   const poll = secret();
   const code = signInCode();
-  const url = flowformStartUrl(loopbackOrigin(req), nonce);
+  // its own Google client when the server has one (the attempt's nonce is Google's state), else Flowform's
+  const url = googleSignIn() ? googleUrlFor(nonce) : flowformStartUrl(loopbackOrigin(req), nonce);
   saveAttempt(nonce, { mode: "desktop", pollHash: hash(poll), code, returnTo: "/" });
   return { url, poll, code, expiresIn: DESKTOP_TTL / 1000 };
 }
+
+/**
+ * Google came back with a state. If it is a desktop attempt's (an app began it and is polling), finish it
+ * the way /done does: verify, then show the code and ask for the press; nothing reaches the app before
+ * "This is me". Returns false when the state is no desktop attempt, and the web sign-in handles it.
+ */
+export async function googleDesktopDone(req: Req, res: ServerResponse): Promise<boolean> {
+  sweep();
+  const state = req.query.get("state") ?? "";
+  if (!state || !one("select 1 from flowform_attempts where nonce_hash = ? and mode = 'desktop'", hash(state))) return false;
+  const attempt = consumeAttempt(state);
+  if (!attempt) {
+    page(res, 400, "Sign-in expired", "That sign-in took too long or was already used. Go back to Foundation and try again.");
+    return true;
+  }
+  try {
+    const refused = req.query.get("error");
+    if (refused) throw new HttpError(400, refused === "access_denied" ? "The sign-in was cancelled at Google." : "Google didn't finish the sign-in.");
+    const user = await googleIdentity(req.query.get("code") ?? "");
+    finishDesktop(attempt, { userId: user.id });
+    const press = secret();
+    run("update flowform_attempts set confirm_hash = ? where nonce_hash = ?", hash(press), attempt.nonce_hash);
+    res.setHeader("set-cookie", `${CONFIRM_COOKIE}=${press}; Path=/auth/flowform; HttpOnly; SameSite=Strict; Max-Age=${DESKTOP_TTL / 1000}${secureCookie()}`);
+    confirmPage(res, user, attempt.code ?? "");
+  } catch (e) {
+    const msg = e instanceof HttpError ? e.message : "Something went wrong finishing the sign-in. Try again.";
+    if (!(e instanceof HttpError)) console.error("google sign-in:", (e as Error).message);
+    finishDesktop(attempt, { error: msg });
+    page(res, e instanceof HttpError ? e.status : 500, "Sign-in didn't finish", msg);
+  }
+  return true;
+}
+
+/** cookies set on an https address are kept to https */
+const secureCookie = () => (config.publicUrl.startsWith("https") ? "; Secure" : "");
 
 export function safeReturn(raw: string | null) {
   // only same-origin paths; never an absolute URL, and no backslash or control character (a browser reads "/\host" as "//host")
@@ -377,7 +422,11 @@ export function confirm(req: Req, res: ServerResponse, answer: "yes" | "no") {
   const host = String(req.headers.host ?? "");
   const origin = req.headers.origin;
   const site = String(req.headers["sec-fetch-site"] ?? "");
-  if ((origin !== undefined && origin !== `http://${host}` && origin !== `https://${host}`) || (site && site !== "same-origin" && site !== "none")) {
+  // The page is served with Referrer-Policy: no-referrer, so a browser's press says Origin "null" (the
+  // Fetch spec hides the origin of a non-GET under that policy). It counts only when the browser also
+  // says the press came from this same origin.
+  const ownOrigin = origin === `http://${host}` || origin === `https://${host}` || (origin === "null" && site === "same-origin");
+  if ((origin !== undefined && !ownOrigin) || (site && site !== "same-origin" && site !== "none")) {
     return page(res, 403, "Nothing was done", "That answer didn't come from Foundation's own page.");
   }
   const presented = parseCookies(req.headers.cookie)[CONFIRM_COOKIE] ?? "";
@@ -477,7 +526,8 @@ button.yes{background:#201e19;color:#f6f3ec}@media (prefers-color-scheme:dark){b
   res.end(html);
 }
 
-function page(res: ServerResponse, status: number, title: string, body: string) {
+/** a plain page for a sign-in that ended in the browser (also Google's own callback: index.ts) */
+export function page(res: ServerResponse, status: number, title: string, body: string) {
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${esc(title)} · Foundation</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f3ec;color:#201e19;font:15px/1.5 "Hanken Grotesk",system-ui,sans-serif}
 @media (prefers-color-scheme:dark){body{background:#0a111f;color:#e6ecf7}}main{max-width:420px;padding:32px}
