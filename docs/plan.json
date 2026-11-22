@@ -240,6 +240,24 @@
       "body": "Josh, 2026-11-21: \"show when people are in the boards and collaborating, as well as the agents\". Built: whereabouts.ts (server), shell/HereStack.tsx, a DM row's \"in <grid>\". Checked with a second person from a script on a copy of the real data (docs/evidence/2026-11-21_who-is-where/). A person checks it with a real teammate and a real agent at work."
     },
     {
+      "id": "chatform-rust-vercel",
+      "title": "ChatForm's server in Rust on Vercel: accounts, channels, messages and the live socket on Postgres",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "doing",
+      "body": "Josh, 2026-11-21: \"Host it on vercel for now. build a rust based server there.\" Built: apps/chatserver (axum on Vercel's Rust runtime, Postgres, LISTEN/NOTIFY across instances, Google accounts with an allowlist), the Node server's chat routes and JSON; cargo test green (5 unit, 4 end to end). Next: ChatForm in the app points at it (a chat-server setting and an app sign-in). Waits on a person for the Vercel project, Neon and the Google OAuth client (apps/chatserver/README.md)."
+    },
+    {
+      "id": "chatform-vercel-setup",
+      "title": "Set up ChatForm's server on Vercel: the project, Neon Postgres and the Google OAuth client",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "needs-you",
+      "body": "Steps in apps/chatserver/README.md: import the repo with Root Directory apps/chatserver, add Neon from Storage, create the Google OAuth client (redirect https://<project>.vercel.app/auth/google/callback), set GOOGLE_CLIENT_ID/SECRET, CHATFORM_ALLOWLIST (@formindustries.co,@normallab.co), CHATFORM_ADMIN_EMAILS, CHATFORM_CORS_ORIGINS. Then /api/health says database and listening true."
+    },
+    {
       "id": "chatform-core",
       "title": "ChatForm core: channels, DMs, threads, reactions, files, search and unread on the server",
       "kind": "plan",
