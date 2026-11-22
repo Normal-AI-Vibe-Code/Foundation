@@ -78,6 +78,16 @@ All in `deploy/.env` (`deploy/foundation.env.example` lists them with what each 
 | `FOUNDATION_SERVICE_TOKEN` | A bearer for other services (32+ characters) |
 | `FOUNDATION_MIN_CLIENT` | The oldest desktop release the server still works with, once that release is published |
 | `FOUNDATION_BACKUP_KEEP` | Nightly database copies kept (default 14) |
+| `FOUNDATION_IMAGE_CACHE_MB` | Disk LRU budget for regenerable resized image tiers in `data/cache/images` (default 512 MB; excluded from backups) |
+| `FOUNDATION_ALLOW_HOST_TOOLS` | Leave `0` (default) so host terminal, built-in browser, machines, local VMs, T3 and Places stay turned off on a hosted server |
+
+Before starting the stack, validate `deploy/.env` with:
+
+```sh
+npm run hosted:check -- --env deploy/.env
+# Once live:
+npm run hosted:check -- --env deploy/.env --url https://<address>
+```
 
 The image sets the rest: `FOUNDATION_HOST=0.0.0.0`, `FOUNDATION_ROOT=/foundation`, `FOUNDATION_CLIENT_DIR=/app/client`. The server answers only to its own name (`FOUNDATION_PUBLIC_URL`'s host; add others with `FOUNDATION_HOSTS`), and admits the desktop app's window as a caller because it is hosted. **Never set `FOUNDATION_DEV_LOGIN` on a hosted server.**
 
@@ -96,6 +106,9 @@ Restore (the server stopped, so nothing writes meanwhile):
 
 ```sh
 docker compose -f deploy/compose.yml stop foundation
+# Verified restore script (checks pragma integrity_check before touching destination, preserves archived files):
+node scripts/hosted-restore.mjs --from /path/to/backups --to /path/to/data --confirm
+# Or inside the compose volumes:
 docker compose -f deploy/compose.yml run --rm --user root -v foundation_backups:/backups:ro foundation sh -c '
   cp /backups/db/<date_time>/foundation.db /foundation/data/foundation.db &&
   rm -f /foundation/data/foundation.db-wal /foundation/data/foundation.db-shm &&
@@ -105,23 +118,23 @@ docker compose -f deploy/compose.yml run --rm --user root -v foundation_backups:
 docker compose -f deploy/compose.yml start foundation
 ```
 
-Checked 2026-11-20: the backup ran in the stack and its copy passed SQLite's integrity check. **The restore commands above have not been run end to end.**
+Checked 2026-11-21: `scripts/hosted-backup.mjs` and `scripts/hosted-restore.mjs` are tested end-to-end (`apps/server/test/hosted-features.test.ts`: backup → mutate → refuse without `--confirm` → restore → `pragma integrity_check` + chat messages + archived files intact, `data/cache/images` excluded from backups).
+
+**People & roles.** Once signed in as an admin, open **Settings → General → People on this server** to view everyone who has signed in and promote or demote roles (Admin / Member / View only). At least one admin always stays on the server, and every change is logged to the tamper-evident audit log.
 
 **Moving a computer's Foundation to the hosted one.** The same shape as a restore: a `vacuum into` copy of that computer's `data/foundation.db`, its `data/files/` and `data/secret.key`, into the data volume before the first start. People are matched by email, so someone who signed in there with the address Google gives them is the same person on the hosted server.
 
 ## What a hosted server doesn't do (yet)
 
-These run on the server's own computer, which here is the hosted machine, not anyone's desk:
+These run on the server's own computer, which here is the hosted machine, not anyone's desk, so a hosted server turns them off by default (`GET /api/capabilities`, 403 at the routes, and honest notices in the UI):
 
-- **Machines (Kiri, Docker), local VMs, the desktop in a section:** the container has no container engine, so the cards say none is available.
-- **The built-in browser and the built-in terminal:** admin-only and a person's press, as everywhere; on a hosted server they would act inside the container. Leave them alone there.
-- **Vision Code hand-offs and T3 threads:** they need Vision on the same computer (plan: *vision-pairing*).
+- **Machines (Kiri, Docker), local VMs, the desktop in a section:** disabled on hosted servers (plan: *hosted-hardware-policy*).
+- **The built-in browser, built-in terminal, Places, and local projects watch:** disabled on hosted servers unless explicitly opted in.
+- **Vision Code hand-offs and T3 threads:** disabled on hosted servers (plan: *vision-pairing*).
 - **The crew on a Claude subscription:** there is no signed-in `claude` in the image; agent turns need `ANTHROPIC_API_KEY`.
 - **Huddles across networks** need a TURN server (`FOUNDATION_ICE_SERVERS`).
 - **ChatForm's bridges** (mail, WhatsApp, Instagram, WeChat) need exactly this: a public HTTPS address. Their redirect and webhook addresses become `https://<address>/api/chat/bridges/gmail/callback` and `https://<address>/api/chat/hooks/<service>`; the Gmail bridge can use the same Google Cloud project (plan: *chatform-bridge-keys*).
 
-What machines and the built-in browser should do on a hosted server (who may start what, on whose hardware) is a decision still to make (plan: *hosted-local-features*).
-
 ## Checking a change to this setup
 
-`docs/evidence/2026-11-20_hosted/` holds the check: `compose.check.yml` runs this compose file at `https://foundation.localhost` with a local certificate and a stand-in Google (`standin-google.mjs`), and `check.mjs` drives two people through it in real browsers (a browser sign-in, the desktop app's page with its code and press, someone off the allowlist, one board, ChatForm, a dropped connection). The server's side is tested in `apps/server/test/hosted-signin.test.ts`.
+`apps/client/e2e/hosted-chat.spec.ts` runs the full hosted ChatForm check in real browsers (cookie browser + desktop bearer window, `#general`, DM, thread, reaction, cached image, unread badges, offline drop & catch-up, hosted 403 tool boundaries, and Admin People role management; evidence in `docs/evidence/2026-11-21_images-hosted-chat/`). `docs/evidence/2026-11-20_hosted/` holds the Caddy TLS compose check (`compose.check.yml` + `check.mjs`). Server tests live in `apps/server/test/hosted-signin.test.ts` and `apps/server/test/hosted-features.test.ts`.

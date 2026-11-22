@@ -17,9 +17,9 @@ import { pickUp, type Pickup } from "../lib/pickup";
 import { keys } from "../lib/keys";
 
 /** the picture of a hit, loaded with this device's session wherever the server is (lib/fileSrc.ts) */
-export function HitPicture({ hit }: { hit: SearchHit }) {
-  const src = useFileSrc(pictureOf(hit));
-  return src ? <img src={src} alt="" loading="lazy" draggable={false} /> : null;
+export function HitPicture({ hit, width = 256 }: { hit: SearchHit; width?: number }) {
+  const src = useFileSrc(pictureOf(hit), true, { width });
+  return src ? <img src={src} alt="" loading="lazy" decoding="async" draggable={false} /> : null;
 }
 
 /** press-and-pull on an element picks `hits` up; a press that doesn't move calls `onPress` */
@@ -61,7 +61,7 @@ function ClipCard({ hit }: { hit: SearchHit }) {
   const picture = Boolean(pictureOf(hit));
   return (
     <span className={`clip-card${picture ? " is-picture" : ""}`} data-hit-id={hit.id} data-tip={hit.title} {...pull}>
-      {picture ? <HitPicture hit={hit} /> : <span className="clip-glyph">{glyphOf(hit)}</span>}
+      {picture ? <HitPicture hit={hit} width={256} /> : <span className="clip-glyph">{glyphOf(hit)}</span>}
       <button
         className="clip-x"
         aria-label={`Take ${hit.title} off the clipboard`}

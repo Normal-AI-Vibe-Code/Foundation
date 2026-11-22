@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useCapabilities } from "../lib/capabilities";
 import { longDate } from "./releases";
 import { openGrid } from "../lib/grids";
 import { LocalConnect } from "../panels/LocalView";
@@ -21,6 +22,7 @@ interface Place {
 }
 
 export function PlacesTab() {
+  const caps = useCapabilities();
   const [places, setPlaces] = useState<Place[] | null>(null);
   const [canApprove, setCanApprove] = useState(false);
   const [path, setPath] = useState("");
@@ -38,8 +40,19 @@ export function PlacesTab() {
       (e: Error) => setErr(e.message),
     );
   useEffect(() => {
+    if (!caps.loaded || !caps.local.places) return;
     void read();
-  }, []);
+  }, [caps.loaded, caps.local.places]);
+
+  if (!caps.local.places) {
+    return (
+      <section className="services places-tab" data-hosted-places>
+        <p className="design-lede">
+          Places and local project watches read folders on a local computer and are turned off on a hosted Foundation server. Upload files directly onto a grid or into ChatForm instead.
+        </p>
+      </section>
+    );
+  }
 
   const approve = async (e: React.FormEvent) => {
     e.preventDefault();

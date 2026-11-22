@@ -33,6 +33,7 @@ import { config } from "./config.ts";
 import { all, db, one, run } from "./db.ts";
 import { imageSize } from "./construct.ts";
 import { storeFile, type FileRow } from "./files.ts";
+import { requireLocalFeature } from "./hosted.ts";
 import { HttpError } from "./http.ts";
 import { isSecretName } from "./secretnames.ts";
 
@@ -127,6 +128,7 @@ export function refusal(path: string): string | null {
 
 /** approve a folder. `person` is requirePerson's verdict for this request (a browser or the desktop app, not an agent's bearer). */
 export function approvePlace(by: UserInfo, person: boolean, input: { path?: string; name?: string }): Place {
+  requireLocalFeature("places", "Local computer folders (Places)");
   requireAdminPerson(by, person, "Approving a place");
   const asked = (input.path ?? "").trim().replace(/^"|"$/g, "");
   if (!asked || !isAbsolute(asked)) throw new HttpError(400, "Give the folder's full path, like C:\\Users\\you\\Documents\\Drawings or /Users/you/Drawings.");
@@ -144,6 +146,7 @@ export function approvePlace(by: UserInfo, person: boolean, input: { path?: stri
 
 /** forget an approval (needs confirm). The folder and what was already brought are untouched. */
 export function removePlace(by: UserInfo, person: boolean, id: string, confirm: unknown) {
+  requireLocalFeature("places", "Local computer folders (Places)");
   requireAdminPerson(by, person, "Removing a place");
   if (confirm !== true) throw new HttpError(400, "Removing a place needs confirm: true. It only forgets the approval; the folder isn't touched.");
   getPlace(id);
@@ -177,6 +180,7 @@ export function resolveInPlace(place: Place, rel = ""): string {
 
 /** what's in a folder of a place: folders first, then files, by name; secrets and links out left off */
 export async function listPlace(id: string, dir = ""): Promise<{ place: Place; dir: string; entries: PlaceEntry[]; more: number }> {
+  requireLocalFeature("places", "Local computer folders (Places)");
   const place = getPlace(id);
   const at = resolveInPlace(place, dir);
   if (!(await stat(at)).isDirectory()) throw new HttpError(400, "That's a file, not a folder.");
@@ -210,6 +214,7 @@ export const mimeOf = (name: string) => MIME[extname(name).toLowerCase()] ?? "ap
 
 /** copy one file out of a place into the archive, for a board. The original is only read. */
 export async function bringFromPlace(by: { id: string }, id: string, rel: string, boardId: string | null): Promise<FileRow> {
+  requireLocalFeature("places", "Local computer folders (Places)");
   return (await bringForCard(by, id, rel, boardId)).file;
 }
 

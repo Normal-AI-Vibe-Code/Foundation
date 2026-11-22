@@ -28,6 +28,7 @@ import { landingsOf, toneOf } from "../shell/ports";
 import { CHARACTER_TYPE } from "@foundation/protocol";
 import { api, fetchFile, uploadFile } from "../lib/api";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
+import { ProgressiveImage } from "../components/ProgressiveImage";
 import { askAgent, toast, useUi } from "../state/ui";
 import { camera, onCamera } from "../state/camera";
 import { activeBoard } from "../sync/board";
@@ -615,8 +616,8 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
   useEffect(() => {
     if (live) setSeenLive(true);
   }, [live]);
-  // what an <img>, <video> or <iframe> loads: the server URL, or (bearer) a blob once it's been on screen
-  const shown = useFileSrc(url, (live || seenLive) && (mime.startsWith("image/") || mime.startsWith("video/") || mime === "application/pdf"));
+  // what a <video> or <iframe> loads: the server URL, or (bearer) a blob once it's been on screen (images use ProgressiveImage)
+  const shown = useFileSrc(url, (live || seenLive) && (mime.startsWith("video/") || mime === "application/pdf"));
 
   useEffect(() => {
     if (!live || text !== null || !url) return;
@@ -643,7 +644,7 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
           <span>Uploading {name}…</span>
         </div>
       ) : mime.startsWith("image/") ? (
-        <img src={shown} alt={name} loading="lazy" decoding="async" />
+        <ProgressiveImage src={url} alt={name} targetWidth={512} enabled={live || seenLive} fit="contain" />
       ) : mime.startsWith("video/") ? (
         <video src={shown} muted loop playsInline controls preload="metadata" />
       ) : mime === "application/pdf" ? (

@@ -6,6 +6,8 @@
 
 import { CouncilTalkView } from "../shell/CouncilTalk";
 import { VmSetupView, VmStatusView } from "../panels/LocalVm";
+import { ProgressiveImageDemo } from "./ProgressiveImageDemo";
+import { PeopleSectionView, type ServerRole, type ServerUser } from "../settings/PeopleSection";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
 import { ShibaDot } from "../today/notices";
@@ -176,7 +178,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
   floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
-  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Text box", "Writing together"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Progressive cached images", "Text box", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
   chat: ["ChatForm"],
@@ -184,7 +186,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
   council: ["The council", "Collections"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
-  own: ["Settings, and grids inside grids", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
+  own: ["Settings, and grids inside grids", "People on a hosted server", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
 };
 /** when set, only these sections draw (a chapter's card on the design grid) */
 const Only = createContext<Set<string> | null>(null);
@@ -823,6 +825,12 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       <Section title="Adding files" note={`Drop files or whole folders on a section, paste onto the board (${keys("mod+V")}: they land where the pointer is), or pick them (${keys("mod+U")}). A folder comes in as a group, in path order, under a note that names it. Every upload goes through one glass tray at the bottom right: how many and how much in its head, a 3 px meter (blue while sending, green when everything landed, red when something didn't), then a row per file (its folder in dim, a percentage while it goes, ✓ when it's there). Three go at a time. It folds to its head, and goes by itself a beat after the last one lands. A failure keeps it open with Retry; its card waits until Retry or Close. Documents (PDF, Word, PowerPoint, Excel, OpenDocument) are searchable by what's inside them a moment after they land, and a result shows the words that matched.`}>
         <UploadsDemo />
       </Section>
+      <Section
+        title="Progressive cached images"
+        note="Every image card, chat picture, search tile, collection and lightbox reads from one two-tier cache (L1 ref-counted RAM LRU + L2 persistent Cache Storage across cookie and bearer transports) backed by quantized server tiers (64, 256, 512, 1024, 2048 px) with ETag/304. Cold loads reveal a ~1.4 KB 64 px preview first and decode the target off the main thread before swapping via opacity; remounts and board switches hit L1 synchronously on frame 1; off-screen cards shed VRAM down to a tiny cached tier after 2.5 s."
+      >
+        <ProgressiveImageDemo />
+      </Section>
       <Section title="Huddles and Slack" note="A huddle is a video portal at a place on the board: Live (green) while people are in it, REC (red, the one convention read without a legend) while it records, tabs and controls along the bottom clear of the hover bar. A Slack card is a channel: posts carry the person's name, ours get a blue rule. Shown at 400 and 560 px; offline says why.">
         <div className="adapt-row">
           {[560, 400].map((w) => (
@@ -1181,6 +1189,12 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
       >
         <SettingsDemo />
         <SubGridDemo />
+      </Section>
+      <Section
+        title="People on a hosted server"
+        note="In Settings → General for admins: everyone who has signed in to this Foundation server and their server-wide role (Admin, Member, View only). The last admin on the server cannot be demoted, so the server is never locked out, and every role change is written to the tamper-evident audit log."
+      >
+        <PeopleSectionDemo />
       </Section>
 
       <Section
@@ -2679,6 +2693,22 @@ function PickupDemo() {
           </figure>
         ))}
       </div>
+    </div>
+  );
+}
+
+function PeopleSectionDemo() {
+  const [users, setUsers] = useState<ServerUser[]>([
+    { id: "u_ada", name: "Ada Lovelace", email: "ada@formindustries.co", color: "var(--viz-1)", role: "admin", created_at: NOW - 18 * 864e5 },
+    { id: "u_kai", name: "Kai Moreno", email: "kai@formindustries.co", color: "var(--viz-2)", role: "member", created_at: NOW - 6 * 864e5 },
+    { id: "u_maya", name: "Maya Lin", email: "maya@normallab.co", color: "var(--viz-3)", role: "viewer", created_at: NOW - 2 * 864e5 },
+  ]);
+  const onRole = (id: string, role: ServerRole) => {
+    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, role } : u)));
+  };
+  return (
+    <div style={{ maxWidth: 680 }}>
+      <PeopleSectionView users={users} meId="u_ada" onRole={onRole} />
     </div>
   );
 }

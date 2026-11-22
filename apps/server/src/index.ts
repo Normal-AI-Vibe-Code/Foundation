@@ -79,6 +79,7 @@ import { gridOutline } from "./subgrids.ts";
 import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
 import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
+import { listServerUsers, requireLocalFeature, serverCapabilities, setServerUserRole, type ServerRole } from "./hosted.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -92,7 +93,21 @@ setCurator((o) => startRun(o));
 const r = new Router();
 registerVmRoutes(r);
 
-r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
+r.get("/api/health", () => ({ ok: true, name: "foundation", version: SERVER_VERSION, hosted: flowform.hostedServer(), at: Date.now() }));
+r.get("/api/capabilities", () => serverCapabilities());
+
+// ---------- admin people (hosted.ts) ----------
+
+r.get("/api/admin/users", (req) => {
+  const u = requirePerson(req, "Viewing people on this server");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can view people on this server.");
+  return { users: listServerUsers() };
+});
+r.post("/api/admin/users/:id/role", async (req) => {
+  const u = requirePerson(req, "Changing someone's role on this server");
+  const { role } = await readJson<{ role?: ServerRole }>(req);
+  return { users: setServerUserRole(u, req.params.id, role as ServerRole) };
+});
 
 // ---------- auth ----------
 
@@ -430,7 +445,7 @@ r.get("/api/files/:id/cad", async (req) => {
 });
 r.get("/files/:id", (req, res) => {
   requireFileBoard(requireUser(req), req.params.id);
-  serveFile(req, res, req.params.id);
+  return serveFile(req, res, req.params.id);
 });
 
 /** a file on a members-only board is that board's; a chat upload is its uploader's and its messages' readers' (chat.ts) */
@@ -946,7 +961,7 @@ r.get("/api/characters/costs", async (req) => {
 /** a character's file by role (thumb, clips, mavatar, front …): characters are the company's, so this doesn't ask which board */
 r.get("/api/characters/:id/files/:role", (req, res) => {
   requireUser(req);
-  serveFile(req, res, characterFile(req.params.id, req.params.role));
+  return serveFile(req, res, characterFile(req.params.id, req.params.role));
 });
 // ---------- agents assigned to a section or a grid: who is on its council (posted.ts) ----------
 
@@ -1091,6 +1106,7 @@ r.post("/api/today/profile", async (req) => {
 
 // whole coding transcripts, on no board: an admin, in person
 function requireT3Reader(req: Req) {
+  requireLocalFeature("vision", "Vision Code on this computer");
   const u = requirePerson(req, "Reading Vision Code's threads");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can read Vision Code's threads.");
   return u;
@@ -1319,6 +1335,7 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("access-control-allow-headers", "content-type, authorization, range, mcp-session-id, mcp-protocol-version");
+    res.setHeader("access-control-expose-headers", "etag, x-image-level, x-image-natural-width, x-image-natural-height, x-image-width, x-image-height, x-image-alpha");
     res.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader("access-control-max-age", "600");
     res.setHeader("vary", "origin");

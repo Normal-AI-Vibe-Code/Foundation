@@ -27,6 +27,7 @@ import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "reac
 import { boardMaps, MACHINE_DISTROS, type MachineAsk, type MachineState } from "@foundation/protocol";
 import { type PanelMeta } from "../state/store";
 import { api } from "../lib/api";
+import { useCapabilities } from "../lib/capabilities";
 import { activeBoard } from "../sync/board";
 import { askAgent, toast, useUi } from "../state/ui";
 import { useOnScreen } from "./PanelView";
@@ -85,6 +86,7 @@ function ContainerMachineBody({ panel }: { panel: PanelMeta }) {
   const host = useRef<HTMLDivElement>(null);
   const onScreen = useOnScreen(host, 0.25);
   const ui = useUi();
+  const caps = useCapabilities();
   const viewer = ui.role === "viewer";
   const m = panel.machine!;
   const [engines, setEngines] = useState<EngineStatus[] | null>(null);
@@ -92,7 +94,7 @@ function ContainerMachineBody({ panel }: { panel: PanelMeta }) {
 
   // while on screen, the server reads the engine back and writes what's true to the board
   useEffect(() => {
-    if (!onScreen) return;
+    if (!onScreen || !caps.loaded || !caps.local.machines) return;
     let stop = false;
     const load = () =>
       api<{ engines: EngineStatus[] }>(`/api/boards/${encodeURIComponent(board())}/machines/${panel.id}`)
@@ -104,7 +106,7 @@ function ContainerMachineBody({ panel }: { panel: PanelMeta }) {
       stop = true;
       clearInterval(t);
     };
-  }, [onScreen, panel.id, m.state]);
+  }, [onScreen, caps.loaded, caps.local.machines, panel.id, m.state]);
 
   const up = engines?.filter((e) => e.up) ?? [];
   const asleep = engines?.find((e) => e.asleep);
@@ -112,7 +114,7 @@ function ContainerMachineBody({ panel }: { panel: PanelMeta }) {
   // one with no machine yet (or removed) starts on Kiri when it's installed, awake or not; else the first engine up
   const first = engines?.find((e) => e.id === "kiri" && (e.up || e.asleep)) ?? up[0];
   const engine = (m.engine === "kiri" && m.containerId && asleep) || ((m.containerId ? engines?.find((e) => e.id === m.engine && e.up) : undefined) ?? first);
-  const noEngine = engines !== null && up.length === 0 && !asleep;
+  const noEngine = !caps.local.machines || (engines !== null && up.length === 0 && !asleep);
 
   return (
     <div ref={host} className={`machine-body is-${m.state}`}>
@@ -126,7 +128,14 @@ function ContainerMachineBody({ panel }: { panel: PanelMeta }) {
       )}
       <MachineAsks panelId={panel.id} viewer={viewer} />
       {m.state === "running" && <AgentUse panelId={panel.id} m={m} viewer={viewer} view={view} onWatch={() => setView("desktop")} />}
-      {noEngine && m.state !== "running" ? (
+      {!caps.local.machines && m.state !== "running" ? (
+        <div className="connector-offline" data-hosted-machines>
+          <div className="connector-offline-title">Local container machines are turned off on this hosted server</div>
+          <div className="connector-offline-reason">
+            Local container machines (Kiri and Docker) run on a local computer and are turned off on a hosted Foundation server.
+          </div>
+        </div>
+      ) : noEngine && m.state !== "running" ? (
         <NoEngine engines={engines!} />
       ) : m.state === "running" ? (
         !onScreen ? (

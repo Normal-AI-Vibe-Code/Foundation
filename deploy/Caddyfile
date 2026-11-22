@@ -3,5 +3,10 @@
 # uploads go through the same proxy with nothing more to set (it puts no time limit on either).
 {$FOUNDATION_DOMAIN} {
 	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+	}
 	reverse_proxy foundation:4410
 }

@@ -46,6 +46,7 @@ import { boardMaps, logActivity, MACHINE_DISTROS, machineName, type MachineState
 import { editBoard, getBoard } from "./boards.ts";
 import { one } from "./db.ts";
 import { config } from "./config.ts";
+import { localFeatureAllowed, requireLocalFeature } from "./hosted.ts";
 import { HttpError } from "./http.ts";
 
 // ---------- engines ----------
@@ -204,6 +205,7 @@ let statusCache: { at: number; list: EngineStatus[] } | null = null;
 
 /** which engines answer here, Kiri first. Cached 3 s: cards ask while on screen */
 export async function engineStatus(fresh = false): Promise<EngineStatus[]> {
+  if (!localFeatureAllowed("machines")) return [];
   if (!fresh && statusCache && Date.now() - statusCache.at < 3000) return statusCache.list;
   const list = await Promise.all(
     engineCandidates().map(async (e): Promise<EngineStatus> => {
@@ -545,6 +547,7 @@ export function startMachine(boardId: string, panelId: string, person: string, i
 }
 
 async function doStart(boardId: string, panelId: string, person: string, input: StartInput): Promise<MachineState> {
+  requireLocalFeature("machines", "Local container machines");
   const panel = machinePanel(boardId, panelId);
   const prev = panel.machine ?? { name: machineName(panel.name), state: "absent" as const };
   if (prev.pod) throw new HttpError(409, `${prev.name} is a pod: its cluster runs it (Run a pod on the cluster's server card).`);
@@ -642,6 +645,7 @@ async function container(boardId: string, panelId: string) {
 }
 
 export async function stopMachine(boardId: string, panelId: string, person: string) {
+  requireLocalFeature("machines", "Local container machines");
   const { engine, c, panel } = await container(boardId, panelId);
   endTerminal(boardId, panelId, "The machine was stopped.");
   fire(machineHooks.ended, boardId, panelId, "stopped");
@@ -654,6 +658,7 @@ export async function stopMachine(boardId: string, panelId: string, person: stri
 }
 
 export async function restartMachine(boardId: string, panelId: string, person: string) {
+  requireLocalFeature("machines", "Local container machines");
   const { engine, c, panel } = await container(boardId, panelId);
   endTerminal(boardId, panelId, "The machine is restarting.");
   fire(machineHooks.ended, boardId, panelId, "restarted");
@@ -665,6 +670,7 @@ export async function restartMachine(boardId: string, panelId: string, person: s
 
 /** destroys the machine and its disk; the card stays, ready to start a fresh one */
 export async function removeMachine(boardId: string, panelId: string, person: string, confirm: boolean) {
+  requireLocalFeature("machines", "Local container machines");
   if (!confirm) throw new HttpError(400, "Removing a machine deletes its disk. Send confirm: true to do it.");
   const { engine, c, panel } = await container(boardId, panelId);
   endTerminal(boardId, panelId, "The machine was removed.");
@@ -679,6 +685,7 @@ export async function removeMachine(boardId: string, panelId: string, person: st
 
 /** the images an engine already has, newest first (what Start can run without pulling) */
 export async function engineImages(engineId?: string) {
+  if (!localFeatureAllowed("machines")) return { engine: engineId ?? "kiri", images: [] };
   const engine = await pickEngine(engineId);
   const rows = await engineJson<Array<{ RepoTags?: string[] | null; Size: number; Created: number }>>(engine, "GET", "/images/json");
   return {
@@ -696,6 +703,7 @@ export async function engineImages(engineId?: string) {
  * archived; the engine gets a copy.
  */
 export async function loadImage(boardId: string, fileId: string, person: string, engineId?: string) {
+  requireLocalFeature("machines", "Local container machines");
   const f = one<{ id: string; name: string; sha256: string; board_id: string | null; size: number }>("select id, name, sha256, board_id, size from files where id = ?", fileId);
   if (!f) throw new HttpError(404, "no such file");
   if (f.board_id && f.board_id !== boardId) throw new HttpError(403, "that file belongs to another board");

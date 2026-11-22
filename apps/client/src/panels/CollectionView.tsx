@@ -81,8 +81,8 @@ function useSections(): Array<{ id: string; name: string }> {
 }
 
 function Picture({ src, name }: { src?: string; name: string }) {
-  const url = useFileSrc(src ?? null);
-  return url ? <img src={url} alt={name} draggable={false} loading="lazy" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <i aria-hidden>{src ? "" : "☺"}</i>;
+  const url = useFileSrc(src ?? null, true, { width: 256 });
+  return url ? <img src={url} alt={name} draggable={false} loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <i aria-hidden>{src ? "" : "☺"}</i>;
 }
 
 /** the size of the card a copy of an item makes (the server's: a character's card, a picture 300 wide at its shape) */

@@ -183,6 +183,8 @@ export async function logout() {
   } catch { /* private window */ }
   const { forgetDevice } = await import("../sync/board");
   await forgetDevice();
+  const { clearImageCache } = await import("./imageCache");
+  await clearImageCache();
   // the server forgets the session first (it needs the bearer to know which), then this device does
   try {
     return await api("/auth/logout", { method: "POST" });

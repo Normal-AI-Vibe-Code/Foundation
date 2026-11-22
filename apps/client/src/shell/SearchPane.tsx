@@ -204,7 +204,7 @@ function Pane({ mode }: { mode: "pinned" | "pop" }) {
           <div className="search-tiles">
             {images.map((h) => (
               <Draggable key={h.id} hit={h} className="search-tile">
-                <HitPicture hit={h} />
+                <HitPicture hit={h} width={256} />
                 <span className="search-tile-name">{h.title}</span>
               </Draggable>
             ))}
