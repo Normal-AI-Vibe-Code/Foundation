@@ -54,8 +54,8 @@ I can't sign in to Vercel, Google or Neon for you; these are the steps, about fi
 ## Run it here
 
 ```sh
-docker run -d --name chatform-pg -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=chatform -p 127.0.0.1:15432:5432 postgres:17-alpine
-DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/chatform CHATFORM_DEV_LOGIN=1 CHATFORM_ALLOWLIST=@formindustries.co cargo run
+docker run -d --name chatform-pg -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=chatform -p 127.0.0.1:15432:5432 postgres:17-alpine
+DATABASE_URL=postgres://postgres@127.0.0.1:15432/chatform CHATFORM_DEV_LOGIN=1 CHATFORM_ALLOWLIST=@formindustries.co cargo run
 cargo test          # unit tests, and the end-to-end ones against that Postgres (they skip without one)
 ```
 

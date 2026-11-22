@@ -37,7 +37,7 @@ impl Config {
     pub fn from_env() -> Self {
         let on_vercel = env("VERCEL").is_some();
         let port = env("CHATFORM_PORT").and_then(|p| p.parse().ok()).unwrap_or(4420);
-        let database_url = env("DATABASE_URL").or_else(|| env("POSTGRES_URL")).unwrap_or_else(|| "postgres://postgres:postgres@localhost:5432/chatform".into());
+        let database_url = env("DATABASE_URL").or_else(|| env("POSTGRES_URL")).unwrap_or_else(|| "postgres://postgres@localhost:15432/chatform".into());
         let listen_url = env("DATABASE_URL_UNPOOLED").or_else(|| env("POSTGRES_URL_NON_POOLING")).unwrap_or_else(|| database_url.clone());
         let public_url = env("CHATFORM_PUBLIC_URL")
             .or_else(|| env("VERCEL_PROJECT_PRODUCTION_URL").map(|h| format!("https://{h}")))

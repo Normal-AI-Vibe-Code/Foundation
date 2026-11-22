@@ -1,6 +1,6 @@
 //! ChatForm's Rust server end to end, over real HTTP and sockets on a fresh Postgres database.
-//! Needs a Postgres (CHATSERVER_TEST_ADMIN_URL, default postgres://postgres:postgres@127.0.0.1:15432/postgres); without
-//! one the tests say so and pass. Locally: `docker run -d --name chatform-pg -e POSTGRES_PASSWORD=postgres
+//! Needs a Postgres (CHATSERVER_TEST_ADMIN_URL, default postgres://postgres@127.0.0.1:15432/postgres); without
+//! one the tests say so and pass. Locally: `docker run -d --name chatform-pg -e POSTGRES_HOST_AUTH_METHOD=trust
 //! -p 127.0.0.1:15432:5432 postgres:17-alpine`.
 
 use std::{net::SocketAddr, time::Duration};
@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::Message;
 
 fn admin_url() -> String {
-    std::env::var("CHATSERVER_TEST_ADMIN_URL").unwrap_or_else(|_| "postgres://postgres:postgres@127.0.0.1:15432/postgres".into())
+    std::env::var("CHATSERVER_TEST_ADMIN_URL").unwrap_or_else(|_| "postgres://postgres@127.0.0.1:15432/postgres".into())
 }
 
 /// a fresh database, or None when there's no Postgres to test against
