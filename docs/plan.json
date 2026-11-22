@@ -222,6 +222,24 @@
       "body": "Built 2026-11-20 (SPEC §0.14, docs/server.md) and left uncommitted in its worktree; merged onto main 2026-11-21 beside the hosted server (§0.13): both modes stay, On your network for the office switch on this computer, hosted for a server behind HTTPS. Checked on merge: typecheck, the server, client and slack-agent suites (one T3 timing test flaked under load and passes alone). Nothing has met the real Slack, Google or a second computer yet."
     },
     {
+      "id": "council-silhouettes-one-add",
+      "title": "The council's silhouettes: three close together until an agent joins, then one to add another",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"the silhouettes should be closer to each other until an agent is added, and then there should only be one silhouette to add new agents\". Built and seen on a copy of the real data and #/design, day and night (docs/evidence/2026-11-21_council-silhouettes/). A person checks the spacing with their own characters."
+    },
+    {
+      "id": "who-is-where",
+      "title": "Who is where: people and agents on each grid, on the side menu's rows and ChatForm's people",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"show when people are in the boards and collaborating, as well as the agents\". Built: whereabouts.ts (server), shell/HereStack.tsx, a DM row's \"in <grid>\". Checked with a second person from a script on a copy of the real data (docs/evidence/2026-11-21_who-is-where/). A person checks it with a real teammate and a real agent at work."
+    },
+    {
       "id": "chatform-core",
       "title": "ChatForm core: channels, DMs, threads, reactions, files, search and unread on the server",
       "kind": "plan",
