@@ -76,6 +76,7 @@ import { listPrefsOf, prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed, originAllowedFor } from "./origins.ts";
 import { attachNetwork, networkFront, networkRoutes, networkUpgradeRefusal, signInDoors } from "./network.ts";
 import { serveClient } from "./clientfiles.ts";
+import { whereaboutsFor } from "./whereabouts.ts";
 import { gridOutline } from "./subgrids.ts";
 import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
@@ -409,6 +410,8 @@ r.post("/api/boards/:id/sections/:section/extract", async (req) => {
   const out = await runTool(httpToolCtx(req.params.id, u, isPerson(req)), "extract_section", { section: req.params.section, ...(typeof body.request_id === "string" ? { request_id: body.request_id } : {}) });
   return { result: out, board: listBoards().find((b) => b.id === (out as { board: string }).board) };
 });
+// who is on each grid this person can see, people and agents (whereabouts.ts; the chat socket's `where` keeps it current)
+r.get("/api/whereabouts", (req) => ({ boards: whereaboutsFor(requireUser(req)) }));
 r.get("/api/boards/:id/presence", (req) => {
   requireBoard(requireUser(req), req.params.id);
   return { people: presence(req.params.id) };

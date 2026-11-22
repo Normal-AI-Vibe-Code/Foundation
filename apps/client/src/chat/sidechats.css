@@ -239,3 +239,12 @@ body.is-carrying-chat * {
   font: 500 var(--text-11) / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
 }
+
+/* #/design: grid rows with who is on them (SideMenuDesign.tsx WhereRows) */
+.chat-demo-where {
+  width: 272px;
+  padding: var(--space-2);
+  border-radius: var(--radius-card);
+  background: var(--color-void);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}

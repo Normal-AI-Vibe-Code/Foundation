@@ -22,6 +22,8 @@ import { layoutTimeline } from "./logic";
 import type { MessageActions } from "./Message";
 import { DEMO_CHANNELS } from "./ChatDesign";
 import { PlusGlyph } from "../shell/glyphs";
+import { HereStack } from "../shell/HereStack";
+import type { WhereBoard } from "@foundation/protocol";
 import "./sidechats.css";
 
 const NOW = Date.now();
@@ -79,6 +81,45 @@ function Pane({ width, channels, current, held, empty }: { width: number; channe
   );
 }
 
+/** who is on each grid, on its row (shell/HereStack.tsx, 2026-11-21): fixtures, no server */
+const WHERE: Record<string, WhereBoard> = {
+  company: {
+    people: [
+      { id: "u_ada", name: "Ada Lovelace", color: "var(--viz-1)" },
+      { id: "u_josh", name: "Josh Leong", color: "var(--viz-2)" },
+      { id: "u_kai", name: "Kai Moana", color: "var(--viz-4)" },
+    ],
+    agents: [{ id: "crew_1", name: "Lark", hue: 2, via: "claude", status: "working", doing: "laying out the parts" }],
+  },
+  vision: { people: [], agents: [{ id: "crew_2", name: "Wren", hue: 0, via: "claude", status: "done" }] },
+  supply: {
+    people: ["Ada Lovelace", "Kai Moana", "Mei Lin", "Tom Rua", "Sam Ito"].map((name, i) => ({ id: `u_${i}`, name, color: `var(--viz-${(i % 5) + 1})` })),
+    agents: [],
+  },
+};
+
+function WhereRows() {
+  const rows = [
+    { id: "company", name: "Form Industries" },
+    { id: "vision", name: "Vision" },
+    { id: "supply", name: "Supply" },
+    { id: "quiet", name: "Nobody on it" },
+  ];
+  return (
+    <div className="chat-demo-where" data-design-where>
+      {rows.map((r) => (
+        <div key={r.id} className="space-row">
+          <button className="pane-row space-open" type="button">
+            <span className="pane-glyph">▦</span>
+            <span className="pane-label">{r.name}</span>
+            <HereStack boardId={r.id} me={ME.id} all={WHERE} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SideMenuDemo() {
   const kept = useMemo(() => [withHuddle(pick("ch_general")[0]), ...pick("ch_design", "ch_kai", "ch_wren", "ch_shroud", "ch_random")], []);
   const general = DEMO_CHANNELS.find((c) => c.id === "ch_general")!;
@@ -92,6 +133,8 @@ export function SideMenuDemo() {
         <div>
           <p className="chat-demo-cap">Side menu · Chats (unread, a mention, a huddle, current)</p>
           <Pane width={272} channels={kept} current="ch_shroud" />
+          <p className="chat-demo-cap" style={{ marginTop: "var(--space-5)" }}>Who is on each grid (others and agents; you aren't counted)</p>
+          <WhereRows />
         </div>
         <div>
           <p className="chat-demo-cap">A conversation held over it · at 220</p>

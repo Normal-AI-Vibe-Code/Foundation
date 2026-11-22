@@ -1010,3 +1010,48 @@
   flex: none;
   min-height: 0;
 }
+
+/* ---------- who is on a grid, on its row (HereStack.tsx, 2026-11-21) ---------- */
+
+/* the others with it open, then its agents: 16 px faces, overlapping, on the row's right before its count */
+.here-stack {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding-left: var(--space-2);
+}
+.here-face {
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1.5px var(--color-void);
+  color: var(--color-on-fill);
+  font: 700 7px / 1 var(--font-sans);
+  letter-spacing: 0.02em;
+}
+.here-face:first-child {
+  margin-left: 0;
+}
+/* an agent: the ✦ on its crew colour, a rounded tile rather than a face (agents are never a disc in ChatForm either) */
+.here-face.is-agent {
+  border-radius: 4px;
+  font-size: 9px;
+}
+.here-face.is-agent.is-working {
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+.here-more {
+  margin-left: 3px;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .here-face.is-agent.is-working {
+    animation: none;
+  }
+}

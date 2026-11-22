@@ -32,6 +32,7 @@ import {
   type ChatSay,
 } from "@foundation/protocol";
 import { ApiError, api, authHeaders, openSocket, serverUrl } from "../lib/api";
+import { loadWhereabouts, setWhereabouts } from "../lib/whereabouts";
 import { bumpRoot, failPending, mergeMessages, requestId, retryPending, settlePending, toggleReaction, upsertMessage, type PendingMessage } from "./logic";
 
 export interface ChatTimeline {
@@ -231,6 +232,8 @@ function onEvent(ev: ChatEvent) {
     tries = 0;
     rev = ev.rev;
     set((s) => ({ status: "live", why: "", me: s.me && s.me.id === ev.you ? s.me : { id: ev.you, name: s.me?.name ?? s.people.find((p) => p.id === ev.you)?.name ?? "" } }));
+    // who is where on the grids (lib/whereabouts.ts): read now, then kept by this socket's `where`
+    void loadWhereabouts();
     if (again) void catchUp();
     return;
   }
@@ -361,6 +364,9 @@ function apply(ev: ChatEvent) {
       sweepTyping();
       return;
     }
+    case "where":
+      setWhereabouts(ev.boards);
+      return;
     case "presence":
       set({ online: ev.online });
       // someone new is here (signed in for the first time since the list came): the list again, for their name

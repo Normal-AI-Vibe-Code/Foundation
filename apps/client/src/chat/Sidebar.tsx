@@ -15,6 +15,8 @@ import { carryHandlers } from "./carryChat";
 import { isKept, keepInSideMenu, takeOutOfSideMenu } from "./pins";
 import { openContextMenu } from "../components/ContextMenu";
 import { setUi } from "../state/ui";
+import { gridsOf, useWhereabouts } from "../lib/whereabouts";
+import { useGrids } from "../lib/grids";
 
 export interface SidebarProps {
   channels: ChatChannelView[];
@@ -128,6 +130,26 @@ export function channelMark(c: Pick<ChatChannelView, "kind" | "members" | "agent
   return <PartyAvatar party={who} size={size} online={c.kind === "dm" && who.kind === "person" ? !!online?.includes(who.id) : undefined} />;
 }
 
+/**
+ * Which grid the person in a direct message is on right now (2026-11-21): "in Form Industries", dim, after their
+ * name; press the conversation as before. Nothing when they're on none (lib/whereabouts.ts).
+ */
+function PersonWhere({ c, meId }: { c: ChatChannelView; meId?: string }) {
+  const all = useWhereabouts();
+  const grids = useGrids();
+  const other = (c.members ?? []).find((m) => m.id !== meId && m.kind === "person");
+  if (!other) return null;
+  const on = gridsOf(all, other.id);
+  if (!on.length) return null;
+  const names = on.map((id) => grids.find((g) => g.id === id)?.name ?? "a grid");
+  const label = names.length > 1 ? `in ${names[0]} +${names.length - 1}` : `in ${names[0]}`;
+  return (
+    <span className="chat-side-where" data-person-where={other.id} data-tip={`${other.name} is on ${names.join(", ")}`}>
+      {label}
+    </span>
+  );
+}
+
 /** what a conversation is, in a word (the slip in the hand says it) */
 export const kindWord = (c: Pick<ChatChannelView, "kind">) => (c.kind === "open" || c.kind === "private" ? "channel" : c.kind === "dm" ? "direct message" : c.kind === "group" ? "group" : c.kind === "agent" ? "agent" : "conversation");
 
@@ -165,6 +187,7 @@ export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: Ch
     >
       <span className="chat-side-mark">{channelMark(c, meId, online)}</span>
       <span className="chat-side-name">{title}</span>
+      {c.kind === "dm" && <PersonWhere c={c} meId={meId} />}
       {typing && !current && <span className="chat-side-typing" aria-label="typing" />}
       {n > 0 && !muted ? (
         <span className="chat-count is-accent" data-tip={direct ? `${n} unread` : `${n} ${n === 1 ? "mention" : "mentions"} of you`}>

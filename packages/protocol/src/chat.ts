@@ -234,6 +234,38 @@ export interface ChatBridgeStatus {
   lastEventAt?: number;
 }
 
+// ---------- who is where (2026-11-21) ----------
+
+/**
+ * Who is on a grid right now (Josh, 2026-11-21: "show when people are in the boards and collaborating, as well as the
+ * agents"): the people with it open (each once, however many windows) and the agents at work on it. Read from the
+ * grid's live presence on the server (apps/server/src/whereabouts.ts); `GET /api/whereabouts` and the chat socket's
+ * `where` event carry it, for the grids the person can see.
+ */
+export interface WherePerson {
+  id: string;
+  name: string;
+  /** their cursor's colour on the grid */
+  color: string;
+}
+export interface WhereAgent {
+  /** its presence on the grid (crew.ts) */
+  id: string;
+  name: string;
+  /** 0–5: the crew colour */
+  hue: number;
+  /** "claude", "t3:<id>" */
+  via: string;
+  status: "working" | "done" | "stopped" | "error" | "idle";
+  doing?: string;
+  /** who asked it */
+  askerName?: string;
+}
+export interface WhereBoard {
+  people: WherePerson[];
+  agents: WhereAgent[];
+}
+
 // ---------- the wire (/chat) ----------
 
 /**
@@ -251,6 +283,8 @@ export type ChatEvent =
   | { t: "read"; rev: number; channel: string; readSeq: number; mentions: number }
   | { t: "typing"; rev: number; channel: string; root: string | null; party: ChatParty }
   | { t: "presence"; rev: number; online: string[] }
+  /** who is on each grid this person can see, whenever that changes (whereabouts.ts) */
+  | { t: "where"; rev: number; boards: Record<string, WhereBoard> }
   | { t: "bridge"; rev: number; bridge: ChatBridgeStatus };
 
 /** Client → server on the chat socket. Everything that changes anything goes over HTTP; the socket only says what's passing. */

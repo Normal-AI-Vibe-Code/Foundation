@@ -2724,3 +2724,15 @@
   font-size: var(--text-12);
   line-height: 1.5;
 }
+
+/* which grid a direct message's person is on right now (Sidebar.tsx PersonWhere, 2026-11-21) */
+.chat-side-where {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+}
