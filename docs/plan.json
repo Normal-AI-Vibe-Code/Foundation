@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-22T02:10:38.074Z",
+  "syncedAt": "2026-11-22T03:23:39.679Z",
   "columns": [
     {
       "id": "needs-you",
@@ -219,7 +219,8 @@
       "milestone": "chatform",
       "area": "chat",
       "status": "review",
-      "body": "Built 2026-11-20 (SPEC §0.14, docs/server.md) and left uncommitted in its worktree; merged onto main 2026-11-21 beside the hosted server (§0.13): both modes stay, On your network for the office switch on this computer, hosted for a server behind HTTPS. Checked on merge: typecheck, the server, client and slack-agent suites (one T3 timing test flaked under load and passes alone). Nothing has met the real Slack, Google or a second computer yet."
+      "body": "Built 2026-11-20 (SPEC §0.14, docs/server.md) and left uncommitted in its worktree; merged onto main 2026-11-21 beside the hosted server (§0.13): both modes stay, On your network for the office switch on this computer, hosted for a server behind HTTPS. Checked on merge: typecheck, the server, client and slack-agent suites (one T3 timing test flaked under load and passes alone). Nothing has met the real Slack, Google or a second computer yet.",
+      "issue": 236
     },
     {
       "id": "council-silhouettes-one-add",
@@ -228,7 +229,8 @@
       "milestone": "polish",
       "area": "design",
       "status": "review",
-      "body": "Josh, 2026-11-21: \"the silhouettes should be closer to each other until an agent is added, and then there should only be one silhouette to add new agents\". Built and seen on a copy of the real data and #/design, day and night (docs/evidence/2026-11-21_council-silhouettes/). A person checks the spacing with their own characters."
+      "body": "Josh, 2026-11-21: \"the silhouettes should be closer to each other until an agent is added, and then there should only be one silhouette to add new agents\". Built and seen on a copy of the real data and #/design, day and night (docs/evidence/2026-11-21_council-silhouettes/). A person checks the spacing with their own characters.",
+      "issue": 237
     },
     {
       "id": "who-is-where",
@@ -237,7 +239,8 @@
       "milestone": "chatform",
       "area": "chat",
       "status": "review",
-      "body": "Josh, 2026-11-21: \"show when people are in the boards and collaborating, as well as the agents\". Built: whereabouts.ts (server), shell/HereStack.tsx, a DM row's \"in <grid>\". Checked with a second person from a script on a copy of the real data (docs/evidence/2026-11-21_who-is-where/). A person checks it with a real teammate and a real agent at work."
+      "body": "Josh, 2026-11-21: \"show when people are in the boards and collaborating, as well as the agents\". Built: whereabouts.ts (server), shell/HereStack.tsx, a DM row's \"in <grid>\". Checked with a second person from a script on a copy of the real data (docs/evidence/2026-11-21_who-is-where/). A person checks it with a real teammate and a real agent at work.",
+      "issue": 238
     },
     {
       "id": "chatform-rust-vercel",
@@ -246,7 +249,8 @@
       "milestone": "chatform",
       "area": "chat",
       "status": "doing",
-      "body": "Josh, 2026-11-21: \"Host it on vercel for now. build a rust based server there.\" Built: apps/chatserver (axum on Vercel's Rust runtime, Postgres, LISTEN/NOTIFY across instances, Google accounts with an allowlist), the Node server's chat routes and JSON; cargo test green (5 unit, 4 end to end). Next: ChatForm in the app points at it (a chat-server setting and an app sign-in). Waits on a person for the Vercel project, Neon and the Google OAuth client (apps/chatserver/README.md)."
+      "body": "Josh, 2026-11-21: \"Host it on vercel for now. build a rust based server there.\" Built: apps/chatserver (axum on Vercel's Rust runtime, Postgres, LISTEN/NOTIFY across instances, Google accounts with an allowlist), the Node server's chat routes and JSON; cargo test green (5 unit, 4 end to end). Next: ChatForm in the app points at it (a chat-server setting and an app sign-in). Waits on a person for the Vercel project, Neon and the Google OAuth client (apps/chatserver/README.md).",
+      "issue": 239
     },
     {
       "id": "chatform-vercel-setup",
@@ -255,7 +259,8 @@
       "milestone": "chatform",
       "area": "chat",
       "status": "needs-you",
-      "body": "Steps in apps/chatserver/README.md: import the repo with Root Directory apps/chatserver, add Neon from Storage, create the Google OAuth client (redirect https://<project>.vercel.app/auth/google/callback), set GOOGLE_CLIENT_ID/SECRET, CHATFORM_ALLOWLIST (@formindustries.co,@normallab.co), CHATFORM_ADMIN_EMAILS, CHATFORM_CORS_ORIGINS. Then /api/health says database and listening true."
+      "body": "Steps in apps/chatserver/README.md: import the repo with Root Directory apps/chatserver, add Neon from Storage, create the Google OAuth client (redirect https://<project>.vercel.app/auth/google/callback), set GOOGLE_CLIENT_ID/SECRET, CHATFORM_ALLOWLIST (@formindustries.co,@normallab.co), CHATFORM_ADMIN_EMAILS, CHATFORM_CORS_ORIGINS. Then /api/health says database and listening true.",
+      "issue": 240
     },
     {
       "id": "chatform-core",
