@@ -3325,6 +3325,215 @@ body.is-connecting .port-in.is-snap {
   background: var(--color-void);
   user-select: text;
 }
+/* #/design as a library: the menu on the left (search, chapters, their sections), the sections on the right */
+.design-page.design-library {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+}
+.design-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  border-right: 1px solid var(--color-line);
+  background: var(--color-abyss);
+}
+.design-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  color: var(--color-frost);
+  font: 600 var(--text-14) / 1.2 var(--font-sans);
+  text-decoration: none;
+}
+.design-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  color: var(--color-dim);
+  cursor: text;
+}
+.design-search:focus-within {
+  border-color: var(--color-pulse);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-pulse) 18%, transparent);
+}
+.design-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1 var(--font-sans);
+}
+.design-search input::placeholder {
+  color: var(--color-dim);
+}
+.design-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.design-search-clear {
+  border: 0;
+  background: none;
+  color: var(--color-mist);
+  font-size: var(--text-16);
+  line-height: 1;
+  cursor: pointer;
+}
+.design-nav-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0 var(--space-4) var(--space-6);
+}
+.design-nav-group ul {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+.design-nav-chapter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  padding: 7px var(--space-3);
+  border-radius: var(--radius-card);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.25 var(--font-sans);
+  text-decoration: none;
+}
+.design-nav-chapter:hover {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.design-nav-chapter.is-open {
+  background: color-mix(in srgb, var(--color-pulse) 12%, transparent);
+  color: var(--color-pulse);
+}
+.design-nav-count {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.design-nav-section {
+  display: block;
+  width: 100%;
+  padding: 5px var(--space-3) 5px calc(var(--space-3) + var(--space-4));
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  margin-left: var(--space-3);
+  width: calc(100% - var(--space-3));
+  background: none;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.35 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.design-nav-section:hover {
+  color: var(--color-frost);
+  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+}
+.design-nav-section.is-here {
+  border-left-color: var(--color-pulse);
+  background: color-mix(in srgb, var(--color-pulse) 8%, transparent);
+  color: var(--color-frost);
+  font-weight: 500;
+}
+.design-nav-found {
+  padding: var(--space-3) var(--space-3) 0;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.design-main {
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  padding: var(--space-7) clamp(16px, 4vw, 64px) 160px;
+}
+.design-main .design-section {
+  scroll-margin-top: var(--space-5);
+}
+.design-chapter + .design-chapter {
+  margin-top: var(--space-7);
+}
+.design-chapter-head {
+  position: sticky;
+  top: calc(-1 * var(--space-7));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 calc(-1 * clamp(16px, 4vw, 64px));
+  padding: var(--space-4) clamp(16px, 4vw, 64px);
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-void) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+.design-chapter-head .f-eyebrow {
+  color: var(--color-frost);
+}
+/* the sticky chapter head already draws the line the first section's rule would */
+.design-chapter-head + .design-section {
+  border-top: 0;
+}
+.design-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-7) 0;
+  color: var(--color-mist);
+}
+.design-empty p:first-child {
+  color: var(--color-frost);
+  font-size: var(--text-16);
+}
+.design-empty .f-pill {
+  margin-top: var(--space-3);
+}
+/* the page is the window, so the library folds on the window: the menu becomes a row of chapters over the page */
+@media (max-width: 760px) {
+  .design-page.design-library {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .design-nav {
+    padding: var(--space-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .design-nav-list {
+    display: flex;
+    flex: none;
+    gap: var(--space-2);
+    overflow: auto hidden;
+    padding-bottom: var(--space-2);
+  }
+  .design-nav-group ul,
+  .design-nav-found {
+    display: none;
+  }
+  .design-nav-chapter {
+    white-space: nowrap;
+  }
+}
+.has-window-controls .design-page.design-library {
+  padding-top: 0;
+}
+.has-window-controls .design-main {
+  padding-top: 56px;
+}
+
 .design-head {
   display: flex;
   align-items: center;
@@ -3366,6 +3575,10 @@ body.is-connecting .port-in.is-snap {
 .design-section {
   padding: var(--space-7) 0;
   border-top: 1px solid var(--color-line);
+}
+/* the blocks of a section (rows of specimens, demos) stand a step apart */
+.design-section > :not(.design-section-head) + :not(.design-section-head) {
+  margin-top: var(--space-6);
 }
 .design-section-head {
   display: flex;
@@ -3572,6 +3785,19 @@ body.is-connecting .port-in.is-snap {
   background: var(--color-void);
   border: 1px solid var(--color-line);
 }
+/* a specimen's caption sits under it, in the flow: never over the specimen, never under it, and never wider than it */
+.oncall-cell > .effect-label {
+  position: static;
+  width: 0;
+  min-width: 100%;
+  margin-top: auto;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--color-line);
+  border-radius: 0;
+  background: none;
+  font-size: var(--text-12);
+  line-height: 1.45;
+}
 .oncall-static {
   position: relative !important;
   top: auto !important;
@@ -3639,7 +3865,7 @@ body.is-connecting .port-in.is-snap {
 }
 .adapt-row {
   display: flex;
-  gap: var(--space-5);
+  gap: var(--space-6);
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -4801,12 +5027,6 @@ body.is-viewer .port {
 .design-cmd-specimen {
   width: 100%;
   border-radius: var(--radius-pane);
-}
-.uploads-demo .oncall-cell {
-  padding-bottom: 68px;
-}
-.uploads-demo .effect-label {
-  right: var(--space-4);
 }
 
 /* ---------- This computer: approved places, in the search pane (PlacesBrowser) ---------- */

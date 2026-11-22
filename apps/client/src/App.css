@@ -1651,11 +1651,6 @@ body.is-connecting .frame-card,
 }
 [data-card-chrome] .oncall-cell {
   width: 348px;
-  padding-bottom: 76px;
-}
-[data-card-chrome] .effect-label {
-  right: var(--space-4);
-  border-radius: var(--radius-pane);
 }
 
 /* #/design, "Using a card": what the pointer does (design/PointerDemo.tsx) */
@@ -1664,11 +1659,6 @@ body.is-connecting .frame-card,
 }
 [data-pointer-demo] .oncall-cell {
   width: 348px;
-  padding-bottom: 76px;
-}
-[data-pointer-demo] .effect-label {
-  right: var(--space-4);
-  border-radius: var(--radius-pane);
 }
 .pointer-demo-menus {
   margin-top: var(--space-5);

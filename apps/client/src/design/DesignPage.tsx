@@ -16,8 +16,8 @@ import { PROVIDER_NAME, ProviderMark } from "../characters/providers";
 import { Group, Row, Seg } from "../settings/SettingsSpace";
 import { EgressView, type EgressState } from "../shell/EgressSettings";
 import "../panels/system-cards.css";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import type { DesignChapter } from "@foundation/protocol";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { DESIGN_CHAPTERS, type DesignChapter } from "@foundation/protocol";
 import { motion } from "motion/react";
 import { durations, easings, isNight, setNight, springs } from "@foundation/ui";
 import { initAsciiWind2 } from "../login/asciiWind2";
@@ -180,54 +180,297 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
   floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
-  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Progressive cached images", "Text box", "Writing together"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Progressive cached images", "Text box", "Pictures and links from elsewhere", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
   chat: ["ChatForm"],
   machines: ["Machines"],
   agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
-  council: ["The council", "Collections"],
+  council: ["The council", "Collections", "Foundation's avatars"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
-  own: ["Settings, and grids inside grids", "People on a hosted server", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
+  own: ["Settings, and grids inside grids", "People on a hosted server", "What agents may send outside", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
 };
-/** when set, only these sections draw (a chapter's card on the design grid) */
-const Only = createContext<Set<string> | null>(null);
+/** which sections draw here: a chapter's (its card on the design grid, or one shelf of the library) and those matching the search */
+interface Filter {
+  show: (title: string) => boolean;
+  query: string;
+}
+const Only = createContext<Filter | null>(null);
+/** each section's chapter, by title */
+const CHAPTER_OF = new Map(Object.entries(CHAPTER_SECTIONS).flatMap(([ch, titles]) => titles.map((t) => [t, ch as DesignChapter] as const)));
+/** every section's note by title, in page order, gathered as the sections render: what the library's menu and search read */
+const NOTES = new Map<string, string>();
+const chapterName = (title: string) => DESIGN_CHAPTERS.find((c) => c.id === CHAPTER_OF.get(title))?.name ?? "More";
+/** every word of the query is in the section's title, note or chapter */
+function matches(query: string, title: string, note: string): boolean {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = `${title} ${note} ${chapterName(title)}`.toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+const sectionId = (title: string) => `design-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
 
 /**
- * The design language. As a page of its own (`#/design`) it is every section in one scroll, under its
- * head. On the design grid each chapter is a card: `chapter` draws just that chapter's sections, bare.
+ * The design language. As a page of its own (`#/design`) it is a library: chapters and their sections in a
+ * menu on the left, a search over every title and note, and the sections themselves on the right
+ * (`#/design/<chapter>` opens one chapter). On the design grid each chapter is a card: `chapter` draws
+ * just that chapter's sections, bare.
  */
 export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
-  const wind = useRef<HTMLDivElement>(null);
-  const [replay, setReplay] = useState(0);
-  useEffect(() => (wind.current ? initAsciiWind2(wind.current, "wind") : undefined), []);
-  const only = useMemo(() => (chapter ? new Set(CHAPTER_SECTIONS[chapter] ?? []) : null), [chapter]);
+  const filter = useMemo<Filter | null>(() => {
+    if (!chapter) return null;
+    const titles = new Set(CHAPTER_SECTIONS[chapter] ?? []);
+    return { show: (t) => titles.has(t), query: "" };
+  }, [chapter]);
+  if (!chapter) return <DesignLibrary />;
+  return (
+    <Only.Provider value={filter}>
+      <div className="design-page is-chapter">
+        <DesignSections />
+      </div>
+    </Only.Provider>
+  );
+}
+
+/** a shelf of the library: one chapter, or the sections no chapter claims yet */
+interface Shelf {
+  id: DesignChapter | "more";
+  name: string;
+  show: (title: string) => boolean;
+}
+const SHELVES: Shelf[] = [
+  ...DESIGN_CHAPTERS.map((c) => ({ id: c.id, name: c.name, show: (t: string) => CHAPTER_OF.get(t) === c.id })),
+  { id: "more", name: "More", show: (t: string) => !CHAPTER_OF.has(t) },
+];
+
+function useHash(): string {
+  const [hash, setHash] = useState(window.location.hash);
+  useEffect(() => {
+    const on = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+  }, []);
+  return hash;
+}
+
+function DesignLibrary() {
+  const hash = useHash();
+  const open = SHELVES.find((s) => hash.replace(/^#\/design\/?/, "").split(/[/?]/)[0] === s.id)?.id ?? null;
+  const [query, setQuery] = useState("");
+  const q = query.trim();
+  const main = useRef<HTMLElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const [active, setActive] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  // the sections fill NOTES as they render; draw the menu again once they have
+  const [, setIndexed] = useState(false);
+  useEffect(() => setIndexed(true), []);
+
+  const all = [...NOTES.keys()];
+  const shelves = SHELVES.map((s) => ({ ...s, titles: all.filter((t) => s.show(t)) })).filter((s) => s.titles.length || s.id !== "more");
+  const found = shelves.map((s) => ({ ...s, titles: s.titles.filter((t) => matches(q, t, NOTES.get(t) ?? "")) }));
+  // a search looks through every chapter; otherwise the open chapter, or all of them
+  const shown = found.filter((s) => (q ? s.titles.length > 0 : !open || s.id === open));
+  const hits = found.reduce((n, s) => n + s.titles.length, 0);
+  const openName = SHELVES.find((s) => s.id === open)?.name;
+
+  const go = (title: string) => {
+    const ch = CHAPTER_OF.get(title) ?? "more";
+    if (!q && open && open !== ch) window.location.hash = `#/design/${ch}`;
+    setPending(title);
+  };
+  // a new chapter opens at its top; a section picked in the menu scrolls into view once it's drawn
+  useEffect(() => {
+    if (!pending && main.current) main.current.scrollTop = 0;
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!pending) return;
+    const el = main.current?.querySelector<HTMLElement>(`#${CSS.escape(sectionId(pending))}`);
+    if (el) {
+      el.scrollIntoView({ block: "start" });
+      setActive(pending);
+    }
+    setPending(null);
+  }, [pending, open, q]);
+  // the menu marks the section at the top of the page
+  useEffect(() => {
+    const root = main.current;
+    if (!root) return;
+    let frame = 0;
+    const spy = () => {
+      frame = 0;
+      const top = root.getBoundingClientRect().top + 96;
+      let at: string | null = null;
+      for (const el of root.querySelectorAll<HTMLElement>("[data-design-section]")) {
+        if (el.getBoundingClientRect().top > top) break;
+        at = el.dataset.designSection ?? null;
+      }
+      setActive(at ?? root.querySelector<HTMLElement>("[data-design-section]")?.dataset.designSection ?? null);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(spy);
+    };
+    spy();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [open, q]);
+  // a specimen that takes the focus as it draws (the council's input) doesn't keep it: the page opens with nothing
+  // focused, and typing a search that brings such a specimen in keeps typing in the search
+  useEffect(() => {
+    const a = document.activeElement;
+    if (a instanceof HTMLElement && main.current?.contains(a)) a.blur();
+  }, [open]);
+  useEffect(() => {
+    if (main.current?.contains(document.activeElement)) search.current?.focus();
+    if (main.current) main.current.scrollTop = 0;
+  }, [q]);
+  // "/" goes to the search, from anywhere but a field
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      e.preventDefault();
+      search.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
-    <Only.Provider value={only}>
-    <div className={`design-page${chapter ? " is-chapter" : ""}`}>
-      {!chapter && (
-      <>
-      <header className="design-head">
-        <Mark size={28} />
-        <div>
-          <div className="f-eyebrow">Form Industries · one design language</div>
-          <h1>Foundation design language</h1>
-        </div>
-        <div className="capsule-spacer" />
-        <NightOrb onToggle={() => setNight(!isNight())} />
-        <a className="f-pill" href="#/board">
-          ← Back to the grid
+    <div className="design-page design-library">
+      <aside className="design-nav" aria-label="The design language">
+        <a className="design-nav-brand" href="#/design" onClick={() => setQuery("")}>
+          <Mark size={20} />
+          <span>Design language</span>
         </a>
-      </header>
+        <label className="design-search">
+          <SearchGlyph size={14} />
+          <input
+            ref={search}
+            type="search"
+            value={query}
+            placeholder="Search tokens, components…"
+            aria-label="Search the design language"
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setQuery("");
+              if (e.key === "Enter" && q) {
+                const first = found.find((s) => s.titles.length)?.titles[0];
+                if (first) go(first);
+              }
+            }}
+          />
+          {query ? (
+            <button className="design-search-clear" aria-label="Clear the search" onClick={() => setQuery("")}>
+              ×
+            </button>
+          ) : (
+            <kbd className="f-kbd">/</kbd>
+          )}
+        </label>
+        <nav className="design-nav-list">
+          {!q && (
+            <a className={`design-nav-chapter${open ? "" : " is-open"}`} href="#/design" aria-current={open ? undefined : "page"}>
+              <span>Everything</span>
+              <span className="design-nav-count">{all.length}</span>
+            </a>
+          )}
+          {q && <div className="design-nav-found">{hits ? `${hits} ${hits === 1 ? "section" : "sections"}` : "Nothing found"}</div>}
+          {found.map((s) => {
+            if (q && !s.titles.length) return null;
+            const isOpen = !q && open === s.id;
+            const expanded = q || isOpen || !open;
+            return (
+              <div key={s.id} className="design-nav-group">
+                <a
+                  className={`design-nav-chapter${isOpen ? " is-open" : ""}`}
+                  href={`#/design/${s.id}`}
+                  aria-current={isOpen ? "page" : undefined}
+                  onClick={() => setQuery("")}
+                >
+                  <span>{s.name}</span>
+                  <span className="design-nav-count">{s.titles.length}</span>
+                </a>
+                {expanded && (
+                  <ul>
+                    {s.titles.map((t) => (
+                      <li key={t}>
+                        <button className={`design-nav-section${active === t ? " is-here" : ""}`} onClick={() => go(t)}>
+                          {t}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+      </aside>
 
-      <p className="design-lede">
-        Warm printed paper, ink, one federal blue — shared with Vision, the Data Room, FactoryForm and Creation. The work brings the colour; colour means state.
-        Agents wear violet. Everything floats on glass over a living grid. This page renders the real tokens; <code>DESIGN.md</code> is the contract.
-      </p>
-      </>
-      )}
+      <main ref={main} className="design-main">
+        <header className="design-head">
+          <div>
+            <div className="f-eyebrow">{q ? "Search" : open ? "Foundation design language" : "Form Industries · one design language"}</div>
+            <h1>{q ? `“${q}”` : (openName ?? "Foundation design language")}</h1>
+          </div>
+          <div className="capsule-spacer" />
+          <NightOrb onToggle={() => setNight(!isNight())} />
+          <a className="f-pill" href="#/board">
+            ← Back to the grid
+          </a>
+        </header>
 
+        {!q && !open && (
+          <p className="design-lede">
+            Warm printed paper, ink, one federal blue — shared with Vision, the Data Room, FactoryForm and Creation. The work brings the colour; colour means state.
+            Agents wear violet. Everything floats on glass over a living grid. This page renders the real tokens; <code>DESIGN.md</code> is the contract.
+          </p>
+        )}
+
+        {shown.map((s) => (
+          <div key={s.id} className="design-chapter" data-chapter={s.id}>
+            {(q || !open) && (
+              <div className="design-chapter-head">
+                <span className="f-eyebrow">{s.name}</span>
+                <span className="design-nav-count">{s.titles.length}</span>
+              </div>
+            )}
+            <Only.Provider value={{ show: s.show, query: q }}>
+              <DesignSections />
+            </Only.Provider>
+          </div>
+        ))}
+        {q && !hits && (
+          <div className="design-empty">
+            <p>Nothing in the design language matches “{q}”.</p>
+            <p>Try a token (pulse, raise), a component (pill, card, huddle) or a chapter (motion, machines).</p>
+            <button className="f-pill" onClick={() => setQuery("")}>
+              Clear the search
+            </button>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+/** every section of the design language; the Only filter around it says which draw */
+function DesignSections() {
+  const windStop = useRef<(() => void) | undefined>(undefined);
+  // the wind starts when its section draws (a chapter or a search can bring it in later) and stops when it goes
+  const wind = useCallback((el: HTMLDivElement | null) => {
+    windStop.current?.();
+    windStop.current = el ? initAsciiWind2(el, "wind") : undefined;
+  }, []);
+  const [replay, setReplay] = useState(0);
+
+  return (
+    <>
       <Section title="The mark" note="Two leaves, one over the other: a low one over one twice its height, each rounded at its top left and bottom right. Blue on paper and glass; the white original on a solid fill or dark ground.">
         <div className="mark-specimens">
           {[64, 32, 20, 16].map((n) => (
@@ -759,7 +1002,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
             </div>
             <div className="effect-label">A section never takes the wheel: it lays its cards out at the width that shows them largest and fits them to its body, down to 40%. Past that it says what doesn't fit and offers Expand</div>
           </div>
-          <div className="oncall-cell" style={{ paddingBottom: 72 }}>
+          <div className="oncall-cell">
             <div className="section-card oncall-static oncall-section expanded" style={{ width: 420, height: 64 }}>
               <div className="section-header" style={{ height: 42 }}>
                 <span className="section-name">Research</span>
@@ -1295,8 +1538,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           ))}
         </div>
       </Section>
-    </div>
-    </Only.Provider>
+    </>
   );
 }
 
@@ -2249,10 +2491,11 @@ function CouncilDemo() {
 }
 
 function Section({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
-  const only = useContext(Only);
-  if (only && !only.has(title)) return null;
+  NOTES.set(title, note);
+  const filter = useContext(Only);
+  if (filter && (!filter.show(title) || !matches(filter.query, title, note))) return null;
   return (
-    <section className="design-section">
+    <section className="design-section" id={sectionId(title)} data-design-section={title}>
       <div className="design-section-head">
         <h2>{title}</h2>
         <p>{note}</p>

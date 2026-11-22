@@ -1551,6 +1551,10 @@
   .machine-engine {
     display: none;
   }
+  /* four named tabs don't fit a 260 px card: the open one keeps its word, the others their glyph (and their tip) */
+  .machine-view-tab:not(.is-on) > span {
+    display: none;
+  }
 }
 /* #/design only: a still of the terminal in the same type and tokens */
 .machine-term-specimen {
@@ -1583,7 +1587,8 @@
 .machine-well.machine-hero,
 .machine-desk-well.machine-hero {
   align-items: center;
-  justify-content: center;
+  /* safe: in a short card the words scroll from their top, rather than centring past it out of reach */
+  justify-content: safe center;
   padding: var(--space-5) var(--space-4);
   overflow-y: auto;
 }
