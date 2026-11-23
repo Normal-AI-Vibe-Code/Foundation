@@ -123,25 +123,27 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
               return (
                 <button
                   key={r.emoji}
+                  type="button"
                   className={`chat-reaction${on ? " is-mine" : ""}`}
                   onClick={() => actions?.react(m, r.emoji, !on)}
                   data-tip={`${listNames(r.by, me?.name)} reacted with ${emojiName(r.emoji)}`}
+                  aria-label={`${emojiName(r.emoji)}, ${r.by.length} ${r.by.length === 1 ? "reaction" : "reactions"}`}
                   aria-pressed={on}
                 >
-                  <span className="chat-reaction-emoji">{r.emoji}</span>
+                  <span className="chat-reaction-emoji" aria-hidden>{r.emoji}</span>
                   <span className="chat-reaction-n">{r.by.length}</span>
                 </button>
               );
             })}
             {actions && (
-              <button className="chat-reaction is-add" onClick={() => setPicker(true)} data-tip="Add a reaction" aria-label="Add a reaction">
+              <button type="button" className="chat-reaction is-add" onClick={() => setPicker(true)} data-tip="Add a reaction" aria-label="Add a reaction">
                 <IconReact />
               </button>
             )}
           </div>
         )}
         {!inThread && m.replyCount > 0 && (
-          <button className="chat-thread-summary" onClick={() => actions?.reply(m)} data-thread-summary={m.id}>
+          <button type="button" className="chat-thread-summary" onClick={() => actions?.reply(m)} data-thread-summary={m.id}>
             <span className="chat-thread-faces" aria-hidden>
               {(m.repliers ?? []).slice(-3).map((n) =>
                 // an agent among the repliers stands on its line, as everywhere (AgentFigure.tsx)
@@ -162,18 +164,29 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
           </button>
         )}
         {confirm && actions && (
-          <div className="chat-confirm" role="alertdialog">
-            <span>Remove this message for everyone? Its files stay in the archive.</span>
+          <div
+            className="chat-confirm"
+            role="alertdialog"
+            aria-label="Remove message"
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.stopPropagation();
+                setConfirm(false);
+              }
+            }}
+          >
+            <span>Remove this message for everyone? Attached files stay in the archive.</span>
             <button
+              type="button"
               className="chat-confirm-yes"
               onClick={() => {
                 setConfirm(false);
                 actions.remove(m);
               }}
             >
-              Remove
+              Remove message
             </button>
-            <button className="chat-confirm-no" onClick={() => setConfirm(false)} autoFocus>
+            <button type="button" className="chat-confirm-no" onClick={() => setConfirm(false)} autoFocus>
               Keep
             </button>
           </div>
@@ -182,26 +195,33 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
       {hover && (
         <div className="chat-hoverbar" role="toolbar" aria-label="Message actions">
           {["👍", "✅", "👀"].map((e) => (
-            <button key={e} className="chat-hoverbar-quick" onClick={() => actions.react(m, e, !(me && m.reactions.find((r) => r.emoji === e)?.by.includes(me.name)))} data-tip={`React ${emojiName(e)}`}>
+            <button
+              key={e}
+              type="button"
+              className="chat-hoverbar-quick"
+              onClick={() => actions.react(m, e, !(me && m.reactions.find((r) => r.emoji === e)?.by.includes(me.name)))}
+              data-tip={`React ${emojiName(e)}`}
+              aria-label={`React with ${emojiName(e)}`}
+            >
               {e}
             </button>
           ))}
-          <span className="chat-hoverbar-rule" />
-          <button onClick={() => setPicker((p) => !p)} data-tip="Add a reaction" aria-label="Add a reaction">
+          <span className="chat-hoverbar-rule" aria-hidden />
+          <button type="button" onClick={() => setPicker((p) => !p)} data-tip="Add a reaction" aria-label="Add a reaction" aria-expanded={picker}>
             <IconReact />
           </button>
           {!inThread && (
-            <button onClick={() => actions.reply(m)} data-tip="Reply in thread" aria-label="Reply in thread">
+            <button type="button" onClick={() => actions.reply(m)} data-tip="Reply in thread" aria-label="Reply in thread">
               <IconThread />
             </button>
           )}
-          <button className={m.pinned ? "is-on" : ""} onClick={() => actions.pin(m, !m.pinned)} data-tip={m.pinned ? "Unpin" : "Pin to the channel"} aria-label={m.pinned ? "Unpin" : "Pin"}>
+          <button type="button" className={m.pinned ? "is-on" : ""} onClick={() => actions.pin(m, !m.pinned)} data-tip={m.pinned ? "Unpin" : "Pin to the channel"} aria-label={m.pinned ? "Unpin" : "Pin"} aria-pressed={m.pinned}>
             <IconPin />
           </button>
-          <button onClick={() => actions.copyLink(m)} data-tip="Copy a link to this message" aria-label="Copy link">
+          <button type="button" onClick={() => actions.copyLink(m)} data-tip="Copy a link to this message" aria-label="Copy link">
             <IconLink />
           </button>
-          <button className={menu ? "is-on" : ""} onClick={() => setMenu((x) => !x)} data-tip="More" aria-label="More">
+          <button type="button" className={menu ? "is-on" : ""} onClick={() => setMenu((x) => !x)} data-tip="More" aria-label="More" aria-haspopup="menu" aria-expanded={menu}>
             <IconMore />
           </button>
           <AnimatePresence>
@@ -264,7 +284,7 @@ function Body({ m, me, srcOf, liveHuddle, actions }: { m: ChatMessage; me?: Mess
     <>
       {m.type === "huddle" && <HuddleCard message={m} live={liveHuddle} onJoin={actions?.joinHuddle} />}
       {m.type === "link" && m.place && (
-        <button className="chat-place" onClick={() => actions?.openPlace?.(m)} disabled={!actions?.openPlace}>
+        <button type="button" className="chat-place" onClick={() => actions?.openPlace?.(m)} disabled={!actions?.openPlace}>
           <span className="chat-place-glyph" aria-hidden>
             ▦
           </span>
@@ -288,16 +308,7 @@ export function Words({ text, mine, edited }: { text: string; mine?: string; edi
   // edited: said at the end of the last line, not on a line of its own
   if (edited) html = /<\/p>\s*$/.test(html) ? html.replace(/<\/p>\s*$/, ' <span class="chat-edited">(edited)</span></p>') : `${html}<span class="chat-edited">(edited)</span>`;
   return (
-    <div
-      className="chat-text note-rendered"
-      onClick={(e) => {
-        const a = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
-        if (a) {
-          e.preventDefault();
-          window.open(a.href, "_blank", "noopener");
-        }
-      }}
-    >
+    <div className="chat-text note-rendered">
       <div dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
@@ -323,6 +334,7 @@ function EditBox({ text, onSave, onCancel }: { text: string; onSave(t: string): 
       <textarea
         ref={ref}
         value={v}
+        aria-label="Edit message"
         onChange={(e) => setV(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation();
@@ -338,10 +350,10 @@ function EditBox({ text, onSave, onCancel }: { text: string; onSave(t: string): 
       />
       <div className="chat-edit-foot">
         <span>Enter saves · Esc cancels</span>
-        <button className="f-pill" onClick={onCancel}>
+        <button type="button" className="f-pill" onClick={onCancel}>
           Cancel
         </button>
-        <button className="f-pill is-accent" onClick={() => (v.trim() && v !== text ? onSave(v) : onCancel())}>
+        <button type="button" className="f-pill is-accent" onClick={() => (v.trim() && v !== text ? onSave(v) : onCancel())}>
           Save
         </button>
       </div>
@@ -355,14 +367,25 @@ function MoreMenu({ items, onClose }: { items: Array<{ label: string; icon: Reac
     const off = (e: PointerEvent) => {
       if (!box.current?.contains(e.target as Node) && !(e.target as HTMLElement).closest?.(".chat-hoverbar")) onClose();
     };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
     window.addEventListener("pointerdown", off, true);
-    return () => window.removeEventListener("pointerdown", off, true);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointerdown", off, true);
+      window.removeEventListener("keydown", key, true);
+    };
   }, [onClose]);
   return (
     <motion.div ref={box} className="chat-menu is-under-bar" role="menu" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -2 }} transition={{ type: "spring", stiffness: 520, damping: 38 }}>
       {items.map((it) => (
         <button
           key={it.label}
+          type="button"
           role="menuitem"
           className={`chat-menu-item${it.bad ? " is-bad" : ""}`}
           onClick={() => {
@@ -392,19 +415,19 @@ export function PendingView({ p, continued, me, onRetry, onDiscard }: { p: Pendi
         )}
         {p.text && <Words text={p.text} mine={me.handle} />}
         {p.files.length > 0 && <ChatFiles files={p.files} />}
-        <div className="chat-pending-state">
+        <div className="chat-pending-state" role={p.state === "failed" ? "alert" : "status"}>
           {p.state === "sending" ? (
             "Sending…"
           ) : (
             <>
               <span className="chat-pending-bad">Not sent{p.error ? `: ${p.error}` : ""}</span>
               {onRetry && (
-                <button className="chat-link-btn" onClick={onRetry}>
+                <button type="button" className="chat-link-btn" onClick={onRetry}>
                   Retry
                 </button>
               )}
               {onDiscard && (
-                <button className="chat-link-btn is-quiet" onClick={onDiscard}>
+                <button type="button" className="chat-link-btn is-quiet" onClick={onDiscard}>
                   Discard
                 </button>
               )}

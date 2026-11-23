@@ -59,41 +59,49 @@ export function DraftBar({ message: m, live = true }: { message: ChatMessage; li
         </div>
       )}
       {live && waiting && (
-        <div className="chat-draft-actions">
+        <div
+          className="chat-draft-actions"
+          onKeyDown={(e) => {
+            if (asking && e.key === "Escape") {
+              e.stopPropagation();
+              setAsking(false);
+            }
+          }}
+        >
           {asking ? (
             <>
-              <span className="chat-draft-ask">Discard it? It won't be sent.</span>
-              <button className="f-pill chat-draft-bad" disabled={busy} onClick={() => void discard()}>
+              <span className="chat-draft-ask">Discard this draft? It won't be sent.</span>
+              <button type="button" className="f-pill chat-draft-bad" disabled={busy} onClick={() => void discard()}>
                 Discard
               </button>
-              <button className="f-pill" disabled={busy} onClick={() => setAsking(false)}>
+              <button type="button" className="f-pill" disabled={busy} onClick={() => setAsking(false)} autoFocus>
                 Keep
               </button>
             </>
           ) : (
             <>
-              <button className="f-pill is-accent" disabled={busy || (editing && !text.trim() && !m.files.length)} onClick={() => void send(editing ? text : undefined)}>
+              <button type="button" className="f-pill is-accent" disabled={busy || (editing && !text.trim() && !m.files.length)} onClick={() => void send(editing ? text : undefined)}>
                 {busy ? "Sending…" : o.state === "failed" ? "Retry" : "Send"}
               </button>
               {editing ? (
-                <button className="f-pill" disabled={busy} onClick={() => (setEditing(false), setText(m.text))}>
+                <button type="button" className="f-pill" disabled={busy} onClick={() => (setEditing(false), setText(m.text))}>
                   Cancel
                 </button>
               ) : (
                 (m.type === "draft" || o.state === "failed") && (
-                  <button className="f-pill" disabled={busy} onClick={() => (setText(m.text), setEditing(true))}>
+                  <button type="button" className="f-pill" disabled={busy} onClick={() => (setText(m.text), setEditing(true))}>
                     Edit
                   </button>
                 )
               )}
-              <button className="f-pill" disabled={busy} onClick={() => setAsking(true)}>
+              <button type="button" className="f-pill" disabled={busy} onClick={() => setAsking(true)}>
                 Discard…
               </button>
             </>
           )}
         </div>
       )}
-      {err && <span className="chat-draft-err">{err}</span>}
+      {err && <span className="chat-draft-err" role="alert">{err}</span>}
     </div>
   );
 }

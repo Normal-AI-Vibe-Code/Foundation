@@ -4,6 +4,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-5);
   background: var(--color-void);
   container-type: inline-size;
 }
@@ -17,8 +19,10 @@
 }
 .inbox-lede {
   margin: 0;
+  max-width: 70ch;
   color: var(--color-mist);
-  font: 400 var(--text-14) / 1.55 var(--font-sans);
+  font: 400 var(--text-14) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .inbox-err {
   margin: 0;
@@ -53,6 +57,7 @@
 .inbox-head h2 {
   margin: 0;
   font: 600 var(--text-16) / 1.25 var(--font-sans);
+  text-wrap: balance;
 }
 .inbox-state {
   font: 600 var(--text-11) / 1 var(--font-sans);
@@ -67,8 +72,10 @@
 }
 .inbox-detail {
   margin: 0;
+  max-width: 70ch;
   color: var(--color-mist);
   font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .inbox-rule {
   margin: 0;
@@ -89,6 +96,9 @@
   gap: var(--space-2) var(--space-4);
   padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-line);
+}
+.inbox-need > * {
+  min-width: 0;
 }
 .inbox-need .f-dot {
   align-self: center;
@@ -142,10 +152,12 @@
   cursor: pointer;
   transition: transform var(--dur-press) var(--ease-out-soft);
 }
-.inbox-portal:hover {
-  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+@media (hover: hover) {
+  .inbox-portal:hover {
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
 }
-.inbox-portal:active {
+.inbox-portal:not(:disabled):active {
   transform: scale(0.995);
 }
 .inbox-portal:focus-visible {
@@ -201,6 +213,7 @@
   background: color-mix(in srgb, var(--color-ok) 12%, transparent);
   color: var(--color-ok);
   font: 600 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 .inbox-window.is-shut {
   background: color-mix(in srgb, var(--color-warn) 14%, transparent);
@@ -245,6 +258,9 @@
   padding: var(--space-3) var(--space-2);
   border-top: 1px solid var(--color-line);
   border-bottom: 1px solid var(--color-line);
+}
+.inbox-account > * {
+  min-width: 0;
 }
 .inbox-account-name {
   font: 600 var(--text-13) / 1.3 var(--font-sans);
@@ -291,14 +307,14 @@
   padding: var(--space-3) var(--space-4);
   resize: vertical;
 }
-.inbox-connect input:focus,
-.inbox-start input:focus,
-.inbox-start textarea:focus,
-.inbox-settings select:focus,
-.chat-draft-edit textarea:focus {
-  outline: none;
+.inbox-connect input:focus-visible,
+.inbox-start input:focus-visible,
+.inbox-start textarea:focus-visible,
+.inbox-settings select:focus-visible,
+.chat-draft-edit textarea:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -1px;
   border-color: var(--color-pulse);
-  box-shadow: 0 0 0 1px var(--color-pulse);
 }
 .inbox-start {
   display: flex;
@@ -319,6 +335,13 @@
   cursor: pointer;
   color: var(--color-mist);
   font: 600 var(--text-12) / 1.3 var(--font-sans);
+}
+.inbox-settings summary:focus-visible,
+.inbox-chip button:focus-visible,
+.inbox-seg button:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 .inbox-setting {
   display: flex;
@@ -431,6 +454,11 @@
 }
 .chat-draft.is-sending .chat-draft-dot {
   animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-draft.is-sending .chat-draft-dot {
+    animation: none;
+  }
 }
 .chat-draft-edit {
   width: min(560px, 100%);

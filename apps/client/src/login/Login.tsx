@@ -507,7 +507,9 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="name"
                   placeholder="Your name"
+                  aria-label="Your name"
                   value={name}
                   autoComplete="name"
                   onChange={(e) => {
@@ -519,7 +521,11 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="email"
                   placeholder="Work email"
+                  aria-label="Work email"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "login-error" : undefined}
                   type="email"
                   value={email}
                   autoComplete="email"
@@ -531,7 +537,7 @@ export function Login({
                   }}
                   onFocus={(e) => focused(e.currentTarget)}
                 />
-                <motion.button className="f-pill login-btn login-go" data-shape="control" disabled={busy || !email} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
+                <motion.button type="submit" className="f-pill login-btn login-go" data-shape="control" disabled={busy || !email} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
                   {busy ? "Signing in…" : "Enter Foundation"}
                 </motion.button>
               </motion.form>
@@ -559,7 +565,11 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="email"
                   placeholder="Work email"
+                  aria-label="Work email"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "login-error" : undefined}
                   type="email"
                   value={email}
                   autoComplete="email"
@@ -570,16 +580,19 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="code"
                   placeholder="Invitation code (ABCDE-FGHJK)"
                   value={short}
                   autoComplete="one-time-code"
                   spellCheck={false}
                   required
                   aria-label="Invitation code"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "login-error" : undefined}
                   onChange={(e) => setShort(e.target.value)}
                   onFocus={(e) => focused(e.currentTarget)}
                 />
-                <motion.button className="f-pill login-btn login-go" data-shape="control" disabled={busy || !email || !short} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
+                <motion.button type="submit" className="f-pill login-btn login-go" data-shape="control" disabled={busy || !email || !short} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
                   {busy ? "Signing in…" : "Join"}
                 </motion.button>
                 <div className="signin-code-note" data-shape="text">
@@ -593,7 +606,7 @@ export function Login({
               </div>
             )}
             {error && (
-              <motion.div className="login-error" role="alert" data-shape="text" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={press}>
+              <motion.div className="login-error" id="login-error" role="alert" data-shape="text" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={press}>
                 {error}
               </motion.div>
             )}
@@ -616,6 +629,7 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="server"
                   placeholder="https://foundation.example.com"
                   type="url"
                   value={serverDraft}
@@ -623,7 +637,7 @@ export function Login({
                   aria-label="Server"
                   onChange={(e) => setServerDraft(e.target.value)}
                 />
-                <motion.button className="f-pill login-btn" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
+                <motion.button type="submit" className="f-pill login-btn" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
                   Use this server
                 </motion.button>
               </motion.form>

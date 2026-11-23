@@ -66,7 +66,7 @@ export function Sidebar(p: SidebarProps) {
   return (
     <nav className="chat-sidebar" aria-label="Conversations">
       <div className="chat-side-scroll">
-        <button className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads>
+        <button type="button" className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads>
           <span className="chat-side-mark">
             <IconThread />
           </span>
@@ -84,7 +84,7 @@ export function Sidebar(p: SidebarProps) {
         )}
         <Section id="channels" name="Channels" folded={!!folds.channels} onFold={fold} onAdd={() => p.onNew("channel")} addTip="New channel">
           {channels.map((c) => row(c, "c"))}
-          <button className={`chat-side-row is-quiet${p.view === "browse" ? " is-current" : ""}`} onClick={() => p.onView("browse")} data-side-browse>
+          <button type="button" className={`chat-side-row is-quiet${p.view === "browse" ? " is-current" : ""}`} onClick={() => p.onView("browse")} data-side-browse>
             <span className="chat-side-mark">
               <IconPlus />
             </span>
@@ -104,13 +104,13 @@ function Section({ id, name, folded, onFold, onAdd, addTip, count, children }: {
   return (
     <section className={`chat-side-section${folded ? " is-folded" : ""}`} data-side-section={id}>
       <div className="chat-side-head">
-        <button className="chat-side-fold" onClick={() => onFold(id)} aria-expanded={!folded}>
+        <button type="button" className="chat-side-fold" onClick={() => onFold(id)} aria-expanded={!folded}>
           <IconChevron open={!folded} />
           <span>{name}</span>
           {folded && count ? <span className="chat-side-headcount">{count}</span> : null}
         </button>
         {onAdd && (
-          <button className="chat-side-add" onClick={onAdd} data-tip={addTip} aria-label={addTip}>
+          <button type="button" className="chat-side-add" onClick={onAdd} data-tip={addTip} aria-label={addTip}>
             <IconPlus />
           </button>
         )}
@@ -167,6 +167,7 @@ export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: Ch
   const hand = carry ? carryHandlers(() => ({ id: c.id, title: c.kind === "open" || c.kind === "private" ? `#${title}` : title, kind: kindWord(c) })) : null;
   return (
     <button
+      type="button"
       className={`chat-side-row${current ? " is-current" : ""}${unread ? " is-unread" : ""}${muted ? " is-muted" : ""}${c.kind === "agent" ? " is-agent" : ""}`}
       onClick={() => onOpen(c.id)}
       onPointerDown={hand?.onPointerDown}
@@ -186,7 +187,7 @@ export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: Ch
       aria-current={current ? "page" : undefined}
     >
       <span className="chat-side-mark">{channelMark(c, meId, online)}</span>
-      <span className="chat-side-name">{title}</span>
+      <span className="chat-side-name" title={title}>{title}</span>
       {c.kind === "dm" && <PersonWhere c={c} meId={meId} />}
       {typing && !current && <span className="chat-side-typing" aria-label="typing" />}
       {n > 0 && !muted ? (

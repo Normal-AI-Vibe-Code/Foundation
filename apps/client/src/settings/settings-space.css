@@ -24,6 +24,7 @@
   border-bottom: 1px solid var(--color-line);
   background: var(--color-void);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 .settings-strip::-webkit-scrollbar {
@@ -51,10 +52,17 @@
 .settings-strip-link:hover {
   color: var(--color-pulse);
 }
+.settings-strip-link:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
+}
 .settings-body {
   flex: 1 1 0;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-6);
   padding: var(--space-6) clamp(16px, 4vw, 48px) var(--space-7);
   container-type: inline-size;
   display: flex;
@@ -75,18 +83,21 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-2) var(--space-4);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 .set-group-head h2,
 .set-group .update-settings h2 {
   margin: 0;
   font: 600 var(--text-16) / 1.3 var(--font-sans);
+  text-wrap: balance;
 }
 .set-group-head p {
   margin: 0;
   flex: 1 1 320px;
+  max-width: 68ch;
   color: var(--color-mist);
   font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .set-count {
   margin-left: var(--space-2);
@@ -122,8 +133,11 @@
   font: 600 var(--text-13) / 1.4 var(--font-sans);
 }
 .set-row-detail {
+  max-width: 68ch;
   color: var(--color-mist);
   font: 400 var(--text-12) / 1.5 var(--font-sans);
+  text-wrap: pretty;
+  overflow-wrap: break-word;
 }
 .set-row-act {
   flex: none;
@@ -153,6 +167,11 @@
 .set-seg-btn:hover:not(:disabled) {
   color: var(--color-frost);
 }
+.set-seg-btn:focus-visible,
+.set-pick:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
 .set-seg-btn.is-on {
   background: var(--color-raise);
   color: var(--color-frost);
@@ -176,8 +195,10 @@
 }
 .set-empty {
   margin: 0;
+  max-width: 68ch;
   color: var(--color-dim);
   font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .set-t3 {
   border-radius: var(--radius-pane);

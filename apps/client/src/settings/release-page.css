@@ -56,13 +56,15 @@
   font: 600 var(--text-20) / 1.2 var(--font-display);
   letter-spacing: -0.01em;
   color: var(--color-frost);
+  text-wrap: balance;
 }
 /* the small description under it: the post's own opening */
 .release-lede {
   margin: 0;
   max-width: 68ch;
   color: var(--color-mist);
-  font: 400 var(--text-13) / 1.55 var(--font-sans);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 
 /* what it's made of: one bar, a segment per part, then the counts */
@@ -114,13 +116,20 @@
   cursor: pointer;
   transition: transform var(--dur-press) var(--ease-out-soft);
 }
-.release-tile:hover {
-  box-shadow:
-    var(--shadow-sheet),
-    inset 0 0 0 1px var(--color-line-strong);
+@media (hover: hover) {
+  .release-tile:hover {
+    box-shadow:
+      var(--shadow-sheet),
+      inset 0 0 0 1px var(--color-line-strong);
+  }
 }
-.release-tile:active {
+.release-tile:not(:disabled):active {
   transform: scale(0.98);
+}
+.release-tile:focus-visible,
+.release-more:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .release-tile-glyph {
   width: 28px;
@@ -148,6 +157,7 @@
   grid-column: 1 / -1;
   color: var(--color-mist);
   font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-wrap: pretty;
 }
 
 .release-more {
@@ -176,12 +186,16 @@
 /* the full notes: a note's body without the note's own padding, scroller or text cursor */
 .release-card .release-body {
   height: auto;
+  max-width: 70ch;
   padding: 0;
   overflow: visible;
   cursor: auto;
   color: var(--color-mist);
   font-size: var(--text-13);
-  line-height: 1.6;
+  line-height: 1.55;
+}
+.release-card .release-body p {
+  text-wrap: pretty;
 }
 .release-card .release-body h2 {
   scroll-margin-top: var(--space-5);
@@ -230,6 +244,7 @@
   letter-spacing: 0;
   text-transform: none;
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .tool-log-head.has-kind {
   display: grid;

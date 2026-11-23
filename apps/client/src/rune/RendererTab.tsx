@@ -36,8 +36,8 @@ export function RendererTab() {
   const total = n.same + n.partial + n.web + n.missing;
 
   const option = (id: Engine, name: string, tag: string, what: string) => (
-    <button className={`rune-option${engine === id ? " is-current" : ""}`} role="radio" aria-checked={engine === id} onClick={() => setEngine(id)}>
-      <span className="rune-option-radio" />
+    <button type="button" className={`rune-option${engine === id ? " is-current" : ""}`} role="radio" aria-checked={engine === id} onClick={() => setEngine(id)}>
+      <span className="rune-option-radio" aria-hidden />
       <span className="rune-option-text">
         <span className="rune-option-name">
           {name} <span className="rune-option-tag">{tag}</span>

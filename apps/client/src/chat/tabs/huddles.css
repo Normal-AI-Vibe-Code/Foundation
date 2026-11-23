@@ -4,6 +4,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-5);
   padding: var(--space-6) var(--space-6) var(--space-7);
 }
 .htab-overview,
@@ -28,6 +30,7 @@
   margin: 0;
   font: 600 var(--text-16) / 1.25 var(--font-sans);
   color: var(--color-frost);
+  text-wrap: balance;
 }
 .htab-sub {
   margin: 0 0 var(--space-3);
@@ -38,12 +41,15 @@
 }
 .htab-note {
   margin: 0;
+  max-width: 68ch;
   color: var(--color-mist);
   font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .htab-dim {
   color: var(--color-dim);
   font: 400 var(--text-12) / 1.3 var(--font-sans);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .htab-search {
@@ -57,8 +63,9 @@
   color: var(--color-frost);
   font: 400 var(--text-13) / 1 var(--font-sans);
 }
-.htab-search:focus {
-  outline: none;
+.htab-search:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
   border-color: var(--color-pulse);
 }
 
@@ -69,6 +76,7 @@
   gap: var(--space-2);
 }
 .htab-live-row {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -88,6 +96,12 @@
 }
 .htab-where:hover {
   text-decoration: underline;
+}
+.htab-where:focus-visible,
+.htab-back:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 
 /* sessions */
@@ -117,8 +131,15 @@
   font: 400 var(--text-13) / 1.3 var(--font-sans);
   cursor: pointer;
 }
-.htab-row-main:hover {
-  background: var(--color-pulse-dim);
+@media (hover: hover) {
+  .htab-row-main:hover {
+    background: var(--color-pulse-dim);
+  }
+}
+.htab-row-main:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+  border-radius: var(--radius-paper);
 }
 .htab-row-when {
   font-weight: 600;
@@ -197,13 +218,16 @@
   aspect-ratio: 16 / 9;
   border-radius: var(--radius-card);
   background: var(--color-panel);
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
 }
 .htab-recording figcaption {
   color: var(--color-mist);
   font: 500 var(--text-12) / 1.2 var(--font-sans);
 }
 .htab-transcript .huddle-lines {
-  max-height: 70vh;
+  max-height: 70dvh;
+  overscroll-behavior: contain;
 }
 .huddle-line.is-agent b {
   color: var(--color-agent);

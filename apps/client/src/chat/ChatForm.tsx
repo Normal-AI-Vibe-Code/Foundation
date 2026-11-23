@@ -144,7 +144,7 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
             data-chat-search
           />
           {q && (
-            <button className="chat-strip-clear" onClick={() => setQ("")} aria-label="Clear the search">
+            <button type="button" className="chat-strip-clear" onClick={() => setQ("")} aria-label="Clear search">
               <IconClose size={12} />
             </button>
           )}
@@ -473,12 +473,16 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
           onJoin={!viewer ? () => void joinChannel(channel.id).catch(fail) : undefined}
           onUnfold={folded ? () => setListFolded(false) : undefined}
         />
-        {s.status === "offline" && <div className="chat-offline">Offline · {s.why}</div>}
+        {s.status === "offline" && (
+          <div className="chat-offline" role="status">
+            Offline · {s.why}
+          </div>
+        )}
         {loadErr && !tl?.messages.length ? (
-          <div className="chat-tab-empty">
+          <div className="chat-tab-empty" role="alert">
             <h2>The messages didn't come</h2>
             <p>{loadErr}</p>
-            <button className="f-pill" onClick={() => loadChannel(channel.id, true).catch((e: Error) => setLoadErr(e.message))}>
+            <button type="button" className="f-pill" onClick={() => loadChannel(channel.id, true).catch((e: Error) => setLoadErr(e.message))}>
               Try again
             </button>
           </div>

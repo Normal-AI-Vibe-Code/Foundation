@@ -132,7 +132,7 @@ function Overview({ user }: { user: UserInfo }) {
       <section className="htab-section" aria-label="Live now">
         <h2 className="htab-h">Live now</h2>
         {!live ? (
-          <p className="htab-note">{why || "Looking…"}</p>
+          <p className="htab-note" role={why ? "alert" : "status"}>{why || "Looking…"}</p>
         ) : !live.length ? (
           <p className="htab-note">No huddles going on in your conversations. Start one from any channel's head.</p>
         ) : (
@@ -142,7 +142,7 @@ function Overview({ user }: { user: UserInfo }) {
               return (
                 <div key={l.huddle.id} className="htab-live-row" data-htab-live={l.huddle.id}>
                   <span className="f-dot is-ok is-live" />
-                  <button className="htab-where" onClick={() => goChat("chat", l.channel.id)}>
+                  <button type="button" className="htab-where" onClick={() => goChat("chat", l.channel.id)}>
                     {channelLabel(l.channel, user.id)}
                   </button>
                   <span className="huddle-faces">
@@ -158,7 +158,7 @@ function Overview({ user }: { user: UserInfo }) {
                     </span>
                   )}
                   <span className="hcard-gap" />
-                  <button className="f-pill is-accent" disabled={inIt} onClick={() => void joinChannelHuddle(l.channel.id, l.huddle.id, l.huddle.recording)}>
+                  <button type="button" className="f-pill is-accent" disabled={inIt} onClick={() => void joinChannelHuddle(l.channel.id, l.huddle.id, l.huddle.recording)}>
                     {inIt ? "You're in it" : "Join"}
                   </button>
                 </div>
@@ -173,7 +173,7 @@ function Overview({ user }: { user: UserInfo }) {
           <input className="htab-search" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.stopPropagation()} placeholder="Search who came and what was said" aria-label="Search huddles" data-htab-search />
         </div>
         {!sessions ? (
-          <p className="htab-note">{why || "Opening the archive…"}</p>
+          <p className="htab-note" role={why ? "alert" : "status"}>{why || "Opening the archive…"}</p>
         ) : !sessions.length ? (
           <p className="htab-note">{q ? "Nothing said matches." : "No sessions yet. Each time people gather in a huddle becomes one: who came, what was said, the recordings."}</p>
         ) : (
@@ -191,20 +191,21 @@ function Overview({ user }: { user: UserInfo }) {
 function SessionLine({ s, meId }: { s: SessionRow; meId: string }) {
   const grids = useGrids();
   const where = s.home === "chat" ? channelLabel(s.channel, meId) : `${s.name ?? "Huddle"} · ${grids.find((g) => g.id === s.board)?.name ?? s.board}`;
+  const peopleText = s.people.join(", ") || "Nobody";
   return (
     <div className="htab-row" role="listitem" data-htab-session={s.id}>
-      <button className="htab-row-main" onClick={() => goChat("huddles", s.id)}>
+      <button type="button" className="htab-row-main" onClick={() => goChat("huddles", s.id)}>
         <span className="htab-row-when">{day(s.startedAt)}</span>
-        <span className="htab-row-where">{where}</span>
+        <span className="htab-row-where" title={where}>{where}</span>
         <span className="htab-dim">{s.endedAt ? duration(s.endedAt - s.startedAt) : "live now"}</span>
-        <span className="htab-row-people">{s.people.join(", ") || "Nobody"}</span>
+        <span className="htab-row-people" title={peopleText}>{peopleText}</span>
         <span className="htab-dim">
           {s.lines} lines{s.recordings ? ` · ${s.recordings} rec` : ""}
           {s.places.length ? ` · on ${s.places.map((p) => grids.find((g) => g.id === p.board)?.name ?? p.board).join(", ")}` : ""}
         </span>
         {s.snippet && <span className="htab-row-snippet">{s.snippet}</span>}
       </button>
-      <button className="f-pill" onClick={() => goChat("huddles", s.id)} data-htab-replay={s.id}>
+      <button type="button" className="f-pill" onClick={() => goChat("huddles", s.id)} data-htab-replay={s.id}>
         Replay
       </button>
     </div>
@@ -229,17 +230,17 @@ function SessionDetail({ id, user }: { id: string; user: UserInfo }) {
   if (!s)
     return (
       <div className="htab-detail">
-        <button className="htab-back" onClick={() => goChat("huddles")}>
+        <button type="button" className="htab-back" onClick={() => goChat("huddles")}>
           ‹ All huddles
         </button>
-        <p className="htab-note">{why ? (why === "no such session" ? "This session isn't one you can see." : why) : "Opening…"}</p>
+        <p className="htab-note" role={why ? "alert" : "status"}>{why ? (why === "no such session" ? "This session isn't one you can see." : why) : "Opening…"}</p>
       </div>
     );
   const x = s.session;
   const gridName = (b: string) => grids.find((g) => g.id === b)?.name ?? b;
   return (
     <div className="htab-detail" data-htab-detail={x.id}>
-      <button className="htab-back" onClick={() => goChat("huddles")}>
+      <button type="button" className="htab-back" onClick={() => goChat("huddles")}>
         ‹ All huddles
       </button>
       <header className="htab-detail-head">
@@ -250,17 +251,17 @@ function SessionDetail({ id, user }: { id: string; user: UserInfo }) {
         </span>
         <div className="hcard-foot">
           {s.channel && (
-            <button className="f-pill" onClick={() => goChat("chat", s.channel!.id)}>
+            <button type="button" className="f-pill" onClick={() => goChat("chat", s.channel!.id)}>
               Open the conversation
             </button>
           )}
           {(x.places ?? []).map((p) => (
-            <button key={`${p.board}${p.at}`} className="f-pill" onClick={() => goToCard(p.board, x.huddle_id)}>
+            <button key={`${p.board}${p.at}`} type="button" className="f-pill" onClick={() => goToCard(p.board, x.huddle_id)}>
               Open on {gridName(p.board)}
             </button>
           ))}
           {x.home === "board" && (
-            <button className="f-pill" onClick={() => goToCard(x.board_id, x.huddle_id)}>
+            <button type="button" className="f-pill" onClick={() => goToCard(x.board_id, x.huddle_id)}>
               Open on {gridName(x.board_id)}
             </button>
           )}

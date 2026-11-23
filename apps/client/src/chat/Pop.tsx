@@ -47,7 +47,27 @@ export function Pop({ onClose, children, className = "", label }: { onClose(): v
   );
 }
 
-export function PeoplePicker({ people, chosen, onChange, exclude = [], online = [], placeholder = "Find people by name", autoFocus }: { people: ChatParty[]; chosen: string[]; onChange(ids: string[]): void; exclude?: string[]; online?: string[]; placeholder?: string; autoFocus?: boolean }) {
+export function PeoplePicker({
+  people,
+  chosen,
+  onChange,
+  exclude = [],
+  online = [],
+  placeholder = "Find people by name",
+  autoFocus,
+  invalid,
+  describedBy,
+}: {
+  people: ChatParty[];
+  chosen: string[];
+  onChange(ids: string[]): void;
+  exclude?: string[];
+  online?: string[];
+  placeholder?: string;
+  autoFocus?: boolean;
+  invalid?: boolean;
+  describedBy?: string;
+}) {
   const [q, setQ] = useState("");
   const [at, setAt] = useState(0);
   const byId = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
@@ -73,7 +93,7 @@ export function PeoplePicker({ people, chosen, onChange, exclude = [], online = 
         {chosen.map((id) => (
           <span key={id} className="chat-people-chip">
             {byId.get(id)?.name ?? id}
-            <button onClick={() => onChange(chosen.filter((x) => x !== id))} aria-label={`Remove ${byId.get(id)?.name ?? id}`}>
+            <button type="button" onClick={() => onChange(chosen.filter((x) => x !== id))} aria-label={`Remove ${byId.get(id)?.name ?? id}`}>
               ✕
             </button>
           </span>
@@ -100,11 +120,25 @@ export function PeoplePicker({ people, chosen, onChange, exclude = [], online = 
             } else if (e.key === "Backspace" && !q && chosen.length) onChange(chosen.slice(0, -1));
           }}
           aria-label={placeholder}
+          aria-invalid={invalid ? true : undefined}
+          aria-describedby={describedBy}
+          aria-controls="chat-people-listbox"
+          aria-activedescendant={found[at] ? `chat-person-opt-${at}` : undefined}
         />
       </div>
-      <div className="chat-people-list" role="listbox">
+      <div className="chat-people-list" id="chat-people-listbox" role="listbox" aria-label="Matching people">
         {found.map((p, i) => (
-          <button key={p.id} role="option" aria-selected={i === at} className={`chat-people-row${i === at ? " is-on" : ""}`} onMouseEnter={() => setAt(i)} onClick={() => add(p.id)} data-person={p.name}>
+          <button
+            key={p.id}
+            id={`chat-person-opt-${i}`}
+            type="button"
+            role="option"
+            aria-selected={i === at}
+            className={`chat-people-row${i === at ? " is-on" : ""}`}
+            onMouseEnter={() => setAt(i)}
+            onClick={() => add(p.id)}
+            data-person={p.name}
+          >
             <PartyAvatar party={p} size={20} online={online.includes(p.id)} />
             <span>{p.name}</span>
           </button>

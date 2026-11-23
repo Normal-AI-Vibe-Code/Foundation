@@ -90,37 +90,46 @@ export function PlacesTab() {
       <LocalConnect onOpen={openGrid} />
       {canApprove ? (
         <form className="places-form" onSubmit={approve}>
-          <input className="places-field is-path" value={path} onChange={(e) => setPath(e.target.value)} placeholder={"The folder's full path, like C:\\Users\\you\\Documents\\Drawings"} aria-label="Folder path" spellCheck={false} />
+          <input
+            className="places-field is-path"
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+            placeholder={"The folder's full path, like C:\\Users\\you\\Documents\\Drawings"}
+            aria-label="Folder path"
+            aria-invalid={err ? true : undefined}
+            aria-describedby={err ? "places-error" : undefined}
+            spellCheck={false}
+          />
           <input className="places-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" aria-label="Name" />
-          <button className="f-pill is-accent" disabled={!path.trim() || busy}>
+          <button type="submit" className="f-pill is-accent" disabled={!path.trim() || busy}>
             {busy ? "Checking…" : "Approve folder"}
           </button>
         </form>
       ) : (
         places && <div className="kb-col-empty">Only an admin, signed in here as themselves, can approve or remove a place.</div>
       )}
-      {err && <div className="kb-error">{err}</div>}
-      {!places && !err && <div className="kb-col-empty">Asking the server…</div>}
+      {err && <div className="kb-error" id="places-error" role="alert">{err}</div>}
+      {!places && !err && <div className="kb-col-empty" role="status">Asking the server…</div>}
       {places && places.length === 0 && <div className="kb-col-empty">No folders are approved. Foundation can't read anything on this computer outside its own data.</div>}
       <div className="services-list">
         {(places ?? []).map((p) => (
           <div key={p.id} className="services-row">
             <span className={`f-dot ${p.reachable ? "is-ok" : "is-warn"}`} />
             <span className="services-name">{p.name}</span>
-            <span className="services-detail places-path">{p.path}</span>
+            <span className="services-detail places-path" title={p.path}>{p.path}</span>
             {canApprove && (
               <span className="services-act">
                 {removing === p.id ? (
                   <>
-                    <button className="f-pill is-danger" onClick={() => remove(p.id)}>
+                    <button type="button" className="f-pill is-danger" onClick={() => remove(p.id)}>
                       Remove
                     </button>
-                    <button className="f-pill" onClick={() => setRemoving(null)}>
+                    <button type="button" className="f-pill" onClick={() => setRemoving(null)}>
                       Keep
                     </button>
                   </>
                 ) : (
-                  <button className="f-pill" onClick={() => setRemoving(p.id)}>
+                  <button type="button" className="f-pill" onClick={() => setRemoving(p.id)}>
                     Remove…
                   </button>
                 )}
