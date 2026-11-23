@@ -2978,3 +2978,90 @@
   color: var(--color-dim);
   font: 500 var(--text-11) / 1.2 var(--font-sans);
 }
+
+/* ---------- ChatForm on a chat server of its own (chat/ChatServer.tsx, settings/ChatServerSetting.tsx) ---------- */
+
+/* the Chat tab until this device is signed in there: the empty state's column, with the sign-in under it */
+.chat-signin strong {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.chat-signin-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+.chat-tab-empty p.chat-signin-note {
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+.chat-tab-empty p.chat-signin-error {
+  color: var(--color-bad);
+  font-size: var(--text-12);
+}
+.chat-signin-wait {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.chat-signin-wait .signin-code {
+  margin-top: 0;
+}
+/* a test server on this computer: its email-only sign-in, set apart under a rule */
+.chat-signin-dev {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 320px;
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+.chat-signin-dev .chat-field {
+  align-self: stretch;
+}
+.chat-signin-dev-cap {
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.3 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Settings → General → ChatForm's server: the address and Use, on one line */
+.chat-server-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.chat-server-form .chat-field-input {
+  width: 240px;
+}
+.chat-server-error {
+  color: var(--color-bad);
+}
+
+/* #/design: the sign-in's states side by side, and the setting's rows on paper */
+.chat-server-demo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+.chat-server-demo-card {
+  width: 420px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-panel);
+}
+.chat-server-demo-card .chat-tab-empty {
+  padding: var(--space-6);
+}
+.chat-server-demo-card.is-rows {
+  width: 640px;
+  padding: 0 var(--space-5);
+}

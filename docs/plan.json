@@ -258,8 +258,8 @@
       "kind": "plan",
       "milestone": "chatform",
       "area": "chat",
-      "status": "doing",
-      "body": "Josh, 2026-11-21: \"Host it on vercel for now. build a rust based server there.\" Built: apps/chatserver (axum on Vercel's Rust runtime, Postgres, LISTEN/NOTIFY across instances, Google accounts with an allowlist), the Node server's chat routes and JSON; cargo test green (5 unit, 4 end to end). Next: ChatForm in the app points at it (a chat-server setting and an app sign-in). Waits on a person for the Vercel project, Neon and the Google OAuth client (apps/chatserver/README.md).",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"Host it on vercel for now. build a rust based server there.\" Built: apps/chatserver (axum on Vercel's Rust runtime, Postgres, LISTEN/NOTIFY across instances, Google accounts with an allowlist), the Node server's chat routes and JSON. 2026-11-22: an app signs in on it like a device (/auth/app/begin, the code, the press on the server's own page, /auth/app/poll: app_signin.rs), and ChatForm in the app points at it: Settings → General → ChatForm's server (per device; VITE_CHATFORM_SERVER for a build), its own bearer and socket ticket (chat/server.ts), the Chat tab's sign-in, and what the server lacks left out. Checked: cargo test (6 unit, 7 end to end, the app sign-in against a stand-in Google), apps/client/test/chat-server.test.ts, and in a browser on this computer, day and night (docs/evidence/2026-11-22_chat-server/). Not checked: the desktop app's window, a deployed server, real Google: those wait on chatform-vercel-setup. Next on it: files in messages, pins and typing in threads.",
       "issue": 239
     },
     {

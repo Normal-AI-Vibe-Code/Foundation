@@ -22,6 +22,7 @@ import { TOP_BAR, floorInsets, toast, useUi } from "../state/ui";
 import { SETTINGS_TABS, goSettings, setStartsOn, startsOn, type Place, type SettingsTab } from "../lib/place";
 import { useCapabilities } from "../lib/capabilities";
 import { PeopleSection } from "./PeopleSection";
+import { ChatServerSetting } from "./ChatServerSetting";
 import { PlacesTab } from "./PlacesTab";
 import { POSTS, ReleasesTab, ServicesTab } from "./SettingsPage";
 import { RendererTab } from "../rune/RendererTab";
@@ -206,6 +207,10 @@ function GeneralTab({ user }: { user: UserInfo }) {
           />
         </Row>
         <Row name="Side menu" detail={ui.pane ? "Open. It stays the way you leave it; the top bar's first button folds it." : "Folded. It stays the way you leave it; the top bar's first button opens it."} />
+      </Group>
+
+      <Group title="ChatForm's server" note="Where this device's ChatForm keeps its conversations. Everything else stays on the Foundation server.">
+        <ChatServerSetting />
       </Group>
 
       <Group title="Agents on this computer" note="What agents may do beyond writing a grid. Nothing that runs code or spends money starts without a person.">

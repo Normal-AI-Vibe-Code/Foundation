@@ -26,6 +26,8 @@ export interface SidebarProps {
   view?: "threads" | "browse" | "search" | null;
   onOpen(id: string): void;
   onView(v: "threads" | "browse"): void;
+  /** the server has no list of my threads (a chat server of its own): the row is left out */
+  noThreads?: boolean;
   onNew(kind: "channel" | "direct"): void;
   /** channels someone is typing in */
   typing?: Set<string>;
@@ -66,12 +68,14 @@ export function Sidebar(p: SidebarProps) {
   return (
     <nav className="chat-sidebar" aria-label="Conversations">
       <div className="chat-side-scroll">
-        <button type="button" className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads>
-          <span className="chat-side-mark">
-            <IconThread />
-          </span>
-          <span className="chat-side-name">Threads</span>
-        </button>
+        {!p.noThreads && (
+          <button type="button" className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads>
+            <span className="chat-side-mark">
+              <IconThread />
+            </span>
+            <span className="chat-side-name">Threads</span>
+          </button>
+        )}
         {unreads.length > 0 && (
           <Section id="unreads" name="Unreads" folded={!!folds.unreads} onFold={fold} count={unreads.length}>
             {unreads.map((c) => row(c, "u"))}

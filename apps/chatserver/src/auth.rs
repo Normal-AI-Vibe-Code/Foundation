@@ -31,6 +31,8 @@ use crate::{
 };
 
 pub const COOKIE: &str = "chatform_session";
+/// what of ChatForm this server has; a client leaves the rest out (files, pins, huddles, agents… stay on Foundation's own)
+pub const FEATURES: [&str; 5] = ["channels", "direct", "threads", "reactions", "search"];
 const STATE_COOKIE: &str = "chatform_oauth";
 const SESSION_DAYS: i64 = 30;
 const TICKET_MS: i64 = 30_000;
@@ -50,7 +52,7 @@ pub enum AuthKind {
     Cookie,
 }
 
-fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
+pub fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
     for h in headers.get_all(header::COOKIE) {
         let Ok(s) = h.to_str() else { continue };
         for part in s.split(';') {
@@ -65,7 +67,7 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
     None
 }
 
-fn bearer(headers: &HeaderMap) -> Option<String> {
+pub fn bearer(headers: &HeaderMap) -> Option<String> {
     let v = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
     let t = v.strip_prefix("Bearer ").or_else(|| v.strip_prefix("bearer "))?.trim();
     (!t.is_empty()).then(|| t.to_string())
@@ -109,7 +111,9 @@ pub async fn cookie_origin_guard(State(st): State<St>, req: Request, next: Next)
     let safe = matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS);
     let upgrade = req.headers().get(header::UPGRADE).is_some();
     let by_cookie = bearer(req.headers()).is_none() && cookie_value(req.headers(), COOKIE).is_some();
-    if (!safe || upgrade) && by_cookie && !origin_allowed(&st, req.headers()) {
+    // the press on the app sign-in's page checks where it came from itself (its Origin is "null": app_signin::confirm)
+    let own_check = req.uri().path().starts_with("/auth/app/confirm/");
+    if (!safe || upgrade) && by_cookie && !own_check && !origin_allowed(&st, req.headers()) {
         return forbidden("A page elsewhere can't use your ChatForm sign-in. Open ChatForm itself.").into_response();
     }
     next.run(req).await
@@ -161,6 +165,9 @@ pub async fn config_route(State(st): State<St>) -> Json<Value> {
         "devLogin": st.cfg.dev_login,
         "provider": "google",
         "hosted": st.cfg.on_vercel,
+        // an app can sign in here (app_signin.rs), and what of ChatForm this server has
+        "app": st.cfg.google_ready(),
+        "features": FEATURES,
         "server": "chatform-rust",
         "version": env!("CARGO_PKG_VERSION"),
     }))
@@ -174,18 +181,24 @@ pub async fn google_start(State(st): State<St>) -> Result<Response> {
     let now = now_ms();
     sqlx::query("delete from oauth_states where expires_at <= $1").bind(now).execute(&st.db).await?;
     sqlx::query("insert into oauth_states (state_hash, created_at, expires_at) values ($1, $2, $3)").bind(hash_token(&state)).bind(now).bind(now + 600_000).execute(&st.db).await?;
-    let mut u = url::Url::parse("https://accounts.google.com/o/oauth2/v2/auth").expect("google url");
-    u.query_pairs_mut()
-        .append_pair("client_id", &client_id)
-        .append_pair("redirect_uri", &format!("{}/auth/google/callback", st.cfg.public_url))
-        .append_pair("response_type", "code")
-        .append_pair("scope", "openid email profile")
-        .append_pair("state", &state)
-        .append_pair("prompt", "select_account");
+    let u = google_url(&st, &client_id, &state)?;
     let secure = if st.cfg.secure_cookie() { "; Secure" } else { "" };
     let mut res = Redirect::to(u.as_str()).into_response();
     res.headers_mut().append(header::SET_COOKIE, HeaderValue::from_str(&format!("{STATE_COOKIE}={state}; Path=/auth/google; HttpOnly; SameSite=Lax; Max-Age=600{secure}")).expect("cookie"));
     Ok(res)
+}
+
+/// Google's sign-in page for this state; it comes back to `<public url>/auth/google/callback`
+pub fn google_url(st: &St, client_id: &str, state: &str) -> Result<url::Url> {
+    let mut u = url::Url::parse(&st.cfg.google_auth_url).map_err(|e| Error::Other(format!("google url: {e}")))?;
+    u.query_pairs_mut()
+        .append_pair("client_id", client_id)
+        .append_pair("redirect_uri", &format!("{}/auth/google/callback", st.cfg.public_url))
+        .append_pair("response_type", "code")
+        .append_pair("scope", "openid email profile")
+        .append_pair("state", state)
+        .append_pair("prompt", "select_account");
+    Ok(u)
 }
 
 #[derive(Deserialize)]
@@ -195,34 +208,42 @@ pub struct Callback {
     error: Option<String>,
 }
 
-fn page(title: &str, body: &str) -> Response {
+/// these pages may hold a press: never framed, no script, forms only to this server
+pub fn page_headers(res: &mut Response) {
+    let h = res.headers_mut();
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/html; charset=utf-8"));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
+    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"));
+    h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+}
+
+/// a plain page for a sign-in that ended in the browser (its words are escaped here)
+pub fn page_with(status: StatusCode, title: &str, body: &str) -> Response {
+    let (title, body) = (html_escape(title), html_escape(body));
     let html = format!(
         "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>{title}</title><body style=\"font:15px/1.5 system-ui;max-width:32rem;margin:15vh auto;padding:0 1rem;color:#222\"><h1 style=\"font-size:20px\">{title}</h1><p>{body}</p></body>"
     );
-    (StatusCode::FORBIDDEN, [(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response()
+    let mut res = (status, html).into_response();
+    page_headers(&mut res);
+    res
 }
 
-pub async fn google_callback(State(st): State<St>, headers: HeaderMap, Query(q): Query<Callback>) -> Result<Response> {
-    if let Some(e) = q.error {
-        return Ok(page("Not signed in", &format!("Google said: {}.", html_escape(&e))));
-    }
-    let (Some(code), Some(state)) = (q.code, q.state) else { return Err(bad("This sign-in is missing its code.")) };
-    // the state must be this browser's and this server's, and used once
-    if cookie_value(&headers, STATE_COOKIE).as_deref() != Some(state.as_str()) {
-        return Ok(page("Not signed in", "This sign-in was started in another browser, or it expired. Start again from ChatForm."));
-    }
-    let used = sqlx::query("delete from oauth_states where state_hash = $1 and expires_at > $2").bind(hash_token(&state)).bind(now_ms()).execute(&st.db).await?;
-    if used.rows_affected() != 1 {
-        return Ok(page("Not signed in", "This sign-in expired or was already used. Start again from ChatForm."));
-    }
+fn page(title: &str, body: &str) -> Response {
+    page_with(StatusCode::FORBIDDEN, title, body)
+}
+
+/// Who Google says this code is: the person (a verified address on the allowlist, made here on first sign-in), or
+/// the page to show instead (its title and words).
+pub async fn google_person(st: &St, code: &str) -> Result<std::result::Result<User, (&'static str, String)>> {
     let (Some(id), Some(secret)) = (st.cfg.google_client_id.clone(), st.cfg.google_client_secret.clone()) else {
         return Err(http(StatusCode::SERVICE_UNAVAILABLE, "Google sign-in isn't set up on this server yet."));
     };
     let redirect = format!("{}/auth/google/callback", st.cfg.public_url);
     let tok: Value = st
         .http
-        .post("https://oauth2.googleapis.com/token")
-        .form(&[("code", code.as_str()), ("client_id", id.as_str()), ("client_secret", secret.as_str()), ("redirect_uri", redirect.as_str()), ("grant_type", "authorization_code")])
+        .post(&st.cfg.google_token_url)
+        .form(&[("code", code), ("client_id", id.as_str()), ("client_secret", secret.as_str()), ("redirect_uri", redirect.as_str()), ("grant_type", "authorization_code")])
         .send()
         .await
         .map_err(|e| Error::Other(format!("google token: {e}")))?
@@ -230,11 +251,11 @@ pub async fn google_callback(State(st): State<St>, headers: HeaderMap, Query(q):
         .await
         .map_err(|e| Error::Other(format!("google token: {e}")))?;
     let Some(access) = tok.get("access_token").and_then(|v| v.as_str()) else {
-        return Ok(page("Not signed in", "Google didn't accept this sign-in. Start again from ChatForm."));
+        return Ok(Err(("Not signed in", "Google didn't accept this sign-in. Start again from ChatForm.".into())));
     };
     let info: Value = st
         .http
-        .get("https://openidconnect.googleapis.com/v1/userinfo")
+        .get(&st.cfg.google_userinfo_url)
         .bearer_auth(access)
         .send()
         .await
@@ -245,12 +266,36 @@ pub async fn google_callback(State(st): State<St>, headers: HeaderMap, Query(q):
     let email = info.get("email").and_then(|v| v.as_str()).unwrap_or("");
     let verified = info.get("email_verified").and_then(|v| v.as_bool()).unwrap_or(false);
     if email.is_empty() || !verified {
-        return Ok(page("Not signed in", "Google didn't give a verified address for this account."));
+        return Ok(Err(("Not signed in", "Google didn't give a verified address for this account.".into())));
     }
     if !st.cfg.allowed(email) {
-        return Ok(page("Not on this ChatForm", &format!("{} isn't on this server's list of who may sign in. Ask an admin.", html_escape(email))));
+        return Ok(Err(("Not on this ChatForm", format!("{email} isn't on this server's list of who may sign in. Ask an admin."))));
     }
-    let user = upsert_user(&st, email, info.get("name").and_then(|v| v.as_str()).unwrap_or("")).await?;
+    Ok(Ok(upsert_user(st, email, info.get("name").and_then(|v| v.as_str()).unwrap_or("")).await?))
+}
+
+pub async fn google_callback(State(st): State<St>, headers: HeaderMap, Query(q): Query<Callback>) -> Result<Response> {
+    // an app began this one and is polling (app_signin.rs): it ends on a page that asks for a press, not in a cookie
+    if let Some(state) = q.state.as_deref()
+        && crate::app_signin::is_attempt(&st, state).await? {
+            return crate::app_signin::google_done(&st, state, q.code.as_deref(), q.error.as_deref()).await;
+        }
+    if let Some(e) = q.error {
+        return Ok(page("Not signed in", &format!("Google said: {e}.")));
+    }
+    let (Some(code), Some(state)) = (q.code, q.state) else { return Err(bad("This sign-in is missing its code.")) };
+    // the state must be this browser's and this server's, and used once
+    if cookie_value(&headers, STATE_COOKIE).as_deref() != Some(state.as_str()) {
+        return Ok(page("Not signed in", "This sign-in was started in another browser, or it expired. Start again from ChatForm."));
+    }
+    let used = sqlx::query("delete from oauth_states where state_hash = $1 and expires_at > $2").bind(hash_token(&state)).bind(now_ms()).execute(&st.db).await?;
+    if used.rows_affected() != 1 {
+        return Ok(page("Not signed in", "This sign-in expired or was already used. Start again from ChatForm."));
+    }
+    let user = match google_person(&st, &code).await? {
+        Ok(u) => u,
+        Err((title, words)) => return Ok(page(title, &words)),
+    };
     let token = create_session(&st, &user.id, "browser").await?;
     let mut res = Redirect::to("/").into_response();
     res.headers_mut().append(header::SET_COOKIE, session_cookie(&st, &token, SESSION_DAYS * 86_400));
@@ -258,7 +303,7 @@ pub async fn google_callback(State(st): State<St>, headers: HeaderMap, Query(q):
     Ok(res)
 }
 
-fn html_escape(s: &str) -> String {
+pub fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 

@@ -46,10 +46,29 @@ I can't sign in to Vercel, Google or Neon for you; these are the steps, about fi
    | `CHATFORM_ALLOWLIST` | `@formindustries.co,@normallab.co` |
    | `CHATFORM_ADMIN_EMAILS` | the admins' addresses, comma-separated |
    | `CHATFORM_PUBLIC_URL` | `https://<project>.vercel.app` (or your own domain); defaults to the production URL Vercel gives |
-   | `CHATFORM_CORS_ORIGINS` | `http://localhost:31440` (the Foundation app's window), plus any page that calls it |
+   | `CHATFORM_CORS_ORIGINS` | `http://localhost:31440` (the Foundation app's window), plus any page that calls it. Without it the app says it can't reach the server |
 
 5. **Deploy** (a push to `main`, or *Redeploy*). Open `https://<project>.vercel.app/api/health`: `"database": true`
    and `"listening": true` mean it's up. Then `https://<project>.vercel.app` → *Sign in with Google*.
+
+6. **Point the app at it.** In Foundation: *Settings → General → ChatForm's server* → the address → **Use**. The window
+   reloads; open ChatForm and press *Sign in with Google*. The app shows a code, Google opens in the browser, and the
+   server's page shows the same code and asks *This is me*. (A build can name the server for everyone with
+   `VITE_CHATFORM_SERVER`.)
+
+## An app signs in
+
+As Foundation's own desktop sign-in does, like a device (`src/app_signin.rs`):
+
+- `POST /auth/app/begin` → `{ url, poll, code, expiresIn }`: Google's address for the system browser, a secret only the
+  app holds, and a code of eight the app shows. Nobody is signed in by beginning.
+- Google returns to `/auth/google/callback`. The person is checked as any sign-in is, then lands on this server's own
+  page (no script, never framed): *an app is asking to sign in as you, this is its code*, **This is me** / **Not me**.
+- `POST /auth/app/poll` (the secret as `Authorization: Bearer`) → `pending` until the press; after *This is me*,
+  `{ status: "ok", user, session }` once. The app keeps `session` as its bearer. *Not me*, a refusal or five minutes end it.
+
+`GET /auth/config` says `app` (an app can sign in) and `features` (what of ChatForm this server has); the app leaves
+the rest out.
 
 ## Run it here
 
@@ -64,10 +83,10 @@ on Vercel.
 
 ## Not built yet
 
-- **ChatForm in the Foundation app doesn't point here yet**: it talks to the Foundation server it's signed in to. The
-  next step is a "chat server" setting and an app sign-in (a code the app shows, Google in the system browser, a
-  bearer back), as the hosted Foundation does.
 - Files in messages, pins, starring and notify settings, channel topics after creation, archiving, typing in threads,
   link previews, agents, huddles, portals and bridges, the Slack import: Foundation's own server only.
 - It has run only here (Windows, and a Linux build in Docker) against a local Postgres; not yet on Vercel, Neon or a
-  real Google client.
+  real Google client. The app sign-in is tested against a stand-in Google (`tests/flow.rs`; a local run with dev login
+  can name one with `CHATFORM_GOOGLE_STANDIN`, which Vercel never reads).
+- While the app's ChatForm is here, its Agents, Inbox and Huddles tabs are hidden, and who is where on the grids
+  isn't kept live (SPEC §7).

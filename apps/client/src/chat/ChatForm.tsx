@@ -11,6 +11,9 @@
  * Keys: Ctrl/⌘+K inside ChatForm is the quick switcher (and again, Foundation's commands; the shell leaves
  * ⌘K to ChatForm while it's the place). Typing anywhere that isn't a field goes to the composer. Esc
  * closes the thread pane. The shell's plain-key shortcuts (V, P) don't fire here.
+ *
+ * On a chat server of its own (chat/server.ts) the place is the Chat tab alone, signed in there on its own
+ * (chat/ChatServer.tsx); what that server doesn't have (files, pins, huddles, agents, the inbox) is left out.
  */
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -51,6 +54,7 @@ import {
   type ChatHit,
   type ChatState,
 } from "./model";
+import { chatApi } from "./server";
 import { layoutTimeline, parseRest, restOf, type ChatRest } from "./logic";
 import { Sidebar } from "./Sidebar";
 import { setListFolded, usePins } from "./pins";
@@ -60,11 +64,12 @@ import { Composer, type ComposerHandle } from "./Composer";
 import { ThreadPane } from "./Thread";
 import { NewChannelDialog, NewDirectDialog, QuickSwitcher } from "./Dialogs";
 import { BrowseView, ChannelIntro, SearchView, ThreadsView, type ThreadRow } from "./Views";
-import { api } from "../lib/api";
 import { ChatMark, IconClose, IconSearch } from "./Icons";
 import type { MessageActions } from "./Message";
 import { SlackNudge } from "./tabs/SlackGuide";
 import { ServerNote } from "../server/ServerAbout";
+import { ChatServerNote, ChatSignIn } from "./ChatServer";
+import { chatCan, type ChatFeature } from "./serverLogic";
 import "./chat.css";
 
 const AgentsTab = lazy(() => import("./tabs/Agents"));
@@ -119,7 +124,7 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
           ChatForm
         </h1>
         <nav className="settings-tabs chat-tabs" aria-label="ChatForm">
-          {CHAT_TABS.map((t) => (
+          {(s.remote ? (["chat"] as const) : CHAT_TABS).map((t) => (
             <a key={t} href={`#/chat/${t}`} className={`settings-tab${place.tab === t ? " is-current" : ""}`} aria-current={place.tab === t ? "page" : undefined} data-chat-tab-link={t} onClick={t === "chat" ? () => setListFolded(false) : undefined}>
               {LABEL[t]}
             </a>
@@ -149,10 +154,10 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
             </button>
           )}
         </label>
-        <ServerNote />
+        {s.remote ? <ChatServerNote /> : <ServerNote />}
       </header>
       <div className="chat-body">
-        {place.tab === "chat" ? (
+        {place.tab === "chat" || s.remote ? (
           <ChatTabView user={user} s={s} route={route} />
         ) : (
           <Suspense fallback={<div className="chat-tab-empty" />}>
@@ -160,7 +165,7 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
           </Suspense>
         )}
       </div>
-      <SlackNudge user={user} tab={place.tab} />
+      {!s.remote && <SlackNudge user={user} tab={place.tab} />}
       <AnimatePresence>
         {switcher && (
           <QuickSwitcher
@@ -185,7 +190,10 @@ export function ChatForm({ user, place }: { user: UserInfo; place: Extract<Place
 
 // ---------------------------------------------------------------- the Chat tab
 
-function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: ChatRest }) {
+function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: ChatState; route: ChatRest }) {
+  // on a chat server, who I am (my id, my role) is that server's account, not Foundation's
+  const user: UserInfo = useMemo(() => (s.remote && s.account ? { ...foundationUser, ...s.account } : foundationUser), [s.remote, s.account, foundationUser]);
+  const can = useCallback((what: ChatFeature) => chatCan(s.remote, s.features, what), [s.remote, s.features]);
   const channels = useMemo(() => Object.values(s.channels), [s.channels]);
   const meId = s.me?.id ?? user.id;
   const me = useMemo(() => ({ id: meId, name: user.name, handle: chatHandle(user.name), color: user.color }), [meId, user.name, user.color]);
@@ -285,7 +293,7 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
     () => ({
       react: (m, e, on) => void react(m, e, on).catch((x: Error) => toast(x.message, "bad")),
       reply: (m) => go({ channel: m.channel, thread: m.id }),
-      pin: (m, on) => void pin(m, on).catch((x: Error) => toast(x.message, "bad")),
+      pin: can("pins") ? (m, on) => void pin(m, on).catch((x: Error) => toast(x.message, "bad")) : undefined,
       copyLink: (m) => {
         const url = `${window.location.origin}${window.location.pathname}#/chat/chat/${restOf({ channel: m.channel, at: m.seq })}`;
         void navigator.clipboard?.writeText(url).then(
@@ -310,7 +318,7 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
         window.dispatchEvent(new CustomEvent("foundation:board", { detail: m.place.board }));
       },
     }),
-    [go],
+    [go, can],
   );
 
   const items = useMemo(
@@ -396,7 +404,7 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
     if (route.view !== "threads") return;
     let live = true;
     setThreadsWhy("");
-    api<{ threads: ThreadRow[] }>("/api/chat/threads")
+    chatApi<{ threads: ThreadRow[] }>("/api/chat/threads")
       .then((r) => live && setThreadRows(r.threads))
       .catch((e: Error) => live && setThreadsWhy(e.message));
     return () => {
@@ -409,6 +417,12 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
   const folded = usePins().listFolded && !!channel && !route.view;
   const fail = (x: Error) => toast(x.message, "bad");
 
+  // a chat server nobody is signed in to on this device: the whole tab is its sign-in
+  if (s.status === "signin") {
+    return <ChatSignIn note={s.why} />;
+  }
+
+  const noFiles = can("files") ? undefined : "Files can't be sent on this chat server yet. They stay on Foundation's own.";
   let main: React.ReactNode;
   if (s.status === "unavailable") {
     main = (
@@ -446,10 +460,10 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
       <div
         className="chat-main"
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files") && !disabled) e.preventDefault();
+          if (e.dataTransfer.types.includes("Files") && !disabled && !noFiles) e.preventDefault();
         }}
         onDrop={(e) => {
-          if (!e.dataTransfer.files.length || disabled) return;
+          if (!e.dataTransfer.files.length || disabled || noFiles) return;
           e.preventDefault();
           composer.current?.addFiles([...e.dataTransfer.files]);
         }}
@@ -461,15 +475,17 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
           online={s.online}
           pinned={pinned}
           canAdmin={user.role === "admin" || channel.createdBy === user.id}
-          onTopic={channel.me || channel.kind === "open" ? (topic) => void updateChannel(channel.id, { topic }).catch(fail) : undefined}
-          onStar={(on) => void updateChannel(channel.id, { starred: on }).catch(fail)}
-          onNotify={(n) => void updateChannel(channel.id, { notify: n }).catch(fail)}
-          onMembers={channel.me ? (add, remove) => void changeMembers(channel.id, add, remove).catch(fail) : undefined}
+          onTopic={can("topics") && (channel.me || channel.kind === "open") ? (topic) => void updateChannel(channel.id, { topic }).catch(fail) : undefined}
+          onStar={can("star") ? (on) => void updateChannel(channel.id, { starred: on }).catch(fail) : undefined}
+          onNotify={can("notify") ? (n) => void updateChannel(channel.id, { notify: n }).catch(fail) : undefined}
+          onMembers={can("members") && channel.me ? (add, remove) => void changeMembers(channel.id, add, remove).catch(fail) : undefined}
+          noHuddle={!can("huddles")}
+          noPins={!can("pins")}
           onWantMembers={() => void refreshChannel(channel.id)}
           onJump={(m) => go({ channel: channel.id, at: m.seq })}
-          onExport={(f) => void exportChannel(channel.id, f).catch(fail)}
+          onExport={can("export") ? (f) => void exportChannel(channel.id, f).catch(fail) : undefined}
           onLeave={() => void leaveChannel(channel.id).catch(fail)}
-          onArchive={() => void archiveChannel(channel.id).then(() => toast(`#${channel.name} is archived`), fail)}
+          onArchive={can("archive") ? () => void archiveChannel(channel.id).then(() => toast(`#${channel.name} is archived`), fail) : undefined}
           onJoin={!viewer ? () => void joinChannel(channel.id).catch(fail) : undefined}
           onUnfold={folded ? () => setListFolded(false) : undefined}
         />
@@ -522,6 +538,7 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
             channels={channels}
             meId={meId}
             disabled={disabled}
+            noFiles={noFiles}
             autoFocus
             onSend={(text, files) => send(channel.id, text, files, null)}
             onTyping={() => sayTyping(channel.id, null)}
@@ -537,7 +554,7 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
 
   return (
     <div className={`chat-tab-chat${route.thread && channel ? " has-thread" : ""}${folded ? " is-list-folded" : ""}`}>
-      {!folded && <Sidebar channels={channels} meId={meId} online={s.online} current={channelId} view={route.view} onOpen={(id) => go({ channel: id })} onView={(v) => go({ view: v })} onNew={setDialog} typing={typingIn} carry />}
+      {!folded && <Sidebar channels={channels} meId={meId} online={s.online} current={channelId} view={route.view} onOpen={(id) => go({ channel: id })} onView={(v) => go({ view: v })} onNew={setDialog} typing={typingIn} carry={!s.remote} noThreads={!can("threads-list")} />}
       {main}
       <AnimatePresence>
         {route.thread && channel && (
@@ -565,6 +582,7 @@ function ChatTabView({ user, s, route }: { user: UserInfo; s: ChatState; route: 
                 channels={channels}
                 meId={meId}
                 disabled={disabled}
+                noFiles={noFiles}
                 compact
                 autoFocus
                 onSend={(text, files) => send(channel.id, text, files, route.thread)}

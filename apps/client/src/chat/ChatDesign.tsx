@@ -24,6 +24,8 @@ import { HuddleDemo } from "../panels/HuddleDesign";
 import { ReplayDemo } from "../panels/ReplayDesign";
 import { InboxDemo } from "./tabs/InboxDesign";
 import { SideMenuDemo } from "./SideMenuDesign";
+import { ChatServerNoteView, ChatSignInView } from "./ChatServer";
+import { ChatServerSettingView } from "../settings/ChatServerSetting";
 
 const NOW = Date.now();
 const MIN = 60_000;
@@ -193,10 +195,71 @@ export function ChatFormDemo() {
           </div>
         </div>
       </div>
+      <ChatServerDemo />
       <SideMenuDemo />
       <HuddleDemo />
       <ReplayDemo />
       <InboxDemo />
+    </div>
+  );
+}
+
+/**
+ * ChatForm on a chat server of its own: the Chat tab's sign-in (asking, ready, waiting with the code, refused, a
+ * test server's email sign-in), the strip's note, and the setting's rows in both states.
+ */
+export function ChatServerDemo() {
+  const noop = () => {};
+  return (
+    <div className="chat-server-demo" data-chat-server-demo>
+      <div>
+        <p className="chat-demo-cap">A chat server · sign in</p>
+        <div className="chat-server-demo-card">
+          <ChatSignInView server="chatform.vercel.app" config={{ google: true, devLogin: false, app: true }} onGoogle={noop} onSettings={noop} />
+        </div>
+      </div>
+      <div>
+        <p className="chat-demo-cap">Waiting for the press in the browser</p>
+        <div className="chat-server-demo-card">
+          <ChatSignInView server="chatform.vercel.app" config={{ google: true, devLogin: false, app: true }} waiting code="HM7Q-4KXT" link="https://accounts.google.com/" onCancel={noop} />
+        </div>
+      </div>
+      <div>
+        <p className="chat-demo-cap">It didn't finish</p>
+        <div className="chat-server-demo-card">
+          <ChatSignInView server="chatform.vercel.app" config={{ google: true, devLogin: false, app: true }} error="The sign-in was turned down in the browser." onGoogle={noop} onSettings={noop} />
+        </div>
+      </div>
+      <div>
+        <p className="chat-demo-cap">The server can't be reached</p>
+        <div className="chat-server-demo-card">
+          <ChatSignInView server="chatform.vercel.app" config={null} error="Can't reach ChatForm's server (chatform.vercel.app). It isn't running, it doesn't allow this app, or this device is offline." onRetry={noop} onSettings={noop} />
+        </div>
+      </div>
+      <div>
+        <p className="chat-demo-cap">A test server on this computer</p>
+        <div className="chat-server-demo-card">
+          <ChatSignInView server="localhost:4420" config={{ google: false, devLogin: true, app: false }} onDev={noop} onSettings={noop} />
+        </div>
+      </div>
+      <div>
+        <p className="chat-demo-cap">The strip's note</p>
+        <div className="chat-demo-bar">
+          <ChatServerNoteView server="chatform.vercel.app" who="Josh Leong" />
+        </div>
+        <p className="chat-demo-cap" style={{ marginTop: "var(--space-6)" }}>
+          Settings · ChatForm on Foundation's server
+        </p>
+        <div className="chat-server-demo-card is-rows set-rows">
+          <ChatServerSettingView current="" foundation="localhost:4410" onUse={noop} initialDraft="" />
+        </div>
+        <p className="chat-demo-cap" style={{ marginTop: "var(--space-6)" }}>
+          Settings · on a chat server
+        </p>
+        <div className="chat-server-demo-card is-rows set-rows">
+          <ChatServerSettingView current="https://chatform.vercel.app" foundation="localhost:4410" account={{ name: "Josh Leong", email: "josh@formindustries.co" }} onUse={noop} onSignOut={noop} />
+        </div>
+      </div>
     </div>
   );
 }

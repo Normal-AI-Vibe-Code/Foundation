@@ -35,6 +35,18 @@ create table if not exists ws_tickets (
   path text not null,
   expires_at bigint not null
 );
+create table if not exists app_signins (
+  state_hash text primary key,
+  poll_hash text not null unique,
+  code text not null,
+  created_at bigint not null,
+  expires_at bigint not null,
+  used_at bigint,
+  result_user_id text,
+  result_error text,
+  confirm_hash text,
+  confirmed_at bigint
+);
 create table if not exists chat_channels (
   id text primary key,
   kind text not null,

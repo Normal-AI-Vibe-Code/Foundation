@@ -31,7 +31,11 @@ async fn fresh_db() -> Option<String> {
 }
 
 fn config(db: &str) -> Config {
+    let (google_auth_url, google_token_url, google_userinfo_url) = Config::google_urls();
     Config {
+        google_auth_url,
+        google_token_url,
+        google_userinfo_url,
         database_url: db.into(),
         listen_url: db.into(),
         public_url: "http://localhost:4420".into(),
@@ -48,7 +52,11 @@ fn config(db: &str) -> Config {
 
 /// a running instance on a free port; two on one database are two Vercel instances
 async fn instance(db: &str) -> String {
-    let st = state(config(db)).await.expect("state");
+    serve(config(db)).await
+}
+
+async fn serve(cfg: Config) -> String {
+    let st = state(cfg).await.expect("state");
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move { axum::serve(listener, app(st).into_make_service_with_connect_info::<SocketAddr>()).await.unwrap() });
@@ -266,4 +274,206 @@ async fn a_post_on_one_instance_reaches_a_socket_on_another() {
     // and who's online is everyone's, across instances
     let (_, l) = call("GET", &a, "/api/chat", &ada, None).await;
     assert!(l["online"].as_array().unwrap().iter().any(|x| x == kai.id.as_str()));
+}
+
+// ---------------------------------------------------------------- an app signs in (app_signin.rs), against a stand-in Google
+
+/// Google, for a test: the code is the address ("nobody" is refused), and an address starting "unverified" isn't verified
+async fn google_standin() -> String {
+    use axum::{Form, Json, Router, http::HeaderMap, routing::{get, post}};
+    async fn token(Form(f): Form<std::collections::HashMap<String, String>>) -> Json<Value> {
+        let code = f.get("code").cloned().unwrap_or_default();
+        if code == "nobody" || f.get("client_secret").map(String::as_str) != Some("standin-secret") {
+            return Json(json!({ "error": "invalid_grant" }));
+        }
+        Json(json!({ "access_token": code }))
+    }
+    async fn userinfo(h: HeaderMap) -> Json<Value> {
+        let email = h.get("authorization").and_then(|v| v.to_str().ok()).unwrap_or("").trim_start_matches("Bearer ").to_string();
+        Json(json!({ "email": email, "email_verified": !email.starts_with("unverified"), "name": "Ada Lovelace" }))
+    }
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, Router::new().route("/token", post(token)).route("/userinfo", get(userinfo))).await.unwrap() });
+    format!("http://{addr}")
+}
+
+/// an instance whose Google is the stand-in; its public address is the one it listens on, so its own pages are its origin
+async fn instance_with_google(db: &str) -> String {
+    let google = google_standin().await;
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let mut cfg = config(db);
+    cfg.public_url = format!("http://{addr}");
+    cfg.google_client_id = Some("standin-client".into());
+    cfg.google_client_secret = Some("standin-secret".into());
+    cfg.google_auth_url = format!("{google}/auth");
+    cfg.google_token_url = format!("{google}/token");
+    cfg.google_userinfo_url = format!("{google}/userinfo");
+    let st = state(cfg).await.expect("state");
+    tokio::spawn(async move { axum::serve(listener, app(st).into_make_service_with_connect_info::<SocketAddr>()).await.unwrap() });
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    format!("http://{addr}")
+}
+
+struct Begun {
+    state: String,
+    poll: String,
+    code: String,
+}
+
+async fn begin(base: &str) -> Begun {
+    let r: Value = reqwest::Client::new().post(format!("{base}/auth/app/begin")).send().await.unwrap().json().await.unwrap();
+    let url = url::Url::parse(r["url"].as_str().expect("a url to open")).unwrap();
+    let q: std::collections::HashMap<String, String> = url.query_pairs().into_owned().collect();
+    assert_eq!(q["redirect_uri"], format!("{base}/auth/google/callback"));
+    assert_eq!(r["expiresIn"], 300);
+    Begun { state: q["state"].clone(), poll: r["poll"].as_str().unwrap().into(), code: r["code"].as_str().unwrap().into() }
+}
+
+async fn poll(base: &str, secret: &str) -> (u16, Value) {
+    let res = reqwest::Client::new().post(format!("{base}/auth/app/poll")).bearer_auth(secret).send().await.unwrap();
+    let status = res.status().as_u16();
+    (status, res.json().await.unwrap_or(Value::Null))
+}
+
+/// Google sends the browser back: the page it lands on, and the press cookie it was given
+async fn back_from_google(base: &str, state: &str, code: &str) -> (u16, String, Option<String>) {
+    let res = reqwest::Client::new().get(format!("{base}/auth/google/callback")).query(&[("state", state), ("code", code)]).send().await.unwrap();
+    let status = res.status().as_u16();
+    let cookie = res.headers().get_all("set-cookie").iter().filter_map(|v| v.to_str().ok()).find(|v| v.starts_with("chatform_app_confirm=")).map(|v| v.split(';').next().unwrap().to_string());
+    (status, res.text().await.unwrap(), cookie)
+}
+
+async fn press(base: &str, answer: &str, cookie: Option<&str>, origin: Option<&str>, site: Option<&str>) -> (u16, String) {
+    let mut r = reqwest::Client::new().post(format!("{base}/auth/app/confirm/{answer}"));
+    if let Some(c) = cookie {
+        r = r.header("cookie", c);
+    }
+    if let Some(o) = origin {
+        r = r.header("origin", o);
+    }
+    if let Some(s) = site {
+        r = r.header("sec-fetch-site", s);
+    }
+    let res = r.send().await.unwrap();
+    (res.status().as_u16(), res.text().await.unwrap())
+}
+
+#[tokio::test]
+async fn an_app_signs_in_only_after_the_person_says_this_is_me() {
+    let Some(db) = fresh_db().await else { return };
+    let base = instance_with_google(&db).await;
+    let cfg: Value = reqwest::get(format!("{base}/auth/config")).await.unwrap().json().await.unwrap();
+    assert_eq!(cfg["app"], true);
+    assert!(cfg["features"].as_array().unwrap().iter().any(|f| f == "channels"));
+
+    let b = begin(&base).await;
+    assert_eq!(b.code.len(), 9);
+    assert_eq!(poll(&base, &b.poll).await.1["status"], "pending");
+    assert_eq!(poll(&base, "not-a-poll").await.0, 404);
+
+    // Google is done, the person is who they say: still nothing for the app until the press
+    let (status, page, cookie) = back_from_google(&base, &b.state, "ada@formindustries.co").await;
+    assert_eq!(status, 200);
+    assert!(page.contains(&b.code), "the page shows the app's code");
+    assert!(page.contains("ada@formindustries.co") && page.contains("This is me"));
+    let cookie = cookie.expect("a cookie for the press");
+    assert!(cookie.len() > 30 && !page.contains(cookie.split('=').nth(1).unwrap()));
+    assert_eq!(poll(&base, &b.poll).await.1["status"], "pending", "Google alone signs nobody's app in");
+
+    // a press from elsewhere, or without this browser's cookie, does nothing
+    assert_eq!(press(&base, "yes", Some(&cookie), Some("https://evil.example"), Some("cross-site")).await.0, 403);
+    assert_eq!(press(&base, "yes", Some(&cookie), Some("null"), Some("cross-site")).await.0, 403);
+    assert_eq!(press(&base, "yes", None, Some("null"), Some("same-origin")).await.0, 400);
+    assert_eq!(press(&base, "yes", Some("chatform_app_confirm=guessed"), Some("null"), Some("same-origin")).await.0, 400);
+    assert_eq!(poll(&base, &b.poll).await.1["status"], "pending");
+
+    // Google comes back once: the same state again is a replay
+    assert_eq!(back_from_google(&base, &b.state, "ada@formindustries.co").await.0, 400);
+
+    // "This is me", from the page itself (its Origin is "null" under no-referrer, and the browser says same-origin)
+    let (status, said) = press(&base, "yes", Some(&cookie), Some("null"), Some("same-origin")).await;
+    assert_eq!(status, 200);
+    assert!(said.contains("That app is signed in"));
+    assert_eq!(press(&base, "yes", Some(&cookie), Some("null"), Some("same-origin")).await.0, 400, "one press");
+
+    let (status, got) = poll(&base, &b.poll).await;
+    assert_eq!(status, 200);
+    assert_eq!(got["status"], "ok");
+    assert_eq!(got["user"]["email"], "ada@formindustries.co");
+    let who = Who { id: got["user"]["id"].as_str().unwrap().into(), token: got["session"].as_str().unwrap().into() };
+    // the session is the app's bearer: it reads ChatForm, and opens the socket by ticket
+    let (status, me) = call("GET", &base, "/api/me", &who, None).await;
+    assert_eq!((status, me["user"]["id"].as_str()), (200, Some(who.id.as_str())));
+    let (status, list) = call("GET", &base, "/api/chat", &who, None).await;
+    assert_eq!(status, 200);
+    assert_eq!(list["channels"][0]["name"], "general");
+    let mut ws = socket(&base, &who).await;
+    assert_eq!(until(&mut ws, |v| v["t"] == "hello").await.expect("hello")["you"], who.id.as_str());
+    // collected once
+    assert_eq!(poll(&base, &b.poll).await.0, 404);
+    // only its hash was kept
+    let pool = sqlx::PgPool::connect(&db).await.unwrap();
+    let (kept,): (i64,) = sqlx::query_as("select count(*) from sessions where token_hash = $1").bind(&who.token).fetch_one(&pool).await.unwrap();
+    assert_eq!(kept, 0);
+    let (left,): (i64,) = sqlx::query_as("select count(*) from app_signins").fetch_one(&pool).await.unwrap();
+    assert_eq!(left, 0);
+}
+
+#[tokio::test]
+async fn not_me_a_stranger_or_an_unverified_address_sign_no_app_in() {
+    let Some(db) = fresh_db().await else { return };
+    let base = instance_with_google(&db).await;
+
+    // "Not me": the app hears no, once, and gets no session
+    let b = begin(&base).await;
+    let (_, _, cookie) = back_from_google(&base, &b.state, "ada@formindustries.co").await;
+    let (status, said) = press(&base, "no", cookie.as_deref(), Some(&base), Some("same-origin")).await;
+    assert_eq!(status, 200);
+    assert!(said.contains("Nothing was signed in"));
+    let (_, got) = poll(&base, &b.poll).await;
+    assert_eq!(got["status"], "error");
+    assert!(got.get("session").is_none());
+    assert_eq!(poll(&base, &b.poll).await.0, 404);
+
+    // someone off the allowlist: the page says so, there is no press to make, and the app is told
+    let b = begin(&base).await;
+    let (status, page, cookie) = back_from_google(&base, &b.state, "mallory@elsewhere.example").await;
+    assert_eq!(status, 403);
+    assert!(page.contains("isn't on this server's list") && cookie.is_none());
+    let (_, got) = poll(&base, &b.poll).await;
+    assert_eq!(got["status"], "error");
+    assert!(got["error"].as_str().unwrap().contains("mallory@elsewhere.example"));
+    assert!(got.get("session").is_none());
+
+    // an address Google hasn't verified, a code Google refuses, and a sign-in cancelled at Google
+    for (code, error) in [("unverified@formindustries.co", None), ("nobody", None), ("", Some("access_denied"))] {
+        let b = begin(&base).await;
+        let mut q = vec![("state", b.state.as_str()), ("code", code)];
+        if let Some(e) = error {
+            q.push(("error", e));
+        }
+        let res = reqwest::Client::new().get(format!("{base}/auth/google/callback")).query(&q).send().await.unwrap();
+        assert!(res.status().is_client_error());
+        assert!(res.headers().get("set-cookie").is_none());
+        let (_, got) = poll(&base, &b.poll).await;
+        assert_eq!(got["status"], "error", "{code}");
+        assert!(got.get("session").is_none());
+    }
+
+    // a state nobody began is not an app's: the browser's own sign-in answers it (and refuses: no cookie)
+    let res = reqwest::Client::new().get(format!("{base}/auth/google/callback")).query(&[("state", "made-up"), ("code", "ada@formindustries.co")]).send().await.unwrap();
+    assert_eq!(res.status().as_u16(), 403);
+    assert!(res.headers().get("set-cookie").is_none());
+}
+
+#[tokio::test]
+async fn an_app_sign_in_needs_google_set_up() {
+    let Some(db) = fresh_db().await else { return };
+    let base = instance(&db).await;
+    let res = reqwest::Client::new().post(format!("{base}/auth/app/begin")).send().await.unwrap();
+    assert_eq!(res.status().as_u16(), 503);
+    let cfg: Value = reqwest::get(format!("{base}/auth/config")).await.unwrap().json().await.unwrap();
+    assert_eq!(cfg["app"], false);
 }

@@ -14,7 +14,10 @@
 //!   origin takes a one-time 30-second ticket); who wrote a message is the session's to say; a DM or private channel
 //!   reaches only its members, admins included; writes carry `request_id`; removing a message needs `confirm` and
 //!   keeps the row; a page elsewhere can't use the cookie (Origin checked on writes and sockets).
+//! - **An app signs in like a device** (`app_signin.rs`): Google in the system browser, a code shown on both screens,
+//!   and a person's press on this server's own page before the app's poll gets a bearer, once.
 
+pub mod app_signin;
 pub mod auth;
 pub mod chat;
 pub mod config;
@@ -63,6 +66,9 @@ pub fn app(st: St) -> Router {
         .route("/auth/config", get(auth::config_route))
         .route("/auth/google/start", get(auth::google_start))
         .route("/auth/google/callback", get(auth::google_callback))
+        .route("/auth/app/begin", post(app_signin::begin))
+        .route("/auth/app/poll", post(app_signin::poll))
+        .route("/auth/app/confirm/{answer}", post(app_signin::confirm))
         .route("/auth/dev", post(auth::dev_login))
         .route("/auth/logout", post(auth::logout))
         .route("/api/me", get(auth::me))

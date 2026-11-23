@@ -31,6 +31,11 @@ pub struct Config {
     pub cors_origins: Vec<String>,
     pub on_vercel: bool,
     pub port: u16,
+    /// Google's three addresses: its sign-in page, its token exchange, and who the token is. Google's own, always, on
+    /// Vercel; a local run with dev login may name a stand-in (CHATFORM_GOOGLE_STANDIN) so the sign-in can be walked
+    pub google_auth_url: String,
+    pub google_token_url: String,
+    pub google_userinfo_url: String,
 }
 
 impl Config {
@@ -42,6 +47,14 @@ impl Config {
         let public_url = env("CHATFORM_PUBLIC_URL")
             .or_else(|| env("VERCEL_PROJECT_PRODUCTION_URL").map(|h| format!("https://{h}")))
             .unwrap_or_else(|| format!("http://localhost:{port}"));
+        let dev_login = !on_vercel && env("CHATFORM_DEV_LOGIN").as_deref() == Some("1");
+        let (google_auth_url, google_token_url, google_userinfo_url) = match env("CHATFORM_GOOGLE_STANDIN").filter(|_| dev_login) {
+            Some(base) => {
+                let b = base.trim_end_matches('/').to_string();
+                (format!("{b}/auth"), format!("{b}/token"), format!("{b}/userinfo"))
+            }
+            None => Self::google_urls(),
+        };
         Self {
             database_url,
             listen_url,
@@ -50,11 +63,19 @@ impl Config {
             google_client_secret: env("GOOGLE_CLIENT_SECRET"),
             allowlist: list("CHATFORM_ALLOWLIST"),
             admins: list("CHATFORM_ADMIN_EMAILS"),
-            dev_login: !on_vercel && env("CHATFORM_DEV_LOGIN").as_deref() == Some("1"),
+            dev_login,
             cors_origins: list("CHATFORM_CORS_ORIGINS"),
             on_vercel,
             port,
+            google_auth_url,
+            google_token_url,
+            google_userinfo_url,
         }
+    }
+
+    /// Google's own addresses (sign-in page, token exchange, userinfo)
+    pub fn google_urls() -> (String, String, String) {
+        ("https://accounts.google.com/o/oauth2/v2/auth".into(), "https://oauth2.googleapis.com/token".into(), "https://openidconnect.googleapis.com/v1/userinfo".into())
     }
 
     /// the pages that may call this server with credentials: its own, and the listed ones
@@ -93,7 +114,11 @@ impl Config {
 mod tests {
     use super::*;
     fn cfg() -> Config {
+        let (google_auth_url, google_token_url, google_userinfo_url) = Config::google_urls();
         Config {
+            google_auth_url,
+            google_token_url,
+            google_userinfo_url,
             database_url: String::new(),
             listen_url: String::new(),
             public_url: "https://chatform.example.app".into(),
