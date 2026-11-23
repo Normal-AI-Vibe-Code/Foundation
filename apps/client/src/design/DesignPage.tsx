@@ -159,6 +159,7 @@ import { CollectionDemo } from "./CollectionDemo";
 import { LocalDemo } from "./LocalDemo";
 import { ChatFormDemo } from "../chat/ChatDesign";
 import { UploaderDemo } from "./UploaderDemo";
+import { UsabilityDemo } from "./UsabilityDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -176,7 +177,7 @@ const TYPE = [
 
 /** which of the page's sections make up each chapter of the design grid (protocol DESIGN_CHAPTERS), by title */
 export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
-  foundations: ["The mark", "Surfaces", "Ink & accents", "Themes", "Type", "Shape"],
+  foundations: ["The mark", "Surfaces", "Ink & accents", "Usability & contrast", "Themes", "Type", "Shape"],
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
   floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
@@ -506,6 +507,13 @@ function DesignSections() {
           ))}
           <span className="design-note">Data uses --viz-1…8 in order.</span>
         </div>
+      </Section>
+
+      <Section
+        title="Usability & contrast"
+        note="Every ink, state and accent token meets WCAG 2.2 AA (≥ 4.5:1) against all four surfaces in both Day and Night, and --color-on-fill meets ≥ 4.5:1 on every solid fill. Keyboard focus uses a 2px --color-pulse ring with forced-colors fallback, disabled pills never press-scale, and physics springs honour prefers-reduced-motion."
+      >
+        <UsabilityDemo />
       </Section>
 
       <Section title="Themes" note="The interface wears the theme of what is in focus (the shell sets data-theme on the root; packages/ui setTheme). Paper is the default and follows the orb. A grid may pin Always day or Always night for everyone on it (its ⓘ pane → Look). The room is Today: the floor's panes go clear and their ink goes white over the Shiba's room. An app opened as a tab is its own look inside its frame, with paper around it. Each is also a class (.f-paper, .f-day, .f-night, .f-room) for a surface that must wear one whatever is in focus. Anything that resolves tokens by hand (a terminal's colours) listens to onLook and reads them again.">
