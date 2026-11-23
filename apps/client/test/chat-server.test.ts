@@ -27,7 +27,7 @@ test("what isn't a server's address is nothing", () => {
   assert.equal(chatServerOrigin("javascript://alert(1)"), null);
   assert.equal(chatServerOrigin("http://"), null);
   // an address never carries a name or a password
-  assert.equal(chatServerOrigin("https://josh:secret@chat.example.app"), null);
+  assert.equal(chatServerOrigin("https://user:pass@chat.example.app"), null);
   assert.equal(chatServerOrigin("not an address"), null);
 });
 
