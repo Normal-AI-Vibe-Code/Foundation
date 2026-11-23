@@ -23,6 +23,7 @@
  * (name + allowlisted email) is for this machine.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
@@ -504,8 +505,8 @@ export function Login({
               </div>
             )}
             {error && (
-              <motion.div className="login-error" role="alert" data-shape="text" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={press}>
-                {error}
+              <motion.div className="login-error-card" data-shape="text" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={press}>
+                <ErrorCard message={error} />
               </motion.div>
             )}
             {(inDesktop || BEARER) && !waiting && !pickServer && (

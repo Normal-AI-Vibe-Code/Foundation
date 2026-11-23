@@ -4,6 +4,7 @@
  * `has:`); a result opens its message in place, flashed.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { chatTitle, parseChatQuery, type ChatChannelKind, type ChatChannelView, type ChatMessage } from "@foundation/protocol";
 import { PartyAvatar } from "./Avatar";
 import { channelMark } from "./Sidebar";
@@ -77,7 +78,7 @@ export function ThreadsView({ threads, busy, why, onOpen }: { threads: ThreadRow
           </button>
         ))}
         {busy && !threads && <p className="chat-view-empty">Looking…</p>}
-        {why && <p className="chat-view-empty is-bad">{why}</p>}
+        {why && <ErrorCard message={why} />}
         {threads && !threads.length && <p className="chat-view-empty">No threads yet. Reply in thread from a message's hover bar, and it's kept here.</p>}
       </div>
     </div>
@@ -114,7 +115,7 @@ export function SearchView({ q, hits, busy, why, onOpen }: { q: string; hits: Ch
           </button>
         ))}
         {busy && !hits && <p className="chat-view-empty">Looking…</p>}
-        {why && <p className="chat-view-empty is-bad">{why}</p>}
+        {why && <ErrorCard message={why} />}
         {hits && !hits.length && !busy && <p className="chat-view-empty">Nothing said matches that. Fewer words, or a different filter, may find it.</p>}
       </div>
     </div>

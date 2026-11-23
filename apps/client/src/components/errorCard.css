@@ -13,7 +13,7 @@
 }
 .error-card-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-3);
   min-height: 20px;
 }
@@ -30,6 +30,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  flex: none;
   margin-left: auto;
 }
 .error-card-btn {
@@ -63,6 +64,11 @@
 }
 .error-card-help {
   color: var(--color-mist);
+}
+.error-card-head .error-card-summary {
+  flex: 1;
+  min-width: 0;
+  padding-top: var(--space-1);
 }
 .error-card-command {
   display: block;

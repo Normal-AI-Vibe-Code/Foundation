@@ -11,6 +11,7 @@
  * Then the Slack history panel (I1's `History.tsx`, mounted when it's there).
  */
 
+import { ErrorCard } from "../../components/ErrorCard";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
 import type { ChatBridgeStatus, ChatParty, UserInfo } from "@foundation/protocol";
 import { api } from "../../lib/api";
@@ -78,7 +79,7 @@ export default function InboxTab({ user, rest }: { user: UserInfo; rest: string 
         <p className="inbox-lede">
           Mail, WhatsApp, Instagram and WeChat as conversations here. What someone sends comes into a conversation of its own; what a person writes there goes out as they press Enter. An agent's reply waits as a draft until a person sends it.
         </p>
-        {err && <div className="inbox-err">{err}</div>}
+        {err && <ErrorCard message={err} />}
         {!data && !err && <div className="inbox-quiet">Asking the server…</div>}
         {data?.bridges.map((b) => <Bridge key={b.service} b={b} admin={data.admin} demo={data.demo} user={user} reload={load} />)}
         <section className="inbox-bridge" data-bridge="slack">
@@ -196,7 +197,7 @@ function Bridge({ b, admin, demo, user, reload }: { b: BridgeView; admin: boolea
       </div>
       {starting && <Start b={b} done={(id) => (setStarting(false), goChat("chat", id))} />}
       {admin && <Settings b={b} busy={busy} act={act} />}
-      {note && <p className="inbox-err">{note}</p>}
+      {note && <ErrorCard message={note} />}
     </section>
   );
 }
@@ -293,7 +294,7 @@ function Start({ b, done }: { b: BridgeView; done: (channelId: string) => void }
         </button>
         <span className="inbox-quiet">It goes out as you{mail ? ", from your own mailbox" : ""}.</span>
       </div>
-      {err && <p className="inbox-err">{err}</p>}
+      {err && <ErrorCard message={err} />}
     </div>
   );
 }

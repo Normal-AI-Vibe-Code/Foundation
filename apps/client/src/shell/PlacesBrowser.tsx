@@ -11,6 +11,7 @@
  * taking one away asks first, and touches no file.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { placeHitId } from "../lib/hits";
@@ -107,7 +108,7 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
     };
   }, [at]);
 
-  if (err && !at) return <div className="places"><div className="pane-empty is-bad">{err}</div></div>;
+  if (err && !at) return <div className="places"><ErrorCard message={err} /></div>;
   if (!places) return <div className="places"><div className="pane-empty">Asking the server…</div></div>;
 
   if (!at) {
@@ -158,11 +159,7 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
         ) : (
           <div className="places-foot">Only an admin, signed in here as themselves, can approve or take away a folder.</div>
         )}
-        {why && (
-          <div className="pane-empty is-bad" role="alert">
-            {why}
-          </div>
-        )}
+        {why && <ErrorCard message={why} />}
       </div>
     );
   }
@@ -187,7 +184,7 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
           </span>
         ))}
       </nav>
-      {err && <div className="pane-empty is-bad">{err}</div>}
+      {err && <ErrorCard message={err} />}
       {!entries && <div className="pane-empty">Reading the folder…</div>}
       {entries && !err && shown.length === 0 && <div className="pane-empty">{term ? `Nothing named “${filter}” here.` : "This folder is empty."}</div>}
       {shown.map((e) =>

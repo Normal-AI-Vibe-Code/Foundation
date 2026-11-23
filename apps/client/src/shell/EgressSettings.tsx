@@ -11,6 +11,7 @@
  * #/design from EgressView with the same props.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 
@@ -78,7 +79,7 @@ export function EgressView({ state, busy, error, onToggle }: { state: EgressStat
         </div>
       ))}
       <div className="pane-empty egress-who">{state.canChange ? `Off until someone turns it on. ${state.who}` : state.who}</div>
-      {error && <div className="pane-empty is-bad">{error}</div>}
+      {error && <ErrorCard message={error} />}
     </section>
   );
 }

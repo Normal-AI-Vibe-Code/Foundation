@@ -16,6 +16,7 @@
  * The night orb sits in the head, as on #/design.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { ReleaseCard } from "./ReleasePage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -304,7 +305,7 @@ export function PlanBoard({
           </motion.div>
         )}
       </AnimatePresence>
-      {error && <div className="kb-error">{error}</div>}
+      {error && <ErrorCard message={error} />}
 
       <LayoutGroup>
         <div className="kb-board">
@@ -540,7 +541,7 @@ function NewCardForm({ plan, onCreate, onDone }: { plan: Plan; onCreate(input: N
           {busy ? "Adding…" : "Add card"}
         </button>
       </div>
-      {err && <div className="kb-error">{err}</div>}
+      {err && <ErrorCard message={err} />}
     </form>
   );
 }
@@ -771,7 +772,7 @@ export function ServicesTab() {
   return (
     <section className="services">
       <p className="design-lede">What this server is connected to. Every integration is off until its key exists; the server always starts. SPEC §6 has the full list.</p>
-      {err && <div className="kb-error">{err}</div>}
+      {err && <ErrorCard message={err} />}
       {!s && !err && <div className="kb-col-empty">Asking the server…</div>}
       <div className="services-list">
         <FlowformRow />

@@ -13,6 +13,7 @@
  * shortcuts stand down, and Esc twice or a click anywhere else gives them back.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import "./browser-tool.css";
 import { useState } from "react";
 import { HOLDS_KEYS } from "../lib/keysHeld";
@@ -39,7 +40,7 @@ function HostBrowser() {
         <div className="tool-empty">
           <b>A browser on the server's computer</b>
           <p>A real browser (Edge or Chrome), run on the computer Foundation's server is on and shown here, so any site works, and what you sign in to stays signed in. It opens on HyperForm, where our apps are. Nothing runs until you start it, and it ends when you close this pane.</p>
-          {why && <p className="tool-note is-bad">{why}</p>}
+          {why && <ErrorCard message={why} />}
           <button className="f-pill is-accent" onClick={() => void start()} disabled={state === "opening"} data-browser-start>
             {state === "opening" ? "Starting…" : "Start the browser"}
           </button>

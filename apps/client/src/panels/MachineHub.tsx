@@ -7,6 +7,7 @@
  * (any registry: ghcr.io/…, an exact tag).
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { FindGlyph, PackageGlyph, ShieldGlyph } from "../shell/glyphs";
@@ -92,7 +93,7 @@ export function HubSearch({ image, viewer, onImage, still }: { image: string; vi
           </button>
         )}
       </label>
-      {state === "error" && <div className="machine-hub-err">{err}</div>}
+      {state === "error" && err && <ErrorCard message={err} />}
       {repos.length > 0 && (
         <ul className="machine-hub-list" role="listbox" aria-label="Docker Hub">
           {repos.map((r) => (

@@ -27,6 +27,7 @@
  * DeepSeek, to either group.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { CouncilTalk } from "./CouncilTalk";
 import { AddAgent } from "./AddAgent";
 import { BackgroundTasks } from "./BackgroundTasks";
@@ -478,7 +479,7 @@ export function T3AddForm({ presets, local, start, only, busy, error, onWhere, o
         </p>
       )}
       {where === "cloud" && <p className="t3-add-note">The model id and address are the vendor's as last published: change them if yours differ.</p>}
-      {error && <p className="t3-words is-bad">{error}</p>}
+      {error && <ErrorCard message={error} />}
       <div className="t3-add-foot">
         <button type="button" className="crew-row-btn" onClick={onCancel}>
           Cancel
@@ -560,7 +561,7 @@ export function T3BlockView({ host, viewer, admin = false, busy, section, asking
           <span className="thinking-dots"><i /><i /><i /></span> {host?.detail ?? "Starting T3"}
         </p>
       )}
-      {state === "error" && <p className="t3-words is-bad">{host?.detail ?? "T3 stopped."}</p>}
+      {state === "error" && <ErrorCard message={host?.detail ?? "T3 stopped."} />}
       {(state === "off" || state === "error") && !viewer && (
         <button className="f-pill t3-start" onClick={onStart} disabled={busy}>
           {state === "error" ? "Start again" : "Start T3"}

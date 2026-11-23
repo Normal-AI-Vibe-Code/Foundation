@@ -6,6 +6,7 @@
  * nothing in one is changed, and removing an approval touches no file.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
 import { longDate } from "./releases";
@@ -86,7 +87,7 @@ export function PlacesTab() {
       ) : (
         places && <div className="kb-col-empty">Only an admin, signed in here as themselves, can approve or remove a place.</div>
       )}
-      {err && <div className="kb-error">{err}</div>}
+      {err && <ErrorCard message={err} />}
       {!places && !err && <div className="kb-col-empty">Asking the server…</div>}
       {places && places.length === 0 && <div className="kb-col-empty">No folders are approved. Foundation can't read anything on this computer outside its own data.</div>}
       <div className="services-list">

@@ -1,5 +1,6 @@
 /** The repo behind an app: README, recent commits, a door to GitHub, and a hand-off to the agent. */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { api } from "../lib/api";
@@ -48,7 +49,7 @@ export function RepoDrawer() {
               ✕
             </button>
           </header>
-          {error && <div className="turn-error">{error}</div>}
+          {error && <ErrorCard message={error} />}
           {!data && !error && <div className="repo-loading">Reading the repository…</div>}
           {data && (
             <div className="repo-body">

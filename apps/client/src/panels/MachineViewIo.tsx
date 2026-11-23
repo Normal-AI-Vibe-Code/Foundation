@@ -15,6 +15,7 @@
  * card-to-card wires only).
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useState, useSyncExternalStore } from "react";
 import { MACHINE_IN_PATH, MACHINE_IN_PORT, MACHINE_OUT_PATH, MACHINE_OUT_PORT, NOTE_PORT, TABLE_PORT, type LinkDoc, type MachineIo } from "@foundation/protocol";
 import { addLink, addNote, addSectionAdjacent, getState, removeLink, subscribe, type PanelMeta } from "../state/store";
@@ -185,7 +186,7 @@ export function IoLines({
         <code className="machine-io-path">{MACHINE_OUT_PATH}</code>
       </div>
       {io?.error ? (
-        <div className="machine-io-hint is-error">{io.error}</div>
+        <ErrorCard message={io.error} />
       ) : (
         <div className="machine-io-hint">
           In the shell, read what's wired in and write what goes on: <code>tr a-z A-Z &lt;{MACHINE_IN_PATH} &gt;{MACHINE_OUT_PATH}</code>

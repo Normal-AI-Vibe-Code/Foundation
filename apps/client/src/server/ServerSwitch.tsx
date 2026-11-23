@@ -418,6 +418,8 @@ export function ServerSwitch({ day = false, where = "corner", host }: { day?: bo
     }
     if (k === "checkout") keep(FOLDER_KEY, f);
     setMessage(null);
+    // a new try: the same failure, if it comes again, is shown again
+    dismissedRef.current = null;
     setLocal("starting");
     startingRef.current = true;
     try {

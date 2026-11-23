@@ -28,6 +28,7 @@
  * place; closing the pane ends the shell.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import "@xterm/xterm/css/xterm.css";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
@@ -601,7 +602,7 @@ export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean
         <div className="tool-empty">
           <b>This computer's agents</b>
           <p>T3 runs Claude, Codex, Antigravity (Gemini) and more from one place, with their sign-ins and keys, and its page is where their threads, diffs and sign-ins live: Vision's build of it, here beside the grid. It's a program on this computer, so a person starts it.</p>
-          {failed && <p className="tool-note is-bad">{failed}</p>}
+          {failed && <ErrorCard message={failed} />}
           {viewer ? (
             <p className="tool-note">Viewers can't start T3.</p>
           ) : t3 === "running" ? (

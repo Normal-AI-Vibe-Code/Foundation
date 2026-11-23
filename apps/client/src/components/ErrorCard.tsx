@@ -15,11 +15,15 @@ export interface ErrorCardProps {
   /** a command that does it, shown as code */
   command?: string | null;
   onDismiss?: () => void;
+  /** part of a record (a line in a transcript): it has no cross */
+  fixed?: boolean;
 }
 
-export function ErrorCard({ message, help, command, onDismiss }: ErrorCardProps) {
+export function ErrorCard({ message, help, command, onDismiss, fixed }: ErrorCardProps) {
   const { code, summary, detail } = errorParts(message);
   const [copied, setCopied] = useState(false);
+  // put away here when nobody above holds the error; it comes back when the text changes or the error is raised again
+  const [gone, setGone] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
 
@@ -43,22 +47,32 @@ export function ErrorCard({ message, help, command, onDismiss }: ErrorCardProps)
     timer.current = setTimeout(() => setCopied(false), 1400);
   };
 
+  if (gone === message) return null;
   return (
-    <div className="error-card" role="alert">
+    // a press on it selects or copies; it never drags the card or pane it sits in
+    <div className="error-card" role="alert" onPointerDown={(e) => e.stopPropagation()}>
       <div className="error-card-head">
-        {code && <code className="error-card-code">{code}</code>}
+        {code ? <code className="error-card-code">{code}</code> : <p className="error-card-summary">{summary}</p>}
         <span className="error-card-tools">
           <button type="button" className="error-card-btn" onClick={() => void copy()} aria-live="polite">
             {copied ? "Copied" : "Copy"}
           </button>
-          {onDismiss && (
-            <button type="button" className="error-card-btn error-card-close" onClick={onDismiss} aria-label="Dismiss this error">
+          {!fixed && (
+            <button
+              type="button"
+              className="error-card-btn error-card-close"
+              onClick={() => {
+                setGone(message);
+                onDismiss?.();
+              }}
+              aria-label="Dismiss this error"
+            >
               ×
             </button>
           )}
         </span>
       </div>
-      <p className="error-card-summary">{summary}</p>
+      {code && <p className="error-card-summary">{summary}</p>}
       {help && <p className="error-card-help">{help}</p>}
       {command && <code className="error-card-command">{command}</code>}
       {detail && (

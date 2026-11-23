@@ -22,6 +22,7 @@
  * night turns. It mounts only while the card is on screen and big enough.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import "@xterm/xterm/css/xterm.css";
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { boardMaps, MACHINE_DISTROS, type MachineAsk, type MachineState } from "@foundation/protocol";
@@ -539,9 +540,7 @@ export function MachinePickerView(p: {
           </div>
         )}
         {m.state === "error" && m.detail && (
-          <div className="machine-error machine-copyable" onPointerDown={(e) => e.stopPropagation()}>
-            {m.detail}
-          </div>
+          <ErrorCard message={m.detail} />
         )}
         {m.state !== "error" && m.detail && !m.proposedBy && <div className="machine-note">{m.detail}</div>}
         <span className="machine-hero-mark">

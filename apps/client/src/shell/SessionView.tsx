@@ -9,6 +9,7 @@
  * messages, tool steps and proposed plan. Continuing it happens in Vision Code.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentEvent } from "@foundation/protocol";
 import { api } from "../lib/api";
@@ -335,9 +336,7 @@ function TurnView({ turn, last }: { turn: Turn; last: boolean }) {
             ))}
           </div>
         ) : (
-          <div key={i} className="s-error">
-            {it.text}
-          </div>
+          <ErrorCard key={i} message={it.text} fixed />
         ),
       )}
       {turn.status === "running" && last && (
@@ -452,7 +451,7 @@ function T3Session({ tab }: { tab: SessionTab }) {
         </div>
       )}
       <div className="session-list" ref={list}>
-        {err && <div className="s-error">{err}</div>}
+        {err && <ErrorCard message={err} />}
         {!data && !err && <div className="session-empty">Reading the thread…</div>}
         {data?.items.map((it, i) =>
           it.kind === "user" ? (
@@ -471,9 +470,7 @@ function T3Session({ tab }: { tab: SessionTab }) {
               <span className="s-step-name">{it.text}</span>
             </div>
           ) : (
-            <div key={i} className="s-error">
-              {it.text}
-            </div>
+            <ErrorCard key={i} message={it.text} fixed />
           ),
         )}
       </div>

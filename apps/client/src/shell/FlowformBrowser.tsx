@@ -16,6 +16,7 @@
  * Figma) lands as a link card, anything else as a note naming it (lib/hits.ts).
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import type { SearchHit } from "@foundation/protocol";
 import { api, search } from "../lib/api";
@@ -166,7 +167,7 @@ export function FlowformBrowser({ filter }: { filter: string }) {
   if (err && !rooms && !hits)
     return (
       <div className="places">
-        <div className="pane-empty is-bad">{err}</div>
+        <ErrorCard message={err} />
         {again}
       </div>
     );
@@ -185,7 +186,7 @@ export function FlowformBrowser({ filter }: { filter: string }) {
       <div className="places">
         <div className="pane-eyebrow">Your Flowform files</div>
         {!hits && <div className="pane-empty">Searching Flowform…</div>}
-        {hits && hits.length === 0 && (err ? <><div className="pane-empty is-bad">{err}</div>{again}</> : <div className="pane-empty">Nothing in Flowform for “{term}”.</div>)}
+        {hits && hits.length === 0 && (err ? <><ErrorCard message={err} />{again}</> : <div className="pane-empty">Nothing in Flowform for “{term}”.</div>)}
         {hits && <FlowformFiles files={hits} />}
       </div>
     );
@@ -245,7 +246,7 @@ export function FlowformBrowser({ filter }: { filter: string }) {
             {isOpen && (
               <div className="flowform-room-files">
                 {files === null && <div className="pane-empty">Reading its files…</div>}
-                {typeof files === "string" && <div className="pane-empty is-bad">{files}</div>}
+                {typeof files === "string" && <ErrorCard message={files} />}
                 {Array.isArray(files) && files.length === 0 && <div className="pane-empty">No files on this room's boards.</div>}
                 {Array.isArray(files) && <FlowformFiles files={files} />}
               </div>

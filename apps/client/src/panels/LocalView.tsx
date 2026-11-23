@@ -11,6 +11,7 @@
  * computer, not written by a person or an agent on the board. Read only: nothing here writes the project.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { LOCAL_GRID_ID, boardMaps, localLive, type LocalNode, type LocalProject, type LocalSession, type LocalWatch } from "@foundation/protocol";
 import { activeBoard, onBoardChange } from "../sync/board";
@@ -368,7 +369,7 @@ export function LocalConnect({ onOpen }: { onOpen(id: string): void }) {
           {!st?.canConnect && !st?.connected ? " An admin, signed in here as themselves, connects it." : ""}
         </span>
       </div>
-      {err && <div className="kb-error">{err}</div>}
+      {err && <ErrorCard message={err} />}
     </div>
   );
 }

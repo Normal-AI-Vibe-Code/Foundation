@@ -11,6 +11,7 @@
  * Bringing history in is an admin's, as a person: others see the controls, disabled, with the reason.
  */
 
+import { ErrorCard } from "../../components/ErrorCard";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import type { UserInfo } from "@foundation/protocol";
 import { ApiError, BEARER, api, authHeaders, fetchFile, serverUrl } from "../../lib/api";
@@ -226,7 +227,7 @@ export default function History({ user }: { user: UserInfo }) {
       </ol>
       <p className="hist-note">On Slack's Free and Pro plans the export holds public channels only. Direct messages and private channels come through Slack's API (below) with a token.</p>
 
-      {err && <p className="inbox-err">{err}</p>}
+      {err && <ErrorCard message={err} />}
       {!ov && !err && <p className="inbox-quiet">Asking the server…</p>}
 
       {ov && (

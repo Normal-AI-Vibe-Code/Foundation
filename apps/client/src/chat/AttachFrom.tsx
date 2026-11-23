@@ -8,6 +8,7 @@
  *    Places; a pick is copied in the same way.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import type { UploadedFile } from "../lib/api";
 import { api } from "../lib/api";
@@ -69,7 +70,7 @@ export function AttachFrom({ onPicked, onClose }: { onPicked(f: UploadedFile): v
         </button>
       </div>
       {tab === "vision" ? <VisionList busy={busy} onPick={(id) => void bring(id, "/api/chat/attach/vision", { asset: id })} /> : <PlacesList busy={busy} onPick={(place, path) => void bring(`${place}:${path}`, "/api/chat/attach/place", { place, path })} />}
-      {err && <p className="chat-attach-note is-bad">{err}</p>}
+      {err && <ErrorCard message={err} />}
     </div>
   );
 }

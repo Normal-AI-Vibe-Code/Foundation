@@ -4,6 +4,7 @@
  * from the real tokens so it can't drift. New UI behaviour lands here first.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { CouncilTalkView } from "../shell/CouncilTalk";
 import { VmSetupView, VmStatusView } from "../panels/LocalVm";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
@@ -1214,8 +1215,12 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <UpdateDemo />
       </Section>
 
-      <Section title="Server switch" note="Bottom right, wherever the app can point at another server (the desktop app, or a page on another site's server), over the sign-in page too: a glass pill with a dot for whether the server this app uses answers (green), is starting or being checked (amber, breathing) or can't be reached (red), and its address. Pressed, it opens upward into both ways to have a server, on paper: This computer, where Start the server is the one blue action (the desktop app runs Foundation's server from a checkout; once it answers, the app uses it and reloads), and a remote server by address, where Connect reloads onto it to sign in. The one in use is ringed and tagged. A server that won't start says why in its own words, in red. Esc or a press outside puts it away. The call chip and the upload tray move up while it's there.">
+      <Section title="Server switch" note="Bottom right, wherever the app can point at another server (the desktop app, or a page on another site's server), over the sign-in page too: a glass pill with a dot for whether the server this app uses answers (green), is starting or being checked (amber, breathing) or can't be reached (red), and its address. Pressed, it opens upward into both ways to have a server, on paper: This computer, where Start the server is the one blue action (the desktop app runs Foundation's server from a checkout; once it answers, the app uses it and reloads), and a remote server by address, where Connect reloads onto it to sign in. The one in use is ringed and tagged. A server that won't start says why in its own words, as an error card. Esc or a press outside puts it away. The call chip and the upload tray move up while it's there.">
         <ServerSwitchDemo />
+      </Section>
+
+      <Section title="Error card" note="Wherever the app reports an error: a small card with the system's code as a chip when the text carries one (EACCES, an exit), the one line that says why, Copy (the whole text), and a cross that puts it away until the error is raised again. More than one line stays behind Details. Where the app knows a way out, it says so and shows the command; the app never runs it. An error that is part of a record (a line in a session's transcript) has no cross. Shown at 260 and 400 px.">
+        <ErrorCardDemo />
       </Section>
 
       <Section title="Signing in an app" note="The desktop app (or a page on another site's server) signs in through Google in the system browser, like a device sign-in. While it waits it shows a code of eight, grouped in fours, from letters and digits that can't be mixed up (no 0/O, 1/I/L, 5/S, 2/Z), in code type, under the waiting line. After Google the browser lands on Foundation's own page (server-rendered, no script, never framed) that says, in plain words, an app on a computer is asking to sign in as this person, shows the same code large, and asks: This is me, sign that app in, or Not me. The app gets its session only after This is me, once; Not me ends it; the whole sign-in is over in five minutes.">
@@ -2520,6 +2525,23 @@ const SWITCH_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps
   { label: "A remote address that isn't one", props: { current: "https://server.formresearch.ai", reach: "down", local: "stopped", localListening: false, localOurs: false, remote: "ftp://files", remoteError: "A server's address starts with https:// or http://." } },
   { label: "In a browser on another site's server (can't start one)", props: { desktop: false, builtIn: false, current: "https://server.formresearch.ai", local: "stopped", localListening: false, localOurs: false } },
 ];
+
+function ErrorCardDemo() {
+  const log = ["The server stopped (exit code: 1):", "(node:51948) ExperimentalWarning: localStorage is not available", "Error: file is not a database"].join("\n");
+  return (
+    <div className="update-demo">
+      {[260, 400].map((w) => (
+        <div key={w} style={{ width: w, display: "grid", gap: 8 }}>
+          <div className="f-eyebrow update-demo-label">{w}px</div>
+          <ErrorCard message="Can't reach the Foundation server (localhost:4410)." />
+          <ErrorCard message={log} />
+          <ErrorCard message="Foundation's server can't listen on 127.0.0.1:4410 (EADDRINUSE)." help="Another program is listening on port 4410. Close it, then try again." />
+          <ErrorCard message="The agent's run ended: OAuth session expired." fixed />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ServerSwitchDemo() {
   return (

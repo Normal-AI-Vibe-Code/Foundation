@@ -10,12 +10,13 @@
  * Above them, **Add the example functions** puts ImageMagick and three picture functions in.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import type { MachineFunction, MachineState } from "@foundation/protocol";
 import { api } from "../lib/api";
 import { toast } from "../state/ui";
 import { ago, boardId } from "./MachineViewBits";
-import { FunctionGlyph, InGlyph, OutGlyph, PackageGlyph, RestartGlyph } from "../shell/glyphs";
+import { FunctionGlyph, InGlyph, OutGlyph, PackageGlyph } from "../shell/glyphs";
 
 export interface Wiring {
   total: number;
@@ -155,9 +156,7 @@ export function FunctionsView({ m, wiring, viewer, busy, onRun, onExamples, now 
         </div>
       )}
       {setup?.state === "error" && (
-        <div className="machine-fns-setup is-bad machine-copyable" onPointerDown={(e) => e.stopPropagation()}>
-          <RestartGlyph size={14} /> They didn't go in: {setup.detail}
-        </div>
+        <ErrorCard message={`They didn't go in: ${setup.detail}`} />
       )}
       {fns.length === 0 && !setup ? (
         <div className="machine-fns-none">

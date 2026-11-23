@@ -10,6 +10,7 @@
  *   PodWell      a pod's card whose pod isn't running: its phase in words
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import type { MachineState, PanelDoc } from "@foundation/protocol";
 import { api } from "../lib/api";
@@ -184,7 +185,7 @@ export function ClusterView({ panel, m, viewer, still }: { panel: Pick<PanelDoc,
           </>
         )}
       </div>
-      {err && <div className="machine-cluster-err machine-copyable">{err}</div>}
+      {err && <ErrorCard message={err} />}
       <div className="machine-cluster-nodes">
         {nodes.map((n) => (
           <button key={n.name} type="button" className={`machine-cluster-node${n.ready ? " is-ready" : ""}`} onClick={() => n.card && requestSnap({ kind: "object", id: n.card })} disabled={!n.card} data-cluster-node={n.name} data-tip={n.card ? "Go to its card" : "Not a card on this board"}>

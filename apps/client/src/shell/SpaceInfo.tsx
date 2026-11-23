@@ -8,6 +8,7 @@
  * send to outside services (EgressSettings), and its activity.
  */
 
+import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
@@ -206,7 +207,7 @@ function People({ board, me }: { board: string; me: string }) {
           )}
         </div>
       ))}
-      {err && <div className="pane-empty is-bad">{err}</div>}
+      {err && <ErrorCard message={err} />}
     </section>
   );
 }
