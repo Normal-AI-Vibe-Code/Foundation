@@ -283,7 +283,7 @@ export function ObjectFrame({
         <div className="frame-icons">
           {icons}
           <FullscreenButton id={id} round />
-          <button className="frame-icon is-remove" data-tip="Remove" aria-label="Remove" onClick={askRemove}>
+          <button type="button" className="frame-icon is-remove" data-tip="Remove" aria-label="Remove" onClick={askRemove}>
             ✕
           </button>
         </div>
@@ -306,13 +306,14 @@ export function ObjectFrame({
             <div className="header-actions">
               {!folded && headerExtras}
               {folded ? (
-                <button className="icon-btn" data-tip="Restore" aria-label="Restore" onClick={() => setObjectFolded(id, false)} data-card-restore>
+                <button type="button" className="icon-btn" data-tip="Restore" aria-label="Restore" onClick={() => setObjectFolded(id, false)} data-card-restore>
                   ▢
                 </button>
               ) : (
                 <FullscreenButton id={id} />
               )}
               <button
+                type="button"
                 className={"icon-btn float-btn" + (float ? " floating" : "")}
                 data-tip={float ? "Dock into the section" : "Float freely"}
                 aria-label={float ? "Dock into the section" : "Float freely"}
@@ -320,7 +321,7 @@ export function ObjectFrame({
               >
                 {float ? "✥" : "⌗"}
               </button>
-              <button className="icon-btn is-remove" data-tip={confirmRemove ? "Remove…" : "Remove"} aria-label="Remove" onClick={askRemove}>
+              <button type="button" className="icon-btn is-remove" data-tip={confirmRemove ? "Remove…" : "Remove"} aria-label="Remove" onClick={askRemove}>
                 ✕
               </button>
             </div>
@@ -366,12 +367,12 @@ export function ObjectFrame({
         </div>
         {chrome === "icons" && (
           // no bar to hold it by: a grip in the corner, there while the pointer is on the card
-          <div className="frame-grip" role="button" aria-label={`Move ${title}`} data-tip="Drag to move" {...dragHandlers}>
-            <div className="grip mini">
+          <button type="button" className="frame-grip" aria-label={`Move ${title}`} data-tip="Drag to move" {...dragHandlers}>
+            <div className="grip mini" aria-hidden="true">
               <span />
               <span />
             </div>
-          </div>
+          </button>
         )}
         {!folded && overlay}
         {onResize && !folded && (

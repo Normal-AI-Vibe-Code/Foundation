@@ -138,6 +138,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
         >
           {tree && kids.length > 0 ? (
             <button
+              type="button"
               className={`grid-caret${open ? " is-open" : ""}`}
               aria-expanded={open}
               aria-label={open ? `Fold ${b.name}` : `Unfold ${b.name}`}
@@ -155,19 +156,26 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           ) : (
             tree && <span className="grid-caret is-none" aria-hidden />
           )}
-          <button className="pane-row space-open" onClick={() => onSwitch(b.id)} data-tip={`${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : " · drag onto a grid to put it inside"}`}>
-            <span className="pane-glyph">
+          <button
+            type="button"
+            className="pane-row space-open"
+            onClick={() => onSwitch(b.id)}
+            data-tip={`${b.name} · ${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : " · drag onto a grid to put it inside"}`}
+          >
+            <span className="pane-glyph" aria-hidden>
               <SpaceGlyph space={b} />
             </span>
-            <span className="pane-label">{b.name}</span>
+            <span className="pane-label" title={b.name}>
+              {b.name}
+            </span>
             {/* who else is on it, people and agents (2026-11-21) */}
             <HereStack boardId={b.id} me={user.id} />
             {b.id === LOCAL_GRID_ID && <LocalRowDot />}
-            {!tree && parent && <span className="pane-when">{parent.name}</span>}
+            {!tree && parent && <span className="pane-when" title={parent.name}>{parent.name}</span>}
             {tree && kids.length > 0 && <span className="pane-when">{kids.length}</span>}
           </button>
           {tree && !viewer && b.role !== "viewer" && !isPageKind(kind) && (
-            <button className="space-move" onClick={() => onNew("grid", b.id)} aria-label={`New grid inside ${b.name}`} data-tip="New grid inside">
+            <button type="button" className="space-move" onClick={() => onNew("grid", b.id)} aria-label={`Create new grid inside ${b.name}`} data-tip="New grid inside">
               ＋
             </button>
           )}
@@ -185,13 +193,13 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           <div className="pane-pick">
             <div className="pane-seg" role="tablist" aria-label="How grids are listed">
               {(["recent", "all", "chats"] as const).map((v) => (
-                <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${(v === "all" && over === "top") || (v === "chats" && held) ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} data-pane-seg={v} {...(v === "all" ? dropProps(null) : {})}>
+                <button key={v} type="button" role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${(v === "all" && over === "top") || (v === "chats" && held) ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} data-pane-seg={v} {...(v === "all" ? dropProps(null) : {})}>
                   {v === "recent" ? "Recent" : v === "all" ? "All Grids" : "Chats"}
                 </button>
               ))}
             </div>
             {!viewer && (
-              <button className="pane-new" onClick={() => onNew("grid")} aria-label="New grid" data-tip="New grid">
+              <button type="button" className="pane-new" onClick={() => onNew("grid")} aria-label="Create new grid" data-tip="New grid">
                 <PlusGlyph />
               </button>
             )}
@@ -228,8 +236,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           <div className="pane-server-slot" ref={setServerSlot} />
           {/* Settings, and the server this app talks to as a small pill to its right in the same band (2026-11-17) */}
           <section className="pane-band pane-low pane-low-row">
-            <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
-              <span className="pane-glyph">
+            <button type="button" className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
+              <span className="pane-glyph" aria-hidden>
                 <GearGlyph />
               </span>
               <span className="pane-label">Settings</span>
@@ -241,8 +249,9 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
               {initials(user.name)}
             </span>
             <span className="pane-me">
-              <b>{user.name}</b>
+              <b title={user.name}>{user.name}</b>
               <button
+                type="button"
                 className="pane-signout"
                 onClick={async () => {
                   await logout();

@@ -1,35 +1,35 @@
-.vm-body { min-height: 360px; overflow: auto; }
-.vm-setup { display: flex; flex-direction: column; gap: 16px; padding: 24px; overflow: auto; height: 100%; color: var(--color-frost); container-type: inline-size; }
+.vm-body { min-height: 360px; overflow: auto; overscroll-behavior: contain; scroll-padding-block-start: var(--space-4); }
+.vm-setup { display: flex; flex-direction: column; gap: 16px; padding: 24px; overflow: auto; overscroll-behavior: contain; scroll-padding-block-start: var(--space-4); height: 100%; color: var(--color-frost); container-type: inline-size; }
 .vm-intro { display: flex; align-items: center; gap: 16px; }
-.vm-intro h3, .vm-rest h3 { margin: 4px 0 8px; font-size: var(--text-20); font-weight: 600; }
-.vm-intro p, .vm-rest p { margin: 0; color: var(--color-mist); font-size: var(--text-13); line-height: 1.5; }
+.vm-intro h3, .vm-rest h3 { margin: 4px 0 8px; font-size: var(--text-20); font-weight: 600; text-wrap: balance; }
+.vm-intro p, .vm-rest p { margin: 0; max-width: 64ch; color: var(--color-mist); font-size: var(--text-13); line-height: 1.5; text-wrap: pretty; }
 .vm-setup fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .vm-setup label, .vm-commands label { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-12); color: var(--color-mist); }
 .vm-setup input:not([type=checkbox]), .vm-setup select, .vm-commands textarea { min-width: 0; width: 100%; border: 1px solid var(--color-line-strong); border-radius: var(--radius-paper); background: var(--color-raise); color: var(--color-frost); padding: 8px; font: inherit; }
 .vm-setup input:focus-visible, .vm-setup select:focus-visible, .vm-commands textarea:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 2px; }
 .vm-import { padding: 12px; border: 1px dashed var(--color-line-strong); border-radius: var(--radius-card); }
-.vm-host, .vm-note { font-size: var(--text-12); line-height: 1.5; color: var(--color-mist); overflow-wrap: anywhere; }
+.vm-host, .vm-note { font-size: var(--text-12); line-height: 1.5; color: var(--color-mist); overflow-wrap: anywhere; text-wrap: pretty; max-width: 64ch; }
 .vm-host { padding: 12px; background: var(--color-panel); border-radius: var(--radius-card); }
 .vm-host .f-dot { margin-right: 8px; }
 .vm-host a { color: var(--color-pulse); }
-.vm-checksum { color: var(--color-dim); font-size: var(--text-11); overflow-wrap: anywhere; }
+.vm-checksum { color: var(--color-dim); font-size: var(--text-11); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .vm-checksum code, .vm-commands pre, .vm-commands textarea { font-family: var(--font-code); }
-.vm-resources { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: end; }
+.vm-resources { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: end; font-variant-numeric: tabular-nums; }
 .vm-resources span { color: var(--color-frost); font-size: var(--text-13); padding-bottom: 8px; }
 .vm-resources small { color: var(--color-dim); font-size: var(--text-11); }
 .vm-setup .vm-check, .vm-check { display: flex; flex-direction: row; align-items: center; gap: 8px; font-size: var(--text-12); color: var(--color-mist); }
 .vm-check input { accent-color: var(--color-pulse); }
-.vm-error { color: var(--color-bad); font-size: var(--text-12); white-space: pre-wrap; overflow-wrap: anywhere; }
+.vm-error { color: var(--color-bad); font-size: var(--text-12); line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .vm-status { padding: 16px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--color-line); }
-.vm-heading { display: flex; align-items: center; gap: 8px; font-size: var(--text-14); }
+.vm-heading { display: flex; align-items: center; gap: 8px; font-size: var(--text-14); text-wrap: balance; }
 .vm-state { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: var(--text-11); color: var(--color-mist); text-transform: capitalize; }
-.vm-facts { display: flex; gap: 12px; flex-wrap: wrap; font-size: var(--text-11); color: var(--color-dim); }
+.vm-facts { display: flex; gap: 12px; flex-wrap: wrap; font-size: var(--text-11); font-variant-numeric: tabular-nums; color: var(--color-dim); }
 .vm-actions, .vm-tabs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .vm-tabs { padding: 8px 16px; border-bottom: 1px solid var(--color-line); }
 .vm-tabs button[role=tab] { border: 0; background: transparent; color: var(--color-mist); padding: 8px; display: flex; gap: 8px; align-items: center; cursor: pointer; }
 .vm-tabs button[aria-selected=true] { color: var(--color-pulse); box-shadow: inset 0 -2px var(--color-pulse); }
-.vm-commands { padding: 16px; overflow: auto; display: flex; flex-direction: column; gap: 12px; font-size: var(--text-13); }
-.vm-commands p { margin: 0; color: var(--color-mist); line-height: 1.5; }
+.vm-commands { padding: 16px; overflow: auto; overscroll-behavior: contain; scroll-padding-block-start: var(--space-4); display: flex; flex-direction: column; gap: 12px; font-size: var(--text-13); }
+.vm-commands p { margin: 0; max-width: 64ch; color: var(--color-mist); line-height: 1.5; text-wrap: pretty; }
 .vm-commands details { padding: 12px; background: var(--color-panel); }
 .vm-commands summary { cursor: pointer; }
 .vm-commands pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--text-12); padding: 12px; background: var(--color-panel); color: var(--color-frost); }

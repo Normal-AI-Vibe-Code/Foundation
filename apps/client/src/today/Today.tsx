@@ -84,7 +84,7 @@ export function GoalRow({ goal, pointed, onDone }: { goal: Goal | CompanyGoal; p
   const bits = [owner ? `Carried by ${owner}` : null, goal.detail || null].filter(Boolean).join(" · ");
   return (
     <div className="today-goal" data-done={done || undefined} data-pointed={pointed || undefined} data-company={owner !== null || undefined}>
-      <button className="today-check" aria-pressed={done} aria-label={done ? `${goal.title} is done` : `Mark “${goal.title}” done`} data-tip={done ? "Done" : onDone ? "Mark done" : undefined} onClick={onDone} disabled={done || !onDone}>
+      <button type="button" className="today-check" aria-pressed={done} aria-label={done ? `${goal.title} is done` : `Mark “${goal.title}” done`} data-tip={done ? "Done" : onDone ? "Mark done" : undefined} onClick={onDone} disabled={done || !onDone}>
         {done ? "✓" : ""}
       </button>
       <div className="today-goal-text">

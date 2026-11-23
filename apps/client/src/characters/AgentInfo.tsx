@@ -65,7 +65,7 @@ export function AgentInfoPane() {
       <header className="agents-head">
         {seat ? seat.name : "Nobody here"}
         <span className="agents-head-n">{seat ? SEAT_STATUS[seat.status] : ""}</span>
-        <button className="top-btn" onClick={() => setUi({ agentInfo: false })} aria-label="Close the agent's pane" data-tip="Close">
+        <button type="button" className="top-btn" onClick={() => setUi({ agentInfo: false })} aria-label="Close agent details" data-tip="Close">
           ✕
         </button>
       </header>

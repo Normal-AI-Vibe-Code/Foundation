@@ -71,7 +71,12 @@ export function SearchPop() {
 
 function Pane({ mode }: { mode: "pinned" | "pop" }) {
   const pop = mode === "pop";
-  const close = () => setUi(pop ? { searchPop: false } : { search: false });
+  const close = (restore = false) => {
+    setUi(pop ? { searchPop: false } : { search: false });
+    if (restore && pop) {
+      requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-hud-search]")?.focus());
+    }
+  };
   const box = useRef<HTMLElement>(null);
   const ui = useUi();
   const [q, setQ] = useState("");
@@ -149,31 +154,42 @@ function Pane({ mode }: { mode: "pinned" | "pop" }) {
   const rest = shown.filter((h) => !images.includes(h));
 
   return (
-    <aside ref={box} className={pop ? "search-pane search-pop" : "search-pane floor-pane"} style={pop ? undefined : { width: ui.searchW }} aria-label="Search" data-search-mode={mode}>
+    <aside
+      ref={box}
+      className={pop ? "search-pane search-pop" : "search-pane floor-pane"}
+      style={pop ? undefined : { width: ui.searchW }}
+      role={pop ? "dialog" : undefined}
+      aria-label="Search"
+      data-search-mode={mode}
+    >
       {!pop && <FloorEdge side="left" value={ui.searchW} {...WIDTHS.search} onChange={(w) => setUi({ searchW: w })} label="Search" />}
       <header className="search-head">
-        <span className="search-glyph">
+        <span className="search-glyph" aria-hidden>
           <SearchGlyph />
         </span>
         <input
           ref={input}
           className="search-field"
+          aria-label="Search grids, files, apps, Slack, and GitHub"
           value={q}
           placeholder="Try “stator”, a file's name, an app, a channel…"
           onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Escape" && (q ? setQ("") : close())}
+          onKeyDown={(e) => e.key === "Escape" && (q ? setQ("") : close(true))}
         />
-        {loading && <span className="thinking-dots"><i /><i /><i /></span>}
-        <button className={`top-btn${pop ? "" : " is-on"}`} onClick={() => pinSearch(pop)} data-tip={pop ? "Pin to the right" : "Unpin: back over the bar"} aria-label={pop ? "Pin search to the right" : "Unpin search"} aria-pressed={!pop} data-search-pin>
+        {loading && <span className="thinking-dots" aria-hidden><i /><i /><i /></span>}
+        <button type="button" className={`top-btn${pop ? "" : " is-on"}`} onClick={() => pinSearch(pop)} data-tip={pop ? "Pin to the right" : "Unpin: back over the bar"} aria-label={pop ? "Pin search to the right" : "Unpin search"} aria-pressed={!pop} data-search-pin>
           <PinGlyph on={!pop} />
         </button>
-        <button className="top-btn" onClick={close} title={`Close (${keys("mod+F")})`} aria-label="Close search">
+        <button type="button" className="top-btn" onClick={() => close(true)} title={`Close (${keys("mod+F")})`} aria-label="Close search">
           ✕
         </button>
       </header>
-      <div className="search-filters">
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {loading ? "Searching…" : q.trim() ? `${shown.length} ${shown.length === 1 ? "result" : "results"} for ${q.trim()}` : ""}
+      </div>
+      <div className="search-filters" role="group" aria-label="Filter results">
         {FILTERS.map((f) => (
-          <button key={f.id} className={`search-chip${filter === f.id ? " is-on" : ""}`} onClick={() => setFilter(f.id)}>
+          <button key={f.id} type="button" className={`search-chip${filter === f.id ? " is-on" : ""}`} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
             {f.label}
             {f.id !== "all" && counts[f.id] ? <span className="search-chip-n">{counts[f.id]}</span> : null}
           </button>
@@ -182,7 +198,7 @@ function Pane({ mode }: { mode: "pinned" | "pop" }) {
       {filter === "place" && <PlacesBrowser board={board} filter={q.trim()} />}
       {filter === "flowform" && <FlowformBrowser filter={q} />}
       <div className="search-results" hidden={filter === "place" || filter === "flowform"}>
-        {!q.trim() && shown.length > 0 && <div className="pane-eyebrow">Recent on this board</div>}
+        {!q.trim() && shown.length > 0 && <div className="pane-eyebrow">Recent on this grid</div>}
         {q.trim() && !loading && shown.length === 0 && (
           <div className="pane-empty is-create" data-search-empty>
             <span>
@@ -190,10 +206,10 @@ function Pane({ mode }: { mode: "pinned" | "pop" }) {
             </span>
             {ui.role !== "viewer" && (
               <span className="pane-empty-acts">
-                <button className="f-pill is-accent" onClick={() => void newGridNamed(q.trim())}>
+                <button type="button" className="f-pill is-accent" onClick={() => void newGridNamed(q.trim())}>
                   New grid “{q.trim().slice(0, 24)}”
                 </button>
-                <button className="f-pill" onClick={() => void addNote(getState().activeSectionId)}>
+                <button type="button" className="f-pill" onClick={() => void addNote(getState().activeSectionId)}>
                   New note here
                 </button>
               </span>
@@ -205,16 +221,16 @@ function Pane({ mode }: { mode: "pinned" | "pop" }) {
             {images.map((h) => (
               <Draggable key={h.id} hit={h} className="search-tile">
                 <HitPicture hit={h} width={256} />
-                <span className="search-tile-name">{h.title}</span>
+                <span className="search-tile-name" title={h.title}>{h.title}</span>
               </Draggable>
             ))}
           </div>
         )}
         {rest.map((h) => (
           <Draggable key={h.id} hit={h} className="search-row">
-            <span className="search-row-glyph">{glyphOf(h)}</span>
+            <span className="search-row-glyph" aria-hidden>{glyphOf(h)}</span>
             <span className="search-row-main">
-              <span className="search-row-title">{h.title}</span>
+              <span className="search-row-title" title={h.title}>{h.title}</span>
               {h.snippet && <span className="search-row-snip" dangerouslySetInnerHTML={{ __html: snippetHtml(h.snippet) }} />}
             </span>
             <span className="search-row-src">{h.source === "flowform" ? (h.flowform?.origin ?? "flowform") : h.source}</span>
@@ -256,15 +272,23 @@ export function Draggable({
     onPress: (e) => (e.metaKey || e.ctrlKey ? toggle(e.currentTarget as HTMLElement) : onPress ? onPress() : openHit(hit)),
   });
   return (
-    <button className={`${className}${clipped ? " is-clipped" : ""}`} data-tip={hit.title} data-hit-id={hit.id} {...pull}>
+    <button type="button" className={`${className}${clipped ? " is-clipped" : ""}`} data-tip={hit.title} data-hit-id={hit.id} {...pull}>
       {children}
       <span
         className="clip-btn"
         role="button"
-        aria-label={clipped ? "Take it off the clipboard" : "Keep it on the clipboard"}
+        tabIndex={0}
+        aria-label={clipped ? `Remove ${hit.title} from clipboard` : `Keep ${hit.title} on clipboard`}
         data-tip={clipped ? "On the clipboard" : "Keep on the clipboard"}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => (e.stopPropagation(), toggle((e.currentTarget as HTMLElement).closest<HTMLElement>("[data-hit-id]")!))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            e.stopPropagation();
+            toggle((e.currentTarget as HTMLElement).closest<HTMLElement>("[data-hit-id]")!);
+          }
+        }}
       >
         {clipped ? "✓" : "＋"}
       </span>

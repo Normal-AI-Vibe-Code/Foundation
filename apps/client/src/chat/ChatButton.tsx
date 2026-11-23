@@ -23,7 +23,7 @@ export function ChatButton({ on }: { on: boolean }) {
 
 export function ChatButtonView({ on, total, tip, words, onClick }: { on: boolean; total: number; tip: string; words: string; onClick?(): void }) {
   return (
-    <button className={`top-today top-chat${on ? " is-on" : ""}`} onClick={onClick} data-tip={tip} data-top-chat data-place="chat">
+    <button type="button" className={`top-today top-chat${on ? " is-on" : ""}`} aria-current={on ? "page" : undefined} onClick={onClick} data-tip={tip} data-top-chat data-place="chat">
       <ChatMark size={16} />
       ChatForm
       {total > 0 && (

@@ -102,10 +102,12 @@ export function CommandBar() {
   const [sel, setSel] = useState(0);
   const [loading, setLoading] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const prevFocus = useRef<HTMLElement | null>(null);
   const board = activeBoard()?.boardId ?? "company";
 
   useEffect(() => {
     if (ui.command) {
+      prevFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setQ("");
       setHits([]);
       setSel(0);
@@ -140,7 +142,14 @@ export function CommandBar() {
     };
   }, [q, board]);
 
-  const close = () => setUi({ command: false });
+  const close = (restore = false) => {
+    setUi({ command: false });
+    if (restore && prevFocus.current?.isConnected) {
+      const target = prevFocus.current;
+      requestAnimationFrame(() => target.focus());
+    }
+    prevFocus.current = null;
+  };
 
   const actions: Action[] = useMemo(() => {
     const st = getState();
@@ -174,7 +183,7 @@ export function CommandBar() {
       { id: "cad", glyph: "✉", label: "Ask someone for the latest CAD…", hint: "Hermes keeps following up", run: () => askAgent("Ask ") },
       { id: "pipeline", glyph: "◆", label: "Start a design pipeline…", hint: "design → CAD → simulation → release, panel by panel", run: () => askAgent("Start a design pipeline for ") },
       { id: "vision", glyph: "◈", label: "Design something with Vision…", run: () => askAgent("Brief Vision: design ") },
-      { id: "stop-crew", glyph: "■", label: "Stop all my agents on this board", hint: "the crew-wide stop, helpers too", run: () => void stopAllOnBoard() },
+      { id: "stop-crew", glyph: "■", label: "Stop all my agents on this grid", hint: "the crew-wide stop, helpers too", run: () => void stopAllOnBoard() },
       { id: "connect", glyph: "⌁", label: "Connect Claude Code / Codex to this grid", hint: "copies an MCP command; more in Settings → Agents", run: copyMcpCommand },
       { id: "today", glyph: "◌", label: "Today", hint: "the Shiba, your todos, the company's apps", run: () => goToday() },
       { id: "chatform", glyph: "✉", label: "Open ChatForm", hint: "channels, direct messages, threads, agents", run: () => goChat() },
@@ -218,26 +227,35 @@ export function CommandBar() {
         askAgent(q);
       } else choose(sel);
     } else if (e.key === "Escape") {
-      close();
+      e.preventDefault();
+      close(true);
     }
   };
 
   return (
     <AnimatePresence>
       {ui.command && (
-        <motion.div className="cmd-scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} onPointerDown={close}>
+        <motion.div className="cmd-scrim" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.11 } }} transition={{ duration: 0.12 }} onPointerDown={() => close(true)}>
           <motion.div
             className="cmd f-glass"
-            initial={{ opacity: 0, y: -14, scale: 0.98 }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command bar"
+            initial={{ opacity: 0, y: -6, scale: 0.99 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.985 }}
-            transition={{ type: "spring", stiffness: 260, damping: 26 }}
+            exit={{ opacity: 0, y: -6, scale: 0.99, transition: { duration: 0.11 } }}
+            transition={{ duration: 0.12, ease: [0.22, 1, 0.36, 1] }}
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="cmd-field">
-              <span className="cmd-glyph">⌕</span>
+              <span className="cmd-glyph" aria-hidden>⌕</span>
               <input
                 ref={input}
+                role="combobox"
+                aria-expanded={rows.length > 0}
+                aria-controls="cmd-listbox"
+                aria-activedescendant={rows[sel] ? `cmd-opt-${sel}` : undefined}
+                aria-label="Search commands, grids, files, or ask an agent"
                 value={q}
                 onChange={(e) => {
                   setQ(e.target.value);
@@ -248,20 +266,43 @@ export function CommandBar() {
                 placeholder="Search everything, paste a link, or ask the agent…"
                 spellCheck={false}
               />
-              {loading && <span className="cmd-spin" />}
-              <span className="f-kbd">esc</span>
+              {loading && <span className="cmd-spin" aria-hidden />}
+              <span className="f-kbd" aria-hidden>esc</span>
             </div>
-            <div className="cmd-list">
+            <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {loading ? "Searching…" : q.trim() ? `${rows.length} ${rows.length === 1 ? "result" : "results"}` : ""}
+            </div>
+            <div id="cmd-listbox" className="cmd-list" role="listbox" aria-label="Commands and search results">
               {rows.map((r, i) =>
                 r.kind === "action" ? (
-                  <button key={r.a.id} className={`cmd-row${i === sel ? " is-sel" : ""}`} onMouseEnter={() => setSel(i)} onClick={() => choose(i)}>
-                    <span className="cmd-row-glyph">{r.a.glyph}</span>
+                  <button
+                    key={r.a.id}
+                    id={`cmd-opt-${i}`}
+                    type="button"
+                    role="option"
+                    aria-selected={i === sel}
+                    className={`cmd-row${i === sel ? " is-sel" : ""}`}
+                    title={r.a.label}
+                    onMouseEnter={() => setSel(i)}
+                    onClick={() => choose(i)}
+                  >
+                    <span className="cmd-row-glyph" aria-hidden>{r.a.glyph}</span>
                     <span className="cmd-row-label">{r.a.label}</span>
                     {r.a.hint && <span className="cmd-row-hint">{r.a.hint}</span>}
                     {r.a.keys && <span className="f-kbd">{r.a.keys}</span>}
                   </button>
                 ) : (
-                  <button key={r.h.id + i} className={`cmd-row is-hit${i === sel ? " is-sel" : ""}`} onMouseEnter={() => setSel(i)} onClick={() => choose(i)}>
+                  <button
+                    key={r.h.id + i}
+                    id={`cmd-opt-${i}`}
+                    type="button"
+                    role="option"
+                    aria-selected={i === sel}
+                    className={`cmd-row is-hit${i === sel ? " is-sel" : ""}`}
+                    title={r.h.title}
+                    onMouseEnter={() => setSel(i)}
+                    onClick={() => choose(i)}
+                  >
                     <span className={`cmd-src src-${r.h.source}`}>{SOURCE_LABEL[r.h.source]}</span>
                     <span className="cmd-row-label">{r.h.title}</span>
                     <span className="cmd-row-hint" dangerouslySetInnerHTML={{ __html: snippetHtml(r.h.snippet) }} />
@@ -323,9 +364,9 @@ export async function copyMcpCommand() {
     const url = mcp.replace(/board=[^&]+/, `board=${board}`);
     const cmd = `claude mcp add foundation --transport http "${url}" --header "Authorization: Bearer ${token}"`;
     await navigator.clipboard.writeText(cmd);
-    toast("Copied — paste it in a terminal to give Claude Code this board", "ok");
+    toast("Copied — paste it in a terminal to give Claude Code this grid", "ok");
   } catch (e) {
-    toast((e as Error).message, "bad");
+    toast(`Couldn't copy MCP command: ${(e as Error).message}`, "bad");
   }
 }
 

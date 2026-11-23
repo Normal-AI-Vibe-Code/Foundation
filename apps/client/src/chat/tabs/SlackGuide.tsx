@@ -70,10 +70,10 @@ export function NudgeCard({ onStart, onLater, still = false }: { onStart: () => 
         <span>Bring your channels across, or keep both in step while you move.</span>
       </div>
       <div className="fx-nudge-acts">
-        <button className="f-pill is-accent" onClick={onStart} data-nudge-start>
+        <button type="button" className="f-pill is-accent" onClick={onStart} data-nudge-start>
           Start
         </button>
-        <button className="f-pill" onClick={onLater} data-nudge-later>
+        <button type="button" className="f-pill" onClick={onLater} data-nudge-later>
           Not now
         </button>
       </div>
@@ -116,7 +116,7 @@ export function SlackGuide({ user, onClose, start = "choose", inline = false, de
           </span>
         )}
         {!inline && (
-          <button className="fx-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="fx-close" onClick={onClose} aria-label="Close">
             ✕
           </button>
         )}
@@ -134,16 +134,16 @@ export function SlackGuide({ user, onClose, start = "choose", inline = false, de
       </div>
       {path !== "choose" && (
         <footer className="fx-foot">
-          <button className="f-pill" onClick={() => (at === 0 ? go("choose") : setAt((x) => x - 1))}>
+          <button type="button" className="f-pill" onClick={() => (at === 0 ? go("choose") : setAt((x) => x - 1))}>
             Back
           </button>
           <span className="fx-gap" />
           {at < steps.length - 1 ? (
-            <button className="f-pill is-accent" onClick={() => setAt((x) => x + 1)} data-guide-next>
+            <button type="button" className="f-pill is-accent" onClick={() => setAt((x) => x + 1)} data-guide-next>
               Next
             </button>
           ) : (
-            <button className="f-pill is-accent" onClick={onClose}>
+            <button type="button" className="f-pill is-accent" onClick={onClose}>
               Close
             </button>
           )}
@@ -164,12 +164,12 @@ function Choose({ go, admin, view }: { go: (p: Path) => void; admin: boolean; vi
     <>
       <p className="fx-text">Two ways across. Many teams do both: bring the history in once, then keep the channels people still use in step until everyone has moved.</p>
       <div className="fx-paths">
-        <button className="fx-path" onClick={() => go("import")} data-guide-path="import">
+        <button type="button" className="fx-path" onClick={() => go("import")} data-guide-path="import">
           <b>Move in</b>
           <span>Bring Slack's history here once: channels, threads, reactions, files, with who wrote what. Slack's export zip, dropped here.</span>
           {view && view.history.channels > 0 && <span className="fx-quiet">{view.history.channels} conversations came from Slack already.</span>}
         </button>
-        <button className="fx-path" onClick={() => go("bridge")} data-guide-path="bridge">
+        <button type="button" className="fx-path" onClick={() => go("bridge")} data-guide-path="bridge">
           <b>Keep both in step</b>
           <span>Link channels: what's said in Slack appears here within seconds, and what's said here appears in Slack as “Name via Foundation”.</span>
           {view && view.links.length > 0 && <span className="fx-quiet">{view.links.length === 1 ? "1 channel is" : `${view.links.length} channels are`} linked.</span>}
@@ -186,7 +186,7 @@ function AskAdmin({ what }: { what: string }) {
   return (
     <div className="fx-ask">
       <p className="fx-quiet">These steps are an admin's: they act for everyone on this server.</p>
-      <button className="f-pill" onClick={() => void copyText(note).then(setDone)}>
+      <button type="button" className="f-pill" onClick={() => void copyText(note).then(setDone)}>
         {done ? "Copied" : "Copy a note for an admin"}
       </button>
     </div>
@@ -210,7 +210,7 @@ function ImportPath({ at, admin }: { at: number; admin: boolean }) {
           <input value={workspace} onChange={(e) => setWorkspace(e.target.value)} placeholder="formindustries" data-workspace />
         </label>
         <div className="fx-links">
-          <button className="f-pill is-accent" onClick={() => openOutside(ws ? `https://${ws}.slack.com/services/export` : "https://my.slack.com/services/export")} data-open-export>
+          <button type="button" className="f-pill is-accent" onClick={() => openOutside(ws ? `https://${ws}.slack.com/services/export` : "https://my.slack.com/services/export")} data-open-export>
             Open Slack's export page ↗
           </button>
         </div>
@@ -232,7 +232,7 @@ function ImportPath({ at, admin }: { at: number; admin: boolean }) {
     return (
       <>
         <p className="fx-text">Drop the zip. A rehearsal reads it first and says what would come in; nothing is written until you press Bring it in. Bringing the same export in twice adds nothing.</p>
-        {imp.err && <p className="inbox-err">{imp.err}</p>}
+        {imp.err && <p className="inbox-err" role="alert">{imp.err}</p>}
         {imp.ov && <ExportDrop imp={imp} />}
         {imp.ov && !imp.can && <p className="hist-why">{imp.ov.why ?? "Only an admin brings in Slack history."}</p>}
         <FilesCheck imp={imp} />
@@ -240,13 +240,13 @@ function ImportPath({ at, admin }: { at: number; admin: boolean }) {
         {r && <ReportView report={r} jobId={imp.job?.id ?? ""} onError={imp.setErr} />}
         {imp.dryDone && (
           <div className="inbox-acts">
-            <button className="f-pill is-accent" disabled={imp.locked} onClick={() => void imp.bringIn()} data-bring-in>
+            <button type="button" className="f-pill is-accent" disabled={imp.locked} onClick={() => void imp.bringIn()} data-bring-in>
               Bring it in
             </button>
             <span className="inbox-quiet">Writes these messages into ChatForm, in their authors' names.</span>
           </div>
         )}
-        {r && !r.dryRun && <p className="fx-said is-ok"><span className="f-dot is-ok" /> In. Press Next for who's who.</p>}
+        {r && !r.dryRun && <p className="fx-said is-ok" role="status"><span className="f-dot is-ok" /> In. Press Next for who's who.</p>}
       </>
     );
   if (at === 2)
@@ -273,10 +273,10 @@ function ImportPath({ at, admin }: { at: number; admin: boolean }) {
         )}
         <p className="fx-quiet">Someone whose Slack email differs from their Foundation one: change it in Slack (or have them sign in here with that email), then press Link people.</p>
         <div className="inbox-acts">
-          <button className="f-pill" disabled={!admin} onClick={() => void api<{ linked: number }>("/api/chat/history/link", { method: "POST", json: {} }).then((x) => setLinked(x.linked), () => setLinked(0))}>
+          <button type="button" className="f-pill" disabled={!admin} onClick={() => void api<{ linked: number }>("/api/chat/history/link", { method: "POST", json: {} }).then((x) => setLinked(x.linked), () => setLinked(0))}>
             Link people now
           </button>
-          {linked !== null && <span className="inbox-quiet">{linked === 1 ? "1 Slack person became themselves" : `${linked} Slack people became themselves`}</span>}
+          {linked !== null && <span className="inbox-quiet" role="status">{linked === 1 ? "1 Slack person became themselves" : `${linked} Slack people became themselves`}</span>}
         </div>
       </>
     );
@@ -292,7 +292,7 @@ function ImportPath({ at, admin }: { at: number; admin: boolean }) {
       )}
       {first?.channel && (
         <div className="inbox-acts">
-          <button className="f-pill is-accent" onClick={() => goChat("chat", first.channel!)}>
+          <button type="button" className="f-pill is-accent" onClick={() => goChat("chat", first.channel!)}>
             Open {first.name}
           </button>
         </div>
@@ -373,10 +373,10 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
         <ScopeList view={view} />
         <p className="fx-text">No app yet, or a permission missing? Create (or update) it from this manifest: api.slack.com/apps → Create New App → From a manifest (or the app's App Manifest page), paste, save, and install it to the workspace again.</p>
         <div className="fx-links">
-          <button className="f-pill" onClick={() => openOutside("https://api.slack.com/apps")} data-open-url="https://api.slack.com/apps">
+          <button type="button" className="f-pill" onClick={() => openOutside("https://api.slack.com/apps")} data-open-url="https://api.slack.com/apps">
             Open api.slack.com/apps ↗
           </button>
-          <button className="f-pill" disabled={!manifest} onClick={() => manifest && void copyText(manifest).then(setCopied)} data-copy-manifest>
+          <button type="button" className="f-pill" disabled={!manifest} onClick={() => manifest && void copyText(manifest).then(setCopied)} data-copy-manifest>
             {copied ? "Copied" : "Copy the manifest"}
           </button>
         </div>
@@ -394,10 +394,22 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
           <span className="fx-label">
             Bot token <code>SLACK_BOT_TOKEN</code>
           </span>
-          <input type="password" autoComplete="off" spellCheck={false} disabled={!admin || busy} value={token} onChange={(e) => setToken(e.target.value)} placeholder={view.token.set ? `set${view.token.tail ? ` · …${view.token.tail}` : ""} (paste to replace)` : "xoxb-…"} data-slack-token />
+          <input
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={!admin || busy}
+            value={token}
+            aria-invalid={err || view.app?.ok === false ? true : undefined}
+            aria-describedby={err ? "slack-guide-err" : view.app?.ok === false ? "slack-check-said" : undefined}
+            onChange={(e) => setToken(e.target.value)}
+            placeholder={view.token.set ? `set${view.token.tail ? ` · …${view.token.tail}` : ""} (paste to replace)` : "xoxb-…"}
+            data-slack-token
+          />
         </label>
         <div className="inbox-acts">
           <button
+            type="button"
             className="f-pill is-accent"
             disabled={!admin || busy || !token.trim()}
             onClick={() =>
@@ -411,17 +423,17 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
           >
             Save and check
           </button>
-          <button className="f-pill" disabled={!admin || busy || !view.token.set} onClick={() => void act(async () => setView((await api<{ view: SlackView }>("/api/chat/slack/check", { method: "POST", json: {} })).view))} data-check-slack>
+          <button type="button" className="f-pill" disabled={!admin || busy || !view.token.set} onClick={() => void act(async () => setView((await api<{ view: SlackView }>("/api/chat/slack/check", { method: "POST", json: {} })).view))} data-check-slack>
             Check
           </button>
         </div>
         {view.app && (
-          <p className={`fx-said ${view.app.ok ? "is-ok" : "is-bad"}`} data-check-said>
+          <p className={`fx-said ${view.app.ok ? "is-ok" : "is-bad"}`} id="slack-check-said" role={view.app.ok ? "status" : "alert"} data-check-said>
             <span className={`f-dot ${view.app.ok ? "is-ok" : "is-bad"}`} /> {view.app.ok ? `Slack says: ${view.app.team ?? "the workspace"}, as @${view.app.bot ?? "foundation"}.` : view.app.error}
           </p>
         )}
         {view.app?.ok && <ScopeList view={view} />}
-        {err && <p className="inbox-err">{err}</p>}
+        {err && <p className="inbox-err" id="slack-guide-err" role="alert">{err}</p>}
       </>
     );
   if (at === 2)
@@ -431,7 +443,7 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
           Messages posted here will appear in Slack as <i>Name via Foundation</i>; messages in Slack appear here within a few seconds. An agent's reply in a linked channel waits as a draft until a person sends it. Direct messages are never bridged: Slack doesn't let an app post into them for people.
         </p>
         {!view.token.set && <p className="fx-quiet">Set the bot token first (the step before).</p>}
-        {err && <p className="inbox-err">{err}</p>}
+        {err && <p className="inbox-err" role="alert">{err}</p>}
         {channels && (
           <>
             <label className="hist-check is-inline">
@@ -441,7 +453,7 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
             <div className="fx-table" role="table" aria-label="Slack channels and where they land" data-slack-channels>
               {channels.map((c) => (
                 <div key={c.id} className="fx-row" role="row" data-slack-row={c.name}>
-                  <span className="fx-cell" role="cell">
+                  <span className="fx-cell" role="cell" title={`#${c.name}`}>
                     <b>#{c.name}</b>
                     {c.private && <span className="fx-quiet"> · private</span>}
                     {c.members !== null && <span className="fx-quiet"> · {c.members}</span>}
@@ -449,7 +461,7 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
                   <span className="fx-arrow" aria-hidden>
                     ↔
                   </span>
-                  <span className="fx-cell" role="cell">
+                  <span className="fx-cell" role="cell" title={`#${c.link ? c.link.name : c.lands.name}`}>
                     #{c.link ? c.link.name : c.lands.name} <span className="fx-quiet">{c.link ? (c.link.state === "paused" ? "paused" : "linked") : c.lands.how === "imported" ? "brought in" : c.lands.how === "merge" ? "same name here" : "new here"}</span>
                   </span>
                   <span className="fx-cell is-act" role="cell">
@@ -458,11 +470,12 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
                     ) : !c.member && c.private ? (
                       <span className="fx-quiet">/invite @Foundation in Slack</span>
                     ) : !c.member ? (
-                      <button className="f-pill" disabled={!admin || busy} onClick={() => void act(async () => (await api("/api/chat/slack/join", { method: "POST", json: { slackId: c.id } }), loadChannels()))}>
+                      <button type="button" className="f-pill" disabled={!admin || busy} onClick={() => void act(async () => (await api("/api/chat/slack/join", { method: "POST", json: { slackId: c.id } }), loadChannels()))}>
                         Join
                       </button>
                     ) : (
                       <button
+                        type="button"
                         className="f-pill is-accent"
                         disabled={!admin || busy}
                         onClick={() =>
@@ -483,6 +496,7 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
             </div>
             <div className="inbox-acts">
               <button
+                type="button"
                 className="f-pill"
                 disabled={!admin || busy || !channels.some((c) => !c.link && c.member)}
                 onClick={() =>
@@ -494,7 +508,7 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
               >
                 Link all the app is in
               </button>
-              {busy && <span className="inbox-quiet">Linking…</span>}
+              {busy && <span className="inbox-quiet" role="status">Linking…</span>}
             </div>
           </>
         )}
@@ -514,6 +528,7 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
               ))}
             </select>
             <button
+              type="button"
               className="f-pill is-accent"
               disabled={!admin || busy || !testCh}
               onClick={() =>
@@ -535,12 +550,12 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
           <p className="fx-quiet">Link a channel first (the step before).</p>
         )}
         {test && (
-          <p className={`fx-said ${test.confirmed ? "is-ok" : "is-bad"}`} data-test-result>
+          <p className={`fx-said ${test.confirmed ? "is-ok" : "is-bad"}`} role={test.confirmed ? "status" : "alert"} data-test-result>
             <span className={`f-dot ${test.confirmed ? "is-ok" : "is-bad"}`} /> {test.confirmed ? "Sent, and Slack has it: the bridge works both ways from here." : test.sent ? "Sent, but it couldn't be read back yet." : `Not sent: ${test.error ?? "it failed"}`}
           </p>
         )}
         {testCh && (
-          <button className="f-pill" onClick={() => goChat("chat", testCh)}>
+          <button type="button" className="f-pill" onClick={() => goChat("chat", testCh)}>
             Open the channel here
           </button>
         )}
@@ -551,7 +566,7 @@ function BridgePath({ at, admin, view, setView, reload, demoChannels }: { at: nu
       <p className="fx-text">{view.links.length ? `${view.links.length === 1 ? "1 channel is" : `${view.links.length} channels are`} linked:` : "Nothing is linked yet."}</p>
       <LinkList view={view} admin={admin} busy={busy} asking={asking} setAsking={setAsking} act={act} setView={setView} reload={reload} />
       <p className="fx-quiet">To undo: Pause stops both ways for a while; Unlink stops it for good. Neither deletes a message here or in Slack.</p>
-      {err && <p className="inbox-err">{err}</p>}
+      {err && <p className="inbox-err" role="alert">{err}</p>}
     </>
   );
 }
@@ -564,7 +579,7 @@ export function LinkList({ view, admin, busy, asking, setAsking, act, setView, r
       {view.links.map((l) => (
         <div key={l.channel} className="fx-link-row" data-slack-link={l.slackName}>
           <span className={`f-dot ${l.error ? "is-bad" : l.state === "live" ? "is-ok" : ""}`} />
-          <button className="fx-link-name" onClick={() => goChat("chat", l.channel)}>
+          <button type="button" className="fx-link-name" onClick={() => goChat("chat", l.channel)}>
             #{l.name} <span className="fx-quiet">↔ Slack #{l.slackName}</span>
           </button>
           <span className="fx-quiet fx-link-when">
@@ -573,25 +588,25 @@ export function LinkList({ view, admin, busy, asking, setAsking, act, setView, r
           {admin && (
             <span className="fx-link-acts">
               {l.errorCode === "not_in_channel" && !l.private && (
-                <button className="f-pill" disabled={busy} onClick={() => void post("/api/chat/slack/join", { slackId: l.slackId })}>
+                <button type="button" className="f-pill" disabled={busy} onClick={() => void post("/api/chat/slack/join", { slackId: l.slackId })}>
                   Join
                 </button>
               )}
               {asking === l.channel ? (
                 <>
-                  <button className="f-pill chat-draft-bad" disabled={busy} onClick={() => void post(`/api/chat/slack/links/${l.channel}/unlink`, { confirm: true }).then(() => setAsking(null))} data-unlink-yes>
+                  <button type="button" className="f-pill chat-draft-bad" disabled={busy} onClick={() => void post(`/api/chat/slack/links/${l.channel}/unlink`, { confirm: true }).then(() => setAsking(null))} data-unlink-yes>
                     Unlink
                   </button>
-                  <button className="f-pill" onClick={() => setAsking(null)}>
+                  <button type="button" className="f-pill" onClick={() => setAsking(null)}>
                     Keep
                   </button>
                 </>
               ) : (
                 <>
-                  <button className="f-pill" disabled={busy} onClick={() => void post(`/api/chat/slack/links/${l.channel}`, { state: l.state === "live" ? "paused" : "live" })}>
+                  <button type="button" className="f-pill" disabled={busy} onClick={() => void post(`/api/chat/slack/links/${l.channel}`, { state: l.state === "live" ? "paused" : "live" })}>
                     {l.state === "live" ? "Pause" : "Resume"}
                   </button>
-                  <button className="f-pill" onClick={() => setAsking(l.channel)} data-unlink>
+                  <button type="button" className="f-pill" onClick={() => setAsking(l.channel)} data-unlink>
                     Unlink…
                   </button>
                 </>

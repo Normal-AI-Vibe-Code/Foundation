@@ -263,7 +263,7 @@ export function SetupWizard({ service, bridge, server, admin, onClose, onChanged
           ))}
         </span>
         {!inline && (
-          <button className="fx-close" onClick={onClose} aria-label="Close">
+          <button type="button" className="fx-close" onClick={onClose} aria-label="Close">
             ✕
           </button>
         )}
@@ -282,7 +282,7 @@ export function SetupWizard({ service, bridge, server, admin, onClose, onChanged
         {step.links && (
           <div className="fx-links">
             {step.links.map((l) => (
-              <button key={l.url} className="f-pill" onClick={() => openOutside(l.url)} data-open-url={l.url}>
+              <button key={l.url} type="button" className="f-pill" onClick={() => openOutside(l.url)} data-open-url={l.url}>
                 {l.label} ↗
               </button>
             ))}
@@ -294,8 +294,8 @@ export function SetupWizard({ service, bridge, server, admin, onClose, onChanged
           return (
             <div key={c.label} className="fx-copy">
               <span className="fx-label">{c.label}</span>
-              <code className="fx-value">{v}</code>
-              <button className="f-pill" onClick={() => void copy(c.label, v)}>
+              <code className="fx-value" title={v}>{v}</code>
+              <button type="button" className="f-pill" onClick={() => void copy(c.label, v)}>
                 {copied === c.label ? "Copied" : "Copy"}
               </button>
             </div>
@@ -316,16 +316,18 @@ export function SetupWizard({ service, bridge, server, admin, onClose, onChanged
                   disabled={!admin || busy}
                   placeholder={k?.set ? `set${k.source === "env" ? " in the server's .env" : ""}${k.tail ? ` · …${k.tail}` : ""} (paste to replace)` : (f.placeholder ?? "paste it here")}
                   value={draft[f.key] ?? ""}
+                  aria-invalid={err || said?.ok === false ? true : undefined}
+                  aria-describedby={err ? `fx-err-${service}` : said?.ok === false ? `fx-said-${service}` : undefined}
                   onChange={(e) => setDraft((d) => ({ ...d, [f.key]: e.target.value }))}
                   data-key={f.key}
                 />
                 {f.make && admin && (
-                  <button className="f-pill" disabled={busy} onClick={(e) => (e.preventDefault(), setDraft((d) => ({ ...d, [f.key]: randomKey(f.make!) })))}>
+                  <button type="button" className="f-pill" disabled={busy} onClick={(e) => (e.preventDefault(), setDraft((d) => ({ ...d, [f.key]: randomKey(f.make!) })))}>
                     Make one
                   </button>
                 )}
                 {f.make && draft[f.key] && (
-                  <button className="f-pill" onClick={(e) => (e.preventDefault(), void copy(f.key, draft[f.key]))}>
+                  <button type="button" className="f-pill" onClick={(e) => (e.preventDefault(), void copy(f.key, draft[f.key]))}>
                     {copied === f.key ? "Copied" : "Copy"}
                   </button>
                 )}
@@ -339,41 +341,41 @@ export function SetupWizard({ service, bridge, server, admin, onClose, onChanged
           );
         })}
         {said && (
-          <p className={`fx-said ${said.ok ? "is-ok" : "is-bad"}`} data-check-said>
+          <p className={`fx-said ${said.ok ? "is-ok" : "is-bad"}`} id={`fx-said-${service}`} role={said.ok ? "status" : "alert"} data-check-said>
             <span className={`f-dot ${said.ok ? "is-ok" : "is-bad"}`} /> {said.said}
           </p>
         )}
-        {err && <p className="inbox-err">{err}</p>}
+        {err && <p className="inbox-err" id={`fx-err-${service}`} role="alert">{err}</p>}
         {!admin && (
           <div className="fx-ask">
             <p className="fx-quiet">Setting {w.name} up is an admin's: it connects the company's account for everyone on this server.</p>
-            <button className="f-pill" onClick={() => void copy("note", note)}>
+            <button type="button" className="f-pill" onClick={() => void copy("note", note)}>
               {copied === "note" ? "Copied" : "Copy a note for an admin"}
             </button>
           </div>
         )}
       </div>
       <footer className="fx-foot">
-        <button className="f-pill" disabled={at === 0 || busy} onClick={() => setAt((x) => x - 1)}>
+        <button type="button" className="f-pill" disabled={at === 0 || busy} onClick={() => setAt((x) => x - 1)}>
           Back
         </button>
         <span className="fx-gap" />
         {admin && step.fields && (
-          <button className="f-pill" disabled={busy || !dirty} onClick={() => void act(save)}>
+          <button type="button" className="f-pill" disabled={busy || !dirty} onClick={() => void act(save)}>
             Save
           </button>
         )}
         {step.check && (admin || step.address) && (
-          <button className="f-pill" disabled={busy} onClick={() => void check()} data-check={step.check}>
+          <button type="button" className="f-pill" disabled={busy} onClick={() => void check()} data-check={step.check}>
             {busy ? "Checking…" : "Check"}
           </button>
         )}
         {last ? (
-          <button className="f-pill is-accent" disabled={busy} onClick={() => void act(async () => (await save(), onClose()))}>
+          <button type="button" className="f-pill is-accent" disabled={busy} onClick={() => void act(async () => (await save(), onClose()))}>
             Finish
           </button>
         ) : (
-          <button className="f-pill is-accent" disabled={busy} onClick={() => void act(async () => (admin && (await save()), setAt((x) => x + 1)))}>
+          <button type="button" className="f-pill is-accent" disabled={busy} onClick={() => void act(async () => (admin && (await save()), setAt((x) => x + 1)))}>
             Next
           </button>
         )}

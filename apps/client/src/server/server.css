@@ -37,13 +37,23 @@
   color: var(--color-mist);
   font: 500 var(--text-12) / 1 var(--font-sans);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: transform var(--dur-press) var(--ease-out-soft);
 }
-.server-switch-pill:hover {
-  color: var(--color-frost);
+@media (hover: hover) {
+  .server-switch-pill:hover {
+    color: var(--color-frost);
+  }
 }
-.server-switch-pill:active {
+.server-switch-pill:not(:disabled):active {
   transform: scale(0.97);
+}
+.server-switch-pill:focus-visible,
+.server-switch-more:focus-visible,
+.server-note:focus-visible,
+.server-switch-kind:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .server-switch-pill[aria-expanded="true"] {
   color: var(--color-frost);
@@ -144,6 +154,7 @@
 .server-switch-option-head strong {
   font-weight: 650;
   font-size: var(--text-14);
+  text-wrap: balance;
 }
 .server-switch-tag {
   height: 18px;
@@ -162,7 +173,9 @@
 .server-switch-error {
   margin: 0;
   font-size: var(--text-12);
+  line-height: 1.5;
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 .server-switch-lede {
   color: var(--color-mist);
@@ -175,6 +188,7 @@
   white-space: pre-wrap;
   max-height: 140px;
   overflow: auto;
+  overscroll-behavior: contain;
 }
 .server-switch .server-switch-field {
   height: var(--h-control);
@@ -338,9 +352,10 @@ html[data-server-switch] .huddle-pip ~ .upload-tray-place {
 
 /* the panel grows with the network section: it scrolls inside, never off the window */
 .server-switch-panel {
-  max-height: min(80vh, 780px);
+  max-height: min(80dvh, 780px);
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block: var(--space-4);
 }
 .server-about {
   display: flex;
@@ -372,6 +387,7 @@ html[data-server-switch] .huddle-pip ~ .upload-tray-place {
   min-width: 0;
   color: var(--color-mist);
   overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 .server-facts dd code {
   color: var(--color-frost);
@@ -479,6 +495,7 @@ html[data-server-switch] .huddle-pip ~ .upload-tray-place {
 }
 .server-net-who span {
   color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
 }
 .server-net-people .server-switch-dot {
   width: 6px;
@@ -490,6 +507,7 @@ html[data-server-switch] .huddle-pip ~ .upload-tray-place {
   line-height: 1.45;
   padding-left: var(--space-3);
   border-left: 2px solid var(--color-line);
+  text-wrap: pretty;
 }
 .server-net-later {
   padding-top: var(--space-2);

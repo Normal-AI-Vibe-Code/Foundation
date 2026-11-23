@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MotionConfig } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
 import { initNight } from "@foundation/ui";
 import "@foundation/ui/tokens.css";
@@ -61,38 +62,39 @@ function App() {
   }, [arrive]);
 
   const preview = route.startsWith("#/design/sign-in");
-  if (route.startsWith("#/design") && !preview) {
-    return (
-      <>
-        <DesignPage />
-        <WindowControls />
-        <Tip />
-      </>
-    );
-  }
-  // what the Chrome extension (and Foundation) does with your data: open to anyone, signed in or not
-  if (route.startsWith("#/privacy")) {
-    return (
-      <>
-        <Privacy />
-        <Tip />
-        <WindowControls />
-      </>
-    );
-  }
-  if (user === undefined && !preview) {
-    return (
-      <>
-        <div className="boot" />
-        <ServerSwitch day />
-        <WindowControls />
-      </>
-    );
-  }
+  const isDesign = route.startsWith("#/design") && !preview;
+  const isPrivacy = route.startsWith("#/privacy");
+
   const signedOut = preview || !user || veil;
-  return (
+
+  useEffect(() => {
+    if (isDesign) document.title = "Foundation — Design language";
+    else if (isPrivacy) document.title = "Foundation — Privacy";
+    else if (user === undefined && !preview) document.title = "Foundation";
+    else if (signedOut) document.title = "Foundation — Sign in";
+  }, [isDesign, isPrivacy, preview, user, signedOut]);
+
+  const content = isDesign ? (
     <>
-      {user && <Shell user={user} route={preview ? "#/board" : route} />}
+      <DesignPage />
+      <WindowControls />
+      <Tip />
+    </>
+  ) : isPrivacy ? (
+    <>
+      <Privacy />
+      <Tip />
+      <WindowControls />
+    </>
+  ) : user === undefined && !preview ? (
+    <>
+      <div className="boot" />
+      <ServerSwitch day />
+      <WindowControls />
+    </>
+  ) : (
+    <>
+      {user && <Shell user={user} route={preview ? "#/board" : route} titleActive={!signedOut} />}
       {(preview || !user || veil) && (
         <Login
           arriving={veil && arrive && !!user}
@@ -116,6 +118,8 @@ function App() {
       <Tip />
     </>
   );
+
+  return <MotionConfig reducedMotion="user">{content}</MotionConfig>;
 }
 
 export default App;

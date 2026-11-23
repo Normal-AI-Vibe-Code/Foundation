@@ -60,8 +60,9 @@
   color: var(--color-frost);
   font: 400 var(--text-12) / 1 var(--font-sans);
 }
-.inbox-inline-input:focus {
-  outline: none;
+.inbox-inline-input:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
   border-color: var(--color-pulse);
 }
 .inbox-link {
@@ -75,6 +76,14 @@
 }
 .inbox-link:hover {
   text-decoration: underline;
+}
+.inbox-link:focus-visible,
+.fx-close:focus-visible,
+.fx-path:focus-visible,
+.fx-link-name:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 .inbox-settings-body {
   display: flex;
@@ -116,7 +125,7 @@
   display: flex;
   flex-direction: column;
   width: min(560px, 100%);
-  max-height: min(760px, calc(100vh - 48px));
+  max-height: min(760px, calc(100dvh - 48px));
   border: 1px solid var(--color-line);
   border-radius: var(--radius-pane);
   background: var(--color-abyss);
@@ -144,6 +153,7 @@
   flex: 1;
   margin: 0;
   font: 600 var(--text-16) / 1.25 var(--font-sans);
+  text-wrap: balance;
 }
 .fx-dots {
   display: inline-flex;
@@ -179,6 +189,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -195,11 +207,14 @@
   margin: 0;
   font: 600 var(--text-20) / 1.2 var(--font-display);
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 .fx-text {
   margin: 0;
+  max-width: 68ch;
   color: var(--color-frost);
-  font: 400 var(--text-13) / 1.55 var(--font-sans);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .fx-text code,
 .fx-ways code,
@@ -208,9 +223,11 @@
 }
 .fx-quiet {
   margin: 0;
+  max-width: 68ch;
   color: var(--color-dim);
   font-size: var(--text-12);
   line-height: 1.45;
+  text-wrap: pretty;
 }
 .fx-links {
   display: flex;
@@ -270,11 +287,11 @@
   flex: 0 1 auto;
   font-family: var(--font-sans);
 }
-.fx-field input:focus,
-.fx-body select:focus {
-  outline: none;
+.fx-field input:focus-visible,
+.fx-body select:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -1px;
   border-color: var(--color-pulse);
-  box-shadow: 0 0 0 1px var(--color-pulse);
 }
 .fx-field input:disabled {
   opacity: 0.6;
@@ -372,11 +389,13 @@
   color: var(--color-frost);
   font: 600 var(--text-14) / 1.3 var(--font-sans);
 }
-.fx-path:hover {
-  border-color: var(--color-pulse);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .fx-path:hover {
+    border-color: var(--color-pulse);
+    transform: translateY(-1px);
+  }
 }
-.fx-path:active {
+.fx-path:not(:disabled):active {
   transform: scale(0.98);
 }
 
@@ -420,6 +439,7 @@
   margin: 0;
   max-height: 180px;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);

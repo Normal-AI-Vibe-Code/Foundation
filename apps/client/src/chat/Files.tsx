@@ -43,7 +43,7 @@ export function ChatFiles({ files, srcOf = fileSrcOf }: { files: ChatFile[]; src
 function Picture({ file, src, many, onOpen }: { file: ChatFile; src: string; many: boolean; onOpen(): void }) {
   const ratio = !many && file.w && file.h ? `${file.w} / ${file.h}` : undefined;
   return (
-    <button className="chat-picture" onClick={onOpen} data-tip={`${file.name} · ${bytes(file.size)}`} aria-label={`Open ${file.name}`} style={{ aspectRatio: ratio }}>
+    <button type="button" className="chat-picture" onClick={onOpen} data-tip={`${file.name} · ${bytes(file.size)}`} aria-label={`Open ${file.name}`} style={{ aspectRatio: ratio }}>
       <ProgressiveImage src={src} alt={file.name} targetWidth={many ? 256 : 512} fit={many ? "cover" : undefined} draggable={false} />
     </button>
   );
@@ -81,7 +81,7 @@ export function FileRow({ file, src, quiet }: { file: Pick<ChatFile, "name" | "s
         </span>
       )}
       <span className="chat-file-text">
-        <span className="chat-file-name">{file.name}</span>
+        <span className="chat-file-name" title={file.name}>{file.name}</span>
         <span className="chat-file-meta">{[bytes(file.size), kindWord(file)].filter(Boolean).join(" · ")}</span>
       </span>
       <a className="chat-icon-btn" {...fileLink(src, file.name)} download={file.name} data-tip="Download" aria-label={`Download ${file.name}`}>
@@ -112,16 +112,26 @@ export function Lightbox({ file, src, onClose }: { file: ChatFile | null; src: s
   return createPortal(
     <AnimatePresence>
       {file && (
-        <motion.div className="chat-lightbox" onClick={onClose} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }} role="dialog" aria-label={file.name}>
-          <motion.figure onClick={(e) => e.stopPropagation()} initial={{ scale: 0.96, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 4 }} transition={{ type: "spring", stiffness: 420, damping: 36 }}>
+        <motion.div
+          className="chat-lightbox"
+          onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.16 }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={file.name}
+        >
+          <motion.figure initial={{ scale: 0.96, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 4 }} transition={{ type: "spring", stiffness: 420, damping: 36 }}>
             <ProgressiveImage src={src} alt={file.name} targetWidth="orig" preview={false} fit="contain" draggable={false} />
             <figcaption>
-              <span>{file.name}</span>
+              <span title={file.name}>{file.name}</span>
               <span className="chat-file-meta">{bytes(file.size)}</span>
               <a className="f-pill" {...fileLink(src, file.name)} download={file.name}>
                 Download
               </a>
-              <button className="f-pill" onClick={onClose}>
+              <button type="button" className="f-pill" onClick={onClose}>
                 Close
               </button>
             </figcaption>

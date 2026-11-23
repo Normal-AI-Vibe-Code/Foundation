@@ -119,7 +119,7 @@ export function AgentsPane() {
           {t === "council" ? "Council" : t === "agents" ? "At work" : t === "add" ? "＋ Add" : "Background"}
         </button>
       ))}
-      <button className="top-btn" onClick={() => setUi({ agents: false })} aria-label="Close the agents panel" data-tip="Close">
+      <button type="button" className="top-btn" onClick={() => setUi({ agents: false })} aria-label="Close agents panel" data-tip="Close">
         ✕
       </button>
     </nav>
@@ -147,15 +147,17 @@ export function AgentsPaneBody({ places, count, onClose, onGo, live = false, foo
     <>
       <header className="agents-head">
         Agents
-        <span className="agents-head-n">{count === 0 ? "none at work" : `${count} on the board`}</span>
-        <button className="top-btn" onClick={onClose} aria-label="Close the agents pane" data-tip="Close">
+        <span className="agents-head-n" role="status" aria-live="polite">
+          {count === 0 ? "none at work" : `${count} on this grid`}
+        </span>
+        <button type="button" className="top-btn" onClick={onClose} aria-label="Close agents panel" data-tip="Close">
           ✕
         </button>
       </header>
       <div className="agents-scroll">
         {count === 0 && places.length === 0 && (
           <p className="agents-empty">
-            No agents are at work on this board. Hold <span className="f-kbd">Space</span> and say what you need: the agent that takes it shows here, in the section it works in.
+            No agents are at work on this grid. Hold <span className="f-kbd">Space</span> and say what you need: the agent that takes it shows here, in the section it works in.
           </p>
         )}
         {places.map((place) => {
@@ -359,8 +361,8 @@ function T3AgentRow({
             ) : (
               <span className="t3-ask-note">{model}</span>
             )}
-            <span className="t3-ask-note" data-tip={agent.boardTools ? `${agent.name} can read the board and make cards in ${section.name} under its own name. Anything else it would change waits for a person, in T3.` : `${agent.name} has no board tools: it works in a folder of its own and says what it made.`}>
-              {agent.boardTools ? "writes the board" : "works in its folder"} · {agent.where === "local" ? "on this computer" : agent.added ? "your key" : "your plan"}
+            <span className="t3-ask-note" data-tip={agent.boardTools ? `${agent.name} can read this grid and make cards in ${section.name} under its own name. Anything else it would change waits for a person, in T3.` : `${agent.name} has no grid tools: it works in a folder of its own and says what it made.`}>
+              {agent.boardTools ? "writes the grid" : "works in its folder"} · {agent.where === "local" ? "on this computer" : agent.added ? "your key" : "your plan"}
             </span>
             <button className="f-pill is-agent t3-ask-send" onClick={() => void send()} disabled={!text.trim() || sending}>
               {sending ? "Starting" : "Ask"}
@@ -478,7 +480,7 @@ export function T3AddForm({ presets, local, start, only, busy, error, onWhere, o
         </p>
       )}
       {where === "cloud" && <p className="t3-add-note">The model id and address are the vendor's as last published: change them if yours differ.</p>}
-      {error && <p className="t3-words is-bad">{error}</p>}
+      {error && <p className="t3-words is-bad" role="alert">{error}</p>}
       <div className="t3-add-foot">
         <button type="button" className="crew-row-btn" onClick={onCancel}>
           Cancel
@@ -560,7 +562,7 @@ export function T3BlockView({ host, viewer, admin = false, busy, section, asking
           <span className="thinking-dots"><i /><i /><i /></span> {host?.detail ?? "Starting T3"}
         </p>
       )}
-      {state === "error" && <p className="t3-words is-bad">{host?.detail ?? "T3 stopped."}</p>}
+      {state === "error" && <p className="t3-words is-bad" role="alert">{host?.detail ?? "T3 stopped."}</p>}
       {(state === "off" || state === "error") && !viewer && (
         <button className="f-pill t3-start" onClick={onStart} disabled={busy}>
           {state === "error" ? "Start again" : "Start T3"}

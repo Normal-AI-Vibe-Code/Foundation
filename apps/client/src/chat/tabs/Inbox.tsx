@@ -56,8 +56,8 @@ export default function InboxTab({ user, rest }: { user: UserInfo; rest: string 
   return (
     <div className="inbox" data-chat-tab="inbox">
       <div className="inbox-page">
-        {err && <div className="inbox-err">{err}</div>}
-        {!data && !err && <div className="inbox-quiet">Asking the server…</div>}
+        {err && <div className="inbox-err" role="alert">{err}</div>}
+        {!data && !err && <div className="inbox-quiet" role="status">Asking the server…</div>}
         {data && <InboxView data={data} user={user} version={version} reload={() => void load()} waitFor={waitFor} openGuide={rest === "slack-guide"} />}
       </div>
     </div>
@@ -108,7 +108,7 @@ export function ThisFoundation({ data, version }: { data: Bridges; version: stri
           {version ? ` · version ${version}` : ""}
         </span>
         <span className="chat-head-gap" />
-        <button className="f-pill" onClick={() => window.dispatchEvent(new CustomEvent(OPEN_SERVER_PANEL))} data-change-server>
+        <button type="button" className="f-pill" onClick={() => window.dispatchEvent(new CustomEvent(OPEN_SERVER_PANEL))} data-change-server>
           Change server…
         </button>
       </header>
@@ -169,10 +169,10 @@ function Portals({ b }: { b: BridgeView }) {
   return (
     <div className="inbox-portals">
       {b.list.map((p) => (
-        <button key={p.id} className="inbox-portal" onClick={() => goChat("chat", p.id)} title={p.topic}>
+        <button key={p.id} type="button" className="inbox-portal" onClick={() => goChat("chat", p.id)} title={p.topic || p.name}>
           <PartyAvatar party={{ ...ghost, id: p.id, name: p.name }} size={28} />
           <span className="inbox-portal-text">
-            <span className="inbox-portal-name">
+            <span className="inbox-portal-name" title={p.name}>
               {p.name}
               {p.demo && <span className="inbox-tag">Demo</span>}
             </span>
@@ -249,7 +249,7 @@ function MailCard({ b, user, admin, still, reload, waitFor, setUp }: { b: Bridge
       flow={accounts.length ? `${accounts.length === 1 ? "1 mailbox" : `${accounts.length} mailboxes`} connected${b.lastEventAt ? ` · last heard ${ago(b.lastEventAt)}` : ""}` : undefined}
       acts={
         mine ? null : (
-          <button className="f-pill is-accent" disabled={busy || still || waiting} onClick={() => (clientReady ? void connect() : setExplain(true))} data-connect-gmail>
+          <button type="button" className="f-pill is-accent" disabled={busy || still || waiting} onClick={() => (clientReady ? void connect() : setExplain(true))} data-connect-gmail>
             {waiting ? "Waiting…" : "Connect your Gmail"}
           </button>
         )
@@ -265,7 +265,7 @@ function MailCard({ b, user, admin, still, reload, waitFor, setUp }: { b: Bridge
         <div className="inbox-explain" data-needs-admin>
           <p className="inbox-detail">Before anyone can connect a mailbox, an admin adds Foundation's Google OAuth client to this server (once, for everyone). {admin ? "It takes about five minutes in Google Cloud Console." : "Ask an admin to open Inbox → Mail → Set it up."}</p>
           {admin && (
-            <button className="f-pill is-accent" onClick={setUp} data-setup="gmail">
+            <button type="button" className="f-pill is-accent" onClick={setUp} data-setup="gmail">
               Set it up
             </button>
           )}
@@ -284,19 +284,19 @@ function MailCard({ b, user, admin, still, reload, waitFor, setUp }: { b: Bridge
                 <span className="inbox-account-acts">
                   {confirm === a.email ? (
                     <>
-                      <button className="f-pill chat-draft-bad" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/disconnect", { method: "POST", json: { email: a.email, confirm: true } })).then(() => setConfirm(null))}>
+                      <button type="button" className="f-pill chat-draft-bad" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/disconnect", { method: "POST", json: { email: a.email, confirm: true } })).then(() => setConfirm(null))}>
                         Disconnect
                       </button>
-                      <button className="f-pill" onClick={() => setConfirm(null)}>
+                      <button type="button" className="f-pill" onClick={() => setConfirm(null)}>
                         Keep
                       </button>
                     </>
                   ) : (
                     <>
-                      <button className="f-pill" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/sync", { method: "POST", json: {} }))}>
+                      <button type="button" className="f-pill" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/sync", { method: "POST", json: {} }))}>
                         Check now
                       </button>
-                      <button className="f-pill" onClick={() => setConfirm(a.email)}>
+                      <button type="button" className="f-pill" onClick={() => setConfirm(a.email)}>
                         Disconnect…
                       </button>
                     </>
@@ -309,7 +309,7 @@ function MailCard({ b, user, admin, still, reload, waitFor, setUp }: { b: Bridge
       )}
       <Portals b={b} />
       <Details b={b} admin={admin} setUp={setUp} />
-      {note && <p className="inbox-err">{note}</p>}
+      {note && <p className="inbox-err" role="alert">{note}</p>}
     </Card>
   );
 }
@@ -329,7 +329,7 @@ function Details({ b, admin, setUp, children }: { b: BridgeView; admin: boolean;
       {b.window && <p className="inbox-rule">{b.window}</p>}
       {admin && (
         <div className="inbox-acts">
-          <button className="f-pill" onClick={setUp}>
+          <button type="button" className="f-pill" onClick={setUp}>
             Open the setup steps
           </button>
         </div>
@@ -369,12 +369,12 @@ function CompanyCard({ b, admin, demo, still, reload, setUp }: { b: BridgeView; 
       acts={
         <>
           {live && b.canStart && (
-            <button className="f-pill" disabled={busy || still} onClick={() => setStarting((s) => !s)}>
+            <button type="button" className="f-pill" disabled={busy || still} aria-expanded={starting} onClick={() => setStarting((s) => !s)}>
               {starting ? "Close" : "New message…"}
             </button>
           )}
           {!live && (
-            <button className={`f-pill ${admin ? "is-accent" : ""}`} disabled={still} onClick={setUp} data-setup={b.service}>
+            <button type="button" className={`f-pill ${admin ? "is-accent" : ""}`} disabled={still} onClick={setUp} data-setup={b.service}>
               {admin ? "Set it up" : "See the steps"}
             </button>
           )}
@@ -389,13 +389,13 @@ function CompanyCard({ b, admin, demo, still, reload, setUp }: { b: BridgeView; 
         {admin && <Settings b={b} busy={busy} act={act} />}
         {admin && demo && (
           <div className="inbox-acts">
-            <button className="f-pill" disabled={busy} onClick={() => void act(async () => { const r = await api<{ channel: { id: string } | null }>(`/api/chat/bridges/${b.service}/demo`, { method: "POST", json: {} }); if (r.channel) goChat("chat", r.channel.id); })}>
+            <button type="button" className="f-pill" disabled={busy} onClick={() => void act(async () => { const r = await api<{ channel: { id: string } | null }>(`/api/chat/bridges/${b.service}/demo`, { method: "POST", json: {} }); if (r.channel) goChat("chat", r.channel.id); })}>
               Make a sample conversation
             </button>
           </div>
         )}
       </Details>
-      {note && <p className="inbox-err">{note}</p>}
+      {note && <p className="inbox-err" role="alert">{note}</p>}
     </Card>
   );
 }
@@ -406,6 +406,7 @@ function Start({ b, done }: { b: BridgeView; done: (channelId: string) => void }
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const rid = useMemo(() => requestId(), []);
+  const errId = `inbox-start-err-${b.service}`;
   const go = async () => {
     setBusy(true);
     setErr(null);
@@ -420,15 +421,30 @@ function Start({ b, done }: { b: BridgeView; done: (channelId: string) => void }
   };
   return (
     <div className="inbox-start">
-      <input placeholder="To: their WeCom userid" value={to} onChange={(e) => setTo(e.target.value)} />
-      <textarea placeholder="Message" rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+      <input
+        placeholder="To: their WeCom userid"
+        aria-label="Recipient WeCom user ID"
+        aria-invalid={err ? true : undefined}
+        aria-describedby={err ? errId : undefined}
+        value={to}
+        onChange={(e) => setTo(e.target.value)}
+      />
+      <textarea
+        placeholder="Message"
+        aria-label="Message"
+        aria-invalid={err ? true : undefined}
+        aria-describedby={err ? errId : undefined}
+        rows={3}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
       <div className="inbox-acts">
-        <button className="f-pill is-accent" disabled={busy || !to.trim() || !text.trim()} onClick={() => void go()}>
+        <button type="button" className="f-pill is-accent" disabled={busy || !to.trim() || !text.trim()} onClick={() => void go()}>
           {busy ? "Sending…" : "Send"}
         </button>
         <span className="inbox-quiet">It goes out as you.</span>
       </div>
-      {err && <p className="inbox-err">{err}</p>}
+      {err && <p className="inbox-err" id={errId} role="alert">{err}</p>}
     </div>
   );
 }
@@ -439,6 +455,7 @@ function Settings({ b, busy, act }: { b: BridgeView; busy: boolean; act: (fn: ()
   const inbox = b.settings.inbox;
   const name = (id: string) => persons.find((p) => p.id === id)?.name ?? id;
   const save = (patch: Record<string, unknown>) => act(() => api(`/api/chat/bridges/${b.service}`, { method: "POST", json: patch }));
+  const puppetId = `inbox-puppet-${b.service}`;
   return (
     <div className="inbox-settings-body">
       <div className="inbox-setting">
@@ -447,7 +464,7 @@ function Settings({ b, busy, act }: { b: BridgeView; busy: boolean; act: (fn: ()
           {inbox.map((id) => (
             <span key={id} className="inbox-chip">
               {name(id)}
-              <button aria-label={`Take ${name(id)} off`} disabled={busy} onClick={() => void save({ inbox: inbox.filter((x) => x !== id) })}>
+              <button type="button" aria-label={`Take ${name(id)} off`} disabled={busy} onClick={() => void save({ inbox: inbox.filter((x) => x !== id) })}>
                 ✕
               </button>
             </span>
@@ -466,8 +483,10 @@ function Settings({ b, busy, act }: { b: BridgeView; busy: boolean; act: (fn: ()
         </span>
       </div>
       <div className="inbox-setting">
-        <span className="inbox-setting-name">Our own messages sent from the phone show as</span>
-        <select value={b.settings.puppet ?? ""} disabled={busy} onChange={(e) => void save({ puppet: e.target.value || null })}>
+        <label htmlFor={puppetId} className="inbox-setting-name">
+          Our own messages sent from the phone show as
+        </label>
+        <select id={puppetId} value={b.settings.puppet ?? ""} disabled={busy} onChange={(e) => void save({ puppet: e.target.value || null })}>
           <option value="">The account itself</option>
           {persons.map((p) => (
             <option key={p.id} value={p.id}>
@@ -478,11 +497,11 @@ function Settings({ b, busy, act }: { b: BridgeView; busy: boolean; act: (fn: ()
       </div>
       <div className="inbox-setting">
         <span className="inbox-setting-name">{b.name}</span>
-        <span className="inbox-seg" role="group">
-          <button className={b.settings.enabled ? "is-current" : ""} disabled={busy} onClick={() => void save({ enabled: true })}>
+        <span className="inbox-seg" role="group" aria-label={b.name}>
+          <button type="button" className={b.settings.enabled ? "is-current" : ""} aria-pressed={b.settings.enabled} disabled={busy} onClick={() => void save({ enabled: true })}>
             On
           </button>
-          <button className={!b.settings.enabled ? "is-current" : ""} disabled={busy} onClick={() => void save({ enabled: false })}>
+          <button type="button" className={!b.settings.enabled ? "is-current" : ""} aria-pressed={!b.settings.enabled} disabled={busy} onClick={() => void save({ enabled: false })}>
             Off
           </button>
         </span>
@@ -517,16 +536,16 @@ function SlackCard({ view, user, still, reload, openGuide }: { view: SlackView; 
       line={line}
       flow={flow}
       acts={
-        <button className="f-pill is-accent" disabled={still} onClick={openGuide} data-open-guide>
+        <button type="button" className="f-pill is-accent" disabled={still} onClick={openGuide} data-open-guide>
           {!v.token.set && !v.history.channels ? "Start the Slack guide" : v.links.length ? "Open the Slack guide" : "Link channels"}
         </button>
       }
     >
       {v.links.length > 0 && <LinkList view={v} admin={v.admin && !still} busy={la.busy} asking={la.asking} setAsking={la.setAsking} act={la.act} setView={setV} reload={reload} />}
-      {la.err && <p className="inbox-err">{la.err}</p>}
+      {la.err && <p className="inbox-err" role="alert">{la.err}</p>}
       <p className="inbox-rule">Direct messages are never bridged: Slack doesn't let an app post into them for people. Bring them in with the history instead.</p>
       {v.nudgeDismissed && !still && (
-        <button className="inbox-link" onClick={() => void api("/api/chat/slack/nudge", { method: "POST", json: { dismissed: false } }).then(reload)}>
+        <button type="button" className="inbox-link" onClick={() => void api("/api/chat/slack/nudge", { method: "POST", json: { dismissed: false } }).then(reload)}>
           Show “Coming from Slack?” in Chat again
         </button>
       )}

@@ -67,14 +67,14 @@ export function CadAttachment({ file, src, onOpenOnGrid }: { file: Pick<ChatFile
         {seen && asked ? (
           <CadPreview url={src} name={file.name} />
         ) : (
-          <button className="chat-cad-wait" onClick={() => setAsked(true)} disabled={!seen}>
+          <button type="button" className="chat-cad-wait" onClick={() => setAsked(true)} disabled={!seen}>
             <span className="chat-cad-ext">{ext}</span>
             <span>{asked ? "…" : `Show in 3D · ${bytes(file.size)}`}</span>
           </button>
         )}
       </div>
       <div className="chat-cad-facts">
-        <span className="chat-file-name">{file.name}</span>
+        <span className="chat-file-name" title={file.name}>{file.name}</span>
         <span className="chat-file-meta">
           {[bytes(file.size), ext, facts?.products[0] ? `“${facts.products[0]}”` : "", size ? `${size.map((n) => Math.round(n)).join(" × ")} ${facts?.unit || ""}`.trim() : ""].filter(Boolean).join(" · ")}
         </span>
@@ -83,7 +83,7 @@ export function CadAttachment({ file, src, onOpenOnGrid }: { file: Pick<ChatFile
         <a className="f-pill" {...fileLink(src, file.name)} download={file.name}>
           <IconDownload /> Download
         </a>
-        <button className="f-pill" onClick={() => (onOpenOnGrid ? onOpenOnGrid() : setPlacing((p) => !p))} data-cad-open-grid>
+        <button type="button" className="f-pill" onClick={() => (onOpenOnGrid ? onOpenOnGrid() : setPlacing((p) => !p))} aria-expanded={placing} data-cad-open-grid>
           Open on a grid…
         </button>
       </div>
@@ -105,6 +105,16 @@ export function PlaceOnGrid({ fileId, name, onClose, to }: { fileId: string; nam
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ board: string; card: string; label: string } | null>(null);
   useEffect(() => void loadGrids(), []);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", k, true);
+    return () => window.removeEventListener("keydown", k, true);
+  }, [onClose]);
   useEffect(() => {
     if (!board) return;
     setSections(null);
@@ -136,10 +146,10 @@ export function PlaceOnGrid({ fileId, name, onClose, to }: { fileId: string; nam
             <b>{name}</b> is on <b>{done.label}</b>.
           </p>
           <div className="huddle-place-foot">
-            <button className="f-pill is-accent" onClick={() => (goToCard(done.board, done.card), onClose())} data-place-go>
+            <button type="button" className="f-pill is-accent" onClick={() => (goToCard(done.board, done.card), onClose())} data-place-go>
               Go there
             </button>
-            <button className="f-pill" onClick={onClose}>
+            <button type="button" className="f-pill" onClick={onClose}>
               Stay here
             </button>
           </div>
@@ -165,10 +175,10 @@ export function PlaceOnGrid({ fileId, name, onClose, to }: { fileId: string; nam
             </select>
           </label>
           <div className="huddle-place-foot">
-            <button className="f-pill is-accent" disabled={!board || !section || busy} onClick={() => void place()} data-place-take>
+            <button type="button" className="f-pill is-accent" disabled={!board || !section || busy} onClick={() => void place()} data-place-take>
               {busy ? "Putting it there…" : "Put it there"}
             </button>
-            <button className="f-pill" onClick={onClose}>
+            <button type="button" className="f-pill" onClick={onClose}>
               Cancel
             </button>
           </div>
@@ -186,6 +196,17 @@ export function PlaceOnGrid({ fileId, name, onClose, to }: { fileId: string; nam
 export function BringFileToGrid({ files, board, section }: { files: Array<Pick<ChatFile, "id" | "name" | "size" | "mime">>; board: string; section?: string }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown", k, true);
+    return () => window.removeEventListener("keydown", k, true);
+  }, [open]);
   const list = [...new Map(files.map((f) => [f.id, f])).values()].sort((a, b) => Number(/\.(step|stp|iges|igs|stl|obj|glb)$/i.test(b.name)) - Number(/\.(step|stp|iges|igs|stl|obj|glb)$/i.test(a.name)));
   const bring = async (f: (typeof list)[number]) => {
     setBusy(f.id);
@@ -202,7 +223,7 @@ export function BringFileToGrid({ files, board, section }: { files: Array<Pick<C
   };
   return (
     <span className="huddle-ctl-anchor">
-      <button className="f-pill" onClick={() => setOpen((o) => !o)} data-bring-file>
+      <button type="button" className="f-pill" onClick={() => setOpen((o) => !o)} aria-expanded={open} data-bring-file>
         Bring a file to the grid
       </button>
       {open && (
@@ -211,8 +232,8 @@ export function BringFileToGrid({ files, board, section }: { files: Array<Pick<C
           {!list.length && <p className="huddle-pop-note">No files shared here yet. Drop one in the conversation first.</p>}
           <div className="chat-attach-list">
             {list.slice(0, 12).map((f) => (
-              <button key={f.id} className="chat-attach-row" disabled={Boolean(busy)} onClick={() => void bring(f)} data-bring={f.name}>
-                <span>{f.name}</span>
+              <button key={f.id} type="button" className="chat-attach-row" disabled={Boolean(busy)} onClick={() => void bring(f)} data-bring={f.name}>
+                <span title={f.name}>{f.name}</span>
                 <span className="chat-file-meta">{busy === f.id ? "Bringing…" : bytes(f.size)}</span>
               </button>
             ))}

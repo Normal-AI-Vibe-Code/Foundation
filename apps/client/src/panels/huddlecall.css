@@ -30,6 +30,7 @@
   gap: var(--space-2);
   height: 84px;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 .huddle-strip .huddle-tile {
   flex: none;
@@ -74,11 +75,14 @@
   object-fit: contain;
 }
 .huddle-agent-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
   padding: 0 5px;
   border-radius: var(--radius-pill);
   background: var(--color-agent);
   color: var(--color-on-fill);
-  font: 700 var(--text-11) / 16px var(--font-sans);
+  font: 700 var(--text-11) / 1 var(--font-sans);
   letter-spacing: 0.02em;
 }
 

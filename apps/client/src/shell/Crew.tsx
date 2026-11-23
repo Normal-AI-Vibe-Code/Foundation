@@ -356,10 +356,10 @@ export function CrewGuide() {
             </button>
           ) : (
             <>
-              <button className="f-pill is-agent" onClick={go}>
+              <button type="button" className="f-pill is-agent" onClick={go}>
                 Go
               </button>
-              <button className="crew-guide-x" onClick={() => setOffer(null)} aria-label="Not now" data-tip="Not now">
+              <button type="button" className="crew-guide-x" onClick={() => setOffer(null)} aria-label="Dismiss suggestion" data-tip="Not now">
                 ✕
               </button>
             </>

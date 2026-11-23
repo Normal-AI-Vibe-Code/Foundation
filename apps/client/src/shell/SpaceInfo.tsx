@@ -206,7 +206,7 @@ function People({ board, me }: { board: string; me: string }) {
           )}
         </div>
       ))}
-      {err && <div className="pane-empty is-bad">{err}</div>}
+      {err && <div className="pane-empty is-bad" role="alert">{err}</div>}
     </section>
   );
 }
@@ -219,7 +219,7 @@ function Activity() {
       <div className="pane-eyebrow">Activity</div>
       {items.length === 0 && <div className="pane-empty">Quiet so far. Agents and people show up here as they work.</div>}
       {items.map((a, i) => (
-        <button key={a.at + ":" + i} className={`activity-row role-${a.role}`} onClick={() => a.objectId && requestSnap({ kind: "object", id: a.objectId })}>
+        <button key={a.at + ":" + i} type="button" className={`activity-row role-${a.role}`} onClick={() => a.objectId && requestSnap({ kind: "object", id: a.objectId })}>
           <span className={`f-dot ${a.role === "agent" ? "is-agent" : a.role === "human" ? "is-ok" : ""}`} />
           {/* an agent's line says whom it worked for; a person's is just theirs */}
           <span className="activity-who" data-tip={a.role === "agent" && a.for ? `${a.who}: an agent working for ${a.for}` : undefined}>

@@ -235,8 +235,8 @@ export function ExportDrop({ imp }: { imp: SlackImport }) {
         </div>
       ) : (
         <>
-          <span className="hist-drop-title">{upload ? `${upload.name} · ${size(upload.size)}` : "Drop Slack's export zip here"}</span>
-          <button className="f-pill" disabled={locked} onClick={() => pick.current?.click()}>
+          <span className="hist-drop-title" title={upload ? upload.name : undefined}>{upload ? `${upload.name} · ${size(upload.size)}` : "Drop Slack's export zip here"}</span>
+          <button type="button" className="f-pill" disabled={locked} onClick={() => pick.current?.click()}>
             {upload ? "Choose another…" : "Choose the zip…"}
           </button>
         </>
@@ -278,8 +278,8 @@ export default function History({ user }: { user: UserInfo }) {
       </ol>
       <p className="hist-note">On Slack's Free and Pro plans the export holds public channels only. Direct messages and private channels come through Slack's API (below) with a token.</p>
 
-      {err && <p className="inbox-err">{err}</p>}
-      {!ov && !err && <p className="inbox-quiet">Asking the server…</p>}
+      {err && <p className="inbox-err" role="alert">{err}</p>}
+      {!ov && !err && <p className="inbox-quiet" role="status">Asking the server…</p>}
 
       {ov && (
         <>
@@ -292,7 +292,7 @@ export default function History({ user }: { user: UserInfo }) {
 
           {dryDone && (
             <div className="inbox-acts">
-              <button className="f-pill is-primary" disabled={locked} onClick={() => void imp.bringIn()}>
+              <button type="button" className="f-pill is-primary" disabled={locked} onClick={() => void imp.bringIn()}>
                 Bring it in
               </button>
               <span className="inbox-quiet">Writes the messages above into ChatForm, in their authors' names.</span>
@@ -307,10 +307,10 @@ export default function History({ user }: { user: UserInfo }) {
                   The server has a Slack {ov.token.kind} token. It can bring in what the export left out (direct messages and private channels {ov.token.kind === "bot" ? "the Foundation app was invited to" : "you're in"}) and anything said since. Nothing is doubled.
                 </p>
                 <div className="inbox-acts">
-                  <button className="f-pill" disabled={locked} onClick={() => void imp.topUp(true)}>
+                  <button type="button" className="f-pill" disabled={locked} onClick={() => void imp.topUp(true)}>
                     See what's new
                   </button>
-                  <button className="f-pill" disabled={locked} onClick={() => void imp.topUp(false)}>
+                  <button type="button" className="f-pill" disabled={locked} onClick={() => void imp.topUp(false)}>
                     Top up now
                   </button>
                 </div>
@@ -327,9 +327,9 @@ export default function History({ user }: { user: UserInfo }) {
             <div className="hist-jobs" aria-label="Earlier imports">
               <h3>Earlier</h3>
               {ov.jobs.map((j) => (
-                <button key={j.id} className={`hist-job ${job?.id === j.id ? "is-on" : ""}`} onClick={() => imp.open(j)}>
+                <button key={j.id} type="button" className={`hist-job ${job?.id === j.id ? "is-on" : ""}`} onClick={() => imp.open(j)}>
                   <span className={`f-dot ${j.state === "done" ? "is-ok" : j.state === "running" ? "is-warn is-live" : j.state === "failed" ? "is-bad" : "is-warn"}`} />
-                  <span className="hist-job-what">
+                  <span className="hist-job-what" title={j.kind === "api" ? "Slack API" : j.source}>
                     {j.kind === "api" ? "Slack API" : j.source}
                     {j.dryRun ? " · dry run" : ""}
                   </span>
@@ -346,7 +346,7 @@ export default function History({ user }: { user: UserInfo }) {
         <h3>Download everything</h3>
         <p className="inbox-detail">Every conversation you can see in ChatForm, {user.name.split(" ")[0]}, as one zip: each one as JSON and as Markdown, with who's who.</p>
         <div className="inbox-acts">
-          <button className="f-pill" onClick={() => void download(`/api/chat/history/export${exportFiles ? "?files=1" : ""}`, "chatform.zip").catch((e: Error) => imp.setErr(e.message))}>
+          <button type="button" className="f-pill" onClick={() => void download(`/api/chat/history/export${exportFiles ? "?files=1" : ""}`, "chatform.zip").catch((e: Error) => imp.setErr(e.message))}>
             Download everything
           </button>
           <label className="hist-check is-inline">
@@ -428,7 +428,7 @@ export function ReportView({ report: r, jobId, onError }: { report: Report; jobI
       )}
       {jobId && (
         <div className="inbox-acts">
-          <button className="f-pill" onClick={() => void download(`/api/chat/history/jobs/${jobId}/report`, "slack-import.md").catch((e: Error) => onError(e.message))}>
+          <button type="button" className="f-pill" onClick={() => void download(`/api/chat/history/jobs/${jobId}/report`, "slack-import.md").catch((e: Error) => onError(e.message))}>
             Download the report
           </button>
         </div>

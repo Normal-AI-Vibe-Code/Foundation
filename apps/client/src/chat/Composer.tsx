@@ -233,11 +233,22 @@ export function Composer(p: ComposerProps) {
     >
       <AnimatePresence>
         {trigger && options.length > 0 && (
-          <motion.div className="chat-ac" role="listbox" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 2 }} transition={{ type: "spring", stiffness: 520, damping: 40 }}>
+          <motion.div
+            id={`chat-ac-${p.root ? "thread" : "channel"}`}
+            className="chat-ac"
+            role="listbox"
+            aria-label={trigger.kind === "@" ? "People and agents" : trigger.kind === "#" ? "Channels" : "Emoji"}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 2 }}
+            transition={{ type: "spring", stiffness: 520, damping: 40 }}
+          >
             <div className="chat-ac-head">{trigger.kind === "@" ? "People and agents" : trigger.kind === "#" ? "Channels" : "Emoji"}</div>
             {options.map((o, i) => (
               <button
                 key={o.key}
+                id={`chat-ac-${p.root ? "thread" : "channel"}-${i}`}
+                type="button"
                 role="option"
                 aria-selected={i === pick}
                 className={`chat-ac-row${i === pick ? " is-on" : ""}`}
@@ -261,10 +272,13 @@ export function Composer(p: ComposerProps) {
             <div key={c.key} className={`chat-chip${c.error ? " is-bad" : ""}${c.id ? " is-done" : ""}`} data-chip={c.name}>
               {c.thumb ? <img className="chat-chip-thumb" src={c.thumb} alt="" /> : <span className="chat-chip-thumb is-file">{c.name.split(".").pop()?.toUpperCase().slice(0, 4)}</span>}
               <span className="chat-chip-text">
-                <span className="chat-chip-name">{c.name}</span>
-                <span className="chat-chip-meta">{c.error ? c.error : c.id ? bytes(c.size) : `${Math.round(c.progress * 100)} %`}</span>
+                <span className="chat-chip-name" title={c.name}>{c.name}</span>
+                <span className="chat-chip-meta" role={c.error ? "alert" : undefined} title={c.error || undefined}>
+                  {c.error ? c.error : c.id ? bytes(c.size) : `${Math.round(c.progress * 100)} %`}
+                </span>
               </span>
               <button
+                type="button"
                 className="chat-chip-x"
                 onClick={() => {
                   if (c.thumb) URL.revokeObjectURL(c.thumb);
@@ -288,6 +302,9 @@ export function Composer(p: ComposerProps) {
         disabled={!!p.disabled}
         placeholder={p.disabled ?? p.placeholder}
         aria-label={p.placeholder}
+        aria-autocomplete={trigger && options.length > 0 ? "list" : undefined}
+        aria-controls={trigger && options.length > 0 ? `chat-ac-${p.root ? "thread" : "channel"}` : undefined}
+        aria-activedescendant={trigger && options[pick] ? `chat-ac-${p.root ? "thread" : "channel"}-${pick}` : undefined}
         onChange={(e) => {
           setText(e.target.value);
           look(e.target);
@@ -396,7 +413,7 @@ export function Composer(p: ComposerProps) {
             />
           )}
         </div>
-        <button className={`chat-send${can ? " is-ready" : ""}`} onClick={sendNow} disabled={!can} data-tip={busy ? "Waiting for the files to land" : "Send"} data-kbd="Enter" aria-label="Send">
+        <button type="button" className={`chat-send${can ? " is-ready" : ""}`} onClick={sendNow} disabled={!can} data-tip={busy ? "Waiting for the files to land" : "Send"} data-kbd="Enter" aria-label="Send">
           <IconSend />
         </button>
       </div>

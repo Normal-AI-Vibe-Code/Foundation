@@ -95,13 +95,13 @@ export function SideChatsView(p: SideChatsViewProps) {
       {!p.channels.length && !p.waiting && (
         <div className="pane-empty is-create chat-pins-empty">
           <span>Drag a conversation here from ChatForm's list to keep it one press away.</span>
-          <button className="f-pill" onClick={p.onBrowse} data-side-chats-open>
+          <button type="button" className="f-pill" onClick={p.onBrowse} data-side-chats-open>
             Open ChatForm
           </button>
         </div>
       )}
       {p.channels.length > 0 && (
-        <button className="pane-row chat-pins-browse" onClick={p.onBrowse} data-side-chats-browse>
+        <button type="button" className="pane-row chat-pins-browse" onClick={p.onBrowse} data-side-chats-browse>
           <span className="pane-glyph">
             <IconPlus />
           </span>
@@ -124,9 +124,9 @@ function SideChatRow({ c, meId, online, current, dragging, gapBefore, onOpen, on
     <>
       {gapBefore && <div className="chat-pin-gap" aria-hidden />}
       <div className={`space-row chat-pin${current ? " is-current" : ""}${unread ? " is-unread" : ""}${muted ? " is-muted" : ""}${c.kind === "agent" ? " is-agent" : ""}${dragging ? " is-dragging" : ""}`} data-chat-pin={c.id} data-chat-pin-name={title} data-unread={unread ? c.unread : undefined}>
-        <button className="pane-row space-open" onClick={() => onOpen(c.id)} onPointerDown={(e) => onPull(e, c.id)} aria-current={current ? "page" : undefined} data-tip={`${title} · pull to reorder`}>
+        <button type="button" className="pane-row space-open" onClick={() => onOpen(c.id)} onPointerDown={(e) => onPull(e, c.id)} aria-current={current ? "page" : undefined} data-tip={`${title} · pull to reorder`}>
           <span className="pane-glyph chat-pin-mark">{channelMark(c, meId, online, 18)}</span>
-          <span className="pane-label">{title}</span>
+          <span className="pane-label" title={title}>{title}</span>
           {c.huddle && <span className="chat-pin-huddle" aria-label="a huddle is live" data-tip="A huddle is live" />}
           {n > 0 && !muted ? (
             <span className="chat-count is-accent" data-pin-count={n} data-tip={direct ? `${n} unread` : `${n} ${n === 1 ? "mention" : "mentions"} of you`}>
@@ -138,7 +138,7 @@ function SideChatRow({ c, meId, online, current, dragging, gapBefore, onOpen, on
             </span>
           ) : null}
         </button>
-        <button className="space-move chat-pin-off" onClick={() => onUnpin(c.id)} aria-label={`Take ${title} out of the side menu`} data-tip="Take out of the side menu (nothing is left)">
+        <button type="button" className="space-move chat-pin-off" onClick={() => onUnpin(c.id)} aria-label={`Take ${title} out of the side menu`} data-tip="Take out of the side menu (nothing is left)">
           <IconClose size={12} />
         </button>
       </div>

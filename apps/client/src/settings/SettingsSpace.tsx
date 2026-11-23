@@ -231,7 +231,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
         <Row name="Starting a machine" detail="Always a person's press, from a browser. An agent can only propose one." />
         <Row name="Running a command in a machine" detail="Each command an agent wants to run waits on the machine's card for your Run or Decline." />
         <Row name="Folders agents may read" detail="Only the folders an admin approved.">
-          <button className="f-pill" onClick={() => goSettings("places")}>
+          <button type="button" className="f-pill" onClick={() => goSettings("places")}>
             Places
           </button>
         </Row>
@@ -254,6 +254,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
             {initials(user.name)}
           </span>
           <button
+            type="button"
             className="f-pill"
             onClick={async () => {
               await logout();
@@ -286,7 +287,7 @@ function AgentsTab({ user }: { user: UserInfo }) {
     <div className="set-page">
       <Group title="Your own agent, over MCP" note="An agent you run yourself (Claude Code, Codex) joins a grid with its own cursor and the grid's tools.">
         <Row name="Claude Code or Codex" detail="Copies the command that adds this server to it. Run it in a terminal, then ask it about the grid.">
-          <button className="f-pill" onClick={() => void copyMcpCommand()}>
+          <button type="button" className="f-pill" onClick={() => void copyMcpCommand()}>
             Copy the command
           </button>
         </Row>
@@ -385,7 +386,7 @@ function AvatarsTab({ user }: { user: UserInfo }) {
             The characters <span className="set-count">{ready.length}</span>
           </h2>
           <p>Made on the Character studio grid: inspiration, a sheet, then a mesh avatar or a 3D model.</p>
-          <button className="f-pill" onClick={() => void openCharacterStudio()}>
+          <button type="button" className="f-pill" onClick={() => void openCharacterStudio()}>
             Open the Character studio
           </button>
         </div>

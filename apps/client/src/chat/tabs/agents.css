@@ -28,6 +28,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-3);
   padding: var(--space-3) 0 var(--space-6);
 }
 .cfa-part + .cfa-part {
@@ -71,8 +73,14 @@
 .cfa-row.is-quiet {
   min-height: 36px;
 }
-.cfa-row:hover {
-  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+@media (hover: hover) {
+  .cfa-row:hover {
+    background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+  }
+}
+.cfa-row:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: -2px;
 }
 .cfa-row.is-current {
   background: var(--color-agent-dim);
@@ -317,13 +325,21 @@
 .cfa-ghost:hover {
   background: color-mix(in srgb, var(--color-frost) 6%, transparent);
 }
+.cfa-stop:focus-visible,
+.cfa-ghost:focus-visible,
+.cfa-link:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
 .cfa-conversation {
   flex: 1;
 }
 .cfa-intro {
+  max-width: 68ch;
   padding: var(--space-6) var(--space-6) var(--space-3);
   color: var(--color-mist);
   font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .cfa-intro b {
   color: var(--color-agent);

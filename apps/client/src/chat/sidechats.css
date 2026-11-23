@@ -49,7 +49,8 @@
 /* the ✕ takes the count's corner under the pointer */
 .chat-pin:hover .chat-count,
 .chat-pin:focus-within .chat-count,
-.chat-pin:hover .chat-pin-huddle {
+.chat-pin:hover .chat-pin-huddle,
+.chat-pin:focus-within .chat-pin-huddle {
   visibility: hidden;
 }
 .side-pane .chat-pin .chat-pin-off {
@@ -168,6 +169,10 @@ body.is-carrying-chat * {
 .chat-unfold:focus-visible {
   background: var(--color-pulse-dim);
   color: var(--color-frost);
+}
+.chat-unfold:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 
 /* ---------- #/design (SideMenuDesign.tsx): the side menu, the slip and the figures, drawn in place ---------- */
