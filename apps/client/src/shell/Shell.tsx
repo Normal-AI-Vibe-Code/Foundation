@@ -59,7 +59,7 @@ function typing(e: KeyboardEvent) {
 /** the grid this device had open last (never one of Foundation's own, which Settings opens) */
 const lastGrid = () => new URLSearchParams(window.location.search).get("board") || localStorage.getItem("foundation-board") || "company";
 
-export function Shell({ user, route }: { user: UserInfo; route: string }) {
+export function Shell({ user, route, titleActive = true }: { user: UserInfo; route: string; titleActive?: boolean }) {
   const ui = useUi();
   const place = useMemo(() => placeOf(route), [route]);
   /** Settings' Plan and Design language are grids of Foundation's own: on those tabs the grid is what shows */
@@ -276,6 +276,15 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
   const wears = place.kind === "today" ? "room" : onGrid && !isPageKind(space?.kind) && space?.theme ? space.theme : "paper";
   useEffect(() => setTheme(wears), [wears]);
   useEffect(() => () => setTheme("paper"), []);
+
+  // keep document.title in sync with the active place for screen readers and browser tabs
+  useEffect(() => {
+    if (!titleActive) return;
+    if (place.kind === "today") document.title = "Foundation — Today";
+    else if (place.kind === "chat") document.title = "Foundation — ChatForm";
+    else if (place.kind === "settings") document.title = "Foundation — Settings";
+    else document.title = space?.name ? `Foundation — ${space.name}` : "Foundation";
+  }, [titleActive, place.kind, space?.name]);
 
   // Today renders its own <main className="today-words"> landmark; avoid nested <main>
   const MainWrap = place.kind === "today" ? "div" : "main";
