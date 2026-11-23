@@ -65,7 +65,8 @@
   --color-room-shade: #14110c;
   /* a gloss on a raised bead (ports): stays light at night, like the highlight inside --shadow-lift */
   --color-highlight: rgb(255 255 255 / 0.6);
-  --color-media-outline: color-mix(in srgb, var(--color-frost) 10%, transparent);
+  /* pure black/white 10% inset outline for content images (no warm-ink fringe on photos) */
+  --color-media-outline: color-mix(in srgb, rgb(255 255 255 / 0.1) calc(var(--night-hard) * 100%), rgb(0 0 0 / 0.1));
   --color-agent-dim: color-mix(in srgb, rgb(143 118 238 / 0.16) calc(var(--night-hard) * 100%), rgb(104 88 211 / 0.1));
   /* the crew: six agents told apart, all from the agent's violet family (an agent is always violet) */
   --color-crew-0: var(--color-agent);
@@ -203,6 +204,7 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   --color-agent: var(--color-over-room);
   --color-agent-dim: color-mix(in srgb, var(--color-over-room) 18%, transparent);
   --color-on-fill: var(--color-room-shade);
+  --color-media-outline: rgb(255 255 255 / 0.1);
   --shadow-sheet: none;
   background: transparent;
   color: var(--color-over-room);
@@ -248,7 +250,6 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   --glass-fill: color-mix(in srgb, var(--color-abyss) 72%, transparent);
   --glass-fill-strong: color-mix(in srgb, var(--color-abyss) 86%, transparent);
   --glass-edge: color-mix(in srgb, var(--color-frost) 14%, transparent);
-  --color-media-outline: color-mix(in srgb, var(--color-frost) 10%, transparent);
 }
 
 /* ---------- focus, accessibility & media primitives ---------- */

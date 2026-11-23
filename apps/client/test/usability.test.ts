@@ -12,6 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { paper as tsPaper, night as tsNight } from "@foundation/ui";
 import { Spring, Spring2D, prefersReducedMotion, presets } from "../src/physics/spring.ts";
 
 const TOKENS_PATH = fileURLToPath(new URL("../../../packages/ui/src/tokens.css", import.meta.url));
@@ -82,6 +83,17 @@ test("tokens.css declares all surface, foreground, accent, and on-fill tokens", 
   }
 });
 
+test("packages/ui/src/index.ts paper and night objects stay 1:1 with tokens.css", () => {
+  const mismatches: string[] = [];
+  for (const [k, v] of Object.entries(tsPaper)) {
+    if (day[k] !== v.toLowerCase()) mismatches.push(`paper.${k}: index.ts=${v} vs tokens.css=${day[k]}`);
+  }
+  for (const [k, v] of Object.entries(tsNight)) {
+    if (night[k] !== v.toLowerCase()) mismatches.push(`night.${k}: index.ts=${v} vs tokens.css=${night[k]}`);
+  }
+  assert.deepEqual(mismatches, [], `TS token drift:\n${mismatches.join("\n")}`);
+});
+
 test("WCAG 2.2 AA (>= 4.5:1): every text/state/accent token passes on all 4 surfaces in Day and Night", () => {
   const failures: string[] = [];
   for (const [modeName, palette] of [
@@ -136,7 +148,9 @@ test("tokens.css defines baseline :focus-visible ring, forced-colors preservatio
   assert.match(clean, /\.f-sr-only\s*\{/);
   assert.match(clean, /\.f-skip-link\s*\{/);
   assert.match(clean, /\.f-skip-link:focus-visible\s*\{/);
-  assert.match(clean, /--color-media-outline\s*:/);
+  assert.match(clean, /--color-media-outline\s*:\s*color-mix\(\s*in\s+srgb\s*,\s*rgb\(255\s+255\s+255\s*\/\s*0\.1\)\s+calc\(var\(--night-hard\)\s*\*\s*100%\)\s*,\s*rgb\(0\s+0\s+0\s*\/\s*0\.1\)\s*\)/);
+  assert.doesNotMatch(clean, /--color-media-outline\s*:[^;]*--color-frost/, "--color-media-outline must use pure black/white, never a tinted neutral");
+  assert.match(clean, /\.f-room,[\s\S]*?--color-media-outline\s*:\s*rgb\(255\s+255\s+255\s*\/\s*0\.1\)/);
   assert.match(clean, /-moz-osx-font-smoothing\s*:\s*grayscale/);
   assert.match(clean, /text-underline-position\s*:\s*from-font/);
 });
