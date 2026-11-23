@@ -107,7 +107,7 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
     };
   }, [at]);
 
-  if (err && !at) return <div className="places"><div className="pane-empty is-bad">{err}</div></div>;
+  if (err && !at) return <div className="places"><div className="pane-empty is-bad" role="alert">{err}</div></div>;
   if (!places) return <div className="places"><div className="pane-empty">Asking the server…</div></div>;
 
   if (!at) {
@@ -117,16 +117,16 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
         {places.length === 0 && <div className="pane-empty">{canApprove ? "No folders are approved yet. Approve one below, and it can be browsed here and dragged from onto a grid." : "No folders are approved yet. An admin, signed in as themselves, approves the ones Foundation may read."}</div>}
         {places.map((p) => (
           <div key={p.id} className="places-item" data-place={p.id}>
-            <button className="search-row is-folder" disabled={!p.reachable} onClick={() => setAt({ place: p, dir: "" })} data-tip={p.path}>
-              <span className="search-row-glyph">▱</span>
+            <button type="button" className="search-row is-folder" disabled={!p.reachable} onClick={() => setAt({ place: p, dir: "" })} data-tip={p.path}>
+              <span className="search-row-glyph" aria-hidden>▱</span>
               <span className="search-row-main">
-                <span className="search-row-title">{p.name}</span>
-                <span className="search-row-snip">{p.reachable ? p.path : `Not reachable now · ${p.path}`}</span>
+                <span className="search-row-title" title={p.name}>{p.name}</span>
+                <span className="search-row-snip" title={p.path}>{p.reachable ? p.path : `Not reachable now · ${p.path}`}</span>
               </span>
               <span className="search-row-src">folder</span>
             </button>
             {canApprove && removing !== p.id && (
-              <button className="places-remove" onClick={() => setRemoving(p.id)} aria-label={`Take away the approval for ${p.name}`} data-tip="Take away this approval" data-place-remove>
+              <button type="button" className="places-remove" onClick={() => setRemoving(p.id)} aria-label={`Remove approval for ${p.name}`} data-tip="Take away this approval" data-place-remove>
                 ✕
               </button>
             )}
@@ -187,17 +187,17 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
           </span>
         ))}
       </nav>
-      {err && <div className="pane-empty is-bad">{err}</div>}
+      {err && <div className="pane-empty is-bad" role="alert">{err}</div>}
       {!entries && <div className="pane-empty">Reading the folder…</div>}
       {entries && !err && shown.length === 0 && <div className="pane-empty">{term ? `Nothing named “${filter}” here.` : "This folder is empty."}</div>}
       {shown.map((e) =>
         e.dir ? (
-          <button key={e.path} className="search-row is-folder" onClick={() => setAt({ place: at.place, dir: e.path })}>
-            <span className="search-row-glyph">▱</span>
+          <button key={e.path} type="button" className="search-row is-folder" onClick={() => setAt({ place: at.place, dir: e.path })} data-tip={e.name}>
+            <span className="search-row-glyph" aria-hidden>▱</span>
             <span className="search-row-main">
-              <span className="search-row-title">{e.name}</span>
+              <span className="search-row-title" title={e.name}>{e.name}</span>
             </span>
-            <span className="search-row-src">›</span>
+            <span className="search-row-src" aria-hidden>›</span>
           </button>
         ) : (
           <Draggable
@@ -207,9 +207,9 @@ export function PlacesBrowser({ filter }: { board?: string; filter: string }) {
             hit={{ source: "file", id: placeHitId(at.place.id, e.path), title: e.name, snippet: at.place.name, score: 1 }}
             onPress={() => toast("Drag it onto the grid to bring it in")}
           >
-            <span className="search-row-glyph">▤</span>
+            <span className="search-row-glyph" aria-hidden>▤</span>
             <span className="search-row-main">
-              <span className="search-row-title">{e.name}</span>
+              <span className="search-row-title" title={e.name}>{e.name}</span>
             </span>
             <span className="search-row-src places-size">{sizeWords(e.size)}</span>
           </Draggable>

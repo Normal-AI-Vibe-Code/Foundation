@@ -277,14 +277,31 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
   useEffect(() => setTheme(wears), [wears]);
   useEffect(() => () => setTheme("paper"), []);
 
+  // Today renders its own <main className="today-words"> landmark; avoid nested <main>
+  const MainWrap = place.kind === "today" ? "div" : "main";
+
   return (
     <div className={`app shell is-place-${place.kind}${away ? " is-away" : ""}${isPageKind(space?.kind) ? " is-page-space" : ""}${ui.presenting ? " presenting" : ""}`} onContextMenu={(e) => e.preventDefault()}>
-      <GridViewport boardName={space?.name ?? (systemGrid === "plan" ? "The plan" : systemGrid === "design" ? "Design language" : undefined)} />
-      {onGrid && space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
-      {onGrid && space?.kind === "app" && !ui.presenting && <AppCanvas space={space} />}
-      {place.kind === "today" && !ui.presenting && <Today user={user} />}
-      {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}
-      {place.kind === "chat" && !ui.presenting && <ChatForm place={place} user={user} />}
+      {!ui.presenting && (
+        <a
+          href="#main-content"
+          className="f-skip-link"
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById("main-content")?.focus();
+          }}
+        >
+          Skip to content
+        </a>
+      )}
+      <MainWrap id="main-content" className="shell-main" tabIndex={-1}>
+        <GridViewport boardName={space?.name ?? (systemGrid === "plan" ? "The plan" : systemGrid === "design" ? "Design language" : undefined)} />
+        {onGrid && space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
+        {onGrid && space?.kind === "app" && !ui.presenting && <AppCanvas space={space} />}
+        {place.kind === "today" && !ui.presenting && <Today user={user} />}
+        {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}
+        {place.kind === "chat" && !ui.presenting && <ChatForm place={place} user={user} />}
+      </MainWrap>
       {!ui.presenting && <TopBar boards={boards} current={onGrid ? current : ""} place={place} onSwitch={switchBoard} onNew={newSpace} onClose={closeSpace} onRename={(id, name) => void updateSpace(id, { name })} />}
       {!ui.presenting && (ui.paneView === "spaces" || !onGrid) && <SidePane user={user} boards={boards} current={current} place={place} onSwitch={switchBoard} onNew={newSpace} />}
       {!ui.presenting && ui.paneView === "info" && onGrid && <SpaceInfo user={user} space={space} boards={boards} onUpdate={updateSpace} />}
@@ -322,20 +339,30 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
 
 function Toast() {
   const ui = useUi();
+  const isError = ui.toast?.tone === "bad";
   return (
-    <AnimatePresence>
-      {ui.toast && (
-        <motion.div
-          key={ui.toast.at}
-          className={`toast f-glass tone-${ui.toast.tone ?? "plain"}`}
-          initial={{ opacity: 0, y: 16, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8 }}
-          transition={{ type: "spring", stiffness: 300, damping: 24 }}
-        >
-          {ui.toast.text}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {ui.toast && !isError ? ui.toast.text : ""}
+      </div>
+      <div className="sr-only" role="alert" aria-live="assertive" aria-atomic="true">
+        {ui.toast && isError ? ui.toast.text : ""}
+      </div>
+      <AnimatePresence>
+        {ui.toast && (
+          <motion.div
+            key={ui.toast.at}
+            className={`toast f-glass tone-${ui.toast.tone ?? "plain"}`}
+            aria-hidden="true"
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, transition: { duration: 0.14 } }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+          >
+            {ui.toast.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

@@ -79,6 +79,7 @@
   box-shadow:
     var(--shadow-lift),
     0 0 0 1px var(--color-line);
+  transform-origin: top left;
 }
 .tab-new-item {
   display: grid;
@@ -184,6 +185,7 @@
   opacity: 0;
 }
 .space-row:hover .space-move,
+.space-row:focus-within .space-move,
 .space-move:focus-visible,
 .space-move.is-on {
   opacity: 1;
@@ -242,6 +244,17 @@
   outline: 0;
   border-color: var(--color-pulse);
   background: var(--color-raise);
+}
+.info-name:not([readonly]):focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+  border-color: var(--color-pulse);
+  background: var(--color-raise);
+}
+.space-info .pane-group + .pane-group {
+  margin-top: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
 }
 .info-facts {
   display: grid;
@@ -343,6 +356,8 @@
   right: var(--space-4);
   max-height: 60%;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -352,6 +367,7 @@
   box-shadow:
     var(--shadow-lift),
     0 0 0 1px var(--color-line);
+  transform-origin: top right;
 }
 
 /* ---------- scroll bars: a 2 px light line by the pane's edge, there only while the pane is in use ----------
@@ -581,6 +597,7 @@
   margin: 0;
   padding: var(--space-4);
   overflow: auto;
+  overscroll-behavior: contain;
   border-radius: var(--radius-card);
   background: var(--color-panel);
   box-shadow: inset 0 0 0 1px var(--color-line);
@@ -616,7 +633,8 @@
 }
 .detail-goal {
   margin: 0 0 var(--space-4);
-  font: 600 var(--text-14) / 1.4 var(--font-sans);
+  font: 600 var(--text-14) / 1.45 var(--font-sans);
+  text-wrap: balance;
 }
 .detail-plan li {
   display: flex;
@@ -729,9 +747,11 @@
   color: var(--color-mist);
   cursor: pointer;
 }
-.pane-new:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
+@media (hover: hover) {
+  .pane-new:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
 }
 .side-pane .pane-scroll {
   padding: 0 0 var(--space-4);
@@ -770,9 +790,11 @@
   display: none;
 }
 /* hover: a quiet ink wash, the full row */
-.side-pane .pane-row:hover,
-.side-pane .space-row:hover .space-open {
-  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+@media (hover: hover) {
+  .side-pane .pane-row:hover,
+  .side-pane .space-row:hover .space-open {
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
 }
 /* selected: the accent's tint and a 2 px bar at the pane's edge. Never the same as hover */
 .side-pane .space-row.is-current .space-open,
@@ -781,9 +803,11 @@
   box-shadow: inset 2px 0 0 var(--color-pulse);
   color: var(--color-frost);
 }
-.side-pane .space-row.is-current .space-open:hover,
-.side-pane .pane-place.is-current:hover {
-  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+@media (hover: hover) {
+  .side-pane .space-row.is-current .space-open:hover,
+  .side-pane .pane-place.is-current:hover {
+    background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+  }
 }
 .side-pane .space-row .space-move {
   position: absolute;
@@ -872,9 +896,11 @@
   font: 500 var(--text-13) / 1 var(--font-sans);
   cursor: pointer;
 }
-.top-today:hover {
-  color: var(--color-frost);
-  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+@media (hover: hover) {
+  .top-today:hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
 }
 .top-today.is-on {
   color: var(--color-frost);
@@ -962,8 +988,10 @@
   height: 2px;
   background: var(--color-void);
 }
-.top-bar .tab.is-space:not(.is-current):hover {
-  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+@media (hover: hover) {
+  .top-bar .tab.is-space:not(.is-current):hover {
+    background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+  }
 }
 .top-bar .tab-new-wrap {
   margin-left: var(--space-2);
@@ -983,9 +1011,14 @@
   box-shadow: none;
   border-bottom: 1px solid var(--color-line);
 }
-/* the line under the search line is the grid's own hairline, focused or not (2026-11-17, Josh) */
+/* the line under the search line is the grid's own hairline on pointer click; keyboard focus shows a clear pulse ring */
 .search-pane .search-head:focus-within {
   box-shadow: none;
+}
+.search-pane .search-field:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 .search-pane .search-glyph {
   display: inline-grid;

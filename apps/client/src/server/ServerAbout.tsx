@@ -239,7 +239,7 @@ export function NetworkSectionView(p: NetworkSectionProps) {
               )}
             </div>
           )}
-          {p.error && <p className="server-switch-error">{p.error}</p>}
+          {p.error && <p className="server-switch-error" role="alert">{p.error}</p>}
 
           <ul className="server-net-notes">
             <li>Plain http: anyone on this network who can watch traffic could read it. Fine for trying it in the office; the rack server should have HTTPS.</li>

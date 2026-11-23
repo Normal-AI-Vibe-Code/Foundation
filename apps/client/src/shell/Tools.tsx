@@ -73,7 +73,16 @@ export function ToolButtons() {
   return (
     <div className="tool-buttons" role="group" aria-label="Tools">
       {TOOLS.map((t) => (
-        <button key={t.id} className={`top-btn${ui.tool === t.id ? " is-on" : ""}`} onClick={() => toggleTool(t.id)} aria-pressed={ui.tool === t.id} aria-label={t.name} data-tip={t.tip} data-tool-open={t.id}>
+        <button
+          key={t.id}
+          type="button"
+          className={`top-btn${ui.tool === t.id ? " is-on" : ""}`}
+          onClick={() => toggleTool(t.id)}
+          aria-pressed={ui.tool === t.id}
+          aria-label={ui.tool === t.id ? `Close ${t.name}` : `Open ${t.name}`}
+          data-tip={t.tip}
+          data-tool-open={t.id}
+        >
           {t.glyph}
           {t.id === "t3" && t3 !== "off" && <i className={`tool-btn-dot is-${t3}`} aria-hidden />}
         </button>
@@ -102,7 +111,7 @@ export function ToolPane() {
             <span>{t.name}</span>
           </button>
         ))}
-        <button className="top-btn tool-close" onClick={() => setUi({ tool: null })} aria-label="Close the tools" data-tip="Close">
+        <button type="button" className="top-btn tool-close" onClick={() => setUi({ tool: null })} aria-label="Close tools pane" data-tip="Close">
           ✕
         </button>
       </nav>

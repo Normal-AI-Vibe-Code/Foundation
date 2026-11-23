@@ -112,7 +112,13 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
   const pill = pillState(p.reach, p.local, currentIsLocal);
   const starting = p.local === "starting";
   const panel = (
-    <section className={`server-switch-panel${p.host !== undefined ? " is-inline" : " f-glass"}`} aria-label="Server" id="server-switch-panel">
+    <section
+      className={`server-switch-panel${p.host !== undefined ? " is-inline" : " f-glass"}`}
+      role={p.host === undefined && !p.still ? "dialog" : "region"}
+      aria-modal={p.host === undefined && !p.still ? "true" : undefined}
+      aria-label="Server settings"
+      id="server-switch-panel"
+    >
       <header className="server-switch-head">
         <span className="f-eyebrow">Server</span>
         <span className="server-switch-now">
@@ -183,7 +189,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
             onChange={(e) => p.onFolder?.(e.target.value)}
           />
         )}
-        {p.local === "failed" && p.message && <p className="server-switch-error">{p.message}</p>}
+        {p.local === "failed" && p.message && <p className="server-switch-error" role="alert">{p.message}</p>}
         <div className="server-switch-actions">
           {p.localListening ? (
             <>
@@ -244,7 +250,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
             Connect
           </button>
         </div>
-        {p.remoteError ? <p className="server-switch-error">{p.remoteError}</p> : <p className="server-switch-hint">Foundation reloads and signs in on that server.</p>}
+        {p.remoteError ? <p className="server-switch-error" role="alert">{p.remoteError}</p> : <p className="server-switch-hint">Foundation reloads and signs in on that server.</p>}
       </form>
       </>
       )}
@@ -482,18 +488,24 @@ export function ServerSwitch({ day = false, where = "corner", host }: { day?: bo
     return () => clearInterval(t);
   }, [shown, open, refreshLocal]);
 
-  // Esc and a press outside put it away
+  // Esc and a press outside put it away (Escape restores focus to the pill)
   useEffect(() => {
     if (!open) return;
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      root.current?.querySelector<HTMLButtonElement>(".server-switch-pill")?.focus();
+    };
     const down = (e: PointerEvent) => {
       const t = e.target as Node;
       if (root.current && !root.current.contains(t) && !host?.contains(t)) setOpen(false);
     };
-    window.addEventListener("keydown", key);
+    window.addEventListener("keydown", key, true);
     window.addEventListener("pointerdown", down, true);
     return () => {
-      window.removeEventListener("keydown", key);
+      window.removeEventListener("keydown", key, true);
       window.removeEventListener("pointerdown", down, true);
     };
   }, [open, host]);

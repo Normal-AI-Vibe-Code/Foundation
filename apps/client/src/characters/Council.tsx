@@ -293,7 +293,7 @@ export function SayBox({ label, placeholder, onSay, focus, onClose }: { label: s
             <SendGlyph size={14} />
           </button>
         ) : (
-          <button type="button" className="council-say-btn" aria-label="Close" data-tip="Close" data-council-say-close onClick={onClose}>
+          <button type="button" className="council-say-btn" aria-label="Close input" data-tip="Close" data-council-say-close onClick={onClose}>
             <CloseGlyph size={12} />
           </button>
         )
@@ -321,7 +321,7 @@ export function SeatMarks({ seat, name }: { seat: Pick<CouncilSeat, "provider" |
   return (
     <span className="council-marks">
       {name && (
-        <b className="council-mark-name" data-council-name data-tip={seat.status === "working" && seat.doing ? seat.doing : undefined}>
+        <b className="council-mark-name" title={name} data-council-name data-tip={seat.status === "working" && seat.doing ? `${name} · ${seat.doing}` : name}>
           {name}
         </b>
       )}
@@ -462,12 +462,12 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
             </button>
           )}
           {onPanel && (
-            <button type="button" className={`council-tool${panelOpen ? " is-on" : ""}`} aria-pressed={panelOpen} aria-label="The agents panel: the conversation with all of them" data-tip="Open the agents panel: the conversation with all of them" data-council-panel onClick={onPanel}>
+            <button type="button" className={`council-tool${panelOpen ? " is-on" : ""}`} aria-pressed={panelOpen} aria-label={panelOpen ? "Close agents panel" : "Open agents panel"} data-tip="Open the agents panel: the conversation with all of them" data-council-panel onClick={onPanel}>
               <PanelGlyph />
             </button>
           )}
           {onClose && (
-            <button type="button" className="council-tool" aria-label="Send the council away" data-tip="Close" data-kbd="Esc" data-council-close onClick={onClose}>
+            <button type="button" className="council-tool" aria-label="Close council" data-tip="Close" data-kbd="Esc" data-council-close onClick={onClose}>
               <CloseGlyph />
             </button>
           )}

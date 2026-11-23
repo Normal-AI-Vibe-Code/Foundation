@@ -23,8 +23,8 @@ import { ago } from "./SidePane";
 
 const SUGGESTIONS = [
   "What's going on across the company right now?",
-  "Organize this board into sections by project",
-  "Find the repo behind each app on the board and pin it",
+  "Organize this grid into sections by project",
+  "Find the repo behind each app on this grid and pin it",
   "Start a design pipeline for a quieter rim-drive fan",
 ];
 
@@ -44,26 +44,57 @@ export function SessionView() {
 
 function SessionTools() {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!wrapRef.current?.contains(t) && !triggerRef.current?.contains(t)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("pointerdown", onDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("pointerdown", onDown, true);
+    };
+  }, [open]);
   return (
     <>
       <span className="session-tools">
-        <button className={`top-btn${open ? " is-on" : ""}`} onClick={() => setOpen((o) => !o)} aria-label="Earlier sessions" data-tip="Earlier sessions and Vision Code threads">
+        <button
+          ref={triggerRef}
+          type="button"
+          className={`top-btn${open ? " is-on" : ""}`}
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Show earlier sessions"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          data-tip="Earlier sessions and Vision Code threads"
+        >
           ◷
         </button>
-        <button className="top-btn" onClick={() => newSession()} aria-label="New session" data-tip="New session">
+        <button type="button" className="top-btn" onClick={() => newSession()} aria-label="Start new session" data-tip="New session">
           ＋
         </button>
-        <button className="top-btn" onClick={() => setUi({ session: null })} aria-label="Put the conversation away" data-tip="Put the conversation away" data-kbd={keys("mod+J")}>
+        <button type="button" className="top-btn" onClick={() => setUi({ session: null })} aria-label="Close session" data-tip="Put the conversation away" data-kbd={keys("mod+J")}>
           ✕
         </button>
       </span>
-      {open && <SessionHistory onPick={() => setOpen(false)} />}
+      {open && <SessionHistory boxRef={wrapRef} onPick={() => setOpen(false)} />}
     </>
   );
 }
 
 /** this space's agent sessions and Vision Code's threads; a press shows one in the column */
-function SessionHistory({ onPick }: { onPick(): void }) {
+function SessionHistory({ boxRef, onPick }: { boxRef: React.RefObject<HTMLDivElement | null>; onPick(): void }) {
   const ui = useUi();
   const lists = useLists();
   useEffect(() => {
@@ -74,11 +105,11 @@ function SessionHistory({ onPick }: { onPick(): void }) {
     onPick();
   };
   return (
-    <div className="session-history">
+    <div ref={boxRef} className="session-history" role="dialog" aria-label="Earlier sessions and Vision Code threads">
       <div className="pane-eyebrow is-agent">Sessions on this grid</div>
       {lists.sessions.length === 0 && <div className="pane-empty">None yet. What you ask here is kept, with its goal, its steps and what it changed.</div>}
       {lists.sessions.slice(0, 10).map((s) => (
-        <button key={s.id} className={`pane-row is-session${ui.session === s.id ? " is-current" : ""}`} onClick={() => pick({ id: s.id, kind: "agent", title: s.title })}>
+        <button key={s.id} type="button" className={`pane-row is-session${ui.session === s.id ? " is-current" : ""}`} onClick={() => pick({ id: s.id, kind: "agent", title: s.title })} title={s.title}>
           <span className={`f-dot ${s.status === "running" ? "is-agent is-pulse" : s.status === "error" ? "is-bad" : "is-agent-dim"}`} />
           <span className="pane-label">{s.title}</span>
           <span className="pane-when">{ago(s.updatedAt)}</span>
@@ -87,7 +118,7 @@ function SessionHistory({ onPick }: { onPick(): void }) {
       <div className="pane-eyebrow">Vision Code</div>
       {lists.t3Available === false && <div className="pane-empty is-paths">{lists.t3Missing ?? "Vision Code isn't on this computer (or its store moved). Set T3CODE_HOME on the server to point at it."}</div>}
       {lists.t3.slice(0, 8).map((t) => (
-        <button key={t.id} className={`pane-row is-session${ui.session === `t3:${t.id}` ? " is-current" : ""}`} onClick={() => pick({ id: `t3:${t.id}`, kind: "t3", title: t.title })} title={`${t.project} · ${t.title}`}>
+        <button key={t.id} type="button" className={`pane-row is-session${ui.session === `t3:${t.id}` ? " is-current" : ""}`} onClick={() => pick({ id: `t3:${t.id}`, kind: "t3", title: t.title })} title={`${t.project} · ${t.title}`}>
           <span className={`f-dot ${t.status === "running" ? "is-live is-pulse" : t.status === "waiting" ? "is-warn" : t.status === "error" ? "is-bad" : ""}`} />
           <span className="pane-label">{t.title}</span>
           <span className="pane-when">{t.pending > 0 ? `${t.pending} ask` : ago(t.updatedAt)}</span>
@@ -207,10 +238,11 @@ function AgentSession({ tab }: { tab: SessionTab }) {
   return (
     <>
       <header className="session-head">
-        <span className="session-mark">✦</span>
-        <span className="session-title">{tab.title}</span>
+        <span className="session-mark" aria-hidden>✦</span>
+        <span className="session-title" title={tab.title}>{tab.title}</span>
         <select
           className="session-runtime"
+          aria-label="Agent runtime"
           value={runtime}
           onChange={(e) => {
             localStorage.setItem("foundation-runtime", e.target.value);
@@ -235,11 +267,11 @@ function AgentSession({ tab }: { tab: SessionTab }) {
         {run.turns.length === 0 && (
           <div className="session-empty">
             <div className="pane-eyebrow is-agent">New session</div>
-            <p>Tell it what to do on this board. It lays out a goal and steps, works through them with the board's tools, and everything it changes shows up on the grid beside you.</p>
+            <p>Tell it what to do on this grid. It lays out a goal and steps, works through them with the grid's tools, and everything it changes shows up beside you.</p>
             {avail && !avail.subscription && !avail.api && <p className="session-warn">No runtime yet — install Claude Code (subscription) or set ANTHROPIC_API_KEY on the server (credits).</p>}
             <div className="session-suggest">
               {SUGGESTIONS.map((s) => (
-                <button key={s} className="f-pill" onClick={() => send(s)}>
+                <button key={s} type="button" className="f-pill" onClick={() => send(s)}>
                   {s}
                 </button>
               ))}
@@ -260,6 +292,7 @@ function AgentSession({ tab }: { tab: SessionTab }) {
       >
         <textarea
           ref={field}
+          aria-label="Message for the agent"
           value={draft}
           rows={2}
           placeholder={listening ? "Listening…" : run.busy ? "Working… you can type the next ask" : "Ask, or tell it what to build…"}
@@ -272,9 +305,16 @@ function AgentSession({ tab }: { tab: SessionTab }) {
             if (e.key === "Escape") (e.target as HTMLElement).blur();
           }}
         />
-        {voiceNote && <div className="session-voice-note">{voiceNote}</div>}
+        {voiceNote && <div className="session-voice-note" role="status">{voiceNote}</div>}
         <div className="session-actions">
-          <button type="button" className={`f-pill session-mic${listening ? " is-agent is-listening" : ""}`} onClick={talk} title={listening ? "Stop listening" : "Talk (sends when you stop)"} aria-pressed={listening}>
+          <button
+            type="button"
+            className={`f-pill session-mic${listening ? " is-agent is-listening" : ""}`}
+            onClick={talk}
+            aria-label={listening ? "Stop voice input" : "Start voice input"}
+            title={listening ? "Stop listening" : "Talk (sends when you stop)"}
+            aria-pressed={listening}
+          >
             <MicGlyph />
             {listening ? "Listening" : ""}
           </button>
@@ -425,8 +465,8 @@ function T3Session({ tab }: { tab: SessionTab }) {
   return (
     <>
       <header className="session-head">
-        <span className="session-mark is-t3">⌥</span>
-        <span className="session-title">{tab.title}</span>
+        <span className="session-mark is-t3" aria-hidden>⌥</span>
+        <span className="session-title" title={tab.title}>{tab.title}</span>
         {data?.thread.url && (
           <a className="f-pill" href={data.thread.url} target="_blank" rel="noopener" title="Continue this thread in Vision Code">
             Open in Vision Code ↗
@@ -452,7 +492,7 @@ function T3Session({ tab }: { tab: SessionTab }) {
         </div>
       )}
       <div className="session-list" ref={list}>
-        {err && <div className="s-error">{err}</div>}
+        {err && <div className="s-error" role="alert">{err}</div>}
         {!data && !err && <div className="session-empty">Reading the thread…</div>}
         {data?.items.map((it, i) =>
           it.kind === "user" ? (
