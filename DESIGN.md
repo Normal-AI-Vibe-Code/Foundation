@@ -24,18 +24,19 @@
 | `--color-raise` | `#ffffff` | `#1f1f21` | cards, controls |
 | `--color-frost` | `#201e19` | `#ededed` | ink, primary button fill |
 | `--color-mist` | `#5f5b51` | `#a3a3a3` | secondary text |
-| `--color-dim` | `#8a8577` | `#6f6f6f` | tertiary text, captions |
+| `--color-dim` | `#6f6a5d` | `#868686` | tertiary text, captions (tuned 2026-11-22 for WCAG 2.2 AA ≥ 4.5:1 on all four surfaces) |
 | `--color-pulse` | `#325bb4` | `#f2f2f2` | focus, selection, accent action, wires (white at night) |
 | `--color-moss` | `#2e5d43` | `#8c8c8c` | eyebrows |
-| `--color-ok / warn / bad` | `#2e7d54 / #a16207 / #b3261e` | `#d9d9d9 / #f5c542 / #f27a3a` | state: at night ok is light grey, warn yellow, bad orange |
-| `--color-agent` | `#6b5bd6` | `#8f76ee` | **agents** (Foundation's addition) |
+| `--color-ok / warn / bad` | `#287850 / #995c02 / #b3261e` | `#d9d9d9 / #f5c542 / #f27a3a` | state: at night ok is light grey, warn yellow, bad orange (day ok/warn tuned 2026-11-22 for ≥ 4.5:1 on `--color-panel`) |
+| `--color-agent` | `#6858d3` | `#8f76ee` | **agents** (Foundation's addition; day tuned 2026-11-22 for ≥ 4.5:1 on `--color-panel`) |
 | `--color-crew-0…5` | agent · `#4f5fd0` · `#9a4fc4` · `#a8488f` · `#4a3fa8` · `#6f6aa8` | agent · `#7b8cf4` · `#c084f0` · `#e07ac0` · `#a99bff` · `#b0a8e8` | the crew: six agents told apart, all violets |
 | `--color-on-fill` | `#fff` | `#121212` | text and marks on a solid state, accent or person colour (dark at night, where the accent is white) (danger buttons, avatars, ticks, the accent pill) |
 | `--color-highlight` | white 60 % | white 60 % | the gloss on a raised bead (ports), light in any room like `--shadow-lift`'s inner highlight |
+| `--color-media-outline` | `rgb(0 0 0 / 0.1)` | `rgb(255 255 255 / 0.1)` | pure-neutral 1 px inset outline on content images so light/dark edges never bleed into paper or graphite without adding colour fringe |
 | `--color-over-room` / `--color-room-shade` | `#fff` / `#14110c` | the same | type drawn straight over a picture (Today's panel over the Shiba's room), and the shade laid under it so it reads; white in any room |
 | `--color-line(-strong)` | ink 14 % (26 %) | white 12 % (26 %) | rules, borders |
 
-Never write a hex or `rgba()` in a component; mix tokens (`color-mix(in srgb, var(--color-pulse) 12%, transparent)`). No raw colours in components; `apps/client/test/design.test.ts` holds the ratchet (and fails on any component transition of `background`, `color` or `all`). 12 remain on its allowlist, each with its reason: the photo-thumbnail scrim and its caption, the night orb's sun and moon, the white canvas behind embedded pages, Drive's brand green, three non-CSS consumers (three.js, MapLibre, the dev camera fallback) and the sign-in mask. The list may only shrink.
+Never write a hex or `rgba()` in a component; mix tokens (`color-mix(in srgb, var(--color-pulse) 12%, transparent)`). No raw colours in components; `apps/client/test/design.test.ts` holds the ratchet (and fails on any component transition of `background`, `color` or `all`), and `apps/client/test/usability.test.ts` holds the WCAG 2.2 AA contrast ratchet (≥ 4.5:1 for all ink/state/accent tokens on all four surfaces and `--color-on-fill` on every solid fill in both Day and Night, plus 1:1 parity with `packages/ui/src/index.ts`). 12 remain on `design.test.ts`'s allowlist, each with its reason: the photo-thumbnail scrim and its caption, the night orb's sun and moon, the white canvas behind embedded pages, Drive's brand green, three non-CSS consumers (three.js, MapLibre, the dev camera fallback) and the sign-in mask. The list may only shrink.
 
 ### 2.1 Themes (2026-11-18, Josh: "the today theme is what is applied during the today mode, but the rest of the themes are applied depending on the properties of the Grid or application that is in focus")
 
@@ -45,7 +46,7 @@ The interface wears **the theme of what is in focus**. The shell decides it from
 |---|---|---|
 | `paper` | a grid, Settings, an app's tab, a page | the tokens of §2: paper by day, graphite by night, as the orb says |
 | `day` · `night` | a grid whose **Look** pins it (its ⓘ pane: *Paper (follows day and night)* · *Always day* · *Always night*; kept on the grid, for everyone on it) | paper with night pinned off or on. The orb then says *This grid is always night (its own look)* and still sets what everywhere else wears |
-| `room` | Today | the place is a picture: the floor's panes (top bar, side menu, every right pane) go clear and their ink, lines, accent and agent tone go white (`--color-over-room`; mist 84 %, dim 62 %, wells and hairlines 8–44 %), with `--color-on-fill` the shade |
+| `room` | Today | the place is a picture: the floor's panes (top bar, side menu, every right pane) go clear and their ink, lines, accent and agent tone go white (`--color-over-room`; mist 84 %, dim 74 %, wells and hairlines 8–44 %), with `--color-on-fill` the shade |
 
 - **An app in its own tab is its own look.** Its frame is the app's; the chrome around it is paper. In a pane, a framed app follows the look around it where it can (`color-scheme` on the frame: dark in the room and at night, light by day).
 - **Each theme is also a class** (`.f-paper`, `.f-day`, `.f-night`, `.f-room`) for a surface that must wear one whatever is in focus: the sign-in is `.f-day`; a panel that opens out of a pane in the room and has paper of its own (the server panel) is `.f-paper`.
@@ -221,7 +222,7 @@ Ported from Vision (`apps/vision/src/components/wireGeometry.ts`, `@pacific/ui/d
 | `--ease-spring` | `(.22, 1.4, .36, 1)` | small pops (buttons, ports) |
 | `--ease-settle` | `(.22, 1.3, .36, 1)` | layout settling |
 
-Durations: press 80 · quick 160 · pane 280 · lift 350 · rise 800 (ms). Continuous motion (pan, zoom, drag, fling) runs on the shared spring engine and writes `transform` directly — never React state. `prefers-reduced-motion` collapses transitions to 1 ms and turns the ASCII wind off (paper only).
+Durations: press 80 · quick 160 · pane 280 · lift 350 · rise 800 (ms). Continuous motion (pan, zoom, drag, fling) runs on the shared spring engine and writes `transform` directly — never React state. `prefers-reduced-motion` collapses CSS transitions to 1 ms, settles `physics/spring.ts` springs synchronously to their exact targets, applies `<MotionConfig reducedMotion="user">` across all `motion/react` components, and turns the ASCII wind off (paper only).
 
 **Motion has an owner (the Rune renderer, 2026-11-19, Josh: "it tries to animate things between pane transitions which it doesn't need to do").** Rune springs whatever changed between two boards unless told otherwise, so every board it is handed arrives with one word, *lands* or *eases*, by these rules, the first that applies (`apps/client/src/rune/transitions.ts`): **another board lands** (a different board, a section opened as its own grid); **the floor lands** (a pane opening, closing or resized, the window: the pane has the web's motion and the camera its springs, the grid's cut doesn't chase them); **what a hand just did through Rune settles** (a card or section let go, a tool on its toolbar, a new section: that one board, if it comes straight back); **a change of look eases** (day and night, the selection, a question on a section: nothing changed place); **everything else lands** (places, sizes and words from the store: someone's edit, an agent's card, a track or a corner being dragged, typing). The camera is never a scene.
 
@@ -264,3 +265,6 @@ The board: grid paper (WebGL) → grid chrome → sections (hosted apps) → car
 - [ ] Hover chrome is reachable: no dead gap between what's hovered and its buttons (bridge it), and it lingers a beat on leave
 - [ ] Chrome buttons carry `data-tip` (and `data-kbd`), not `title`
 - [ ] No `backdrop-filter` inside the zoomed world; no transitioned `box-shadow` on a section-sized element
+- [ ] Every foreground/surface pair passes WCAG 2.2 AA (`usability.test.ts`); keyboard focus shows a visible `:focus-visible` ring (with `forced-colors` fallback) and never hides behind sticky chrome (`scroll-padding-block-start`)
+- [ ] Scrollable panes, menus, and dialogs set `overscroll-behavior: contain`; hover-only visuals sit in `@media (hover: hover)` and reveal actions on `:focus-within`; `:active` press scales exclude `:disabled`
+- [ ] Prose and error text remain selectable (`user-select: none` belongs only on `.grid-viewport` and drag handles), headings use `text-wrap: balance`, body copy uses `text-wrap: pretty` with unitless line-height, and content images take `--color-media-outline`

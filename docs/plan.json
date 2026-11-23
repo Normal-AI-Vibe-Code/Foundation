@@ -93,6 +93,15 @@
   ],
   "cards": [
     {
+      "id": "usability-pass-2026-11-22",
+      "title": "Whole-app usability, legibility, spacing, accessibility & motion pass (jakubkrehel/skills)",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-22 (SPEC §0.15): comprehensive whole-app pass using jakubkrehel/skills (better-interface across accessibility, layout, writing, typography, colors, UI polish, motion) preserving Foundation's warm-paper / graphite / federal-blue / violet-agent look and features. Built: OKLCH lightness-tuned WCAG 2.2 AA (>= 4.5:1) tokens in packages/ui/src/tokens.css + packages/ui/src/index.ts; global :focus-visible + forced-colors ring, .f-skip-link + <main> landmark, <MotionConfig reducedMotion=\"user\"> + synchronous prefers-reduced-motion settlement in physics/spring.ts; body user-select restored (scoped to .grid-viewport and drag handles); overscroll-behavior: contain (11 -> 92), scroll-padding-block (0 -> 61), text-wrap (2 -> 136), @media (hover: hover) (0 -> 63), :focus-visible (31 -> 217), :not(:disabled):active, aria-modal dialogs, pure-neutral --color-media-outline, and #/design -> Usability & contrast live specimen. Verified: test/usability.test.ts (11/11), test/design.test.ts (4/4), e2e/usability.spec.ts (5/5, Day/Night/Room/CommandBar/ChatForm/Settings/reduced-motion), typecheck, build, check:security. Evidence: docs/evidence/2026-11-22_usability-pass/. Still unverified on physical touch hardware, OS forced-colors, screen readers, and packaged desktop app."
+    },
+    {
       "id": "hosted-signin-decision",
       "title": "Decide how Google sign-in reaches a hosted address: Flowform widened, or Foundation's own Google client",
       "kind": "hookup",

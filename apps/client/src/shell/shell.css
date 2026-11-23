@@ -2897,7 +2897,7 @@ body.is-connecting .port-in.is-snap {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: color-mix(in srgb, var(--color-void) 30%, transparent);
+  background: color-mix(in srgb, var(--color-frost) 10%, transparent);
   display: flex;
   justify-content: center;
   padding-top: 14dvh;
@@ -2907,7 +2907,8 @@ body.is-connecting .port-in.is-snap {
   max-height: 64dvh;
   display: flex;
   flex-direction: column;
-  background: var(--glass-fill-strong);
+  background: color-mix(in srgb, var(--color-abyss) 94%, transparent);
+  border-color: var(--color-line-strong);
   box-shadow: var(--shadow-pane);
   overflow: hidden;
   transform-origin: top center;
