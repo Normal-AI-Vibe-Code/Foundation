@@ -31,13 +31,16 @@ import {
   pillState,
   serverOrigin,
   shortAddress,
+  startHelp,
   startsAtLaunch,
   type LocalKind,
   type LocalPhase,
   type Reach,
 } from "./model";
+import { ErrorCard } from "../components/ErrorCard";
 import "./server.css";
 
+const WINDOWS = typeof navigator !== "undefined" && /Windows/i.test(navigator.userAgent);
 const FOLDER_KEY = "foundation-server-folder";
 const REMOTE_KEY = "foundation-server-remote";
 /** which kind "This computer" offers (the person's last pick) */
@@ -69,6 +72,9 @@ export interface ServerSwitchViewProps {
   folder: string;
   /** why starting failed, in the server's or the app's own words */
   message?: string | null;
+  /** this computer runs Windows (the way out of a reserved port is Windows's); #/design pins it */
+  windows?: boolean;
+  onDismissError?: () => void;
   remote: string;
   remoteError?: string | null;
   /** a still for #/design: no glass motion */
@@ -157,7 +163,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
             onChange={(e) => p.onFolder?.(e.target.value)}
           />
         )}
-        {p.local === "failed" && p.message && <p className="server-switch-error">{p.message}</p>}
+        {p.local === "failed" && p.message && <ErrorCard message={p.message} {...(startHelp(p.message, p.windows ?? WINDOWS) ?? {})} onDismiss={p.onDismissError} />}
         <div className="server-switch-actions">
           {p.localListening ? (
             <>
@@ -332,6 +338,8 @@ export function ServerSwitch({ day = false, where = "corner", host }: { day?: bo
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const startingRef = useRef(false);
+  /** the failure a person put away: the app still reports that exit, and it isn't shown again */
+  const dismissedRef = useRef<string | null>(null);
 
   // the corner is shared: the call chip and the upload tray move up while the switch is there (server.css)
   useEffect(() => {
@@ -364,7 +372,7 @@ export function ServerSwitch({ day = false, where = "corner", host }: { day?: bo
       setBuiltIn(s.builtIn);
       setRunning({ kind: s.kind, folder: s.folder });
       if (startingRef.current) return s;
-      if (s.exited) {
+      if (s.exited && s.exited !== dismissedRef.current) {
         setLocal("failed");
         setMessage(s.exited);
       } else setLocal(s.listening ? "running" : "stopped");
@@ -523,6 +531,11 @@ export function ServerSwitch({ day = false, where = "corner", host }: { day?: bo
         remote={remote}
         remoteError={remoteError}
         onToggle={() => setOpen((o) => !o)}
+        onDismissError={() => {
+          dismissedRef.current = message;
+          setLocal("stopped");
+          setMessage(null);
+        }}
         onStart={() => void start()}
         onStop={() => void stop()}
         onRestart={() => void restart()}

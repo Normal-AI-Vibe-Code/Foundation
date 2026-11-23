@@ -2504,6 +2504,18 @@ const SWITCH_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps
       message: "Foundation's server needs Node 22.16 or newer (its search needs SQLite's FTS5), and this computer has v22.13.1. Install it with winget install OpenJS.NodeJS.LTS, or start the built-in server instead.",
     },
   },
+  {
+    label: "It didn't start: Windows reserved the port (the error as a card: Copy, Details, the cross)",
+    props: {
+      reach: "down",
+      local: "failed",
+      localListening: false,
+      localOurs: false,
+      windows: true,
+      message:
+        "The server stopped (exit code: 1):\n[app 1795394649] Foundation started its server\n(node:51948) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.\n(Use `node --trace-warnings ...` to show where the warning was created)\nFoundation's server can't listen on 127.0.0.1:4410 (EACCES): another program holds that port, or Windows has reserved it.",
+    },
+  },
   { label: "On a remote server; this computer's is running too", props: { current: "https://server.formresearch.ai", localOurs: false } },
   { label: "A remote address that isn't one", props: { current: "https://server.formresearch.ai", reach: "down", local: "stopped", localListening: false, localOurs: false, remote: "ftp://files", remoteError: "A server's address starts with https:// or http://." } },
   { label: "In a browser on another site's server (can't start one)", props: { desktop: false, builtIn: false, current: "https://server.formresearch.ai", local: "stopped", localListening: false, localOurs: false } },
@@ -2522,7 +2534,7 @@ function ServerSwitchDemo() {
       {SWITCH_STATES.map((d, i) => (
         <div key={i} style={{ width: 360 }}>
           <div className="f-eyebrow update-demo-label">{d.label}</div>
-          <ServerSwitchView {...SWITCH_BASE} {...d.props} />
+          <ServerSwitchView {...SWITCH_BASE} {...d.props} onDismissError={() => {}} />
         </div>
       ))}
     </div>

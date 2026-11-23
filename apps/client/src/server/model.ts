@@ -85,3 +85,18 @@ export function pillState(reach: Reach, local: LocalPhase, currentIsLocal: boole
   if (reach === "up") return { tone: "ok", word: "Connected" };
   return { tone: "bad", word: currentIsLocal ? "Not running" : "Can't reach" };
 }
+
+/**
+ * The way out of a start that failed, when the app knows one. EACCES on Windows is the port inside a
+ * block Windows reserved at boot for Hyper-V and WSL (`netsh int ipv4 show excludedportrange tcp`):
+ * nothing holds it, and nothing may take it until the block moves or the port is set aside for good.
+ */
+export function startHelp(message: string, windows: boolean, port = LOCAL_PORT): { help: string; command: string | null } | null {
+  if (/\b(WSA)?EACCES\b/.test(message) && windows)
+    return {
+      help: `Windows reserved a block of ports that includes ${port} when it started (Hyper-V and WSL do this). Restarting the computer usually moves the block. To keep ${port} free for good, run this once in an administrator terminal:`,
+      command: `net stop winnat; netsh int ipv4 add excludedportrange protocol=tcp startport=${port} numberofports=1 store=persistent; net start winnat`,
+    };
+  if (/\bEADDRINUSE\b/.test(message)) return { help: `Another program is listening on port ${port}. Close it, then try again.`, command: null };
+  return null;
+}

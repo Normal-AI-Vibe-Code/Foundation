@@ -1,0 +1,95 @@
+/* An error as a small card (ErrorCard.tsx). Tokens only. */
+.error-card {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-bad) 38%, var(--color-line));
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-bad) 7%, transparent);
+  color: var(--color-frost);
+  font-size: var(--text-12);
+  text-align: left;
+}
+.error-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 20px;
+}
+.error-card-code {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-paper);
+  background: color-mix(in srgb, var(--color-bad) 16%, transparent);
+  color: var(--color-bad);
+  font: 600 var(--text-11) / 1.2 var(--font-code);
+  letter-spacing: 0.02em;
+  user-select: all;
+}
+.error-card-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+.error-card-btn {
+  height: 20px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.error-card-btn:hover {
+  background: color-mix(in srgb, var(--color-bad) 14%, transparent);
+  color: var(--color-frost);
+}
+.error-card-btn:focus-visible {
+  outline: 1px solid var(--color-bad);
+  outline-offset: 1px;
+}
+.error-card-close {
+  width: 20px;
+  padding: 0;
+  font-size: var(--text-13);
+}
+.error-card-summary,
+.error-card-help {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.error-card-help {
+  color: var(--color-mist);
+}
+.error-card-command {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: var(--text-11) / 1.5 var(--font-code);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.error-card-detail summary {
+  width: fit-content;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  cursor: pointer;
+}
+.error-card-detail summary:hover {
+  color: var(--color-mist);
+}
+.error-card-detail pre {
+  max-height: 120px;
+  margin: var(--space-2) 0 0;
+  overflow: auto;
+  color: var(--color-mist);
+  font: var(--text-11) / 1.5 var(--font-code);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
