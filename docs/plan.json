@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-22T03:23:39.679Z",
+  "syncedAt": "2026-11-23T06:07:39.341Z",
   "columns": [
     {
       "id": "needs-you",
@@ -99,7 +99,8 @@
       "milestone": "polish",
       "area": "design",
       "status": "review",
-      "body": "Josh, 2026-11-22 (SPEC §0.15): comprehensive whole-app pass using jakubkrehel/skills (better-interface across accessibility, layout, writing, typography, colors, UI polish, motion) preserving Foundation's warm-paper / graphite / federal-blue / violet-agent look and features. Built: OKLCH lightness-tuned WCAG 2.2 AA (>= 4.5:1) tokens in packages/ui/src/tokens.css + packages/ui/src/index.ts; global :focus-visible + forced-colors ring, .f-skip-link + <main> landmark, <MotionConfig reducedMotion=\"user\"> + synchronous prefers-reduced-motion settlement in physics/spring.ts; body user-select restored (scoped to .grid-viewport and drag handles); overscroll-behavior: contain (11 -> 92), scroll-padding-block (0 -> 61), text-wrap (2 -> 136), @media (hover: hover) (0 -> 63), :focus-visible (31 -> 217), :not(:disabled):active, aria-modal dialogs, pure-neutral --color-media-outline, and #/design -> Usability & contrast live specimen. Verified: test/usability.test.ts (11/11), test/design.test.ts (4/4), e2e/usability.spec.ts (5/5, Day/Night/Room/CommandBar/ChatForm/Settings/reduced-motion), typecheck, build, check:security. Evidence: docs/evidence/2026-11-22_usability-pass/. Still unverified on physical touch hardware, OS forced-colors, screen readers, and packaged desktop app."
+      "body": "Josh, 2026-11-22 (SPEC §0.15): comprehensive whole-app pass using jakubkrehel/skills (better-interface across accessibility, layout, writing, typography, colors, UI polish, motion) preserving Foundation's warm-paper / graphite / federal-blue / violet-agent look and features. Built: OKLCH lightness-tuned WCAG 2.2 AA (>= 4.5:1) tokens in packages/ui/src/tokens.css + packages/ui/src/index.ts; global :focus-visible + forced-colors ring, .f-skip-link + <main> landmark, <MotionConfig reducedMotion=\"user\"> + synchronous prefers-reduced-motion settlement in physics/spring.ts; body user-select restored (scoped to .grid-viewport and drag handles); overscroll-behavior: contain (11 -> 92), scroll-padding-block (0 -> 61), text-wrap (2 -> 136), @media (hover: hover) (0 -> 63), :focus-visible (31 -> 217), :not(:disabled):active, aria-modal dialogs, pure-neutral --color-media-outline, and #/design -> Usability & contrast live specimen. Verified: test/usability.test.ts (11/11), test/design.test.ts (4/4), e2e/usability.spec.ts (5/5, Day/Night/Room/CommandBar/ChatForm/Settings/reduced-motion), typecheck, build, check:security. Evidence: docs/evidence/2026-11-22_usability-pass/. Still unverified on physical touch hardware, OS forced-colors, screen readers, and packaged desktop app.",
+      "issue": 241
     },
     {
       "id": "hosted-signin-decision",
