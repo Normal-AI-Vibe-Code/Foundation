@@ -36,6 +36,10 @@
 .f-prog-img.is-visible {
   opacity: 1;
 }
+.f-prog.is-sharp .f-prog-img.is-visible {
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
+}
 
 /* 64px micro-preview: soft blur + tiny overscan so edges stay crisp while target decodes */
 .f-prog-img.is-preview {
@@ -94,8 +98,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  max-width: min(1400px, 90vw);
-  max-height: calc(100vh - 140px);
+  max-width: min(1400px, 90%);
+  max-height: calc(100dvh - 140px);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-lift);
 }
@@ -103,8 +107,8 @@
 .chat-lightbox .f-prog .f-prog-img {
   width: auto;
   height: auto;
-  max-width: min(1400px, 90vw);
-  max-height: calc(100vh - 140px);
+  max-width: min(1400px, 90%);
+  max-height: calc(100dvh - 140px);
   object-fit: contain;
   border-radius: var(--radius-card);
 }

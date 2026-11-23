@@ -70,27 +70,29 @@ export function SectionEmpty({ name, onUpload, onNote, onText, onAsk, onFocus }:
               <small>It works here under its own name, with you</small>
             </span>
           </button>
-          <button className="empty-action" data-tip="Write in a text box: formatted as you type" onClick={onText}>
-            <span className="empty-glyph">¶</span>
+          <div className="empty-action is-split" data-tip="Write in a text box: formatted as you type">
+            <button
+              type="button"
+              className="empty-action-cover"
+              aria-label="Write in a text box"
+              onClick={onText}
+            >
+              <span className="empty-glyph" aria-hidden="true">¶</span>
+            </button>
             <span>
               <b>Write</b>
               <small>
                 A text box, formatted as you type · or a{" "}
-                <span
-                  role="button"
-                  tabIndex={0}
+                <button
+                  type="button"
                   className="empty-inline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onNote();
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), onNote())}
+                  onClick={onNote}
                 >
                   markdown note
-                </span>
+                </button>
               </small>
             </span>
-          </button>
+          </div>
         </div>
         {apps.length > 0 && (
           <>

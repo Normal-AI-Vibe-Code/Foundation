@@ -481,10 +481,12 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
       )}
       {!engaged && mount && (
         // a plain click selects the card (the wheel and the pointer stay the grid's); ⌘/Ctrl-click uses the app (lib/cardUse.ts)
-        <div
+        <button
+          type="button"
           className="frame-engage"
+          aria-label={`Use ${panel.name}`}
           onClick={(e) => {
-            if (!modHeld(e)) return;
+            if (e.detail !== 0 && !modHeld(e)) return;
             e.preventDefault();
             e.stopPropagation();
             putInUse(panel.id);
@@ -493,7 +495,7 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
           <span className="f-pill frame-engage-pill">
             {keys("mod+click")} to use · {keys("mod+enter")} full screen
           </span>
-        </div>
+        </button>
       )}
       {panel.mcp && <AppToolAsks panelId={panel.id} viewer={viewer} />}
     </div>

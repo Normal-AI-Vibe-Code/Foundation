@@ -297,10 +297,12 @@ export function HostPage({ panel, near }: { panel: PanelMeta; near: boolean }) {
 
         {/* a plain click selects the card; ⌘/Ctrl-click uses the page (lib/cardUse.ts) */}
         {showPage && !engaged && (
-          <div
+          <button
+            type="button"
             className="frame-engage"
+            aria-label={`Use ${panel.name}`}
             onClick={(e) => {
-              if (!modHeld(e)) return;
+              if (e.detail !== 0 && !modHeld(e)) return;
               e.preventDefault();
               e.stopPropagation();
               putInUse(panel.id);
@@ -309,7 +311,7 @@ export function HostPage({ panel, near }: { panel: PanelMeta; near: boolean }) {
             <span className="f-pill frame-engage-pill">
               {keys("mod+click")} to use · {keys("mod+enter")} full screen
             </span>
-          </div>
+          </button>
         )}
       </div>
     </div>

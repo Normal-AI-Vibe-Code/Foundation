@@ -138,7 +138,15 @@ export function StageBody({ panel }: { panel: PanelMeta }) {
         <p
           className={`stage-text${panel.stage === "brief" ? " is-brief is-editable" : ""}`}
           title={panel.stage === "brief" ? "Click to edit the brief" : undefined}
+          role={panel.stage === "brief" && panel.status !== "done" ? "button" : undefined}
+          tabIndex={panel.stage === "brief" && panel.status !== "done" ? 0 : undefined}
           onClick={() => panel.stage === "brief" && panel.status !== "done" && setEditing(true)}
+          onKeyDown={(e) => {
+            if (panel.stage === "brief" && panel.status !== "done" && (e.key === "Enter" || e.key === " ")) {
+              e.preventDefault();
+              setEditing(true);
+            }
+          }}
         >
           {panel.text}
         </p>
