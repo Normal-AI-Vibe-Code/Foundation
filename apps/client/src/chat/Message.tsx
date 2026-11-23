@@ -36,7 +36,8 @@ export interface MessageMe {
 export interface MessageActions {
   react(m: ChatMessage, emoji: string, on: boolean): void;
   reply(m: ChatMessage): void;
-  pin(m: ChatMessage, on: boolean): void;
+  /** absent where the server has no pins (a chat server of its own) */
+  pin?(m: ChatMessage, on: boolean): void;
   copyLink(m: ChatMessage): void;
   markUnread(m: ChatMessage): void;
   edit(m: ChatMessage): void;
@@ -195,9 +196,11 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
               <IconThread />
             </button>
           )}
-          <button className={m.pinned ? "is-on" : ""} onClick={() => actions.pin(m, !m.pinned)} data-tip={m.pinned ? "Unpin" : "Pin to the channel"} aria-label={m.pinned ? "Unpin" : "Pin"}>
-            <IconPin />
-          </button>
+          {actions.pin && (
+            <button className={m.pinned ? "is-on" : ""} onClick={() => actions.pin!(m, !m.pinned)} data-tip={m.pinned ? "Unpin" : "Pin to the channel"} aria-label={m.pinned ? "Unpin" : "Pin"}>
+              <IconPin />
+            </button>
+          )}
           <button onClick={() => actions.copyLink(m)} data-tip="Copy a link to this message" aria-label="Copy link">
             <IconLink />
           </button>

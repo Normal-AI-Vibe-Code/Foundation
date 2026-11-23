@@ -34,6 +34,9 @@ export interface ChannelHeadProps {
   onLeave?(): void;
   onArchive?(): void;
   onJoin?(): void;
+  /** the server has no huddles or no pins (a chat server of its own): their buttons are left out */
+  noHuddle?: boolean;
+  noPins?: boolean;
   /** the channel list is folded away (opened from the side menu): a small control at the far left brings it back */
   onUnfold?(): void;
 }
@@ -88,7 +91,7 @@ export function ChannelHead(p: ChannelHeadProps) {
           Join
         </button>
       )}
-      <ChannelHuddleButton channel={c} />
+      {!p.noHuddle && <ChannelHuddleButton channel={c} />}
       <div className="chat-head-anchor">
         <button className={`chat-head-btn is-count${pop === "members" ? " is-on" : ""}`} data-pop-anchor onClick={() => (toggle("members"), p.onWantMembers?.())} data-tip="Who's in it" data-members-count={c.memberCount}>
           <IconPeople />
@@ -137,38 +140,39 @@ export function ChannelHead(p: ChannelHeadProps) {
           )}
         </AnimatePresence>
       </div>
-      <div className="chat-head-anchor">
-        <button className={`chat-head-btn${pop === "pins" ? " is-on" : ""}`} data-pop-anchor onClick={() => toggle("pins")} data-tip="Pinned" aria-label="Pinned messages">
-          <IconPin />
-          {(c.pinned?.length ?? 0) > 0 && <span>{c.pinned!.length}</span>}
-        </button>
-        <AnimatePresence>
-          {pop === "pins" && (
-            <Pop className="chat-pins-pop" onClose={() => setPop(null)} label="Pinned messages">
-              <div className="chat-pop-head">Pinned</div>
-              <div className="chat-pop-list">
-                {(p.pinned ?? []).map((m) => (
-                  <button
-                    key={m.id}
-                    className="chat-pin-row"
-                    onClick={() => {
-                      setPop(null);
-                      p.onJump?.(m);
-                    }}
-                  >
-                    <span className="chat-pin-who">
-                      {m.author.name} · {timeOf(m.createdAt)}
-                    </span>
-                    <span className="chat-pin-text">{m.text || m.files.map((f) => f.name).join(", ") || "A message"}</span>
-                  </button>
-                ))}
-                {!(p.pinned ?? []).length && <p className="chat-pop-note">Nothing's pinned. A message's pin keeps it here for everyone.</p>}
-              </div>
-            </Pop>
-          )}
-        </AnimatePresence>
-      </div>
-      {c.me && (
+      {!p.noPins && (
+        <div className="chat-head-anchor">
+          <button className={`chat-head-btn${pop === "pins" ? " is-on" : ""}`} data-pop-anchor onClick={() => toggle("pins")} data-tip="Pinned" aria-label="Pinned messages">
+            <IconPin />
+            {(c.pinned?.length ?? 0) > 0 && <span>{c.pinned!.length}</span>}
+          </button>
+          <AnimatePresence>
+            {pop === "pins" && (
+              <Pop className="chat-pins-pop" onClose={() => setPop(null)} label="Pinned messages">
+                <div className="chat-pop-head">Pinned</div>
+                <div className="chat-pop-list">
+                  {(p.pinned ?? []).map((m) => (
+                    <button
+                      key={m.id}
+                      className="chat-pin-row"
+                      onClick={() => {
+                        setPop(null);
+                        p.onJump?.(m);
+                      }}
+                    >
+                      <span className="chat-pin-who">
+                        {m.author.name} · {timeOf(m.createdAt)}
+                      </span>
+                      <span className="chat-pin-text">{m.text || m.files.map((f) => f.name).join(", ") || "A message"}</span>
+                    </button>
+                  ))}
+                  {!(p.pinned ?? []).length && <p className="chat-pop-note">Nothing's pinned. A message's pin keeps it here for everyone.</p>}
+                </div>
+              </Pop>
+            )}
+          </AnimatePresence>
+        </div>      )}
+      {c.me && p.onStar && (
         <button className={`chat-head-btn${c.me.starred ? " is-star" : ""}`} onClick={() => p.onStar?.(!c.me!.starred)} data-tip={c.me.starred ? "Unstar" : "Star: keep it at the top"} aria-pressed={c.me.starred} aria-label="Star">
           <IconStar on={c.me.starred} />
         </button>
@@ -180,7 +184,7 @@ export function ChannelHead(p: ChannelHeadProps) {
         <AnimatePresence>
           {pop === "more" && (
             <Pop className="chat-more-pop" onClose={() => (setPop(null), setArchiving(false))} label="Channel settings">
-              {c.me && (
+              {c.me && p.onNotify && (
                 <>
                   <div className="chat-pop-head">Tell me about</div>
                   <div className="chat-seg" role="radiogroup" aria-label="Notifications">
@@ -192,16 +196,21 @@ export function ChannelHead(p: ChannelHeadProps) {
                   </div>
                 </>
               )}
-              <div className="chat-pop-head">Take it out</div>
-              <button className="chat-menu-item" onClick={() => p.onExport?.("md")}>
-                <IconDownload />
-                Download as Markdown
-              </button>
-              <button className="chat-menu-item" onClick={() => p.onExport?.("json")}>
-                <IconDownload />
-                Download as JSON (everything)
-              </button>
-              {(c.me && !direct && p.onLeave) || (p.canAdmin && p.onArchive && !c.archivedAt) ? <div className="chat-pop-rule" /> : null}
+              {p.onExport && (
+                <>
+                  <div className="chat-pop-head">Take it out</div>
+                  <button className="chat-menu-item" onClick={() => p.onExport?.("md")}>
+                    <IconDownload />
+                    Download as Markdown
+                  </button>
+                  <button className="chat-menu-item" onClick={() => p.onExport?.("json")}>
+                    <IconDownload />
+                    Download as JSON (everything)
+                  </button>
+                </>
+              )}
+              {p.onExport && ((c.me && !direct && p.onLeave) || (p.canAdmin && p.onArchive && !c.archivedAt)) ? <div className="chat-pop-rule" /> : null}
+              {!p.onExport && !(c.me && p.onNotify) && !(c.me && !direct && p.onLeave) && !(p.canAdmin && p.onArchive && !c.archivedAt && !direct) && <p className="chat-pop-note">Nothing to change here on this chat server.</p>}
               {c.me && !direct && p.onLeave && (
                 <button className="chat-menu-item" onClick={() => (setPop(null), p.onLeave!())}>
                   Leave the channel
@@ -228,7 +237,7 @@ export function ChannelHead(p: ChannelHeadProps) {
         </AnimatePresence>
       </div>
     </header>
-    <ChannelHuddleDock channel={c} />
+    {!p.noHuddle && <ChannelHuddleDock channel={c} />}
     </>
   );
 }
