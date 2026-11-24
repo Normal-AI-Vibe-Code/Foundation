@@ -905,10 +905,59 @@
    height, to its top edge; the open tab is its two sides and no foot, so it opens into the grid below it
    (it covers the bar's own hairline for its width), and its name is bold */
 .top-bar .tabs {
+  /* the tabs' offsets are measured from the strip (TopBar: what's past its edge) */
+  position: relative;
   align-self: stretch;
   align-items: flex-end;
   gap: 0;
-  padding-left: var(--space-3);
+  /* 2026-11-23, Josh: no room before the first tab; it starts on the line that parts the menu from the tabs */
+  padding-left: 0;
+}
+/* the first tab's own edge lands on that line (over the menu, the menu's edge), not a second line beside it */
+.top-bar .tabs > .tab.is-space:first-child {
+  margin-left: -1px;
+}
+/* a full strip fades where it cuts a tab */
+.top-bar .tabs.is-clip-right {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--space-6)), transparent);
+}
+.top-bar .tabs.is-clip-left {
+  mask-image: linear-gradient(to right, transparent, #000 var(--space-6));
+}
+.top-bar .tabs.is-clip-left.is-clip-right {
+  mask-image: linear-gradient(to right, transparent, #000 var(--space-6), #000 calc(100% - var(--space-6)), transparent);
+}
+/* and at its right end, the caret that lists what it cut */
+.tab-more-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.tab-more {
+  width: auto;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
+}
+.tab-more:hover,
+.tab-more.is-on {
+  color: var(--color-frost);
+}
+.tab-more-menu {
+  left: auto;
+  right: 0;
+  max-height: min(420px, calc(100vh - 80px));
+  overflow-y: auto;
+}
+.tab-more-item {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+}
+.tab-more-item .tab-new-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .top-bar .tab.is-space {
   position: relative;

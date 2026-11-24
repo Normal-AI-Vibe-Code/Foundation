@@ -66,6 +66,60 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
     return () => window.removeEventListener("pointerdown", off, true);
   }, [menu]);
 
+  // the tabs past the strip's edge (2026-11-23, Josh): when the strip is full, a caret at its right end lists the
+  // tabs it cuts off, and the strip fades at the side that's cut
+  const navRef = useRef<HTMLElement>(null);
+  const [clip, setClip] = useState({ left: false, right: false });
+  const [clipped, setClipped] = useState<string[]>([]);
+  const [more, setMore] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const tabKey = tabs.map((b) => b.id).join(" ");
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const left = nav.scrollLeft > 1;
+      const right = nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1;
+      setClip((c) => (c.left === left && c.right === right ? c : { left, right }));
+      // by layout offsets, not on-screen boxes: a tab mid-spring (motion's layout moves) still counts where it lands
+      const out = [...nav.querySelectorAll<HTMLElement>("[data-space-drop]")]
+        .filter((el) => el.offsetLeft < nav.scrollLeft - 1 || el.offsetLeft + el.offsetWidth > nav.scrollLeft + nav.clientWidth + 1)
+        .map((el) => el.dataset.spaceDrop!);
+      setClipped((c) => (c.join(" ") === out.join(" ") ? c : out));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(nav);
+    for (const el of nav.children) ro.observe(el);
+    nav.addEventListener("scroll", measure, { passive: true });
+    return () => {
+      ro.disconnect();
+      nav.removeEventListener("scroll", measure);
+    };
+  }, [tabKey, place.kind, current, more]);
+  // the open tab is never left past the edge: switching to one brings it into the strip
+  useEffect(() => {
+    const nav = navRef.current;
+    const el = nav?.querySelector<HTMLElement>(`[data-space-drop="${CSS.escape(current)}"]`);
+    if (!nav || !el) return;
+    const start = el.offsetLeft;
+    const end = start + el.offsetWidth;
+    if (start < nav.scrollLeft) nav.scrollTo({ left: start, behavior: "smooth" });
+    else if (end > nav.scrollLeft + nav.clientWidth) nav.scrollTo({ left: end - nav.clientWidth, behavior: "smooth" });
+  }, [current, tabKey]);
+  useEffect(() => {
+    if (!more) return;
+    const off = (e: PointerEvent) => {
+      if (!moreRef.current?.contains(e.target as Node)) setMore(false);
+    };
+    window.addEventListener("pointerdown", off, true);
+    return () => window.removeEventListener("pointerdown", off, true);
+  }, [more]);
+  const hiddenTabs = tabs.filter((b) => clipped.includes(b.id));
+  useEffect(() => {
+    if (more && !hiddenTabs.length) setMore(false);
+  }, [more, hiddenTabs.length]);
+
   const spacesOpen = ui.pane && ui.paneView === "spaces";
   const infoOpen = ui.pane && ui.paneView === "info";
 
@@ -95,7 +149,7 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
           <PaneGlyph />
         </button>
       </div>
-      <nav className="tabs" aria-label="Open grids">
+      <nav ref={navRef} className={`tabs${clip.left ? " is-clip-left" : ""}${clip.right ? " is-clip-right" : ""}`} aria-label="Open grids">
         {/* a place that isn't a grid has no tab of its own: Settings shows as a pill while you're there (it's passing, not open work) */}
         {place.kind === "settings" && (
           <div className="tab-pill" data-place-tab="settings">
@@ -186,6 +240,49 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
           })}
         </AnimatePresence>
       </nav>
+      {hiddenTabs.length > 0 && (
+        <div className="tab-more-wrap" ref={moreRef}>
+          <button
+            className={`top-btn tab-more${more ? " is-on" : ""}`}
+            onClick={() => setMore((m) => !m)}
+            aria-label={`${hiddenTabs.length} more ${hiddenTabs.length === 1 ? "tab" : "tabs"}`}
+            aria-haspopup="menu"
+            aria-expanded={more}
+            data-tip="The tabs past the edge"
+            data-tabs-more={hiddenTabs.length}
+          >
+            <span className="tab-more-count">{hiddenTabs.length}</span>
+            <svg width="10" height="10" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden>
+              <path d="M1 2.5l3 3 3-3" />
+            </svg>
+          </button>
+          {more && (
+            <div className="tab-new-menu tab-more-menu" role="menu">
+              {hiddenTabs.map((b) => {
+                const kind = b.kind ?? "grid";
+                return (
+                  <button
+                    key={b.id}
+                    className={`tab-new-item tab-more-item${b.id === current ? " is-current" : ""}`}
+                    role="menuitem"
+                    data-tab-more-item={b.id}
+                    onClick={() => {
+                      setMore(false);
+                      onSwitch(b.id);
+                    }}
+                  >
+                    <span className="tab-glyph">
+                      <SpaceGlyph space={b} />
+                    </span>
+                    <span className="tab-new-name">{b.name}</span>
+                    <span className="tab-new-hint">{KIND_NAME[kind]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       {!viewer && (
         <div className="tab-new-wrap" ref={menuRef}>
           <button className="top-btn tab-new" onClick={() => onNew("grid")} data-tip="New grid">
