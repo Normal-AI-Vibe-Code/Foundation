@@ -97,9 +97,9 @@ export function ToolPane() {
       <FloorEdge side="left" value={ui.toolW} {...WIDTHS.tool} onChange={(w) => setUi({ toolW: w })} label={at.name} />
       <nav className="tool-tabs" role="tablist" aria-label="Tools">
         {TOOLS.map((t) => (
-          <button key={t.id} type="button" role="tab" aria-selected={ui.tool === t.id} className={`tool-tab${ui.tool === t.id ? " is-on" : ""}`} onClick={() => setUi({ tool: t.id })} data-tool-tab={t.id}>
+          <button key={t.id} type="button" role="tab" aria-selected={ui.tool === t.id} className={`tool-tab${ui.tool === t.id ? " is-on" : ""}`} onClick={() => setUi({ tool: t.id })} aria-label={t.name} data-tip={ui.tool === t.id ? undefined : t.name} data-tool-tab={t.id}>
             {t.glyph}
-            <span>{t.name}</span>
+            <span className="tool-tab-name">{t.name}</span>
           </button>
         ))}
         <button className="top-btn tool-close" onClick={() => setUi({ tool: null })} aria-label="Close the tools" data-tip="Close">

@@ -17,7 +17,7 @@
  * (shell/WindowControls.tsx), all on the one line.
  */
 
-import { GearGlyph } from "./glyphs";
+import { SunGlyph } from "./glyphs";
 import { ToolButtons } from "./Tools";
 import { goToday } from "../lib/place";
 import { ShibaDot, useNotices } from "../today/notices";
@@ -153,7 +153,7 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
         {/* a place that isn't a grid has no tab of its own: Settings shows as a pill while you're there (it's passing, not open work) */}
         {place.kind === "settings" && (
           <div className="tab-pill" data-place-tab="settings">
-            <GearGlyph size={14} />
+            <SunGlyph size={14} />
             Settings
           </div>
         )}
