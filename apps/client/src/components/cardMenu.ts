@@ -18,7 +18,7 @@ import { isHostable } from "@foundation/protocol";
 import { toggleFullscreen } from "../lib/cardUse";
 import { openDetail } from "../lib/detail";
 import { openAppTab } from "../lib/grids";
-import { keys } from "../lib/keys";
+import { IS_MAC, keys } from "../lib/keys";
 import { canPin, getObject, getState, hostOf, isPanel, objectsInSection, removeObject, requestSnap, setObjectFloat, setObjectFolded, setObjectPinned, setSectionHost, updatePanel, type AnyObject } from "../state/store";
 import { getUi, toast } from "../state/ui";
 import { activeBoard } from "../sync/board";
@@ -44,10 +44,12 @@ export function hasWiring(o: AnyObject): boolean {
 
 /** ask the card's own frame to remove it (it asks first when that would lose something); cards without one go at once */
 export const CARD_REMOVE = "foundation:card-remove";
-function remove(id: string) {
+/** remove a card the way its frame does (the menu's Remove, the Delete key); true when it's gone now, false when it asks first */
+export function removeCard(id: string): boolean {
   const ev = new CustomEvent(CARD_REMOVE, { detail: { id, handled: false } });
   window.dispatchEvent(ev);
   if (!ev.detail.handled) removeObject(id);
+  return !getObject(id);
 }
 
 /** the items for one card; `null` when it's gone */
@@ -108,6 +110,6 @@ export function cardMenuItems(id: string): MenuItem[] | null {
   });
   items.push({ divider: true }, ...more);
 
-  if (!viewer) items.push({ divider: true }, { icon: "🗑", label: `Remove this ${word}`, danger: true, action: () => remove(id) });
+  if (!viewer) items.push({ divider: true }, { icon: "🗑", label: `Remove this ${word}  ${keys(IS_MAC ? "⌫" : "Del")}`, danger: true, action: () => void removeCard(id) });
   return items;
 }

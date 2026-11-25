@@ -42,6 +42,9 @@ import { api, openSocket } from "../lib/api";
 import { toast } from "../state/ui";
 
 const LOCAL = Symbol("local");
+/** this device's own housekeeping (a legacy note given its shared text): local, but not a step anyone can undo */
+const QUIET = Symbol("quiet");
+const mine = (origin: unknown) => origin === LOCAL || origin === QUIET;
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
 
@@ -155,12 +158,12 @@ class BoardSync {
       // and notifying re-rendered every presence and crew view on each move of your own pointer
     });
     const m = boardMaps(this.doc);
-    m.objects.observe((e) => e.transaction.origin !== LOCAL && this.pullObjects([...e.keysChanged]));
-    m.sections.observe((e) => e.transaction.origin !== LOCAL && this.pullSections());
-    m.grid.observe((e) => e.transaction.origin !== LOCAL && this.pullGrid());
-    m.links.observe((e) => e.transaction.origin !== LOCAL && this.pullLinks());
+    m.objects.observe((e) => !mine(e.transaction.origin) && this.pullObjects([...e.keysChanged]));
+    m.sections.observe((e) => !mine(e.transaction.origin) && this.pullSections());
+    m.grid.observe((e) => !mine(e.transaction.origin) && this.pullGrid());
+    m.links.observe((e) => !mine(e.transaction.origin) && this.pullLinks());
     m.cells.observeDeep((events, tx) => {
-      if (tx.origin === LOCAL) return;
+      if (mine(tx.origin)) return;
       const ids = new Set<string>();
       for (const e of events) {
         if (e.target === m.cells) for (const k of (e as Y.YMapEvent<unknown>).keysChanged) ids.add(k);
@@ -169,7 +172,7 @@ class BoardSync {
       this.pullCells([...ids]);
     });
     m.noteText.observeDeep((events, tx) => {
-      if (tx.origin === LOCAL) return;
+      if (mine(tx.origin)) return;
       const ids = new Set<string>();
       for (const e of events) {
         if (e.target === m.noteText) for (const k of (e as Y.YMapEvent<Y.Text>).keysChanged) ids.add(k);
@@ -353,6 +356,13 @@ class BoardSync {
       this.pullCells(null);
     }
     setSyncHook((next, prev) => this.push(next, prev));
+    // from here on, what this device changes on the grid can be taken back (and put again): see undo()
+    this.gridUndo = new Y.UndoManager([m.grid, m.sections, m.objects, m.links, m.cells, m.noteText], {
+      trackedOrigins: new Set([LOCAL]),
+      captureTimeout: 800,
+    });
+    this.gridUndo.on("stack-item-added", () => this.notify());
+    this.gridUndo.on("stack-item-popped", () => this.notify());
     this.unsubWorkbook = workbook.subscribeAll((tableId) => {
       if (!this.applyingCells && tableId) {
         if (this.readOnly) this.revert();
@@ -603,9 +613,47 @@ class BoardSync {
       // a legacy note with no Y.Text yet: give it one, from what the card shows
       const n = getState().notes[id];
       if (!n) return null;
-      this.doc.transact(() => setNoteText(this.doc, id, n.text), LOCAL);
+      this.doc.transact(() => setNoteText(this.doc, id, n.text), QUIET);
     }
     return m.noteText.get(id) ?? null;
+  }
+
+  // ---------- undo and redo on the grid ----------
+
+  /**
+   * The grid's undo stack: everything *you* changed on this board (a card
+   * moved, resized, removed or added, a section split or moved, a wire, a
+   * table's cells, a card's flags), never what someone else or an agent did,
+   * so taking a step back can't undo a teammate's work. It sits on the board's
+   * Y.Doc: an undo is an ordinary change to the shared board (everyone sees the
+   * card come back), and the store follows it the way it follows a remote
+   * edit. Writing in a note keeps its own stack (noteUndoManager), so the
+   * grid's never takes back a keystroke. A new press or key starts a new step
+   * (gridStep); the frames of one drag or resize are one.
+   */
+  private gridUndo: Y.UndoManager | null = null;
+
+  /** close the step in progress: the next change is a step of its own */
+  gridStep() {
+    this.gridUndo?.stopCapturing();
+  }
+  get canUndo() {
+    return !this.readOnly && (this.gridUndo?.canUndo() ?? false);
+  }
+  get canRedo() {
+    return !this.readOnly && (this.gridUndo?.canRedo() ?? false);
+  }
+  /** take back your last change on the grid; false when there was none */
+  undo(): boolean {
+    if (this.readOnly || !this.gridUndo?.canUndo()) return false;
+    this.gridUndo.undo();
+    return true;
+  }
+  /** put back what the last undo took; false when there was none */
+  redo(): boolean {
+    if (this.readOnly || !this.gridUndo?.canRedo()) return false;
+    this.gridUndo.redo();
+    return true;
   }
 
   private undoers = new Map<string, Y.UndoManager>();
@@ -728,6 +776,8 @@ class BoardSync {
     setSyncHook(null);
     for (const u of this.undoers.values()) u.destroy();
     this.undoers.clear();
+    this.gridUndo?.destroy();
+    this.gridUndo = null;
     this.unsubWorkbook?.();
     awarenessProtocol.removeAwarenessStates(this.awareness, [this.doc.clientID], "local");
     this.ws?.close();

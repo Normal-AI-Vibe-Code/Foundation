@@ -691,15 +691,15 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           </div>
           <div className="oncall-cell">
             <div className="frame-anchor chrome-icons oncall-static is-hover" style={{ width: 200 }}>
-              <div className="frame-icons">
-                <span className="frame-icon is-on">♪</span>
-                <span className="frame-icon is-remove">✕</span>
-              </div>
               <div className="frame-card">
                 <div className="frame-body oncall-media" />
+                <div className="frame-corner">
+                  <span className="frame-icon is-on">♪</span>
+                  <span className="frame-icon">⤢</span>
+                </div>
               </div>
             </div>
-            <div className="effect-label">Video, hovered: a ghost rail carries the pointer out to mute and remove</div>
+            <div className="effect-label">Video, hovered: mute and full screen in its top-right corner; the rest of it is the handle</div>
           </div>
           <div className="oncall-cell">
             <div className="section-card oncall-static oncall-section is-hover" style={{ width: 460, height: 120 }}>

@@ -1727,101 +1727,59 @@ body.is-connecting .frame-card,
   gap: 8px;
 }
 
-/* Images and video: no bar. Round icons wait behind the card's right edge
-   and slide out, one after another, while the pointer is on it. */
-/* An image or a video is moved by its grip (2026-11-17: a left press picks a card up by its bar, or by this
-   where it has none, and by nothing else): a round in the top-left corner, of the icons' family, there
-   while the pointer is on the card. */
-.frame-grip {
+/* Images and video: no bar (2026-11-24, Josh: "Image cards and media cards need to be grabbable and movable
+   around the grid … The expansion icon should be in the top right of the card"). The picture is the handle:
+   a press anywhere on it picks it up (a tap on a video still plays it). Its few buttons wait in its top-right
+   corner, 8 px in, full screen last, and come in from the corner while the pointer is on it. No ✕: it goes
+   from its right-click menu or with Delete, and ⌘Z brings it back. */
+.chrome-icons .frame-card {
+  z-index: 1;
+  cursor: grab;
+  touch-action: none;
+}
+.frame-anchor.chrome-icons.dragging .frame-card {
+  cursor: grabbing;
+}
+body.is-viewer .chrome-icons .frame-card {
+  cursor: default;
+}
+.frame-corner {
   position: absolute;
   z-index: 4;
   top: 8px;
-  left: 8px;
-  width: 28px;
-  height: 28px;
+  right: 8px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--glass-edge);
-  background: color-mix(in srgb, var(--color-abyss) 95%, transparent);
-  box-shadow: var(--shadow-glass);
-  cursor: grab;
-  touch-action: none;
+  gap: 6px;
   opacity: 0;
-  margin-left: -6px;
+  margin-right: -6px;
   pointer-events: none;
-  /* it comes in from the corner on a margin (never a transform), and waits a beat on the way out */
+  /* in from the corner on a margin (never a transform), and a beat (150 ms) before it goes */
   transition:
     opacity var(--dur-quick) var(--ease-out-soft) 150ms,
-    margin-left var(--dur-pane) var(--ease-spring) 150ms;
+    margin-right var(--dur-pane) var(--ease-spring) 150ms;
 }
-.frame-grip .grip {
-  cursor: inherit;
-  padding: 0;
-}
-.frame-anchor.chrome-icons:is(:hover, .is-hover, .dragging) .frame-grip {
+.frame-anchor.chrome-icons:is(:hover, .is-hover) .frame-corner {
   opacity: 1;
-  margin-left: 0;
+  margin-right: 0;
   pointer-events: auto;
   transition-delay: 0s;
 }
-.frame-anchor.chrome-icons.dragging .frame-grip {
-  cursor: grabbing;
+/* held, the corner gets out of the way */
+.frame-anchor.chrome-icons.dragging .frame-corner,
+.carry-ghost .frame-corner {
+  opacity: 0;
+  pointer-events: none;
 }
-.carry-ghost .frame-grip {
-  opacity: 1;
-  margin-left: 0;
-}
-body.is-viewer .frame-grip {
-  display: none;
-}
-/* no pointer to hover with: the grip shows */
+/* no pointer to hover with: the corner shows */
 @media (hover: none) {
-  .frame-grip {
+  .frame-corner {
     opacity: 1;
-    margin-left: 0;
+    margin-right: 0;
     pointer-events: auto;
   }
 }
-.frame-icons {
-  position: absolute;
-  z-index: 0;
-  top: 8px;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-}
-/* The ghost rail: a faint track from under the card's edge out past the icons.
-   It belongs to the card, so the pointer keeps the card's hover all the way
-   across to a button (before, an 8 px gap dropped the hover and the icons
-   slid away before they could be clicked). */
-.frame-icons::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  top: -6px;
-  bottom: -6px;
-  left: calc(100% - 12px);
-  width: 54px;
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--color-frost) 7%, transparent);
-  background: color-mix(in srgb, var(--color-frost) 4%, transparent);
-  /* fades in on opacity, never a transitioned background (it would lag the night fade) */
-  opacity: 0;
-  transition: opacity var(--dur-quick) var(--ease-out-soft) 150ms;
-}
-.frame-anchor.chrome-icons:hover .frame-icons::before,
-.frame-anchor.chrome-icons.is-hover .frame-icons::before {
-  opacity: 1;
-  transition-delay: 0s;
-}
-.chrome-icons .frame-card {
-  z-index: 1;
-}
 .frame-icon {
+  position: relative;
   width: 28px;
   height: 28px;
   display: inline-flex;
@@ -1834,31 +1792,6 @@ body.is-viewer .frame-grip {
   color: var(--color-mist);
   font-size: var(--text-12);
   cursor: pointer;
-  translate: -30px 0;
-  opacity: 0;
-  /* going away waits a beat (150 ms), so a pointer that slips off doesn't lose them */
-  transition:
-    translate var(--dur-pane) var(--ease-spring) 150ms,
-    opacity var(--dur-quick) var(--ease-out-soft) 150ms;
-}
-.frame-anchor.chrome-icons:hover .frame-icons {
-  pointer-events: auto;
-}
-.frame-anchor.chrome-icons:hover .frame-icon,
-.frame-anchor.chrome-icons.is-hover .frame-icon {
-  translate: 36px 0;
-  opacity: 1;
-  transition-delay: 0s;
-}
-.frame-anchor.chrome-icons:hover .frame-icon:nth-child(2) {
-  transition-delay: 40ms;
-}
-.frame-anchor.chrome-icons:hover .frame-icon:nth-child(3) {
-  transition-delay: 80ms;
-}
-.frame-anchor.chrome-icons.dragging .frame-icon {
-  translate: -30px 0;
-  opacity: 0;
 }
 .frame-icon:hover {
   color: var(--color-frost);
@@ -1866,8 +1799,11 @@ body.is-viewer .frame-grip {
 .frame-icon.is-on {
   color: var(--color-pulse);
 }
-.frame-icon.is-remove:hover {
-  color: var(--color-bad);
+/* a 26 px press on the screen however small the card is drawn (as the bar's ✕, below) */
+.frame-corner .frame-icon::before {
+  content: "";
+  position: absolute;
+  inset: min(0px, calc((100% - 26px / var(--view-scale, 1)) / 2));
 }
 
 .frame-anchor.dragging .frame-header {
@@ -2966,12 +2902,10 @@ body.is-viewer .frame-grip {
 
 /* 2026-11-17: a card's ✕ keeps a 26 px press on the screen however small the card is drawn (it was 8 px at
    30 %, with the drag handle all round it, so a near miss picked the card up). --view-scale: how small the card is drawn, measured when the pointer comes onto it (ObjectFrame.tsx) */
-.frame-header .icon-btn.is-remove,
-.frame-icons .frame-icon.is-remove {
+.frame-header .icon-btn.is-remove {
   position: relative;
 }
-.frame-header .icon-btn.is-remove::before,
-.frame-icons .frame-icon.is-remove::before {
+.frame-header .icon-btn.is-remove::before {
   content: "";
   position: absolute;
   inset: min(0px, calc((100% - 26px / var(--view-scale, 1)) / 2));

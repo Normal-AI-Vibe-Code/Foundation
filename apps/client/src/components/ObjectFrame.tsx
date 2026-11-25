@@ -1,5 +1,6 @@
 import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { getUi } from "../state/ui";
 import { MINI_HEADER, getObject, liveObjPos, setActiveObject, setObjectFloat, setObjectFolded } from "../state/store";
 import { CARD_REMOVE } from "./cardMenu";
 import { Spring2D, presets } from "../physics/spring";
@@ -16,14 +17,20 @@ import { FullscreenBar, FullscreenButton, useFullscreenCard } from "./Fullscreen
  * `bar` (default) slides a glass bar in at the card's top edge on hover, and
  * the card's content moves down to make room for it (2026-11-16, Josh: "The
  * Cards roll over menu covers up the card contents, it should push it down");
- * `icons` (images, video) slides a few round buttons out from behind the
- * card's right edge, and a round grip shows in its top-left corner.
+ * `icons` (images, video) shows a few round buttons in the card's top-right
+ * corner, full screen last (2026-11-24, Josh: "The expansion icon should be in
+ * the top right of the card"). There's no ✕ on them: an image or a video goes
+ * from its right-click menu, or with Delete while it's selected, and ⌘Z brings
+ * it back (lib/gridUndo.ts).
  *
  * What a left press picks up (2026-11-17, Josh: "left mouse is always grabs,
  * where it really should only grab on the grid, or a top handle of a section
- * or a menu"): a card moves by its bar, or by its grip where it has no bar,
- * and by nothing else. A press on a card's body is the body's own: a button, a
- * link, a caret, a selection. A tap on a video still plays or pauses it.
+ * or a menu"): a card moves by its bar and by nothing else; a press on its
+ * body is the body's own (a button, a link, a caret, a selection). An image or
+ * a video has nothing of its own to press, so it is picked up anywhere on it
+ * (2026-11-24, Josh: "Image cards and media cards need to be grabbable and
+ * movable around the grid"); a tap on a video, without moving, still plays or
+ * pauses it.
  *
  * Making room never changes the card's own box (the section's flow doesn't
  * move): the body clips, and what's inside it either gets shorter from the
@@ -54,7 +61,7 @@ interface Props {
   overlay?: ReactNode;
   /** how the card's chrome appears on hover (see above) */
   chrome?: "bar" | "icons";
-  /** for `icons` chrome: the buttons that slide out (remove is added last) */
+  /** for `icons` chrome: the buttons in its top-right corner (full screen is added last) */
   icons?: ReactNode;
   /** for `icons` chrome: a click on the card's body (a video plays or pauses) */
   onTap?(): void;
@@ -152,7 +159,7 @@ export function ObjectFrame({
     if (!dragRef.current.active) spring.to(pos.x, pos.y);
   }, [pos.x, pos.y, spring]);
 
-  const dragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0, lastX: 0, lastT: 0, lean: 0, carry: null as Carry | null });
+  const dragRef = useRef({ active: false, moved: false, startX: 0, startY: 0, origX: 0, origY: 0, lastX: 0, lastT: 0, lean: 0, carry: null as Carry | null, dragged: false });
 
   /** the held card lifts and leans into its motion: a little physicality, not a ton (DESIGN.md §6: lean ≤ 2.5°) */
   const setLean = (deg: number, lifted: boolean) => {
@@ -165,12 +172,15 @@ export function ObjectFrame({
   const onHeaderDown = useCallback(
     (e: React.PointerEvent) => {
       if (e.button !== 0) return;
+      // full screen, nothing moves; a viewer's card stays where it is
+      if (fullscreen || (chrome === "icons" && getUi().role === "viewer")) return;
       // a button, and the row of them (a near miss between two isn't a grab)
       if ((e.target as HTMLElement).closest("button, input, select, a, .header-actions")) return;
       e.stopPropagation();
       setActiveObject(id);
       const d = dragRef.current;
       d.moved = false;
+      d.dragged = false;
       d.active = true;
       d.startX = e.clientX;
       d.startY = e.clientY;
@@ -185,7 +195,7 @@ export function ObjectFrame({
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       } catch { /* synthetic */ }
     },
-    [spring, id, float],
+    [spring, id, float, fullscreen, chrome],
   );
 
   const onHeaderMove = useCallback(
@@ -230,7 +240,11 @@ export function ObjectFrame({
       spring.set(d.origX, d.origY);
       return;
     }
-    if (d.moved) onMove(spring.x.goal, spring.y.goal);
+    if (d.moved) {
+      // the click that ends a drag isn't a tap on the card (a video doesn't play because it was moved)
+      d.dragged = true;
+      onMove(spring.x.goal, spring.y.goal);
+    }
   }, [spring, onMove]);
 
   // ----- resize -----
@@ -279,21 +293,27 @@ export function ObjectFrame({
       }}
       {...Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]))}
     >
-      {chrome === "icons" && (
-        <div className="frame-icons">
-          {icons}
-          <FullscreenButton id={id} round />
-          <button className="frame-icon is-remove" data-tip="Remove" aria-label="Remove" onClick={askRemove}>
-            ✕
-          </button>
-        </div>
-      )}
       <motion.div
         className={"frame-card fs-able" + (isActive ? " ctx-active" : "") + (cardClass ? ` ${cardClass}` : "")}
         initial={{ scale: 0.94, opacity: 0, y: 8 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 380, damping: 30 }}
-        onPointerDown={() => setActiveObject(id)}
+        onPointerDown={(e) => {
+          setActiveObject(id);
+          // an image or a video is picked up anywhere on it (the corner's buttons and the resize corner excepted)
+          if (chrome === "icons") onHeaderDown(e);
+        }}
+        {...(chrome === "icons" ? { onPointerMove: onHeaderMove, onPointerUp: onHeaderUp, onPointerCancel: onHeaderUp } : {})}
+        // a tap (a press let go where it was) on a video plays or pauses it; a click is on the card, which holds the press
+        onClick={
+          chrome === "icons" && onTap
+            ? (e) => {
+                if ((e.target as Element).closest("button, .map-resize, .fs-bar")) return;
+                if (dragRef.current.dragged) dragRef.current.dragged = false;
+                else onTap();
+              }
+            : undefined
+        }
       >
         {fullscreen && <FullscreenBar id={id} title={title} url={openUrl} />}
         {chrome === "bar" && (
@@ -361,16 +381,14 @@ export function ObjectFrame({
           )}
         </AnimatePresence>
         {/* minimized: the content stays mounted (a page keeps its place, a terminal its shell), just not shown */}
-        <div className={"frame-body " + (bodyClass ?? "")} hidden={folded} onClick={chrome === "icons" && onTap ? () => onTap() : undefined}>
+        <div className={"frame-body " + (bodyClass ?? "")} hidden={folded}>
           {children}
         </div>
-        {chrome === "icons" && (
-          // no bar to hold it by: a grip in the corner, there while the pointer is on the card
-          <div className="frame-grip" role="button" aria-label={`Move ${title}`} data-tip="Drag to move" {...dragHandlers}>
-            <div className="grip mini">
-              <span />
-              <span />
-            </div>
+        {chrome === "icons" && !fullscreen && (
+          // no bar: its few buttons wait in the top-right corner, full screen last, while the pointer is on it
+          <div className="frame-corner">
+            {icons}
+            <FullscreenButton id={id} round />
           </div>
         )}
         {!folded && overlay}

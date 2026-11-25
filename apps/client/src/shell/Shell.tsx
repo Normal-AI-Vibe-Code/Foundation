@@ -10,9 +10,11 @@ import { cardOf, fullscreenCard, installCardUse, modHeld } from "../lib/cardUse"
  *
  * Keys (⌘ is Ctrl off a Mac, and lib/keys.ts labels it so): ⌘K commands · ⌘F search · ⌘\ side menu · ⌘I this grid · ⌘J the agent ·
  * ⌘1…9 the tabs · ⌘W close the tab · P present · ⌘U upload ·
+ * ⌘Z / ⇧⌘Z undo and redo on the grid · Delete removes the selected card (lib/gridUndo.ts) ·
  * Esc releases an engaged app (then steps up the grid's levels).
  */
 
+import { installGridKeys } from "../lib/gridUndo";
 import { DetailPane } from "./DetailPane";
 import { Council, CouncilPreload } from "../characters/Council";
 import { AgentInfoPane } from "../characters/AgentInfo";
@@ -252,6 +254,9 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
+
+  // undo and redo on the grid, and Delete on the selected card (lib/gridUndo.ts)
+  useEffect(() => installGridKeys(() => placeOf(window.location.hash).kind === "grid"), []);
 
   // clicking anywhere else releases the card in use
   useEffect(() => {

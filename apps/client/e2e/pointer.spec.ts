@@ -5,7 +5,7 @@
  *  1. "left mouse is always grabs, where it really should only grab on the
  *     grid, or a top handle of a section or a menu": a plain left drag moves
  *     something only from the paper (pans), a section's header, or a card's
- *     own bar; an image or a video by the grip in its corner. A press on a
+ *     own bar; an image or a video from anywhere on it (2026-11-24). A press on a
  *     card's body is the body's own, at 1.0, 0.6 and 0.3: a character's ✕ and
  *     its Remove / Keep, the buttons in it, a kanban's buttons, a note's
  *     words (they select), a table's cells.
@@ -285,7 +285,7 @@ test("1 · a press on a card's body is the body's own, at 1.0, 0.6 and 0.3: butt
   await expect(ada.locator('[data-character-card="Taro"]'), "Remove, at 0.3, removes it").toHaveCount(0);
 });
 
-test("1b · what a left drag does pick up: the paper pans, a card's bar moves it, an image or a video moves by its grip; a tap on a video plays it", async () => {
+test("1b · what a left drag does pick up: the paper pans, a card's bar moves it, an image or a video moves from anywhere on it; a tap on a video plays it", async () => {
   // a card's bar
   await show(ada, ids.Words, 0.8);
   const c = await mid(card(ada, ids.Words));
@@ -315,34 +315,31 @@ test("1b · what a left drag does pick up: the paper pans, a card's bar moves it
     expect(await obj(ada, ids.Words), "a press in the gap between two of the bar's buttons moves nothing").toEqual(at);
   }
 
-  // an image: its body isn't a handle; its grip is
+  // an image (2026-11-24): the picture itself is the handle; its buttons wait in its top-right corner
   await show(ada, ids.Picture, 0.8);
   const pic = slot(ada, ids.Picture);
   const pm = await mid(pic.locator(".frame-card"));
-  await expect(pic.locator(".frame-grip")).toHaveCSS("opacity", "0"); // nothing at rest
-  const p0 = { o: (await obj(ada, ids.Picture))!, w: await world(ada) };
-  await drag(ada, pm, { x: 90, y: 40 });
-  expect(await obj(ada, ids.Picture), "a drag on the picture itself doesn't move it").toEqual(p0.o);
-  expect(await world(ada), "and doesn't pan the grid").toBe(p0.w);
+  await expect(pic.locator(".frame-corner")).toHaveCSS("opacity", "0"); // nothing at rest
+  await expect(pic.locator(".frame-grip, .frame-icons, .is-remove")).toHaveCount(0); // no grip, no ✕
   await ada.mouse.move(pm.x, pm.y, { steps: 4 });
   await settle(ada, 500);
-  const grip = pic.locator(".frame-grip");
-  await expect(grip).toHaveCSS("opacity", "1");
-  const g = (await grip.boundingBox())!;
+  const corner = pic.locator(".frame-corner");
+  await expect(corner).toHaveCSS("opacity", "1");
+  const fs = (await corner.locator(".fs-open").boundingBox())!;
   const cb = (await pic.locator(".frame-card").boundingBox())!;
-  // top-left, 28 px round like the icons on the right
-  expect(Math.abs(g.x - cb.x - 8 * 0.8)).toBeLessThan(2.5);
-  expect(Math.abs(g.y - cb.y - 8 * 0.8)).toBeLessThan(2.5);
-  expect(Math.abs(g.width - 28 * 0.8)).toBeLessThan(1.5);
-  expect(await grip.getAttribute("data-tip")).toBe("Drag to move");
-  expect(await grip.getAttribute("title")).toBeNull();
-  await ada.screenshot({ path: `${SHOTS}/02_image-grip-night.png`, clip: { x: cb.x - 30, y: cb.y - 30, width: cb.width + 110, height: cb.height + 60 } });
-  await drag(ada, { x: g.x + g.width / 2, y: g.y + g.height / 2 }, { x: 70, y: 44 });
+  // full screen, top right, 8 px in, 28 px round
+  expect(Math.abs(cb.x + cb.width - (fs.x + fs.width) - 8 * 0.8)).toBeLessThan(2.5);
+  expect(Math.abs(fs.y - cb.y - 8 * 0.8)).toBeLessThan(2.5);
+  expect(Math.abs(fs.width - 28 * 0.8)).toBeLessThan(1.5);
+  await ada.screenshot({ path: `${SHOTS}/02_image-corner-night.png`, clip: { x: cb.x - 30, y: cb.y - 30, width: cb.width + 60, height: cb.height + 60 } });
+  const p0 = { o: (await obj(ada, ids.Picture))!, w: await world(ada) };
+  await drag(ada, pm, { x: 70, y: 44 });
   const p1 = (await obj(ada, ids.Picture))!;
   expect(p1.float).toBe(true);
-  expect(Math.hypot(p1.x - p0.o.x, p1.y - p0.o.y), "by its grip it moves").toBeGreaterThan(40);
+  expect(Math.hypot(p1.x - p0.o.x, p1.y - p0.o.y), "picked up anywhere on it, it moves").toBeGreaterThan(40);
+  expect(await world(ada), "and the grid doesn't pan").toBe(p0.w);
 
-  // a video: a tap plays or pauses it, a drag on it does neither and doesn't move it; the grip moves it
+  // a video: a tap plays or pauses it; a drag on it moves it and doesn't play it
   await show(ada, ids.Clip, 0.8);
   const vid = slot(ada, ids.Clip);
   const vm = await mid(vid.locator(".frame-card"));
@@ -352,11 +349,10 @@ test("1b · what a left drag does pick up: the paper pans, a card's bar moves it
   await click(ada, vm.x, vm.y);
   expect((await obj(ada, ids.Clip))!.autoplay, "and pauses it").toBe(false);
   const v0 = (await obj(ada, ids.Clip))!;
-  const vg = await mid(vid.locator(".frame-grip"));
-  await drag(ada, vg, { x: 60, y: 40 });
+  await drag(ada, vm, { x: 60, y: 40 });
   const v1 = (await obj(ada, ids.Clip))!;
-  expect(Math.hypot(v1.x - v0.x, v1.y - v0.y), "the grip moves the video").toBeGreaterThan(30);
-  expect(v1.autoplay, "and moving it by the grip isn't a tap").toBe(false);
+  expect(Math.hypot(v1.x - v0.x, v1.y - v0.y), "a drag on the video moves it").toBeGreaterThan(30);
+  expect(v1.autoplay, "and moving it isn't a tap").toBe(false);
 
   // the paper pans (a press where no section is)
   await ada.keyboard.press("0");
@@ -820,13 +816,13 @@ test("day and night: the board and #/design", async ({ browser }) => {
     await settle(p, 600);
     await p.screenshot({ path: `${SHOTS}/11_scroll-hint-close-${tone}.png`, clip: { x: hm.x - 260, y: hm.y - 70, width: 340, height: 160 } });
 
-    // an image's grip
+    // an image's corner
     await show(p, ids.Picture, 1);
     const pm = await mid(card(p, ids.Picture));
     await p.mouse.move(pm.x, pm.y, { steps: 4 });
     await settle(p, 700);
-    await expect(slot(p, ids.Picture).locator(".frame-grip")).toHaveCSS("opacity", "1");
-    await p.screenshot({ path: `${SHOTS}/12_image-grip-${tone}.png`, clip: { x: pm.left - 40, y: pm.top - 40, width: pm.w + 130, height: pm.h + 80 } });
+    await expect(slot(p, ids.Picture).locator(".frame-corner")).toHaveCSS("opacity", "1");
+    await p.screenshot({ path: `${SHOTS}/12_image-corner-${tone}.png`, clip: { x: pm.left - 40, y: pm.top - 40, width: pm.w + 130, height: pm.h + 80 } });
 
     // a section's menu
     await p.keyboard.press("0");
@@ -848,8 +844,8 @@ test("day and night: the board and #/design", async ({ browser }) => {
     await p.goto("/#/design");
     const demo = p.locator("[data-pointer-demo]");
     await demo.scrollIntoViewIfNeeded();
-    await expect(demo.locator(".frame-grip")).toHaveCount(2);
-    await expect(demo.locator(".frame-anchor.is-hover .frame-grip")).toHaveCSS("opacity", "1");
+    await expect(demo.locator(".frame-corner")).toHaveCount(2);
+    await expect(demo.locator(".frame-anchor.is-hover .frame-corner")).toHaveCSS("opacity", "1");
     await expect(demo.locator(".scroll-hint.is-on")).toHaveCount(2);
     await expect(demo.locator(".scroll-hint.is-shown-x .scroll-hint-x")).toHaveCSS("opacity", "1");
     const spec = demo.locator('[data-menu-specimen="section"]');

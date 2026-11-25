@@ -93,6 +93,16 @@
   ],
   "cards": [
     {
+      "id": "media-grab-undo",
+      "title": "Images and video picked up anywhere; undo and redo on the grid",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "grid",
+      "status": "review",
+      "body": "Josh, 2026-11-24: media cards grabbable and movable, full screen at their top right, remove from the right-click menu or Delete, and all of it undoable, with a real undo/redo sequence on the grid. Built: the picture is the handle, the corner buttons, no ✕, Delete/Backspace on the selected card, and a per-window Y.UndoManager over the board (only your own changes; ⌘Z, ⇧⌘Z, Ctrl+Y). Checked in two browsers (e2e/grid-undo.spec.ts). Waiting for a person to try it in the desktop app.",
+      "issue": null
+    },
+    {
       "id": "hosted-signin-decision",
       "title": "Decide how Google sign-in reaches a hosted address: Flowform widened, or Foundation's own Google client",
       "kind": "hookup",

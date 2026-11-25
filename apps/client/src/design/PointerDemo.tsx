@@ -2,12 +2,14 @@ import type { ReactNode } from "react";
 import { MenuBody } from "../components/ContextMenu";
 import type { MenuGroup, MenuItem } from "../components/menuLayout";
 import { hintLabel, hintMarkup } from "../lib/scrollHint";
+import { FullscreenButton } from "../components/Fullscreen";
+import { keys } from "../lib/keys";
 
 /**
  * What the pointer does, on `#/design` ("Using a card"), 2026-11-17:
  *
- *  - **what a left press picks up**: a card moves by its bar, an image or a
- *    video by the grip in its corner, and by nothing else;
+ *  - **what a left press picks up**: a card moves by its bar; an image or a
+ *    video anywhere on it (2026-11-24), its buttons in its top-right corner;
  *  - **the mark that says a card scrolls**: Alt + scroll, on a card with more
  *    in it than fits, and how it's put away;
  *  - **a section's right-click menu**: the council across the top, Add and
@@ -31,23 +33,15 @@ const LINES = [
 function Picture({ state }: { state?: string }) {
   return (
     <div className={`frame-anchor chrome-icons chrome-demo oncall-static${state ? ` ${state}` : ""}`} style={{ width: 240 }}>
-      <div className="frame-icons">
-        <button className="frame-icon" aria-label="Full screen" data-tip="Full screen">
-          ⤢
-        </button>
-        <button className="frame-icon is-remove" aria-label="Remove" data-tip="Remove">
-          ✕
-        </button>
-      </div>
       <div className="frame-card media-card">
         <div className="frame-body media-body">
           <div className="oncall-media" style={{ width: 240, height: 150 }} />
         </div>
-        <div className="frame-grip" role="button" aria-label="Move the picture" data-tip="Drag to move">
-          <div className="grip mini">
-            <span />
-            <span />
-          </div>
+        <div className="frame-corner">
+          <button className="frame-icon" aria-label="Invert on dark" data-tip="Invert on dark">
+            ◐
+          </button>
+          <FullscreenButton id="design-picture" round />
         </div>
         <div className="map-resize" data-tip="Resize" />
       </div>
@@ -120,11 +114,11 @@ export function PointerDemo() {
       <div className="adapt-row">
         <div className="oncall-cell">
           <Picture state="is-live-demo" />
-          <div className="effect-label">Live: put the pointer on it. A grip comes up in its corner; the picture itself is not a handle</div>
+          <div className="effect-label">Live: put the pointer on it. Its buttons come in at the top right, full screen last; press anywhere else on it to pick it up</div>
         </div>
         <div className="oncall-cell">
           <Picture state="is-hover" />
-          <div className="effect-label">An image or a video has no bar: it moves by the grip, top left, of the same family as its icons</div>
+          <div className="effect-label">An image or a video has no bar and no ✕: the picture is the handle; it goes from its right-click menu or with Delete, and {keys("mod+Z")} brings it back</div>
         </div>
         <div className="oncall-cell">
           <Scrolling />
