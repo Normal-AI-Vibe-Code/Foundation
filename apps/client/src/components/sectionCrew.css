@@ -858,7 +858,7 @@ body.is-connecting .sec-crew,
     0 0 0 1px var(--color-line);
 }
 .agents-tab[data-agents-tab="add"] {
-  color: var(--color-agent);
+  color: var(--color-pulse);
 }
 .agents-pane[data-agents-pane="agents"] .agents-head {
   display: none;
@@ -915,7 +915,7 @@ body.is-connecting .sec-crew,
   box-shadow: 0 0 0 1px var(--color-line);
 }
 .add-step.is-open {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-agent) 45%, var(--color-line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-pulse) 45%, var(--color-line));
 }
 .add-step.is-wait {
   opacity: 0.55;
@@ -939,7 +939,7 @@ body.is-connecting .sec-crew,
   font-variant-numeric: tabular-nums;
 }
 .add-step.is-open .add-step-n {
-  background: var(--color-agent);
+  background: var(--color-pulse);
   color: var(--color-on-fill);
 }
 .add-step.is-done .add-step-n {
@@ -974,17 +974,17 @@ body.is-connecting .sec-crew,
   cursor: pointer;
 }
 .add-kind:hover {
-  background: var(--color-agent-dim);
+  background: var(--color-pulse-dim);
 }
 .add-kind:focus-visible,
 .add-avatar:focus-visible,
 .add-way-head:focus-visible {
-  outline: 2px solid var(--color-agent);
+  outline: 2px solid var(--color-pulse);
   outline-offset: 2px;
 }
 .add-kind.is-on {
   background: var(--color-raise);
-  box-shadow: 0 0 0 1px var(--color-agent);
+  box-shadow: 0 0 0 1px var(--color-pulse);
 }
 .add-kind-text {
   display: flex;
@@ -1046,8 +1046,8 @@ body.is-connecting .sec-crew,
   border-color: var(--color-line-strong);
 }
 .add-avatar.is-on {
-  border-color: var(--color-agent);
-  box-shadow: 0 0 0 2px var(--color-agent);
+  border-color: var(--color-pulse);
+  box-shadow: 0 0 0 2px var(--color-pulse);
 }
 .add-check {
   display: flex;
@@ -1127,8 +1127,8 @@ body.is-connecting .sec-crew,
   box-shadow: inset 0 0 0 1px var(--color-line);
 }
 .add-way.is-on {
-  box-shadow: inset 0 0 0 1px var(--color-agent);
-  background: color-mix(in srgb, var(--color-agent) 4%, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+  background: color-mix(in srgb, var(--color-pulse) 4%, transparent);
 }
 .add-way-head {
   width: 100%;
@@ -1152,9 +1152,9 @@ body.is-connecting .sec-crew,
 }
 .add-way.is-on .add-way-radio {
   box-shadow:
-    inset 0 0 0 1.5px var(--color-agent),
+    inset 0 0 0 1.5px var(--color-pulse),
     inset 0 0 0 4px var(--color-raise),
-    inset 0 0 0 8px var(--color-agent);
+    inset 0 0 0 8px var(--color-pulse);
 }
 .add-way-text {
   display: flex;
@@ -1199,7 +1199,7 @@ body.is-connecting .sec-crew,
   font-variant-numeric: tabular-nums;
 }
 .way-step.is-now .way-step-n {
-  background: var(--color-agent);
+  background: var(--color-pulse);
   box-shadow: none;
   color: var(--color-void);
 }

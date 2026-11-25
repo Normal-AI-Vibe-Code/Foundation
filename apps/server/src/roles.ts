@@ -21,9 +21,10 @@ import { audit } from "./audit.ts";
 
 export type BoardRole = "admin" | "member" | "viewer";
 
-/** tools that only look, which a viewer may use */
+/** tools that only look (or, run_code, only call tools that are checked again), which a viewer may use */
 export const READ_TOOLS = new Set([
   "read_board",
+  "read_card",
   "read_collection",
   "machines",
   "search",
@@ -53,6 +54,10 @@ export const READ_TOOLS = new Set([
   "chat_search",
   "chat_post",
   "chat_react",
+  // code mode (codemode.ts): finding tools reads only; a script's every call goes through runTool again,
+  // so a viewer's script reads and each write inside it is refused here like any other
+  "search_tools",
+  "run_code",
 ]);
 
 function accountRole(userId: string): BoardRole {

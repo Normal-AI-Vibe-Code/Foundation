@@ -91,12 +91,12 @@ async function pinnedNode() {
   return bin;
 }
 
-/** apps/server as two files: the server, and the worker it starts to read documents */
+/** apps/server as three files: the server, the worker it starts to read documents, and the one that runs an agent's script (QuickJS, its WebAssembly inside the file) */
 async function bundle() {
   const { build } = await import("esbuild");
   const r = await build({
     absWorkingDir: root,
-    entryPoints: { index: "apps/server/src/index.ts", "extract-worker": "apps/server/src/extract-worker.ts" },
+    entryPoints: { index: "apps/server/src/index.ts", "extract-worker": "apps/server/src/extract-worker.ts", "codemode-worker": "apps/server/src/codemode-worker.mjs" },
     outdir: OUT,
     outExtension: { ".js": ".mjs" },
     bundle: true,

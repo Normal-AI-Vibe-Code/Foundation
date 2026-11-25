@@ -20,7 +20,7 @@
 
 import * as Y from "yjs";
 import * as awarenessProtocol from "y-protocols/awareness";
-import { boardMaps, findSection } from "@foundation/protocol";
+import { CREW_PLAN_STEPS, CREW_THOUGHT_CHARS, boardMaps, findSection, type CrewPlan } from "@foundation/protocol";
 import { getBoard } from "./boards.ts";
 
 /** short, unlike anyone's real name: winds, birds, stones, stars */
@@ -80,6 +80,12 @@ export interface CrewState {
     guide: CrewGuide | null;
     status: "working" | "done" | "stopped" | "error";
     at: number;
+    /** its plan (set_plan): the goal and at most 8 steps, the card over its head (docs/agent-harness.md §2) */
+    plan: CrewPlan | null;
+    /** the latest of its reasoning, at most 200 characters; null between thoughts and once it has finished */
+    thought: string | null;
+    /** when the run began */
+    started: number;
   };
   /** the ring the agent layer draws (as before) */
   focus: string | null;
@@ -103,6 +109,11 @@ export interface CrewMember {
   joinedAt: number;
   /** the plan this agent showed (set_plan): a lead's goes to its helpers */
   plan?: { goal: string; steps: Array<{ text: string; status: string }> };
+  /** when its thought last reached the board, and the write waiting to (thoughts are written ≥ 250 ms apart) */
+  thoughtAt?: number;
+  thoughtTimer?: ReturnType<typeof setTimeout> | null;
+  /** it has read beyond the board (PRIVATE_READS): no thought, and no free text of its own, on its presence */
+  private?: boolean;
   /** sections this agent made, and cards it wrote (with createdBy, the board's word for it) */
   sections: string[];
   made: Set<string>;
@@ -202,6 +213,9 @@ export function joinCrew(opts: { boardId: string; userId: string; userName: stri
         guide: null,
         status: "working",
         at: Date.now(),
+        plan: null,
+        thought: null,
+        started: Date.now(),
       },
       focus: null,
     },
@@ -266,14 +280,113 @@ export function describeCrewWork(m: CrewMember): string {
 
 function publish(m: CrewMember) {
   if (m.left) return;
+  // any write carries the latest thought, so one waiting to go has gone
+  if (m.thoughtTimer) {
+    clearTimeout(m.thoughtTimer);
+    m.thoughtTimer = null;
+    m.thoughtAt = Date.now();
+  }
   m.state.crew.at = Date.now();
   m.awareness.setLocalState({ ...m.state, crew: { ...m.state.crew } });
 }
 
+/**
+ * Tools that read beyond the board: the asker's chats, DMs and channels, Slack, search across everything, Flowform,
+ * huddle transcripts, replays, their Today, files and places, a browser's or a machine's screen, repos. What they
+ * return is the asker's, not the grid's: once a run has read any of them (directly, or inside run_code: each inner
+ * call goes through runTool, which names its step here), its reasoning may be about that, so its presence carries no
+ * `thought` for the rest of the run and no free text of the model's own on its `doing` (docs/agent-harness.md §2).
+ * The full reasoning still goes to the asker's own stream and transcript.
+ */
+export const PRIVATE_READS = new Set([
+  "chat_read", "chat_search", "chat_channels", "slack_read", "search", "flowform", "huddle_transcript", "replay_timeline",
+  "today", "read_file", "places", "bring_file", "browser_read", "browser_tabs", "desktop_screenshot", "find_images",
+  "read_repo", "find_repo", "company", "read_collection", "call_app_tool", "app_tools",
+]);
+
+/** steps whose `doing` is the model's own free text (a pointing note), shown as plain words once a run is private */
+const FREE_TEXT_STEPS: Record<string, string> = { focus: "pointing it out" };
+
+/**
+ * describeStep names the step it described, and the write that follows it at once (runTool: describeStep, then
+ * setDoing or travel, with nothing between) takes it: so the crew learns which tool a run is calling, inner calls of
+ * run_code included, without being told by every caller.
+ */
+let describing: string | null = null;
+function takeStep(m: CrewMember, doing: string): string {
+  const step = describing;
+  describing = null;
+  if (step && PRIVATE_READS.has(step)) markPrivate(m);
+  if (step && m.private && FREE_TEXT_STEPS[step]) return FREE_TEXT_STEPS[step];
+  return doing;
+}
+
+/** from now on this run's presence shows none of its reasoning (PRIVATE_READS) */
+export function markPrivate(m: CrewMember) {
+  if (m.private) return;
+  m.private = true;
+  m.state.crew.thought = null;
+  if (m.state.crew.guide) m.state.crew.guide = { ...m.state.crew.guide, note: undefined };
+}
+
 /** what the agent is doing now, in a few words */
 export function setDoing(m: CrewMember, doing: string) {
-  m.state.crew.doing = doing.slice(0, 80);
+  m.state.crew.doing = takeStep(m, doing).slice(0, 80);
   publish(m);
+}
+
+const STEP_STATUS = new Set(["pending", "active", "done"]);
+const clip = (s: unknown, n: number) => String(s ?? "").replace(/\s+/g, " ").trim().slice(0, n);
+
+/** a plan as the grid carries it: a goal, at most CREW_PLAN_STEPS steps, each pending, active or done */
+export function crewPlan(raw: { goal?: unknown; steps?: unknown }): CrewPlan {
+  const steps = Array.isArray(raw.steps) ? raw.steps : [];
+  return {
+    goal: clip(raw.goal, 200),
+    steps: steps.slice(0, CREW_PLAN_STEPS).map((s: { text?: unknown; status?: unknown }) => ({
+      text: clip(s?.text, 120),
+      status: STEP_STATUS.has(String(s?.status)) ? (String(s.status) as CrewPlan["steps"][number]["status"]) : "pending",
+    })),
+  };
+}
+
+/** set_plan: the plan goes on the agent's presence (everyone on the grid sees the card) and to its helpers (crew_work) */
+export function setPlan(m: CrewMember, raw: { goal?: unknown; steps?: unknown }) {
+  const plan = crewPlan(raw);
+  m.plan = { goal: plan.goal, steps: plan.steps };
+  m.state.crew.plan = plan;
+  publish(m);
+}
+
+/** how far apart a run's thoughts reach the board */
+export const THOUGHT_MS = 250;
+
+/**
+ * The latest of its reasoning (its last CREW_THOUGHT_CHARS characters) on its presence. A model thinks in many
+ * small pieces, so the board hears at most one every THOUGHT_MS: a later piece waits and goes with the next write.
+ * null clears it.
+ */
+export function setThought(m: CrewMember, text: string | null) {
+  if (m.left) return;
+  // a run that has read the asker's own material keeps its reasoning to the asker (PRIVATE_READS)
+  if (m.private) text = null;
+  const t = text == null ? null : text.replace(/\s+/g, " ").trim().slice(-CREW_THOUGHT_CHARS) || null;
+  if (m.state.crew.thought === t) return;
+  m.state.crew.thought = t;
+  const wait = (m.thoughtAt ?? 0) + THOUGHT_MS - Date.now();
+  if (wait <= 0 || t === null) {
+    if (m.thoughtTimer) clearTimeout(m.thoughtTimer);
+    m.thoughtTimer = null;
+    m.thoughtAt = Date.now();
+    publish(m);
+    return;
+  }
+  m.thoughtTimer ??= setTimeout(() => {
+    m.thoughtTimer = null;
+    m.thoughtAt = Date.now();
+    publish(m);
+  }, wait);
+  m.thoughtTimer.unref?.();
 }
 
 /** resolve a card id, section id or section name on the board */
@@ -292,7 +405,7 @@ export function aim(m: CrewMember, target: CrewTarget | null, doing?: string) {
     m.state.crew.target = target;
     m.state.focus = target.kind === "object" ? target.id : null;
   }
-  if (doing) m.state.crew.doing = doing.slice(0, 80);
+  if (doing) m.state.crew.doing = takeStep(m, doing).slice(0, 80);
   publish(m);
 }
 
@@ -306,7 +419,8 @@ export async function travel(m: CrewMember, target: CrewTarget | null, doing?: s
 
 /** bring the person who asked to a card or section: their browser moves their camera (or asks first) */
 export function guide(m: CrewMember, target: CrewTarget, name: string, note?: string) {
-  m.state.crew.guide = { to: m.userId, target, name, note: note?.slice(0, 120), nonce: Date.now() + Math.random() };
+  // a private run's note is the model's own words: the person is brought there without it
+  m.state.crew.guide = { to: m.userId, target, name, note: m.private ? undefined : note?.slice(0, 120), nonce: Date.now() + Math.random() };
   aim(m, target, `showing ${m.userName.split(" ")[0]} ${name}`);
 }
 
@@ -316,6 +430,7 @@ export function leaveCrew(m: CrewMember, status: "done" | "stopped" | "error" = 
   m.state.crew.status = status;
   m.state.crew.doing = status === "done" ? "done" : status === "stopped" ? "stopped" : "hit a problem";
   m.state.crew.guide = null;
+  m.state.crew.thought = null;
   publish(m);
   const go = () => {
     if (m.left) return;
@@ -339,6 +454,7 @@ export function canCallHelp(m: CrewMember): string | null {
 
 /** the few words a cursor shows for a tool step */
 export function describeStep(name: string, input: Record<string, unknown>, boardId?: string): string {
+  describing = name;
   const q = (k: string) => (typeof input[k] === "string" ? String(input[k]).slice(0, 40) : "");
   /** a card's name, not its id (a real model wires by ids) */
   const named = (k: string) => {
@@ -350,6 +466,12 @@ export function describeStep(name: string, input: Record<string, unknown>, board
   switch (name) {
     case "read_board":
       return "reading the board";
+    case "read_card":
+      return named("id") ? `reading “${named("id")}”` : "reading a card";
+    case "search_tools":
+      return "looking for a tool";
+    case "run_code":
+      return "running a script";
     case "search":
       return `searching “${q("query")}”`;
     case "company":

@@ -42,10 +42,16 @@ import { followCrew, useFollowing, type CrewPeer } from "./Crew";
 import { FloorEdge } from "./FloorEdge";
 import { useActiveBoard } from "./Presence";
 import { activeBoard } from "../sync/board";
+import { RunCard } from "../characters/RunCard";
+import type { CrewPlan } from "@foundation/protocol";
 
 export interface AgentRowData extends CrewFace {
   task: string;
   mine: boolean;
+  /** its run's plan and latest reasoning (docs/agent-harness.md §2; absent from an older server) */
+  plan?: CrewPlan | null;
+  thought?: string;
+  started?: number;
 }
 
 export interface AgentsPlace {
@@ -77,6 +83,9 @@ export const rowOf = (p: CrewPeer, me: string | undefined): AgentRowData => ({
   leadName: p.crew.leadName,
   task: p.crew.task,
   mine: p.crew.asker === me,
+  plan: p.crew.plan ?? null,
+  thought: p.crew.thought,
+  started: p.crew.started,
 });
 
 /** the agents by where they are: the section asked about first, then sections in the order agents came to them */
@@ -401,7 +410,7 @@ const hostOf = (url: string) => {
 };
 
 /** adding Kimi or DeepSeek: which, and where it runs (the cloud with a key, or a model server on this computer) */
-export function T3AddForm({ presets, local, start, only, busy, error, onWhere, onAdd, onCancel }: { presets: Record<string, T3Preset>; local: T3Local | null; start?: { preset?: string; where?: "cloud" | "local" }; /** the agent and where it runs are already settled (the guided steps): no pickers */ only?: boolean; busy?: boolean; error?: string | null; onWhere?: (where: "cloud" | "local", baseUrl: string) => void; onAdd?: (input: T3AddInput) => void; onCancel?: () => void }) {
+export function T3AddForm({ presets, local, start, only, models, busy, error, onWhere, onAdd, onCancel }: { presets: Record<string, T3Preset>; local: T3Local | null; start?: { preset?: string; where?: "cloud" | "local" }; /** the agent and where it runs are already settled (the guided steps): no pickers */ only?: boolean; /** the vendor's models, newest first (Claude's, from the server): a select in the cloud instead of a typed id */ models?: Array<{ id: string; name: string }>; busy?: boolean; error?: string | null; onWhere?: (where: "cloud" | "local", baseUrl: string) => void; onAdd?: (input: T3AddInput) => void; onCancel?: () => void }) {
   const names = Object.keys(presets);
   const [preset, setPreset] = useState(start?.preset ?? names[0] ?? "");
   const [where, setWhere] = useState<"cloud" | "local">(start?.where ?? "cloud");
@@ -410,7 +419,8 @@ export function T3AddForm({ presets, local, start, only, busy, error, onWhere, o
   const [base, setBase] = useState<string | null>(null);
   const d = presets[preset]?.[where];
   const baseUrl = base ?? d?.baseUrl ?? "";
-  const modelNow = model ?? (where === "local" ? (local?.models[0] ?? "") : (d?.model ?? ""));
+  const listed = where === "cloud" && models && models.length > 0 ? models : null;
+  const modelNow = model ?? (where === "local" ? (local?.models[0] ?? "") : listed ? (listed.find((m) => m.id === d?.model)?.id ?? listed[0].id) : (d?.model ?? ""));
   const pick = (p: string, w: "cloud" | "local") => {
     setPreset(p);
     setWhere(w);
@@ -457,7 +467,16 @@ export function T3AddForm({ presets, local, start, only, busy, error, onWhere, o
       )}
       <label className="t3-field">
         <span>Model</span>
-        {where === "local" && local?.up && local.models.length > 0 ? (
+        {listed ? (
+          <select value={modelNow} onChange={(e) => setModel(e.target.value)} data-t3-add-models>
+            {listed.map((m, i) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+                {i === 0 ? " (latest)" : ""}
+              </option>
+            ))}
+          </select>
+        ) : where === "local" && local?.up && local.models.length > 0 ? (
           <select value={modelNow} onChange={(e) => setModel(e.target.value)}>
             {local.models.map((m) => (
               <option key={m} value={m}>
@@ -479,7 +498,7 @@ export function T3AddForm({ presets, local, start, only, busy, error, onWhere, o
           {local === null ? "Asking this computer's model server…" : local.up ? `A model server answers at ${hostOf(local.baseUrl)} with ${local.models.length} model${local.models.length === 1 ? "" : "s"}.` : `No model server answers at ${hostOf(baseUrl)}. It can be added now and will work once one runs there with this model.`}
         </p>
       )}
-      {where === "cloud" && <p className="t3-add-note">The model id and address are the vendor's as last published: change them if yours differ.</p>}
+      {where === "cloud" && <p className="t3-add-note">{listed ? "The models are Anthropic's, newest first; the address is the vendor's as last published." : "The model id and address are the vendor's as last published: change them if yours differ."}</p>}
       {error && <p className="t3-words is-bad" role="alert">{error}</p>}
       <div className="t3-add-foot">
         <button type="button" className="crew-row-btn" onClick={onCancel}>
@@ -711,6 +730,12 @@ export function AgentRow({ row, team, acts }: { row: AgentRowData; team: CrewTea
         </div>
         <div className="agent-row-doing">{row.status === "working" ? row.doing || "working" : row.status === "done" ? "done" : row.status === "stopped" ? "stopped" : "hit a problem"}</div>
       </div>
+      {/* the run card (2026-11-24): its plan and its reasoning, the same as over its head on the council */}
+      {row.status === "working" && (row.plan || row.thought) && (
+        <div className="agent-row-run">
+          <RunCard run={{ status: "working", doing: row.doing, plan: row.plan, thought: row.thought, started: row.started, hue: row.hue }} variant="row" />
+        </div>
+      )}
       {row.task && !row.lead && <div className="agent-row-task">Asked: {titleOf(row.task)}</div>}
       {row.task && row.lead && <div className="agent-row-task">Its part: {titleOf(row.task)}</div>}
       <div className="agent-row-acts">{acts}</div>

@@ -26,6 +26,7 @@ import { join } from "node:path";
 import { boardMaps, findSection, logActivity } from "@foundation/protocol";
 import type { UserInfo } from "@foundation/protocol";
 import { config } from "./config.ts";
+import { selfBase } from "./agent.ts";
 import { createSession, revokeSession } from "./auth.ts";
 import { boardDigest, editBoard, getBoard } from "./boards.ts";
 import { aim, joinCrew, leaveCrew, seatName, setDoing, type CrewMember } from "./crew.ts";
@@ -100,7 +101,7 @@ export async function askT3(user: UserInfo, input: { board: string; section: str
       toolsFile = join(folder, BOARD_TOOLS_FILE);
       writeFileSync(
         toolsFile,
-        JSON.stringify({ mcpServers: { foundation: { type: "http", url: `http://${config.host}:${config.port}/mcp?board=${encodeURIComponent(input.board)}&crew=${encodeURIComponent(member.id)}`, headers: { Authorization: `Bearer ${token}` } } } }),
+        JSON.stringify({ mcpServers: { foundation: { type: "http", url: `${selfBase()}/mcp?board=${encodeURIComponent(input.board)}&crew=${encodeURIComponent(member.id)}`, headers: { Authorization: `Bearer ${token}` } } } }),
         { mode: 0o600 },
       );
     }

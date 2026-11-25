@@ -24,6 +24,7 @@ import { holdsKeys } from "../lib/keysHeld";
 import { crewPeers, followCrew, followingCrew, type CrewPeer } from "./Crew";
 import { stopAllOnBoard } from "./CommandBar";
 import { useBoardTick } from "./Presence";
+import { useCrewOnCouncil } from "../characters/Council";
 
 type Mode = "idle" | "listening" | "typing";
 let mode: Mode = "idle";
@@ -290,7 +291,11 @@ export function TalkButton() {
   const mine = crew.filter((p) => p.crew.asker === me);
   const mineWorking = mine.filter((p) => p.crew.status === "working").length;
   const recent = useRecentCrewAsks(new Set(crew.map((p) => p.crew.id)));
-  const showRoster = open || crew.length > 0;
+  // 2026-11-24 (Josh): an agent with a head to hang its work on (a seat on the open council) shows it there, not in the
+  // strip over the bar; the open sheet still lists everyone (Stop all, Open)
+  const onCouncil = useCrewOnCouncil();
+  const listed = open ? crew : crew.filter((p) => !onCouncil.has(p.crew.id));
+  const showRoster = open || listed.length > 0;
 
   return (
     <>
@@ -325,7 +330,7 @@ export function TalkButton() {
             data-mode={m}
           >
             {open && <TalkInput mode={m} words={words} />}
-            {crew.length > 0 && (
+            {listed.length > 0 && (
               <ul className="crew-roster" aria-label="The crew at work">
                 {mineWorking > 1 && (
                   <li className="crew-row crew-row-all">
@@ -337,7 +342,7 @@ export function TalkButton() {
                     </span>
                   </li>
                 )}
-                {crew.map((p) => (
+                {listed.map((p) => (
                   <RosterRow key={p.clientId} peer={p} mine={p.crew.asker === me} />
                 ))}
               </ul>

@@ -93,6 +93,16 @@
   ],
   "cards": [
     {
+      "id": "council-harness",
+      "title": "The council at work, kinds of agent, MCP and code mode",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agents",
+      "status": "review",
+      "body": "Josh, 2026-11-24 (SPEC §0.17, docs/agent-harness.md). Built: one bar over each agent's head that carries its work and becomes the text box; seats as wide as their figures; one sleeping silhouette with a small one to add; a run card (plan and reasoning) for everyone on the grid; Claude as three kinds (account on this computer, API key with a model picker, federated identity) and T3 as its own; Connect Claude Code or another MCP client; read_card, search_tools, run_code in a QuickJS isolate, /mcp mode=code (about 14,100 tokens of tools down to about 1,270). Checked: 637 server and 290 client tests, the council, section-agents, agent-setup, crew, build and one-interface browser specs, two real Claude Code turns, an independent review whose ten findings were fixed. For Josh to check: restart the server on :4410; try a real API key and, if wanted, a federation rule (neither has run against Anthropic); say whether code mode should be the default (FOUNDATION_AGENT_TOOLS=code). Evidence: docs/evidence/2026-11-24_council-harness/.",
+      "issue": 248
+    },
+    {
       "id": "usability-pass-2026-11-22",
       "title": "Whole-app usability, legibility, spacing, accessibility & motion pass (jakubkrehel/skills)",
       "kind": "plan",

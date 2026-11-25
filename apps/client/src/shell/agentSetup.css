@@ -1,0 +1,418 @@
+/* setting up agents (AgentSetup.tsx, AddAgent.tsx): a way's readiness, the API key, the model, the MCP command.
+   Keys and tokens are a person's: pulse and paper here, never violet. Tokens only. */
+
+.add-agent,
+.setup-claude {
+  container: agent-setup / inline-size;
+}
+
+/* how a way stands: a dot and its words */
+.setup-ready {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-wrap: pretty;
+}
+.setup-ready[data-ok="yes"] {
+  color: var(--color-frost);
+}
+.setup-ready .f-dot {
+  flex: none;
+  transform: translateY(-1px);
+}
+
+/* the kind's sentence and the way's: where it runs and who pays */
+.setup-runs {
+  color: var(--color-mist);
+}
+
+/* the API key */
+.setup-key,
+.setup-key-form {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.setup-key-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+.setup-key-stored {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.4 var(--font-sans);
+}
+.setup-key-stored code {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-paper);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1.3 var(--font-code);
+  letter-spacing: 0.04em;
+}
+.setup-key-acts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.setup-key-form .setup-key-acts {
+  margin-left: 0;
+  align-self: flex-end;
+}
+.setup-key-form input {
+  font-family: var(--font-code);
+}
+.setup-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-bad) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-bad) 40%, transparent);
+}
+.setup-confirm p {
+  margin: 0;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  text-wrap: pretty;
+}
+.f-pill.setup-danger {
+  background: var(--color-bad);
+  color: var(--color-on-fill);
+}
+
+/* the model: newest first, the newest marked Latest */
+.setup-models {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.setup-models-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 248px;
+  overflow-y: auto;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  padding: var(--space-1);
+}
+.setup-model {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  cursor: pointer;
+}
+.setup-model:hover:not(:disabled) {
+  background: var(--color-raise);
+}
+.setup-model:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+.setup-model:disabled {
+  cursor: default;
+}
+.setup-model.is-on {
+  background: var(--color-raise);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+.setup-model-radio {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--color-line-strong);
+}
+.setup-model.is-on .setup-model-radio {
+  box-shadow:
+    inset 0 0 0 1.5px var(--color-pulse),
+    inset 0 0 0 4px var(--color-raise),
+    inset 0 0 0 8px var(--color-pulse);
+}
+.setup-model-name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  min-width: 0;
+}
+.setup-model-name b {
+  font: 600 var(--text-12) / 1.3 var(--font-sans);
+}
+.setup-model-name code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-code);
+}
+.setup-latest {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse-dim);
+  color: var(--color-pulse);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+}
+
+/* Claude Code or another MCP client */
+.setup-mcp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+.setup-mcp-head {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.setup-mcp-head .top-btn {
+  margin-left: auto;
+}
+.setup-mcp-cmd {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+}
+.setup-mcp-cmd code {
+  align-self: stretch;
+  color: var(--color-frost);
+  font: 400 var(--text-11) / 1.5 var(--font-code);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.setup-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-pulse);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* the T3 session's agents: which one, as a row of choices */
+.setup-t3-agents {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: var(--space-2);
+}
+.setup-t3-agent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.setup-t3-agent span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.setup-t3-agent:hover {
+  background: var(--color-raise);
+}
+.setup-t3-agent:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+.setup-t3-agent.is-on {
+  background: var(--color-raise);
+  box-shadow: inset 0 0 0 1px var(--color-pulse);
+}
+
+/* the older server's line */
+.setup-older {
+  margin: 0;
+  color: var(--color-warn);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  text-wrap: pretty;
+}
+
+/* narrow: the state words under the name, decoration out first (DESIGN principle 7) */
+@container agent-setup (max-width: 300px) {
+  .add-kind {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .add-kind > .add-kind-state {
+    grid-column: 2;
+    max-width: none;
+    text-align: left;
+  }
+  .add-way-head {
+    grid-template-columns: 16px minmax(0, 1fr);
+  }
+  .add-way-head > .add-kind-state {
+    grid-column: 2;
+    text-align: left;
+  }
+  .setup-model-name code {
+    display: none;
+  }
+  .t3-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+}
+
+/* the T3 session's mark in the kind list: T3 on the panel well, never a crew colour (no agent is at work) */
+.add-kind-t3 {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-mist);
+  font: 700 var(--text-11) / 1 var(--font-sans);
+}
+
+/* in Settings → Agents: the way's readiness, key and model sit under its words */
+.setup-way .set-row-text {
+  gap: var(--space-2);
+}
+.setup-way .setup-key,
+.setup-way .setup-models {
+  max-width: 520px;
+  margin-top: var(--space-2);
+}
+
+/* federated identity: the ids and the token file, an admin's */
+.setup-fed,
+.setup-fed-form {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.setup-fed-field {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+}
+.setup-fed-label {
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+}
+.setup-fed-label i {
+  display: block;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+}
+.setup-fed-field input {
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1 var(--font-sans);
+  outline: 2px solid transparent;
+}
+.setup-fed-field input.is-code {
+  font-family: var(--font-code);
+}
+.setup-fed-field input:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+.setup-fed-hint {
+  grid-column: 2;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.4 var(--font-sans);
+  text-wrap: pretty;
+}
+.setup-fed-set {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.setup-fed-set div {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
+}
+.setup-fed-set dt {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.4 var(--font-sans);
+}
+.setup-fed-set dd {
+  margin: 0;
+  min-width: 0;
+}
+.setup-fed-set code {
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.4 var(--font-code);
+  overflow-wrap: anywhere;
+}
+.setup-way .setup-fed {
+  max-width: 520px;
+  margin-top: var(--space-2);
+}
+
+/* the MCP commands: a label over each */
+.setup-mcp-label {
+  align-self: stretch;
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+}
+
+@container agent-setup (max-width: 300px) {
+  .setup-fed-field,
+  .setup-fed-set div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .setup-fed-hint {
+    grid-column: 1;
+  }
+}

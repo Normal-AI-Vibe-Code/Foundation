@@ -1,22 +1,29 @@
 /**
  * The Foundation agent: one conversation per person per board, able to run
- * the whole grid through the board tools (tools.ts). Two runtimes, the way
- * Vision splits subscription from API:
+ * the whole grid through the board tools (tools.ts). Which runtime a run uses
+ * follows from its seat's kind (agentkinds.ts; docs/agent-harness.md §1), with
+ * no falling from one to another:
  *
- * - "subscription" (default when `claude` is installed): Claude Code on this
- *   machine, headless (`claude -p --output-format stream-json`), with
- *   Foundation's MCP endpoint attached for the board. The person's plan pays;
- *   no API key involved. Sessions resume, so the conversation carries over —
- *   Foundation's T3-style session mechanism.
- * - "api": the Anthropic Messages API with the workspace key (credits),
+ * - "subscription" (claude-account): Claude Code on this machine, headless
+ *   (`claude -p --output-format stream-json`), with Foundation's MCP endpoint
+ *   attached for the board. The plan signed in there pays; never an API key.
+ *   Sessions resume, so the conversation carries over.
+ * - "api" (claude-api): the Anthropic Messages API on the key an admin stored,
  *   streaming, a manual tool loop so every step streams to the grid.
+ * - "federated" (claude-federated): the same loop, on a short-lived token
+ *   exchanged from the organization's identity provider.
  *
- * Either way each step arrives at the client as AgentEvents over SSE, and
- * every board write shows up live to everyone through the board's Y.Doc.
+ * Either way each step arrives at the client as AgentEvents over SSE (its
+ * reasoning as `thinking`), every board write shows up live to everyone through
+ * the board's Y.Doc, and the run's presence carries its plan and latest thought.
+ * A run that says nothing for FOUNDATION_AGENT_SILENCE_MS ends with an error
+ * that says why, and anything thrown anywhere in a run ends as an `error`.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { childOptions, execFileSyncChild, spawnChild, type ChildOptions, type ExecFileSyncOptions, type SpawnOptions } from "./child.ts";
+import type { AgentKind } from "@foundation/protocol";
+import { apiClient, apiKey, defaultKind, defaultModel, federationState, runtimeOfKind, scrub } from "./agentkinds.ts";
+import { childOptions, execFileChild, execFileSyncChild, execFileText, spawnChild, type ChildOptions, type ChildProcess, type ExecFileOptions, type ExecFileSyncOptions, type SpawnOptions } from "./child.ts";
 import { randomBytes } from "node:crypto";
 import { writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -26,6 +33,7 @@ import { config } from "./config.ts";
 import { all, one, run } from "./db.ts";
 import { boardDigest, editBoard } from "./boards.ts";
 import { runTool, toolContent, TOOLS, type ToolCtx } from "./tools.ts";
+import { CODE_MODE_TOOLS } from "./codemode.ts";
 import { audit } from "./audit.ts";
 import { canWrite } from "./roles.ts";
 import { createSession, revokeSession } from "./auth.ts";
@@ -55,7 +63,7 @@ function contextBlock(opts: { boardId: string; user: UserInfo; persona?: "shiba"
   if (opts.persona === "shiba") return `<today person="${opts.user.name}"${access}>\n${todayDigest(todayFor(opts.user))}\n</today>`;
   return `<board name="${opts.boardId}" person="${opts.user.name}"${access}>\n${boardDigest(opts.boardId)}\n</board>`;
 }
-import { describeCrewWork, joinCrew, leaveCrew, setDoing, type CrewMember, seatName } from "./crew.ts";
+import { describeCrewWork, joinCrew, leaveCrew, setDoing, setThought, type CrewMember, seatName } from "./crew.ts";
 import { setHelperStarter } from "./tools.ts";
 import { runScript } from "./script.ts";
 import { CLAUDE_CODE_ENV, claudeCommand, here, type Runtime } from "./rea.ts";
@@ -83,7 +91,7 @@ How you work:
 - Nothing that spends money or runs third-party tooling starts on its own: reverse-engineering jobs wait for a person to press Run, machines wait for a person's Start, and a command you want run in a running machine (machine_run) waits for a person to press Run on its card. If they decline or don't answer, nothing ran: say so, don't work around it.
 - When a design needs CAD or a decision you don't have, use ask_person rather than guessing.
 - Building pages: when asked to lay out, gather, or make a board, page or document of things ("lay out all the images from Slack about the Airform PTHP"), call find_images, choose what belongs, then lay_out with a fitting style (grid for a set, board for a mood board, document to be read top to bottom with captions, timeline when the order in time matters) and a short intro. Say how many you placed and where, and what you couldn't search (e.g. Slack not connected).
-- For work with more than one step, call set_plan first (the goal and the steps), and again as each step starts and finishes, so the person can follow along in the session tab.
+- Unless the ask is a single question, call set_plan first (the goal and two to six short steps; reading and then writing is already two), and again as each step starts and finishes. Everyone on the grid sees it as a card beside you while you work, and the person follows along in the session tab.
 - Be brief and concrete. No preamble.
 
 You are one of the crew: people see you on the board as a named cursor (your name is in <you>), moving to whatever you're working on, and every change you make is signed with your name. So work in the open:
@@ -103,8 +111,13 @@ You are one of the crew: people see you on the board as a named cursor (your nam
  * 0.3.323 turns `tools: []` into this same `--tools=`), and `--disallowedTools=` naming every built-in as
  * a second fence, should a version ever bring one back. `--allowedTools` only pre-approves Foundation's.
  * Flag names as Claude Code 2.1.288's `claude --help` gives them.
+ *
+ * So its reasoning can be shown (docs/agent-harness.md §2): `--include-partial-messages` streams it (and its
+ * words) as they come, and `--thinking-display summarized` asks for readable summaries of it (Claude Code
+ * 2.1.331; without it, a `-p` run's thinking blocks arrive empty). A CLI too old for either is run again
+ * without them (`live` false).
  */
-export function subscriptionArgs(o: { prompt: string; mcpFile: string; system: string }): string[] {
+export function subscriptionArgs(o: { prompt: string; mcpFile: string; system: string; live?: boolean }): string[] {
   return [
     "-p",
     o.prompt,
@@ -122,8 +135,12 @@ export function subscriptionArgs(o: { prompt: string; mcpFile: string; system: s
     "mcp__foundation__*",
     "--tools=",
     `--disallowedTools=${CLAUDE_BUILT_IN_TOOLS.join(",")}`,
+    ...(o.live === false ? [] : LIVE_FLAGS),
   ];
 }
+
+/** what a run needs to show its reasoning as it comes (subscriptionArgs) */
+export const LIVE_FLAGS = Object.freeze(["--include-partial-messages", "--thinking-display", "summarized"]);
 
 /**
  * Claude Code's built-in tools, every one a board run is denied (subscriptionArgs): shells, files, the web,
@@ -176,28 +193,60 @@ export function claudeCliAvailable(): boolean {
 
 export function runtimes() {
   const c = claudeStart();
+  const fed = federationState();
   return {
     subscription: c.ok,
     /** why the subscription runtime is off, when Claude Code was found wanting */
     subscriptionNote: c.ok ? null : c.reason,
-    api: Boolean(config.anthropic.apiKey),
-    model: config.anthropic.model,
+    /** an API key is there for claude-api seats (stored by an admin, or the server's env) */
+    api: Boolean(apiKey().key),
+    /** federated identity is set up for claude-federated seats */
+    federated: fed.configured,
+    /** the default model of claude-api and claude-federated seats */
+    model: defaultModel(),
   };
 }
 
-export function pickRuntime(requested?: string): AgentRuntime | null {
+/** what a run's kind needs before anything starts, and what's missing when it isn't there */
+export function runtimeFor(kind: AgentKind): { runtime: AgentRuntime } | { error: string } {
   // tests and e2e: a fixed playbook through the same tools, no model (never set in a real deployment)
-  if (process.env.FOUNDATION_AGENT_SCRIPT === "1") return "script";
-  const r = runtimes();
-  if (requested === "api") return r.api ? "api" : null;
-  if (requested === "subscription") return r.subscription ? "subscription" : null;
-  return r.subscription ? "subscription" : r.api ? "api" : null;
+  if (process.env.FOUNDATION_AGENT_SCRIPT === "1") return { runtime: "script" };
+  const runtime = runtimeOfKind(kind);
+  if (!runtime) return { error: "That seat is one of T3's agents: it runs through T3 on this computer, not here." };
+  if (runtime === "subscription") {
+    const c = claudeStart();
+    return c.ok ? { runtime } : { error: `The subscription runtime can't start: ${c.reason}\nThis seat runs on the Claude sign-in on Foundation's server, and never falls back to an API key.` };
+  }
+  if (runtime === "api") return apiKey().key ? { runtime } : { error: "This seat runs on Foundation's Anthropic API key, and none is set: an admin adds one in Settings → Agents. It never falls back to the Claude subscription." };
+  const fed = federationState();
+  return fed.configured ? { runtime } : { error: fed.why ?? "Federated identity isn't set up." };
+}
+
+/** a runtime's name, as callers before kinds asked for one, to the kind that runs on it */
+const KIND_OF_RUNTIME: Record<string, AgentKind> = { subscription: "claude-account", api: "claude-api", federated: "claude-federated" };
+
+/** the runtime an ask with no seat would use (or one asked for by name), or null when it can't run */
+export function pickRuntime(requested?: string): AgentRuntime | null {
+  const kind = (requested && KIND_OF_RUNTIME[requested]) || defaultKind(claudeStart().ok);
+  const r = runtimeFor(kind);
+  return "runtime" in r ? r.runtime : null;
+}
+
+/** the silence that ends a run (FOUNDATION_AGENT_SILENCE_MS, 90 s) */
+export function silenceMs() {
+  const v = Number(process.env.FOUNDATION_AGENT_SILENCE_MS ?? "90000");
+  return Number.isFinite(v) && v > 0 ? v : 90_000;
 }
 
 export async function runAgent(opts: {
   boardId: string;
   user: UserInfo;
   prompt: string;
+  /** the seat's kind, as the server knows it (posted seat → kind). Absent: the server's own default (agentkinds.ts defaultKind) */
+  kind?: AgentKind;
+  /** a claude-api or claude-federated seat's own model (else the default) */
+  model?: string;
+  /** older callers and tests: a runtime by name ("subscription", "api"), read as its kind */
   runtime?: string;
   /** the session tab this turn belongs to: its own conversation (default: the person's one per board) */
   session?: string;
@@ -213,56 +262,94 @@ export async function runAgent(opts: {
   emit: (e: AgentEvent) => void;
   signal: AbortSignal;
 }) {
-  const runtime = pickRuntime(opts.runtime);
-  if (!runtime) {
-    const c = claudeStart();
-    opts.emit({
-      type: "error",
-      message:
-        opts.runtime === "subscription" && !c.ok
-          ? `The subscription runtime can't start: ${c.reason}`
-          : `No agent runtime: install Claude Code (\`claude\`) to use your subscription, or set ANTHROPIC_API_KEY to use API credits.${c.ok ? "" : `\n${c.reason}`}`,
-    });
-    return;
-  }
-  const runId = opts.runId ?? newRunId();
-  run(
-    "insert into agent_runs (id, board_id, runtime, prompt, status, created_by, created_at, session_id) values (?, ?, ?, ?, 'running', ?, ?, ?)",
-    runId, opts.boardId, runtime, opts.prompt, opts.user.id, Date.now(), opts.session ?? null,
-  );
-  // a viewer's question isn't a change to the board, so it doesn't go in its activity;
-  // a helper's brief isn't the person's ask (call_in_help logs it, signed by the lead);
-  // the Shiba's talk is the person's own, not the board's
-  if (!opts.crew?.lead && opts.persona !== "shiba" && !opts.chat && canWrite(opts.user.id, opts.boardId)) editBoard(opts.boardId, "agent", (doc) => logActivity(doc, { who: opts.user.name, role: "human", text: `asked the agent: ${opts.prompt.slice(0, 140)}` }));
-  const transcript: AgentEvent[] = [];
-  // the transcript is saved as the turn runs, so a reload mid-turn replays it
-  let saveTimer: ReturnType<typeof setTimeout> | null = null;
-  const save = () => {
-    saveTimer = null;
-    run("update agent_runs set transcript_json = ? where id = ? and status = 'running'", JSON.stringify(transcript), runId);
-  };
-  const emit = (e: AgentEvent) => {
-    // streamed text is stored as one event per run of text, not one per token
-    const last = transcript[transcript.length - 1];
-    if (e.type === "text" && last?.type === "text") transcript[transcript.length - 1] = { type: "text", text: last.text + e.text };
-    else transcript.push(e);
-    opts.emit(e);
-    saveTimer ??= setTimeout(save, 1200);
-  };
-  const finish = (status: "done" | "error" | "stopped") => {
-    if (saveTimer) clearTimeout(saveTimer);
-    run("update agent_runs set status = ?, transcript_json = ?, finished_at = ? where id = ?", status, JSON.stringify(transcript), Date.now(), runId);
-  };
+  // everything a run does, from its first check to its last write, is inside this try: whatever throws
+  // ends as an error event (and the crew's status), never an unhandled rejection
+  let finish: ((status: "done" | "error" | "stopped") => void) | null = null;
+  let emit: (e: AgentEvent) => void = opts.emit;
   try {
-    if (runtime === "api") await runApi(opts, emit);
+    const named = opts.kind ?? (opts.runtime ? KIND_OF_RUNTIME[opts.runtime] : undefined);
+    const kind = named ?? defaultKind(claudeStart().ok);
+    const picked = runtimeFor(kind);
+    if (!("runtime" in picked)) {
+      const c = claudeStart();
+      // an ask from no seat, on a server with nothing set up: say what would set one up
+      const nothing = !named && !c.ok && !apiKey().key && !federationState().configured;
+      opts.emit({
+        type: "error",
+        message: nothing ? `No agent runtime: install Claude Code (\`claude\`) and sign in to use the subscription, or have an admin add an Anthropic API key in Settings → Agents.\n${c.ok ? "" : c.reason}`.trim() : picked.error,
+      });
+      return;
+    }
+    const runtime = picked.runtime;
+    const runId = opts.runId ?? newRunId();
+    run(
+      "insert into agent_runs (id, board_id, runtime, prompt, status, created_by, created_at, session_id) values (?, ?, ?, ?, 'running', ?, ?, ?)",
+      runId, opts.boardId, runtime, opts.prompt, opts.user.id, Date.now(), opts.session ?? null,
+    );
+    const transcript: AgentEvent[] = [];
+    // the transcript is saved as the turn runs, so a reload mid-turn replays it
+    let saveTimer: ReturnType<typeof setTimeout> | null = null;
+    const save = () => {
+      saveTimer = null;
+      run("update agent_runs set transcript_json = ? where id = ? and status = 'running'", JSON.stringify(transcript), runId);
+    };
+    const seen = crewFollower(opts.crew);
+    emit = (e: AgentEvent) => {
+      // streamed text and reasoning are stored as one event per run of it, not one per token
+      const last = transcript[transcript.length - 1];
+      if (e.type === "text" && last?.type === "text") transcript[transcript.length - 1] = { type: "text", text: last.text + e.text };
+      else if (e.type === "thinking" && last?.type === "thinking") transcript[transcript.length - 1] = { type: "thinking", text: last.text + e.text };
+      else transcript.push(e);
+      opts.emit(e);
+      seen(e);
+      saveTimer ??= setTimeout(save, 1200);
+    };
+    finish = (status) => {
+      finish = null;
+      if (saveTimer) clearTimeout(saveTimer);
+      run("update agent_runs set status = ?, transcript_json = ?, finished_at = ? where id = ?", status, JSON.stringify(transcript), Date.now(), runId);
+    };
+    // a viewer's question isn't a change to the board, so it doesn't go in its activity;
+    // a helper's brief isn't the person's ask (call_in_help logs it, signed by the lead);
+    // the Shiba's talk is the person's own, not the board's
+    if (!opts.crew?.lead && opts.persona !== "shiba" && !opts.chat && canWrite(opts.user.id, opts.boardId)) editBoard(opts.boardId, "agent", (doc) => logActivity(doc, { who: opts.user.name, role: "human", text: `asked the agent: ${opts.prompt.slice(0, 140)}` }));
+    if (runtime === "api" || runtime === "federated") await runApi(opts, emit, kind, runtime);
     else if (runtime === "script") await runScript(opts, emit, { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" });
     else await runSubscription(opts, emit, runId);
-    finish(opts.signal.aborted ? "stopped" : "done");
+    finish?.(opts.signal.aborted ? "stopped" : "done");
   } catch (e) {
-    if (opts.signal.aborted) return finish("stopped");
-    emit({ type: "error", message: (e as Error).message });
-    finish("error");
+    if (opts.signal.aborted) return void finish?.("stopped");
+    // an error the person was already told (as soon as it showed) isn't said twice
+    if (!(e as { said?: boolean })?.said) emit({ type: "error", message: scrub((e as Error)?.message ?? String(e)) });
+    finish?.("error");
   }
+}
+
+/**
+ * A run's presence follows its stream, so the grid sees it work from the first moment: "reading the ask", then
+ * "thinking" with its latest thought, "writing its answer" as words come, and (tools.ts) a line for each step.
+ * A thought lasts until the next step or words; then the next stretch of reasoning starts fresh.
+ */
+function crewFollower(m: CrewMember | undefined): (e: AgentEvent) => void {
+  if (!m) return () => {};
+  let thinking = "";
+  const early = () => m.state.crew.doing === "reading the ask" || m.state.crew.doing.startsWith("called in by ");
+  return (e) => {
+    if (m.left) return;
+    if (e.type === "thinking") {
+      thinking = (thinking + e.text).slice(-2000);
+      if (early() || m.state.crew.doing === "writing its answer") setDoing(m, "thinking");
+      setThought(m, thinking);
+    } else if (e.type === "status" && (e.status === "thinking" || e.status === "working") && early()) {
+      setDoing(m, "thinking");
+    } else if (e.type === "text") {
+      thinking = "";
+      if (early() || m.state.crew.doing === "thinking") setDoing(m, "writing its answer");
+    } else if (e.type === "tool") {
+      thinking = "";
+      setThought(m, null);
+    }
+  };
 }
 
 /** who the agent is, for the prompt */
@@ -284,15 +371,22 @@ interface LiveRun {
   listeners: Set<(e: AgentEvent) => void>;
   done: boolean;
   ctrl: AbortController;
+  /** the kind it runs as (and a seat's own model): a helper it calls in runs the same way */
+  kind?: AgentKind;
+  model?: string;
 }
 const live = new Map<string, LiveRun>();
 
 export function startRun(opts: Omit<Parameters<typeof runAgent>[0], "emit" | "signal" | "runId" | "crew"> & { lead?: CrewMember }): LiveRun {
-  const r: LiveRun = { id: newRunId(), userId: opts.user.id, boardId: opts.boardId, events: [], listeners: new Set(), done: false, ctrl: new AbortController() };
+  // a helper runs as its lead does: the same kind, the same model
+  const leadRun = opts.lead ? live.get(opts.lead.runId) : undefined;
+  if (leadRun && !opts.kind) opts = { ...opts, kind: leadRun.kind, model: opts.model ?? leadRun.model };
+  const r: LiveRun = { id: newRunId(), userId: opts.user.id, boardId: opts.boardId, events: [], listeners: new Set(), done: false, ctrl: new AbortController(), kind: opts.kind, model: opts.model };
   live.set(r.id, r);
   const emit = (e: AgentEvent) => {
     const last = r.events[r.events.length - 1];
     if (e.type === "text" && last?.type === "text") r.events[r.events.length - 1] = { type: "text", text: last.text + e.text };
+    else if (e.type === "thinking" && last?.type === "thinking") r.events[r.events.length - 1] = { type: "thinking", text: last.text + e.text };
     else r.events.push(e);
     for (const fn of r.listeners) fn(e);
   };
@@ -333,13 +427,18 @@ export function startRun(opts: Omit<Parameters<typeof runAgent>[0], "emit" | "si
     if (e.type === "error") failed = true;
     emit(e);
   };
-  void runAgent({ ...opts, prompt, crew, runId: r.id, emit: watch, signal: r.ctrl.signal }).finally(() => {
-    if (crew) {
-      leaveCrew(crew, r.ctrl.signal.aborted ? "stopped" : failed ? "error" : "done");
-      crewUsers.delete(crew.id);
-    }
-    end();
-  });
+  // runAgent ends every throw as an error event; this catch is the fence behind it, so nothing escapes as an unhandled rejection
+  void runAgent({ ...opts, prompt, crew, runId: r.id, emit: watch, signal: r.ctrl.signal })
+    .catch((e) => {
+      if (!r.ctrl.signal.aborted) watch({ type: "error", message: scrub((e as Error)?.message ?? String(e)) });
+    })
+    .finally(() => {
+      if (crew) {
+        leaveCrew(crew, r.ctrl.signal.aborted ? "stopped" : failed ? "error" : "done");
+        crewUsers.delete(crew.id);
+      }
+      end();
+    });
   return r;
 }
 
@@ -418,8 +517,29 @@ export function settleOrphanRuns() {
 
 // ---------- API runtime (credits) ----------
 
-function apiTools(): Anthropic.Tool[] {
-  return TOOLS.map((t) => {
+/**
+ * Which tools a run is given (FOUNDATION_AGENT_TOOLS): "code", the few a model calls alone plus search_tools and
+ * run_code, through which it reaches every other tool as an API (docs/agent-harness.md §3); or "all", every tool
+ * listed. The default is the one the real turns in docs/evidence/2026-11-24_council-harness/REAL-TURN.md favoured.
+ */
+export const DEFAULT_AGENT_TOOLS: "code" | "all" = "all";
+export function agentToolsMode(): "code" | "all" {
+  const v = (process.env.FOUNDATION_AGENT_TOOLS ?? "").trim().toLowerCase();
+  return v === "code" || v === "all" ? v : DEFAULT_AGENT_TOOLS;
+}
+
+/** the MCP address a claude-account run is given: its board, its crew member, a chat agent's name, and code mode when that's the setting */
+export function runMcpUrl(o: { boardId: string; crew?: string; as?: string; mode?: "code" | "all" }): string {
+  const mode = o.mode ?? agentToolsMode();
+  return `${selfBase()}/mcp?board=${encodeURIComponent(o.boardId)}${o.crew ? `&crew=${encodeURIComponent(o.crew)}` : ""}${o.as ? `&as=${encodeURIComponent(o.as)}` : ""}${mode === "code" ? "&mode=code" : ""}`;
+}
+
+/** what the system prompt adds in code mode, so the model knows where the rest of its tools are */
+const CODE_MODE_NOTE = "\nMost of your board tools are reached through run_code: find them with search_tools (it gives each one's signature), then call several in one script as `await foundation.<tool>({ … })`. read_board, read_card, set_plan, point_at and bring_view you call directly.";
+
+export function apiTools(mode: "code" | "all" = agentToolsMode()): Anthropic.Tool[] {
+  const only = mode === "code" ? new Set<string>(CODE_MODE_TOOLS) : null;
+  return TOOLS.filter((t) => !only || only.has(t.name)).map((t) => {
     const schema = zodToJsonSchema(t.schema, { $refStrategy: "none" }) as Record<string, unknown>;
     delete schema.$schema;
     return { name: t.name, description: t.description, input_schema: schema as Anthropic.Tool.InputSchema };
@@ -429,8 +549,52 @@ function apiTools(): Anthropic.Tool[] {
 /** one conversation per person per board, or per session tab */
 const convKey = (opts: { boardId: string; user: UserInfo; session?: string }) => `${opts.boardId}:${opts.user.id}${opts.session ? `:${opts.session}` : ""}`;
 
-async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent) => void) {
-  const client = new Anthropic({ apiKey: config.anthropic.apiKey });
+/**
+ * What to ask a model for so its reasoning can be shown (the claude-api skill, Thinking & Effort): adaptive
+ * thinking on the 4.6+ and 5 families, with the readable summary asked for on those whose default is to omit
+ * it (4.7 and later); a budget on older ones (Haiku 4.5), which take no effort setting.
+ */
+export function thinkingFor(model: string): { thinking: Record<string, unknown>; output_config?: { effort: string } } {
+  if (/^claude-(opus|sonnet|haiku|fable|mythos)-5/.test(model) || /^claude-opus-4-[78]/.test(model)) return { thinking: { type: "adaptive", display: "summarized" }, output_config: { effort: "medium" } };
+  if (/^claude-(opus|sonnet)-4-6/.test(model)) return { thinking: { type: "adaptive" }, output_config: { effort: "medium" } };
+  return { thinking: { type: "enabled", budget_tokens: 8000 } };
+}
+
+/** the models the API's own refusal fallback is asked for on (the claude-api skill: `fallbacks: "default"`) */
+const FALLBACK_MODELS = /^claude-(fable-5-[12]|opus-5-5|opus-5|sonnet-5-5)$/;
+
+/** a timer that ends a run that has said nothing for `ms`; paused while a tool of ours runs (that's our silence, not its) */
+function silenceWatch(ms: number, onSilent: () => void) {
+  let t: ReturnType<typeof setTimeout> | null = null;
+  let paused = false;
+  const arm = () => {
+    if (t) clearTimeout(t);
+    t = paused ? null : setTimeout(onSilent, ms);
+    t?.unref?.();
+  };
+  arm();
+  return {
+    poke: arm,
+    pause(on: boolean) {
+      paused = on;
+      arm();
+    },
+    stop() {
+      if (t) clearTimeout(t);
+      t = null;
+      paused = true;
+    },
+  };
+}
+
+/** an error that was already shown to the person (runAgent doesn't say it twice) */
+class SaidError extends Error {
+  said = true;
+}
+
+async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent) => void, kind: AgentKind, runtime: "api" | "federated") {
+  const client = apiClient(kind);
+  const model = opts.model || defaultModel();
   const key = convKey(opts);
   const history = histories.get(key) ?? [];
   history.push({
@@ -438,32 +602,58 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
     content: `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`,
   });
   const ctx: ToolCtx = { boardId: opts.boardId, actor: opts.crew?.name ?? opts.chat?.agent ?? "Foundation Agent", userId: opts.user.id, crew: opts.crew?.id, door: "agent-run" };
-  const tools = apiTools();
+  const toolsMode = agentToolsMode();
+  const tools = apiTools(toolsMode);
   let usage = { input: 0, output: 0 };
+  const quiet = silenceMs();
 
   for (let step = 0; step < 24; step++) {
     if (opts.signal.aborted) throw new Error("stopped");
     emit({ type: "status", status: step === 0 ? "thinking" : "working" });
-    const stream = client.messages.stream(
+    // the request ends with the run, or when Anthropic says nothing for the silence
+    const ctrl = new AbortController();
+    const stop = () => ctrl.abort();
+    opts.signal.addEventListener("abort", stop, { once: true });
+    let silent = false;
+    const watch = silenceWatch(quiet, () => {
+      silent = true;
+      ctrl.abort();
+    });
+    const fallback = FALLBACK_MODELS.test(model);
+    const stream = client.beta.messages.stream(
       {
-        model: config.anthropic.model,
-        max_tokens: 16000,
-        system: [{ type: "text", text: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? ""), cache_control: { type: "ephemeral" } }],
-        thinking: { type: "adaptive" },
-        output_config: { effort: "medium" },
+        model,
+        max_tokens: 64000,
+        system: [{ type: "text", text: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? "") + (toolsMode === "code" ? CODE_MODE_NOTE : ""), cache_control: { type: "ephemeral" } }],
+        ...thinkingFor(model),
         tools,
         messages: history,
-      } as Anthropic.MessageStreamParams,
-      { signal: opts.signal },
+        // a refusal is answered by the next model rather than ending the turn (server-side; billed at that model's rates)
+        ...(fallback ? { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" } : {}),
+      } as never,
+      { signal: ctrl.signal },
     );
+    stream.on("streamEvent", () => watch.poke());
     stream.on("text", (t) => emit({ type: "text", text: t }));
-    const msg = await stream.finalMessage();
+    stream.on("thinking", (t) => {
+      if (t) emit({ type: "thinking", text: t });
+    });
+    let msg: Anthropic.Beta.BetaMessage;
+    try {
+      msg = await stream.finalMessage();
+    } catch (e) {
+      if (silent) throw new Error(`The Anthropic API sent nothing for ${Math.round(quiet / 1000)} s, so the run was stopped. Anthropic may be slow or down; try again in a moment.`);
+      throw new Error(apiFailure(e, kind));
+    } finally {
+      watch.stop();
+      opts.signal.removeEventListener("abort", stop);
+    }
     usage = { input: usage.input + msg.usage.input_tokens, output: usage.output + msg.usage.output_tokens };
-    history.push({ role: "assistant", content: msg.content });
+    history.push({ role: "assistant", content: msg.content as unknown as Anthropic.ContentBlockParam[] });
 
-    if (msg.stop_reason === "refusal") throw new Error("the model declined this request");
+    if (msg.stop_reason === "refusal") throw new Error("The model declined this request.");
     if (msg.stop_reason === "pause_turn") continue;
-    const calls = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+    const calls = msg.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
     if (msg.stop_reason !== "tool_use" || calls.length === 0) break;
 
     const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
@@ -497,7 +687,18 @@ async function runApi(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent
   // keep the conversation bounded; older turns fall off whole
   while (history.length > 40) history.splice(0, 2);
   histories.set(key, history);
-  emit({ type: "done", runtime: "api", usage });
+  emit({ type: "done", runtime, usage });
+}
+
+/** what an API failure means for the person, in words (the SDK's typed errors; never the key) */
+function apiFailure(e: unknown, kind: AgentKind): string {
+  const who = kind === "claude-api" ? "the API key an admin stored" : "the organization's federated identity";
+  if (e instanceof Anthropic.AuthenticationError) return `Anthropic didn't accept ${who} (401). ${kind === "claude-api" ? "An admin can put in a new key in Settings → Agents." : "Check the federation rule and the identity token."}`;
+  if (e instanceof Anthropic.PermissionDeniedError) return `Anthropic refused ${who} for this (403): ${scrub(e.message).slice(0, 300)}`;
+  if (e instanceof Anthropic.NotFoundError) return `Anthropic doesn't know this model (404): ${scrub(e.message).slice(0, 300)}. An admin can pick another in Settings → Agents.`;
+  if (e instanceof Anthropic.RateLimitError) return "Anthropic is rate-limiting this key right now (429). Try again in a minute.";
+  if (e instanceof Anthropic.APIError) return `The Anthropic API answered ${e.status ?? "with an error"}: ${scrub(e.message).slice(0, 400)}`;
+  return scrub((e as Error)?.message ?? String(e));
 }
 
 // ---------- subscription runtime (Claude Code, T3-style session) ----------
@@ -513,6 +714,43 @@ export function subscriptionSpawnOptions(): ChildOptions<SpawnOptions> {
   return childOptions<SpawnOptions>({ extras: CLAUDE_CODE_ENV }, { cwd: workFolder("agent"), stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
 }
 
+/**
+ * Where a run's Claude Code reaches this server's MCP endpoint: the address it listens on, except that one
+ * listening on every address (0.0.0.0, ::) is reached on loopback — "http://0.0.0.0:…" is no address to
+ * connect to (on Windows it fails outright, and the run is left with no tools).
+ */
+export function selfBase(host: string = config.host, port: number = config.port): string {
+  const h = host.trim().replace(/^\[|\]$/g, "");
+  if (!h || h === "0.0.0.0" || h === "::") return `http://127.0.0.1:${port}`;
+  return h.includes(":") ? `http://[${h}]:${port}` : `http://${h}:${port}`;
+}
+
+/** what Claude Code says when it isn't signed in, or its sign-in has lapsed */
+const SIGNED_OUT = /not logged in|please run \/login|invalid api key|oauth token (has )?expired|authentication_error|credit balance is too low/i;
+const signedOutWords = (said: string) =>
+  `Claude Code on Foundation's server isn't signed in, or its sign-in has expired: on that computer, run \`claude\` and sign in (/login), then ask again. It said: ${scrub(said).slice(0, 300)}`;
+
+/** what a Claude Code too old for the live flags says when it refuses them */
+const OLD_CLI = /unknown option|unrecognized option|invalid (value|choice|argument)|allowed choices|is not one of|not a valid/i;
+
+/** how long a run's Claude Code has to go after SIGTERM before SIGKILL (not Windows: there it's the tree at once) */
+function killMs() {
+  const v = Number(process.env.FOUNDATION_AGENT_KILL_MS ?? "5000");
+  return Number.isFinite(v) && v >= 0 ? v : 5000;
+}
+
+/** end a child and everything it started (Windows: taskkill /T /F, as t3host.ts does) */
+function killTree(c: ChildProcess) {
+  if (c.pid && process.platform === "win32") execFileChild("taskkill", ["/pid", String(c.pid), "/T", "/F"], childOptions<ExecFileOptions>({ extras: [] }, { windowsHide: true }));
+  else c.kill("SIGKILL");
+}
+
+/** Claude Code too old for the live flags (subscriptionArgs): run again without them, and remember */
+let liveFlags = true;
+
+/** the last run's word on the sign-in, for GET /api/agents/claude when `claude auth status` can't say */
+let lastAccount: { signedIn: boolean; at: number; why?: string } | null = null;
+
 async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: AgentEvent) => void, runId: string) {
   const c = claudeStart();
   if (!c.ok) throw new Error(`The subscription runtime can't start: ${c.reason}`);
@@ -522,38 +760,96 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
   audit({ actor_kind: "service", actor_id: "server", actor_name: "Foundation", for_person: opts.user.id, board_id: opts.boardId, door: "agent-run", action: "agent_token.mint", target: runId, decision: "allowed", reason: "a run's own MCP bearer, 2 hours", result: "ok" });
   // the run's pass to the board, in a folder of the run's own (not data/, not the folder Claude Code works in), gone when it ends
   const runDir = workFolder("runs", /^[A-Za-z0-9_-]+$/.test(runId) ? runId : `run_${randomBytes(6).toString("hex")}`);
-  const mcpFile = join(runDir, "mcp.json");
-  writeFileSync(
-    mcpFile,
-    JSON.stringify({
-      mcpServers: {
-        foundation: {
-          type: "http",
-          url: `http://${config.host}:${config.port}/mcp?board=${encodeURIComponent(opts.boardId)}${opts.crew ? `&crew=${encodeURIComponent(opts.crew.id)}` : ""}${opts.chat ? `&as=${encodeURIComponent(opts.chat.agent)}` : ""}`,
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      },
-    }),
-    { mode: 0o600 },
-  );
-  const prompt = `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`;
-  const argv = subscriptionArgs({ prompt, mcpFile, system: SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? "") + "\nYour board tools are the mcp__foundation__* tools." });
-  // the Claude Code session to continue: this server's memory, else the last run of this tab
-  const resume =
-    claudeSessions.get(key) ??
-    (opts.session
-      ? one<{ claude_session: string }>("select claude_session from agent_runs where session_id = ? and created_by = ? and claude_session is not null order by created_at desc limit 1", opts.session, opts.user.id)?.claude_session
-      : undefined);
-  if (resume) argv.push("--resume", resume);
+  try {
+    const mcpFile = join(runDir, "mcp.json");
+    const toolsMode = agentToolsMode();
+    const mcpUrl = runMcpUrl({ boardId: opts.boardId, crew: opts.crew?.id, as: opts.chat?.agent, mode: toolsMode });
+    writeFileSync(mcpFile, JSON.stringify({ mcpServers: { foundation: { type: "http", url: mcpUrl, headers: { Authorization: `Bearer ${token}` } } } }), { mode: 0o600 });
+    const prompt = `${opts.prompt}${youTag(opts.crew)}\n\n${contextBlock(opts)}`;
+    const system = SYSTEM + (opts.persona === "shiba" ? SHIBA : "") + (opts.chat?.system ?? "") + "\nYour board tools are the mcp__foundation__* tools." + (toolsMode === "code" ? CODE_MODE_NOTE : "");
+    // the Claude Code session to continue: this server's memory, else the last run of this tab
+    const resume =
+      claudeSessions.get(key) ??
+      (opts.session
+        ? one<{ claude_session: string }>("select claude_session from agent_runs where session_id = ? and created_by = ? and claude_session is not null order by created_at desc limit 1", opts.session, opts.user.id)?.claude_session
+        : undefined);
+    emit({ type: "status", status: "thinking" });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const argv = subscriptionArgs({ prompt, mcpFile, system, live: liveFlags });
+      if (resume) argv.push("--resume", resume);
+      const said = await claudeTurn({ cmd: c.cmd, argv: [...c.pre, ...argv], key, runId, emit, signal: opts.signal, mcpBase: selfBase(), live: liveFlags });
+      if (said !== "old-cli") return;
+      liveFlags = false;
+    }
+  } finally {
+    rmSync(runDir, { recursive: true, force: true });
+    revokeSession(token);
+  }
+}
 
-  emit({ type: "status", status: "thinking" });
-  await new Promise<void>((resolve, reject) => {
+type StreamLine = {
+  type: string;
+  subtype?: string;
+  session_id?: string;
+  mcp_servers?: Array<{ name: string; status: string }>;
+  event?: { type: string; message?: { id?: string }; content_block?: { type: string }; delta?: { type: string; text?: string; thinking?: string } };
+  message?: { id?: string; content?: Array<{ type: string; id?: string; tool_use_id?: string; text?: string; thinking?: string; name?: string; input?: unknown; content?: unknown; is_error?: boolean }> };
+  usage?: { input_tokens?: number; output_tokens?: number };
+  result?: string;
+  is_error?: boolean;
+};
+
+/** one `claude -p` child, to its end: its stream turned into AgentEvents, watched for silence and for a lost sign-in */
+function claudeTurn(o: { cmd: string; argv: string[]; key: string; runId: string; emit: (e: AgentEvent) => void; signal: AbortSignal; mcpBase: string; live: boolean }): Promise<void | "old-cli"> {
+  const { emit } = o;
+  return new Promise<void | "old-cli">((resolve, reject) => {
     // no shell: the prompt is one argument, whatever it holds
-    const child = spawnChild(c.cmd, [...c.pre, ...argv], subscriptionSpawnOptions());
-    opts.signal.addEventListener("abort", () => child.kill("SIGTERM"));
+    const child = spawnChild(o.cmd, o.argv, subscriptionSpawnOptions());
+    // Stop and the silence end it for sure: on Windows the whole tree at once (taskkill /T /F; SIGTERM there would
+    // end only claude.exe and leave what it started holding the pipes); elsewhere SIGTERM, then SIGKILL after
+    // FOUNDATION_AGENT_KILL_MS (5 s) for one that ignores it. Either way its pipes are let go a second after it
+    // exits, so the run ends, its folder is removed and its MCP pass revoked.
+    let killing = false;
+    const kill = () => {
+      if (killing) return;
+      killing = true;
+      if (process.platform === "win32") return killTree(child);
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      }, killMs()).unref?.();
+    };
+    child.on("exit", () => {
+      setTimeout(() => {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+      }, 1000).unref?.();
+    });
+    o.signal.addEventListener("abort", kill, { once: true });
     let buf = "";
     let err = "";
+    let spoke = false;
+    let silent = false;
+    /** an error the person has already been told (a lost sign-in, an unreachable MCP, Claude Code's own error result) */
+    let told: string | null = null;
+    const pending = new Set<string>();
+    const watch = silenceWatch(silenceMs(), () => {
+      silent = true;
+      kill();
+    });
+    const tell = (message: string) => {
+      if (told) return;
+      told = message;
+      emit({ type: "error", message });
+    };
+    // which streamed messages already gave their words and reasoning as they came (--include-partial-messages)
+    let current = "";
+    const streamedText = new Set<string>();
+    const streamedThinking = new Set<string>();
+
     child.stdout!.on("data", (b: Buffer) => {
+      spoke = true;
+      watch.poke();
       buf += b.toString("utf8");
       let i: number;
       while ((i = buf.indexOf("\n")) >= 0) {
@@ -562,58 +858,145 @@ async function runSubscription(opts: Parameters<typeof runAgent>[0], emit: (e: A
         if (line) handleLine(line);
       }
     });
-    child.stderr!.on("data", (b: Buffer) => (err += b.toString("utf8")));
+    child.stderr!.on("data", (b: Buffer) => {
+      watch.poke();
+      const chunk = b.toString("utf8");
+      err = (err + chunk).slice(-4000);
+      // a lost sign-in says so as soon as it shows, not when the run gives up
+      for (const l of chunk.split("\n")) {
+        if (l.trim() && SIGNED_OUT.test(l)) {
+          lastAccount = { signedIn: false, at: Date.now(), why: scrub(l.trim()).slice(0, 200) };
+          tell(signedOutWords(l.trim()));
+        }
+      }
+    });
     const handleLine = (line: string) => {
-      let ev: {
-        type: string;
-        subtype?: string;
-        session_id?: string;
-        message?: { content?: Array<{ type: string; text?: string; name?: string; input?: unknown; content?: unknown; is_error?: boolean }> };
-        usage?: { input_tokens?: number; output_tokens?: number };
-        result?: string;
-        is_error?: boolean;
-      };
+      let ev: StreamLine;
       try {
         ev = JSON.parse(line);
       } catch {
         return;
       }
-      if (ev.session_id && claudeSessions.get(key) !== ev.session_id) {
-        claudeSessions.set(key, ev.session_id);
-        run("update agent_runs set claude_session = ? where id = ?", ev.session_id, runId);
+      if (ev.session_id && claudeSessions.get(o.key) !== ev.session_id) {
+        claudeSessions.set(o.key, ev.session_id);
+        run("update agent_runs set claude_session = ? where id = ?", ev.session_id, o.runId);
       }
-      if (ev.type === "assistant") {
-        for (const b of ev.message?.content ?? []) {
-          if (b.type === "text" && b.text) emit({ type: "text", text: b.text });
-          // Claude Code's own plumbing (tool search) isn't a step people need to see
-          if (b.type === "tool_use" && b.name !== "ToolSearch") emit({ type: "tool", name: (b.name ?? "").replace(/^mcp__foundation__/, ""), input: b.input });
+      if (ev.type === "system" && ev.subtype === "init") {
+        // its tools are Foundation's MCP: without them the run can only talk, so it stops and says why
+        const mcp = ev.mcp_servers?.find((s) => s.name === "foundation");
+        if (mcp && (mcp.status === "failed" || mcp.status === "needs-auth")) {
+          tell(`Claude Code couldn't reach Foundation's board tools at ${o.mcpBase}/mcp (it says “${mcp.status}”), so it was stopped before it could only talk. Is the server listening there?`);
+          kill();
         }
+      } else if (ev.type === "stream_event" && ev.event) {
+        const e = ev.event;
+        if (e.type === "message_start") current = e.message?.id ?? "";
+        else if (e.type === "content_block_start" && e.content_block?.type === "thinking") emit({ type: "status", status: "thinking" });
+        else if (e.type === "content_block_delta" && e.delta?.type === "thinking_delta" && e.delta.thinking) {
+          streamedThinking.add(current);
+          emit({ type: "thinking", text: e.delta.thinking });
+        } else if (e.type === "content_block_delta" && e.delta?.type === "text_delta" && e.delta.text) {
+          streamedText.add(current);
+          emit({ type: "text", text: e.delta.text });
+        }
+      } else if (ev.type === "assistant") {
+        const id = ev.message?.id ?? "";
+        for (const b of ev.message?.content ?? []) {
+          if (b.type === "thinking" && b.thinking && !streamedThinking.has(id)) emit({ type: "thinking", text: b.thinking });
+          if (b.type === "text" && b.text && !streamedText.has(id)) emit({ type: "text", text: b.text });
+          if (b.type === "tool_use") {
+            if (b.id) pending.add(b.id);
+            // Claude Code's own plumbing (tool search) isn't a step people need to see
+            if (b.name !== "ToolSearch") emit({ type: "tool", name: (b.name ?? "").replace(/^mcp__foundation__/, ""), input: b.input });
+          }
+        }
+        // while a tool of ours runs, the silence is ours (a person's Run press, a long read), not Claude Code's
+        watch.pause(pending.size > 0);
         emit({ type: "status", status: "working" });
       } else if (ev.type === "user") {
         for (const b of ev.message?.content ?? []) {
           if (b.type === "tool_result") {
+            if (b.tool_use_id) pending.delete(b.tool_use_id);
             if (typeof b.content !== "string" && JSON.stringify(b.content).includes('"tool_reference"')) continue;
             const text = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
             emit({ type: "tool_result", name: "", ok: !b.is_error, summary: text.slice(0, 200) });
           }
         }
+        watch.pause(pending.size > 0);
       } else if (ev.type === "result") {
-        if (ev.is_error) emit({ type: "error", message: ev.result ?? "Claude Code reported an error" });
-        emit({ type: "done", runtime: "subscription", usage: { input: ev.usage?.input_tokens ?? 0, output: ev.usage?.output_tokens ?? 0 } });
+        const failed = ev.is_error || (ev.subtype ?? "success") !== "success";
+        if (failed) {
+          const said = ev.result || ev.subtype || "Claude Code reported an error";
+          if (SIGNED_OUT.test(said)) {
+            lastAccount = { signedIn: false, at: Date.now(), why: scrub(said).slice(0, 200) };
+            tell(signedOutWords(said));
+          } else tell(`Claude Code reported an error: ${scrub(said).slice(0, 600)}`);
+        } else lastAccount = { signedIn: true, at: Date.now() };
+        // one ending per run: an error, or done
+        if (!failed) emit({ type: "done", runtime: "subscription", usage: { input: ev.usage?.input_tokens ?? 0, output: ev.usage?.output_tokens ?? 0 } });
       }
     };
+    const end = () => {
+      watch.stop();
+      o.signal.removeEventListener("abort", kill);
+    };
     child.on("error", (e) => {
-      rmSync(runDir, { recursive: true, force: true });
-      revokeSession(token);
+      end();
       reject(e);
     });
     child.on("close", (code) => {
-      rmSync(runDir, { recursive: true, force: true });
-      revokeSession(token);
-      if (code === 0 || opts.signal.aborted) resolve();
-      else reject(new Error(`Claude Code exited ${code}: ${err.slice(-600)}`));
+      end();
+      const tail = scrub(err.trim()).slice(-600);
+      // one ending per run: what was already said stands, a silence after it adds nothing
+      if (told) return o.signal.aborted && !silent ? resolve() : reject(new SaidError(told));
+      if (silent) return reject(new Error(silenceWords(silenceMs(), spoke, err, tail)));
+      if (o.signal.aborted) return resolve();
+      if (code === 0) return resolve();
+      // a Claude Code older than the live flags: once more without them
+      // (an option it doesn't know, or a value of one it won't take); runSubscription retries once at most
+      if (o.live && !spoke && OLD_CLI.test(err)) return resolve("old-cli");
+      reject(new Error(`Claude Code exited ${code}${tail ? `: ${tail}` : " and said nothing"}`));
     });
   });
+}
+
+/** why a run went quiet, as best the server can tell, and what Claude Code's error output said */
+function silenceWords(ms: number, spoke: boolean, err: string, tail: string): string {
+  const s = Math.round(ms / 1000);
+  const cause = SIGNED_OUT.test(err)
+    ? "its sign-in has expired (on the server's computer, run `claude` and sign in with /login)"
+    : !spoke
+      ? "it never started: it may be waiting on a prompt it can't show here (a first-run question, a sign-in, a trust prompt). Run `claude` once on the server's computer to see"
+      : "the model stopped answering (Anthropic slow or down), or Claude Code is waiting on a prompt it can't show here";
+  return `Claude Code said nothing for ${s} s, so the run was stopped. Likely: ${cause}. Its error output: ${tail || "nothing"}`;
+}
+
+/**
+ * Whether the Claude sign-in on the server's computer is there, without spending anything: `claude auth status`
+ * (its JSON says loggedIn), asked at most once a minute; else what the last run showed; else "unknown".
+ */
+let accountCache: { at: number; value: { installed: boolean; version?: string; signedIn: boolean | "unknown"; why?: string } } | null = null;
+export async function claudeAccount(): Promise<{ installed: boolean; version?: string; signedIn: boolean | "unknown"; why?: string }> {
+  if (accountCache && Date.now() - accountCache.at < 60_000) return accountCache.value;
+  const c = claudeStart();
+  if (!c.ok) return { installed: false, signedIn: false, why: c.reason };
+  const opts = childOptions<ExecFileOptions>({ extras: CLAUDE_CODE_ENV }, { timeout: 10_000, windowsHide: true, maxBuffer: 256 * 1024 });
+  let version: string | undefined;
+  try {
+    version = (await execFileText(c.cmd, [...c.pre, "--version"], opts)).stdout.trim().split(/\s/)[0] || undefined;
+  } catch {
+    /* it answered once, at start; a version is nice to have */
+  }
+  let value: { installed: boolean; version?: string; signedIn: boolean | "unknown"; why?: string };
+  try {
+    const { stdout } = await execFileText(c.cmd, [...c.pre, "auth", "status", "--json"], opts);
+    const st = JSON.parse(stdout) as { loggedIn?: boolean; authMethod?: string };
+    value = typeof st.loggedIn === "boolean" ? { installed: true, version, signedIn: st.loggedIn, ...(st.loggedIn ? {} : { why: "Claude Code on the server isn't signed in: on that computer, run `claude` and sign in with /login." }) } : { installed: true, version, signedIn: "unknown" };
+  } catch {
+    value = lastAccount ? { installed: true, version, signedIn: lastAccount.signedIn, ...(lastAccount.why ? { why: lastAccount.why } : {}) } : { installed: true, version, signedIn: "unknown", why: "This Claude Code can't say whether it's signed in; the next run will." };
+  }
+  accountCache = { at: Date.now(), value };
+  return value;
 }
 
 // ---------- sessions (the tabs) ----------

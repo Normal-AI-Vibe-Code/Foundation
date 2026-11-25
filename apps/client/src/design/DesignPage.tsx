@@ -10,6 +10,8 @@ import { ProgressiveImageDemo } from "./ProgressiveImageDemo";
 import { PeopleSectionView, type ServerRole, type ServerUser } from "../settings/PeopleSection";
 import { CouncilView, type CouncilSeat } from "../characters/Council";
 import { AgentInfoBody } from "../characters/AgentInfo";
+import { RunCard } from "../characters/RunCard";
+import { readyCharacters, useRoster } from "../characters/roster";
 import { ShibaDot } from "../today/notices";
 import { ShibaTalk } from "../today/ShibaTalk";
 import { PROVIDER_NAME, ProviderMark } from "../characters/providers";
@@ -160,6 +162,7 @@ import { LocalDemo } from "./LocalDemo";
 import { ChatFormDemo } from "../chat/ChatDesign";
 import { UploaderDemo } from "./UploaderDemo";
 import { UsabilityDemo } from "./UsabilityDemo";
+import { AgentSetupDemo } from "./AgentSetupDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -1423,7 +1426,11 @@ function DesignSections() {
         <SectionAgentsDemo />
       </Section>
 
-      <Section title="The council" note="The agents at work on a section or the whole board, seated along the foot of the window as characters (☺ in the top bar, on a section's tools, in its right-click menu, and ⌘K). A glass bar, pane radius, risen on the settle spring; seats stagger in 45 ms apart on the spring. Each seat is 124 × 156: its character from the chest up over a plinth washed in its agent's cursor colour (--color-crew-n, the same hue as its cursor and its presence dot) with a 3 px rule of that colour at the foot, what its cursor says above it on raised paper with a hairline tinted the same, and under it the colour's dot, the agent's name in 12/600 and “as <character>” in dim 11. A seat's mood is the agent's state: it waves when it arrives, thinks while it reads, works while it writes, talks when it asks you something, cheers when it's done, holds its head on an error. Pressed, a seat stands (208 × 332, head to toe on a round wash of its colour) and a card beside it says what it was asked and for whom, with Follow, Stop and the characters it can appear as (the one worn ringed in its colour). With nobody at work the seats are the bench: the characters there are, on a neutral plinth, and one waves when pointed at. Below, a composer on a pill; Ask is the violet pill, because an agent will act. 3D characters are drawn on one canvas laid over the bar, so six seats cost one renderer; the board above stays live, since only the bar takes the pointer.">
+      <Section title="Agent setup" note="Adding an agent starts with its kind, each in one sentence saying where it runs and who pays. Claude has exactly three ways, run by Foundation itself: Claude account on this computer (the server starts Claude Code on the sign-in this computer already has; not a connection to a Claude Code window you have open), API key (straight to Anthropic, on the key's credits) and Federated identity (the organization's sign-in; the server's reason, and a stub says it's a stub, when it isn't set up). A T3 session is the other kind: T3 Code runs Claude, ChatGPT, Gemini, Kimi, DeepSeek or a local model, on whatever that agent is signed in to in T3. Each way shows how it stands: a dot (ok, warn, none) and the server's words. The key is a password field that is emptied the moment it is sent; stored, it is ••••last4 in the code face with Replace and Forget…, which asks in place on a bad-tinted well. The model is a list newest first, the newest marked Latest, with a dim line saying whether it is live from Anthropic or built in. A Claude Code you run yourself is an MCP client acting as you: Create a token, and the ready-to-paste command appears once, with Copy. Keys and tokens are a person's, so nothing here is violet. At 260, 400 and 560 px.">
+        <AgentSetupDemo />
+      </Section>
+
+      <Section title="The council" note="The agents that belong to a section, or to the whole grid, as characters standing on an edge, no panel (2026-11-24 pass). Each seat is as wide as its figure needs at 190 tall (a mesh avatar's picture is 896 × 1200, a 3D figure's frame 0.72, a still its own proportions): cut only at the edge it stands behind, never at the sides; six shrink evenly to fit the paper. Over each head, one opaque bar on raised paper with a hairline and the lift shadow: the model's mark, the name in full, a cloud or a computer, and a state dot (ok; breathing in the agent's colour at work; a pulled plug in red when it can't be reached). At work the same bar ringed in its colour says what it's doing behind three beating dots, a light running along its foot, with Follow, and Open and Stop for the one who asked. Beside the head, the run card: a chip with dots from the moment you send (Starting), then the plan (the goal, the steps, the active one breathing, done ones ticked) and the latest reasoning in dim italics; done is a ✓ chip for 2.4 s. Pressing an agent turns its bar into the line to it, opaque paper above the head in any room, and opens its pane, where the same card shows in full. Beside the agents, one silhouette asleep (closed eyes, breathing), and peeking from behind it a small one with the ＋ that adds an agent">
         <CouncilDemo />
         <CharacterStudioDemo />
       </Section>
@@ -2471,19 +2478,35 @@ function SettingsDemo() {
 }
 
 function CouncilDemo() {
+  // the characters this server has, when it has them: a mesh avatar shows its full width (2026-11-24), a still its own proportions
+  const roster = useRoster();
+  const ready = readyCharacters(roster);
+  const mesh = ready.find((c) => c.form === "mesh" && c.files.mavatar);
+  const others = ready.filter((c) => c !== mesh);
+  const plan = { goal: "A Supply section with the parts, hooked up to FactoryForm", steps: [{ text: "Read the board", status: "done" as const }, { text: "Make the Supply section", status: "done" as const }, { text: "Add a table of parts", status: "active" as const }, { text: "Hook up FactoryForm", status: "pending" as const }, { text: "Bring Ada there", status: "pending" as const }] };
+  const thought = "The parts list has 48 rows; a table reads better than a note, and FactoryForm can fill the lead times.";
   const seats: CouncilSeat[] = [
-    { id: "a", name: "Wren", agentName: "Claude", agentKey: "claude", provider: "claude", where: "cloud", service: "Claude Code on the server, on its Claude subscription", tools: true, place: "sec", postedBy: "Ada", hue: 0, status: "working", doing: "adding a table of parts", task: "Make a Supply section with the parts and hook up FactoryForm", askerName: "Ada", mine: true, mood: "working" },
-    { id: "b", name: "Codex", agentName: "Codex", agentKey: "t3:codex", provider: "chatgpt", where: "cloud", service: "ChatGPT Plus, signed in on this computer", tools: true, place: "sec", postedBy: "Ada", hue: 2, status: "idle", mood: "idle" },
-    { id: "c", name: "Kimi", agentName: "Kimi", agentKey: "t3:kimi", provider: "kimi", where: "local", service: "a model server on this computer (127.0.0.1:11434)", model: "kimi-k3", tools: true, place: "sec", postedBy: "Kai", hue: 3, status: "done", mood: "happy" },
-    { id: "d", name: "DeepSeek", agentName: "DeepSeek", agentKey: "t3:deepseek", provider: "deepseek", where: "cloud", service: "api.deepseek.com, on your key", tools: false, place: "sec", postedBy: "Kai", hue: 1, status: "idle", mood: "sad", offline: true, why: "its key was turned down" },
+    { id: "a", name: "Garnet", agentName: "Claude", agentKey: "claude", provider: "claude", where: "cloud", service: "Claude Code on the server, on its Claude subscription", tools: true, place: "sec", postedBy: "Ada", hue: 0, status: "working", doing: "adding a table of parts", task: "Make a Supply section with the parts and hook up FactoryForm", askerName: "Ada", mine: true, mood: "working", crewId: "demo-garnet", session: "demo-garnet", plan, thought, started: Date.now() - 84_000, character: mesh },
+    { id: "b", name: "Codex", agentName: "Codex", agentKey: "t3:codex", provider: "chatgpt", where: "cloud", service: "ChatGPT Plus, signed in on this computer", tools: true, place: "sec", postedBy: "Ada", hue: 2, status: "idle", mood: "idle", pending: true, character: others[0] },
+    { id: "c", name: "Kimi", agentName: "Kimi", agentKey: "t3:kimi", provider: "kimi", where: "local", service: "a model server on this computer (127.0.0.1:11434)", model: "kimi-k3", tools: true, place: "sec", postedBy: "Kai", hue: 3, status: "idle", mood: "idle", character: others[1] },
+    { id: "d", name: "DeepSeek", agentName: "DeepSeek", agentKey: "t3:deepseek", provider: "deepseek", where: "cloud", service: "api.deepseek.com, on your key", tools: false, place: "sec", postedBy: "Kai", hue: 1, status: "idle", mood: "sad", offline: true, why: "its key was turned down", character: others[2] },
   ];
   return (
-    <div data-design-council>
-      <CouncilView title="Supply" kind="section" seats={seats} ghosts={[undefined]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline hot="b" />
-      {/* 2026-11-21: nobody on it yet, three silhouettes close together; from the first agent on, one to add another */}
-      <div className="f-eyebrow update-demo-label">Nobody yet: three silhouettes, close together</div>
-      <div data-design-council-empty>
-        <CouncilView title="Tooling" kind="section" seats={[]} ghosts={[undefined, undefined, undefined]} canAsk onSay={() => {}} onAdd={() => {}} onPanel={() => {}} onClose={() => {}} inline />
+    <div data-design-council style={{ display: "flow-root" }}>
+      <div data-design-council-main style={{ display: "flow-root" }}>
+        <CouncilView title="Supply" kind="section" seats={seats} ghost={others[3]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline />
+      </div>
+      {/* pressed: the line to that agent is the last row of the same bar, its name and marks above it */}
+      <div className="f-eyebrow update-demo-label">Pressed: the bar over its head becomes the line to it</div>
+      <div data-design-council-say style={{ display: "flow-root" }}>
+        <CouncilView title="Supply" kind="section" seats={[seats[2]]} ghost={others[3]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onClose={() => {}} inline hot="c" />
+      </div>
+      <div className="f-eyebrow update-demo-label">The run card: starting, the plan with its reasoning, done</div>
+      <div className="design-council-run" style={{ ["--crew" as string]: "var(--color-crew-0)" }}>
+        <RunCard run={{ status: "pending" }} variant="seat" />
+        <RunCard run={{ status: "working", doing: "reading the board" }} variant="seat" />
+        <RunCard run={{ status: "working", doing: "adding a table of parts", plan, thought, started: Date.now() - 84_000 }} variant="full" />
+        <RunCard run={{ status: "done" }} variant="row" />
       </div>
       <div className="design-council-talk agents-pane" style={{ height: 360, display: "flex", flexDirection: "column" }}>
         <CouncilTalkView title="Supply" seats={seats} said={[{ id: 1, at: Date.UTC(2026, 10, 17, 9, 30), text: "Which of the parts are we still short of?", to: seats.map((s) => s.name), all: true }]} viewer={false} onSay={() => {}} onAdd={() => {}} onAbout={() => {}} />
@@ -2493,6 +2516,12 @@ function CouncilDemo() {
           Codex <span className="agents-head-n">at rest</span>
         </header>
         <AgentInfoBody seat={seats[1]} seats={seats} sectionId={null} viewer={false} still />
+      </div>
+      <div className="design-agent-info agents-pane agent-info" data-design-agent-working>
+        <header className="agents-head">
+          Garnet <span className="agents-head-n">at work</span>
+        </header>
+        <AgentInfoBody seat={seats[0]} seats={seats} sectionId={null} viewer={false} still />
       </div>
     </div>
   );

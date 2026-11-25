@@ -64,6 +64,8 @@ export interface ServerCapabilities {
   allowHostTools: boolean;
   local: Record<LocalFeature, boolean>;
   chat: true;
+  /** run_code and search_tools, and /mcp?mode=code (codemode.ts) */
+  codeMode: true;
   images: {
     serverLevels: true;
     widths: number[];
@@ -86,6 +88,7 @@ export function serverCapabilities(): ServerCapabilities {
       localDev: localFeatureAllowed("localDev"),
     },
     chat: true,
+    codeMode: true,
     images: {
       serverLevels: true,
       widths: [64, 256, 512, 1024, 2048],

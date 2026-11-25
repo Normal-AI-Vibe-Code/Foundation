@@ -1,28 +1,35 @@
 /**
- * Adding an agent to a council, in the agents panel on the right: who it is, getting it connected,
- * the character it wears, and where it sits. Four steps on one sheet, each open only when the one
- * before is settled, so a person is led through it:
+ * Adding an agent to a council, in the agents panel on the right. Four steps on one sheet, each open
+ * only when the one before is settled.
  *
- *  1. **Who.** Claude, ChatGPT, Gemini, Kimi, DeepSeek, or a model on this computer. The list is
- *     already there when the panel opens (lib/agentsAvailable.ts keeps it), each saying how it stands.
- *  2. **Connect** (2026-11-17: "much more hand holding"). Every kind of agent has its *ways* of being
- *     connected, each a card: what it is in a line, then numbered steps that tick themselves off as
- *     they're done, with the button or the link each step needs right there. For Claude there are
- *     three: an API key (a link to the page that makes one, then the key), your Claude account
- *     through this computer's agents (start T3, sign in in T3, and its sessions keep working on
- *     Foundation), or Claude Code on this computer (signed in once in a terminal). The others get the
- *     same treatment: sign-in through T3 for ChatGPT and Gemini, a key or a local model for Kimi and
- *     DeepSeek.
+ * 2026-11-24 (Josh: "I tried to add one via the API key, but it seemed like it was going through T3 …
+ * There really should only be three types of Claude agents"): re-cut by **kind** (docs/agent-harness.md §1).
+ *
+ *  1. **Kind.** *Claude*, run by Foundation itself, or *A T3 session*, where T3 Code runs the agent.
+ *     Each says in one sentence where it runs and who pays (the server's `runs` when it sends one).
+ *  2. **Connect.** Claude has exactly three ways, each with its live readiness from
+ *     `GET /api/agents/claude`: *Claude account on this computer* (`claude-account`: the server starts
+ *     Claude Code here on this computer's sign-in; not a connection to any Claude Code window you have
+ *     open), *API key* (`claude-api`: straight to Anthropic, on the key's credits; the key stored by an
+ *     admin, the model chosen from Anthropic's list) and *Federated identity* (`claude-federated`: the
+ *     organization's sign-in; the server's `why` when it isn't set up). *A T3 session* first asks which
+ *     agent (Claude, ChatGPT, Gemini, Kimi, DeepSeek, a local model), then that agent's ways as before:
+ *     signed in through T3, a key T3 keeps, or a local model. Nothing under Claude says T3.
+ *     A Claude Code you run yourself is none of these: "Using Claude Code yourself?" opens the MCP block.
  *  3. **Avatar.** The approved characters; one is chosen already (an abstract one nobody wears).
- *  4. **Add.** To the section or the grid the council is for. One of this computer's agents also gets
- *     its own session, named after it, opened in that section (it reads the grid once).
+ *  4. **Add.** To the section or the grid the council is for (kept while the panel is open, even after
+ *     the council itself is put away). One of T3's agents also gets its own session in that section.
+ *
+ * An older server (404 on the Claude routes) gets today's flow: its one Claude agent on the account way,
+ * and a line saying the server is older than the app on the other two.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api";
-import { refreshAvailable, useAvailable } from "../lib/agentsAvailable";
+import { refreshAvailable, useAvailable, type OfferedAgent } from "../lib/agentsAvailable";
+import { claudeModels, refreshClaude, useClaude, type ClaudeModel, type ClaudeStatus } from "../lib/claudeAgents";
 import { GRID_PLACE, postAgent, usePosted, type AvailableAgent } from "../lib/posted";
-import { councilOpen } from "../lib/councilOpen";
+import { useCouncilOpen, type CouncilScope } from "../lib/councilOpen";
 import { getState } from "../state/store";
 import { setUi, toast, useUi } from "../state/ui";
 import { activeBoard } from "../sync/board";
@@ -31,20 +38,37 @@ import { Still } from "../characters/Avatar";
 import { ProviderMark, providerOf, type Provider } from "../characters/providers";
 import { chooseAvatar, readyCharacters, useRoster, type RosterCharacter } from "../characters/roster";
 import { T3AddForm, type T3Agent, type T3Local, type T3Preset } from "./AgentsPane";
+import { ClaudeKey, ClaudeModelPicker, Federation, McpConnect, OLDER_WORDS, Readiness, wayState, type ClaudeWayId } from "./AgentSetup";
 
-export type WayId = "key" | "t3" | "own" | "local";
+export type KindId = "claude" | "t3";
+export type T3WayId = "t3" | "key" | "local";
+export type WayId = ClaudeWayId | T3WayId;
 
-/** which of T3's own agents drives each kind, signed in through T3 */
+/** which of T3's own agents drives each, signed in through T3 */
 const T3_DRIVER: Partial<Record<Provider, string>> = { claude: "claudeAgent", chatgpt: "codex", gemini: "antigravity" };
 
-/** one way of connecting a kind of agent */
+/** one way of connecting an agent */
 export interface Way {
   id: WayId;
   title: string;
   what: string;
 }
 
-interface Kind {
+/** the two kinds, each in one sentence: where it runs and who pays */
+export const KINDS: Array<{ id: KindId; label: string; what: string }> = [
+  { id: "claude", label: "Claude", what: "Run by Foundation itself, in one of three ways: this computer's Claude sign-in, an API key, or your organization's sign-in." },
+  { id: "t3", label: "A T3 session", what: "T3 Code runs the agent (Claude, ChatGPT, Gemini, Kimi, DeepSeek or a local model) in a session Foundation starts, paid by whatever that agent is signed in to or keyed with." },
+];
+
+/** Claude's three ways (docs/agent-harness.md §1), with the server's agent key for each */
+export const CLAUDE_WAYS: Array<Way & { id: ClaudeWayId; key: string }> = [
+  { id: "account", key: "claude", title: "Claude account on this computer", what: "Foundation's server starts Claude Code here, on the Claude sign-in this computer already has. Your Claude plan pays; no key." },
+  { id: "api", key: "claude-api", title: "API key", what: "Foundation talks to Anthropic directly, on a key an admin stores here. The key's credits pay." },
+  { id: "federated", key: "claude-fed", title: "Federated identity", what: "Your organization's sign-in, exchanged for a short-lived token. Your organization's Anthropic workspace pays." },
+];
+
+/** an agent T3 runs, and its ways of being connected */
+export interface T3Kind {
   id: Provider;
   label: string;
   what: string;
@@ -56,26 +80,16 @@ interface Kind {
   install?: string;
   /** where a person makes an API key */
   keyPage?: string;
-  ways: Way[];
+  ways: Array<Way & { id: T3WayId }>;
 }
 
-const T3_WAY = (who: string, account: string): Way => ({ id: "t3", title: `Sign in with your ${account} account`, what: `Through this computer's agents (T3). No key: it runs on your ${who} plan, and its sessions keep working on Foundation.` });
-const KEY_WAY = (vendor: string): Way => ({ id: "key", title: "An API key", what: `Billed to your ${vendor} account as it's used. This computer's agents keep the key; Foundation never stores it.` });
-const LOCAL_WAY: Way = { id: "local", title: "A model on this computer", what: "Run by a model server here (Ollama's address by default). No key, and nothing you ask leaves the computer." };
+const T3_WAY = (who: string, account: string): Way & { id: T3WayId } => ({ id: "t3", title: `Sign in with your ${account} account`, what: `In T3. No key: it runs on your ${who} plan, and its sessions keep working on Foundation.` });
+const KEY_WAY = (vendor: string): Way & { id: T3WayId } => ({ id: "key", title: "An API key, kept by T3", what: `Billed to your ${vendor} account as it's used. T3 keeps the key; Foundation never stores it.` });
+const LOCAL_WAY: Way & { id: T3WayId } = { id: "local", title: "A model on this computer", what: "Run by a model server here (Ollama's address by default). No key, and nothing you ask leaves the computer." };
 
-/** the kinds of agent there are to add, in the order offered, each with its ways of being connected */
-export const KINDS: Kind[] = [
-  {
-    id: "claude",
-    label: "Claude",
-    what: "Anthropic's, through Claude Code",
-    preset: "claude",
-    program: "Claude Code",
-    signIn: "claude",
-    install: "npm install -g @anthropic-ai/claude-code",
-    keyPage: "https://console.anthropic.com/settings/keys",
-    ways: [KEY_WAY("Anthropic"), T3_WAY("Claude", "Claude"), { id: "own", title: "Claude Code on this computer", what: "The computer Foundation's server runs on, signed in once in a terminal. Your Claude subscription, no key. This is Foundation's own agent." }],
-  },
+/** the agents a T3 session can run, in the order offered */
+export const T3_KINDS: T3Kind[] = [
+  { id: "claude", label: "Claude", what: "Anthropic's, through Claude Code in T3", preset: "claude", program: "Claude Code", signIn: "claude", install: "npm install -g @anthropic-ai/claude-code", keyPage: "https://console.anthropic.com/settings/keys", ways: [T3_WAY("Claude", "Claude"), KEY_WAY("Anthropic")] },
   { id: "chatgpt", label: "ChatGPT", what: "OpenAI's, through Codex", program: "Codex", signIn: "codex login", install: "npm install -g @openai/codex", ways: [T3_WAY("ChatGPT", "ChatGPT")] },
   { id: "gemini", label: "Gemini", what: "Google's, through Antigravity", program: "Antigravity", signIn: "antigravity", ways: [T3_WAY("Google", "Google")] },
   { id: "kimi", label: "Kimi", what: "Moonshot's, on a key or a local model", preset: "kimi", keyPage: "https://platform.moonshot.ai/console/api-keys", ways: [KEY_WAY("Moonshot"), LOCAL_WAY] },
@@ -83,12 +97,18 @@ export const KINDS: Kind[] = [
   { id: "local", label: "A local model", what: "runs on this computer, nothing leaves it", preset: "kimi", ways: [LOCAL_WAY] },
 ];
 
-/** the available agent that is this kind connected this way, if this server or this computer has one */
-export function agentFor(kind: Kind, way: WayId, agents: AvailableAgent[]): AvailableAgent | undefined {
+/** the server's agent for a Claude way: on an older server only the account way has one (its "claude") */
+export function claudeAgentFor(way: ClaudeWayId, agents: AvailableAgent[], older: boolean): AvailableAgent | undefined {
+  if (older) return way === "account" ? agents.find((a) => a.key === "claude") : undefined;
+  const w = CLAUDE_WAYS.find((x) => x.id === way)!;
+  return agents.find((a) => a.key === w.key);
+}
+
+/** the T3 agent that is this kind connected this way, if this computer has one */
+export function t3AgentFor(kind: T3Kind, way: T3WayId, agents: AvailableAgent[]): AvailableAgent | undefined {
   const added = (w: "cloud" | "local") => agents.find((a) => a.key === `t3:${kind.preset}-${w}`);
-  if (way === "own") return agents.find((a) => a.key === "claude");
   if (way === "key") return added("cloud");
-  if (way === "local") return kind.id === "local" ? agents.find((a) => a.where === "local") : added("local");
+  if (way === "local") return kind.id === "local" ? agents.find((a) => a.key.startsWith("t3:") && a.where === "local") : added("local");
   // signed in through T3: its own program's agent, not one added on a key
   return agents.find((a) => a.key.startsWith("t3:") && providerOf(a) === kind.id && !/-(cloud|local)$/.test(a.key));
 }
@@ -122,57 +142,134 @@ function WayStep({ n, done, wait, title, children }: { n: number; done: boolean;
   );
 }
 
+/** the two kinds, each with its sentence and how it stands (also drawn on #/design) */
+export function KindList({ kind, words, onPick }: { kind: KindId | null; words: (id: KindId) => { ok: boolean; words: string }; onPick?: (id: KindId) => void }) {
+  return (
+    <div className="add-kinds">
+      {KINDS.map((x) => {
+        const s = words(x.id);
+        return (
+          <button key={x.id} type="button" className={`add-kind${kind === x.id ? " is-on" : ""}`} data-add-kind={x.id} aria-pressed={kind === x.id} onClick={() => onPick?.(x.id)}>
+            {x.id === "claude" ? <ProviderMark provider="claude" size={28} /> : <span className="add-kind-t3" aria-hidden>T3</span>}
+            <span className="add-kind-text">
+              <b>{x.label}</b>
+              <span>{x.what}</span>
+            </span>
+            <span className={`add-kind-state${s.ok ? " is-ok" : ""}`}>{s.words}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** one way of connecting: a radio card, its sentence, how it stands, and (open) its body (also drawn on #/design) */
+export function WayCard({ id, title, what, ok, state, on, onPick, children }: { id: string; title: string; what: string; ok: boolean; state: string; on: boolean; onPick?: () => void; children?: React.ReactNode }) {
+  return (
+    <div className={`add-way${on ? " is-on" : ""}${ok ? " is-ready" : ""}`} data-add-way={id} data-add-way-ready={ok ? "yes" : "no"}>
+      <button type="button" className="add-way-head" aria-expanded={on} onClick={onPick}>
+        <span className="add-way-radio" aria-hidden />
+        <span className="add-way-text">
+          <b>{title}</b>
+          <span className="setup-runs">{what}</span>
+        </span>
+        <span className={`add-kind-state${ok ? " is-ok" : ""}`}>{state}</span>
+      </button>
+      {on && <div className="add-way-body">{children}</div>}
+    </div>
+  );
+}
+
+/** the council the panel was opened for, kept while the panel is open even once the council is put away */
+function useAddScope(): CouncilScope | null {
+  const live = useCouncilOpen();
+  const [kept, setKept] = useState<CouncilScope | null>(live);
+  useEffect(() => {
+    if (live) setKept(live);
+  }, [live]);
+  return live ?? kept;
+}
+
 export function AddAgent({ onDone }: { onDone(): void }) {
   const ui = useUi();
   const { agents, t3, host } = useAvailable();
+  const claude = useClaude();
   const posted = usePosted();
   const roster = useRoster();
   const ready = readyCharacters(roster);
-  const scope = councilOpen();
+  const scope = useAddScope();
   const st = getState();
   const sectionId = scope?.kind === "section" ? scope.id : null;
   const place = sectionId ?? GRID_PLACE;
   const placeName = sectionId ? (st.allSections[sectionId]?.name ?? "this section") : "this grid";
   const here = new Set((posted[place] ?? []).map((p) => p.key));
+  const admin = ui.role === "admin";
 
-  const [kind, setKind] = useState<Provider | null>(null);
-  const [wayPick, setWay] = useState<WayId | null>(null);
+  const [kind, setKind] = useState<KindId | null>(null);
+  const [claudeWayPick, setClaudeWay] = useState<ClaudeWayId | null>(null);
+  const [t3Pick, setT3Pick] = useState<Provider | null>(null);
+  const [t3WayPick, setT3Way] = useState<T3WayId | null>(null);
+  const [mcpOpen, setMcpOpen] = useState(false);
   const [avatar, setAvatar] = useState<string | null>(null);
   const [session, setSession] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [presets, setPresets] = useState<Record<string, T3Preset>>({});
   const [local, setLocal] = useState<T3Local | null>(null);
+  const [claudeList, setClaudeList] = useState<ClaudeModel[] | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  // a Claude on the API (key or federated): the model this seat runs, when the person picks one
+  const [seatModelPick, setSeatModel] = useState<string | null>(null);
 
   useEffect(() => {
     void refreshAvailable();
-    const t = setInterval(() => void refreshAvailable(), 4000);
+    void refreshClaude();
+    const t = setInterval(() => {
+      void refreshAvailable();
+      void refreshClaude();
+    }, 4000);
     return () => clearInterval(t);
   }, []);
 
-  const k = KINDS.find((x) => x.id === kind);
-  // the way in use: the one picked, else one that's already connected, else the first offered
-  const way: WayId | null = k ? (wayPick && k.ways.some((w) => w.id === wayPick) ? wayPick : (k.ways.find((w) => agentFor(k, w.id, agents)?.ready)?.id ?? k.ways[0].id)) : null;
-  const found: AvailableAgent | undefined = useMemo(() => (k && way ? agentFor(k, way, agents) : undefined), [k, way, agents]);
-  // T3's own agent for this kind, even one it has switched off (it isn't offered as available until it's on)
-  const t3Agent: T3Agent | undefined = found?.key.startsWith("t3:") ? host?.agents.find((a) => `t3:${a.id}` === found.key) : k ? host?.agents.find((a) => a.driver === T3_DRIVER[k.id]) : undefined;
+  const older = claude.older;
+  const status: ClaudeStatus | null = claude.status;
+  const runsOf = (key: string) => (agents.find((a) => a.key === key) as OfferedAgent | undefined)?.runs;
+
+  // Claude: the way picked, else one that's ready, else the account
+  const claudeWay: ClaudeWayId = claudeWayPick ?? CLAUDE_WAYS.find((w) => claudeAgentFor(w.id, agents, older)?.ready)?.id ?? "account";
+  // a T3 session: the agent picked, then its way (picked, else one that's connected, else its first)
+  const tk = T3_KINDS.find((x) => x.id === t3Pick);
+  const t3Way: T3WayId | null = tk ? (t3WayPick && tk.ways.some((w) => w.id === t3WayPick) ? t3WayPick : (tk.ways.find((w) => t3AgentFor(tk, w.id, agents)?.ready)?.id ?? tk.ways[0].id)) : null;
+
+  const found: AvailableAgent | undefined = useMemo(() => {
+    if (kind === "claude") return claudeAgentFor(claudeWay, agents, older);
+    if (kind === "t3" && tk && t3Way) return t3AgentFor(tk, t3Way, agents);
+    return undefined;
+  }, [kind, claudeWay, tk, t3Way, agents, older]);
+  // T3's own agent for this one, even one it has switched off (it isn't offered as available until it's on)
+  const t3Agent: T3Agent | undefined = kind !== "t3" || !tk ? undefined : found?.key.startsWith("t3:") ? host?.agents.find((a) => `t3:${a.id}` === found.key) : host?.agents.find((a) => a.driver === T3_DRIVER[tk.id]);
   const t3On = t3 === "running";
   const connected = !!found && found.ready;
   const picked = ready.find((c) => c.id === avatar) ?? defaultAvatar(ready, roster.avatars);
-  const needsForm = !!k && (way === "key" || way === "local") && !found && t3On;
+  const needsForm = kind === "t3" && !!tk && (t3Way === "key" || t3Way === "local") && !found && t3On;
 
   useEffect(() => {
     if (!needsForm) return;
     void api<Record<string, T3Preset>>("/api/t3host/presets").then(setPresets).catch(() => {});
-  }, [needsForm]);
+    // Claude in T3 on a key: the model is chosen from Anthropic's list, not typed
+    if (tk?.preset === "claude") void claudeModels().then((r) => setClaudeList(r?.models ?? null)).catch(() => setClaudeList(null));
+  }, [needsForm, tk?.preset]);
   useEffect(() => {
-    if (!needsForm || way !== "local" || !k?.preset) return;
+    if (!needsForm || t3Way !== "local" || !tk?.preset) return;
     void api<T3Local>("/api/t3host/local")
       .then(setLocal)
       .catch(() => setLocal(null));
-  }, [needsForm, way, k?.preset]);
+  }, [needsForm, t3Way, tk?.preset]);
 
   const said = (e: unknown) => toast((e as Error).message, "bad");
+  const again = () => {
+    void refreshAvailable();
+    void refreshClaude();
+  };
   const startT3 = () => {
     setBusy("t3");
     void api("/api/t3host/start", { method: "POST" })
@@ -194,7 +291,8 @@ export function AddAgent({ onDone }: { onDone(): void }) {
     setBusy("add");
     try {
       // a new seat with a name of its own: its character is chosen for that name, so a second Claude doesn't re-dress the first
-      const seat = await postAgent(place, found.key);
+      const own = (found.key === "claude-api" || found.key === "claude-fed") && seatModelPick ? seatModelPick : undefined;
+      const seat = await postAgent(place, found.key, own);
       const who = seat?.alias ?? found.name;
       if (picked) await chooseAvatar(who, picked.id).catch(() => {});
       let opened = "";
@@ -216,8 +314,13 @@ export function AddAgent({ onDone }: { onDone(): void }) {
     }
   };
 
-  const viewer = ui.role === "viewer";
-  if (viewer) return <p className="agents-empty">Viewers can't add agents to a council.</p>;
+  if (ui.role === "viewer")
+    return (
+      <div className="add-agent" data-add-agent>
+        <p className="agents-empty">Viewers can't add agents to a council.</p>
+        <McpConnect viewer />
+      </div>
+    );
   const step = (n: number, title: string, state: "open" | "done" | "wait", summary: React.ReactNode, body: React.ReactNode) => (
     <section className={`add-step is-${state}`} data-add-step={n} data-add-state={state}>
       <header className="add-step-head">
@@ -228,25 +331,130 @@ export function AddAgent({ onDone }: { onDone(): void }) {
       {state !== "wait" && body}
     </section>
   );
+  const mcpLink = (
+    <button type="button" className="setup-link" onClick={() => setMcpOpen(true)} data-add-mcp-link>
+      Using Claude Code yourself?
+    </button>
+  );
+  const againBtn = (
+    <button type="button" className="f-pill" onClick={again} data-add-again>
+      Check again
+    </button>
+  );
+
+  // ---------- Claude's three ways ----------
+
+  const claudeBody = (way: ClaudeWayId) => {
+    const agent = claudeAgentFor(way, agents, older);
+    // one line, one state: ready and on what, or what's missing, in the server's words
+    const line = <Readiness {...wayState(way, agent, status, older)} attr={way} />;
+    const ready = !!agent?.ready;
+    const modelPicker = <ClaudeModelPicker status={status} admin={admin} seat={{ value: seatModelPick, onPick: setSeatModel }} />;
+    if (way === "account") {
+      // a ready agent on this way settles both steps (a test server's scripted stand-in has no Claude Code at all)
+      const installed = ready || (!older && !!status?.account.installed);
+      const signedIn = ready || (!older && status?.account.signedIn === true);
+      return (
+        <>
+          {line}
+          <p className="add-note" data-add-account-note>
+            It is the same sign-in Claude Code uses on this computer. It is <b>not</b> a connection to a Claude Code window you have open: Foundation starts its own Claude Code for each ask. {mcpLink}
+          </p>
+          <ol className="way-steps">
+            <WayStep n={1} done={installed} title="Install Claude Code on this computer">
+              <p>In a terminal on the computer Foundation's server runs on:</p>
+              <Cmd text="npm install -g @anthropic-ai/claude-code" />
+              {againBtn}
+            </WayStep>
+            <WayStep n={2} done={signedIn} wait={!installed} title="Sign it in, once">
+              <p>Run it and follow its sign-in (it opens your browser). Once it's signed in, every Claude on this way uses that sign-in.</p>
+              <Cmd text="claude" />
+              <p className="way-fine">A machine card's terminal is a computer of its own and can't sign this one in: use this computer's own terminal.</p>
+              {againBtn}
+            </WayStep>
+          </ol>
+        </>
+      );
+    }
+    if (older)
+      return (
+        <p className="setup-older" data-add-older>
+          {OLDER_WORDS}
+        </p>
+      );
+    if (way === "api") {
+      const stored = !!status?.api.configured;
+      return (
+        <>
+          {line}
+          <ol className="way-steps">
+            <WayStep n={1} done={stored} title="Make a key on Anthropic's console">
+              <p>It opens in your browser. Sign in there, make a key, and copy it.</p>
+              <button type="button" className="f-pill" onClick={() => void openExternal("https://console.anthropic.com/settings/keys")} data-add-key-page>
+                Open console.anthropic.com ↗
+              </button>
+            </WayStep>
+            <WayStep n={2} done={false} title={stored ? "The key" : "Store it here"}>
+              <ClaudeKey api={status?.api ?? null} admin={admin} />
+            </WayStep>
+            <WayStep n={3} done={false} wait={!stored && !ready} title="This seat's model">
+              {modelPicker}
+            </WayStep>
+          </ol>
+        </>
+      );
+    }
+    const fedSet = !!status?.federated.configured;
+    return (
+      <>
+        {line}
+        <ol className="way-steps">
+          <WayStep n={1} done={false} title="Your organization's identity">
+            <p>A federation rule in the Claude Console lets this server trade its identity provider's token for a short-lived Anthropic one. Tell Foundation which rule, and where the token is.</p>
+            <Federation admin={admin} configured={fedSet} />
+          </WayStep>
+          <WayStep n={2} done={false} wait={!fedSet && !ready} title="This seat's model">
+            {modelPicker}
+          </WayStep>
+        </ol>
+      </>
+    );
+  };
+
+  const claudeWays = (
+    <>
+      {CLAUDE_WAYS.map((w) => {
+        const st = wayState(w.id, claudeAgentFor(w.id, agents, older), status, older);
+        return (
+          <WayCard key={w.id} id={w.id} title={w.title} what={runsOf(w.key) ?? w.what} ok={st.ok} state={st.short} on={claudeWay === w.id} onPick={() => (setClaudeWay(w.id), setSeatModel(null))}>
+            {claudeBody(w.id)}
+          </WayCard>
+        );
+      })}
+    </>
+  );
+
+  // ---------- a T3 session ----------
 
   const startStep = (n: number) => (
-    <WayStep n={n} done={t3On} title={t3On ? "This computer's agents are running" : "Start this computer's agents"}>
+    <WayStep n={n} done={t3On} title={t3On ? "T3 is running" : "Start T3"}>
       <p>
-        One program (T3) runs them and keeps their sign-ins and keys. Foundation starts and stops it{t3 === "error" ? `; it failed: ${host?.detail ?? "no reason given"}` : ""}.
+        T3 is a program on this computer that runs these agents and keeps their sign-ins and keys. Foundation starts and stops it{t3 === "error" ? `; it failed: ${host?.detail ?? "no reason given"}` : ""}.
       </p>
       <button type="button" className="f-pill is-accent" disabled={busy === "t3" || t3 === "starting"} onClick={startT3} data-add-start-t3>
-        {busy === "t3" || t3 === "starting" ? "Starting…" : "Start them"}
+        {busy === "t3" || t3 === "starting" ? "Starting…" : "Start T3"}
       </button>
     </WayStep>
   );
   const form = (where: "cloud" | "local") =>
-    k?.preset && presets[k.preset] ? (
+    tk?.preset && presets[tk.preset] ? (
       <T3AddForm
-        key={`${k.preset}-${where}`}
-        presets={{ [k.preset]: presets[k.preset] }}
+        key={`${tk.preset}-${where}`}
+        presets={{ [tk.preset]: presets[tk.preset] }}
         only
         local={local}
-        start={{ preset: k.preset, where }}
+        start={{ preset: tk.preset, where }}
+        models={tk.preset === "claude" && claudeList?.length ? claudeList : undefined}
         busy={busy === "form"}
         error={formError}
         onWhere={(w, baseUrl) => {
@@ -256,7 +464,7 @@ export function AddAgent({ onDone }: { onDone(): void }) {
             .then(setLocal)
             .catch(() => setLocal({ baseUrl, up: false, models: [] }));
         }}
-        onCancel={() => setKind(null)}
+        onCancel={() => setT3Pick(null)}
         onAdd={(input) => {
           setBusy("form");
           setFormError(null);
@@ -267,35 +475,29 @@ export function AddAgent({ onDone }: { onDone(): void }) {
         }}
       />
     ) : (
-      <p>Asking this computer's agents what they need…</p>
+      <p>Asking T3 what it needs…</p>
     );
 
-  /** the steps of the way in use */
-  const steps = () => {
-    if (!k || !way) return null;
-    const again = (
-      <button type="button" className="f-pill" onClick={() => void refreshAvailable()} data-add-again>
-        Check again
-      </button>
-    );
-    if (way === "key")
+  const t3Steps = () => {
+    if (!tk || !t3Way) return null;
+    if (t3Way === "key")
       return (
         <ol className="way-steps">
-          <WayStep n={1} done={connected} title={`Make a key on ${k.label}'s site`}>
+          <WayStep n={1} done={connected} title={`Make a key on ${tk.label}'s site`}>
             <p>It opens in your browser. Sign in there, make a key, and copy it.</p>
-            {k.keyPage && (
-              <button type="button" className="f-pill" onClick={() => void openExternal(k.keyPage!)} data-add-key-page>
-                Open {new URL(k.keyPage).host} ↗
+            {tk.keyPage && (
+              <button type="button" className="f-pill" onClick={() => void openExternal(tk.keyPage!)} data-add-key-page>
+                Open {new URL(tk.keyPage).host} ↗
               </button>
             )}
           </WayStep>
           {startStep(2)}
-          <WayStep n={3} done={connected} wait={!t3On} title="Paste the key">
+          <WayStep n={3} done={connected} wait={!t3On} title="Paste the key into T3">
             {form("cloud")}
           </WayStep>
         </ol>
       );
-    if (way === "local")
+    if (t3Way === "local")
       return (
         <ol className="way-steps">
           <WayStep n={1} done={connected || Boolean(local?.up)} title="Have a model server running here">
@@ -312,23 +514,6 @@ export function AddAgent({ onDone }: { onDone(): void }) {
           </WayStep>
         </ol>
       );
-    if (way === "own")
-      return (
-        <ol className="way-steps">
-          <WayStep n={1} done={connected} title={`Install ${k.program} on this computer`}>
-            <p>In a terminal on the computer Foundation's server runs on:</p>
-            {k.install && <Cmd text={k.install} />}
-          </WayStep>
-          <WayStep n={2} done={connected} title="Sign it in, once">
-            <p>
-              Run it and follow its sign-in (it opens your browser). {found?.why ? `Right now: ${found.why}.` : ""}
-            </p>
-            {k.signIn && <Cmd text={k.signIn} />}
-            <p className="way-fine">A machine card's terminal is a computer of its own and can't sign this one in: use this computer's own terminal.</p>
-            {again}
-          </WayStep>
-        </ol>
-      );
     // signed in through T3
     const state = t3Agent?.state;
     const off = t3On && state === "off";
@@ -339,29 +524,29 @@ export function AddAgent({ onDone }: { onDone(): void }) {
       <ol className="way-steps">
         {startStep(1)}
         {extra > 0 && (
-          <WayStep n={2} done={!off} wait={!t3On} title={`Turn ${t3Agent?.name ?? k.program ?? k.label} on`}>
-            <p>T3 has it, switched off (it ships that way). Turning it on lets this computer run {k.program ?? k.label} when it's asked to.</p>
-            <button type="button" className="f-pill is-accent" disabled={busy === "enable" || !t3Agent || ui.role !== "admin"} onClick={() => t3Agent && enable(t3Agent.id)} data-add-enable>
+          <WayStep n={2} done={!off} wait={!t3On} title={`Turn ${t3Agent?.name ?? tk.program ?? tk.label} on`}>
+            <p>T3 has it, switched off (it ships that way). Turning it on lets T3 run {tk.program ?? tk.label} when it's asked to.</p>
+            <button type="button" className="f-pill is-accent" disabled={busy === "enable" || !t3Agent || !admin} onClick={() => t3Agent && enable(t3Agent.id)} data-add-enable>
               {busy === "enable" ? "Turning it on…" : "Turn it on"}
             </button>
-            {ui.role !== "admin" && <p className="way-fine">Only an admin can turn an agent on.</p>}
+            {!admin && <p className="way-fine">Only an admin can turn an agent on.</p>}
           </WayStep>
         )}
-        <WayStep n={2 + extra} done={connected || (t3On && !missing && !off)} wait={!t3On || off} title={`Have ${k.program ?? k.label} on this computer`}>
-          <p>This computer's agents drive {k.program ?? k.label}, and it isn't installed here yet.</p>
-          {k.install && <Cmd text={k.install} />}
-          {again}
+        <WayStep n={2 + extra} done={connected || (t3On && !missing && !off)} wait={!t3On || off} title={`Have ${tk.program ?? tk.label} on this computer`}>
+          <p>T3 drives {tk.program ?? tk.label}, and it isn't installed here yet.</p>
+          {tk.install && <Cmd text={tk.install} />}
+          {againBtn}
         </WayStep>
-        <WayStep n={3 + extra} done={connected} wait={!t3On || missing || off} title={`Sign in with your ${k.label} account`}>
+        <WayStep n={3 + extra} done={connected} wait={!t3On || missing || off} title={`Sign in with your ${tk.label} account`}>
           <p>
-            {found?.name ?? k.label} {found?.why ?? "needs signing in"}. Open T3 and sign in from its settings{k.signIn ? ", or in a terminal on this computer:" : "."}
+            {found?.name ?? tk.label} {found?.why ?? "needs signing in"}. Open T3 and sign in from its settings{tk.signIn ? ", or in a terminal on this computer:" : "."}
           </p>
-          {k.signIn && <Cmd text={k.signIn} />}
+          {tk.signIn && <Cmd text={tk.signIn} />}
           <span className="way-acts">
             <button type="button" className="f-pill is-accent" onClick={openT3} data-add-open-t3>
               Open T3 to sign in
             </button>
-            {again}
+            {againBtn}
           </span>
           <p className="way-fine">It shows as connected here by itself once the sign-in is done.</p>
         </WayStep>
@@ -369,71 +554,85 @@ export function AddAgent({ onDone }: { onDone(): void }) {
     );
   };
 
+  const t3Body = (
+    <>
+      <div className="setup-t3-agents" role="radiogroup" aria-label="Which agent T3 runs">
+        {T3_KINDS.map((x) => (
+          <button key={x.id} type="button" role="radio" aria-checked={t3Pick === x.id} className={`setup-t3-agent${t3Pick === x.id ? " is-on" : ""}`} onClick={() => (setT3Pick(x.id), setT3Way(null), setFormError(null))} data-add-t3-agent={x.id} data-tip={x.what}>
+            <ProviderMark provider={x.id} size={18} />
+            <span>{x.label}</span>
+          </button>
+        ))}
+      </div>
+      {!t3Pick && <p className="add-note">Which agent should T3 run? Each is signed in, keyed or local in T3, not in Foundation.</p>}
+      {tk && tk.ways.length > 1 && <p className="add-note">There are {tk.ways.length} ways to connect {tk.label} in T3. Pick one; the steps under it tick off as you go.</p>}
+      {tk?.ways.map((w) => {
+        const a = t3AgentFor(tk, w.id, agents);
+        const on = t3Way === w.id;
+        return (
+          <WayCard key={w.id} id={`t3-${w.id}`} title={w.title} what={(a as OfferedAgent | undefined)?.runs ?? w.what} ok={!!a?.ready} state={a?.ready ? "connected" : a ? "not yet" : ""} on={on} onPick={() => (setT3Way(w.id), setFormError(null))}>
+            {t3Steps()}
+          </WayCard>
+        );
+      })}
+    </>
+  );
+
+  // how each kind stands, for its row in step 1
+  const claudeReady = CLAUDE_WAYS.map((w) => claudeAgentFor(w.id, agents, older)).find((a) => a?.ready);
+  const t3Ready = agents.filter((a) => a.key.startsWith("t3:") && a.ready);
+  const kindWords = (id: KindId): { ok: boolean; words: string } =>
+    id === "claude"
+      ? claudeReady
+        ? { ok: true, words: here.has(claudeReady.key) ? "ready · one here already" : "ready" }
+        : { ok: false, words: !claude.loaded ? "asking…" : "3 ways to connect" }
+      : t3On
+        ? t3Ready.length
+          ? { ok: true, words: `${t3Ready.length} ready in T3` }
+          : { ok: false, words: "T3 is running" }
+        : { ok: false, words: t3 === "starting" ? "T3 is starting" : "T3 is off" };
+
+  const kindLabel = KINDS.find((x) => x.id === kind)?.label;
   return (
-    <div className="add-agent" data-add-agent>
+    <div className="add-agent" data-add-agent data-add-place={place}>
       <p className="add-lede">
-        An agent for the council of <b>{placeName}</b>. Adding it starts nothing by itself: it sits there until it's spoken to.
+        An agent for the council of <b>{placeName}</b>. Adding it starts nothing by itself: it sits there until it's spoken to. {!mcpOpen && mcpLink}
       </p>
+      {mcpOpen && <McpConnect onClose={() => setMcpOpen(false)} />}
 
       {step(
         1,
-        "Who",
+        "Kind",
         kind ? "done" : "open",
-        <button type="button" className="add-link" onClick={() => (setKind(null), setWay(null))}>
-          {k?.label} · change
+        <button type="button" className="add-link" onClick={() => setKind(null)}>
+          {kindLabel} · change
         </button>,
-        <div className="add-kinds">
-          {KINDS.map((x) => {
-            const all = x.ways.map((w) => agentFor(x, w.id, agents)).filter(Boolean) as AvailableAgent[];
-            const a = all.find((y) => y.ready) ?? all[0];
-            const words = a ? (a.ready ? (here.has(a.key) ? "ready · one here already" : "ready") : (a.why ?? "not ready")) : x.ways.length > 1 ? `${x.ways.length} ways to connect` : t3On ? "not connected yet" : "needs this computer's agents";
-            return (
-              <button key={x.id} type="button" className={`add-kind${kind === x.id ? " is-on" : ""}`} data-add-kind={x.id} aria-pressed={kind === x.id} onClick={() => (setKind(x.id), setWay(null), setFormError(null))}>
-                <ProviderMark provider={x.id} size={28} />
-                <span className="add-kind-text">
-                  <b>{x.label}</b>
-                  <span>{x.what}</span>
-                </span>
-                <span className={`add-kind-state${a?.ready ? " is-ok" : ""}`}>{words}</span>
-              </button>
-            );
-          })}
-        </div>,
+        <KindList kind={kind} words={kindWords} onPick={(id) => (setKind(id), setFormError(null))} />,
       )}
 
       {step(
         2,
         "Connect",
         !kind ? "wait" : "open",
-        "after choosing who",
-        <div className="add-connect" data-add-connect={connected ? "ready" : (way ?? "none")}>
-          {k && k.ways.length > 1 && <p className="add-note">There are {k.ways.length} ways to connect {k.label}. Pick one; the steps under it tick off as you go.</p>}
-          {k?.ways.map((w) => {
-            const a = agentFor(k, w.id, agents);
-            const on = way === w.id;
-            return (
-              <div key={w.id} className={`add-way${on ? " is-on" : ""}${a?.ready ? " is-ready" : ""}`} data-add-way={w.id} data-add-way-ready={a?.ready ? "yes" : "no"}>
-                <button type="button" className="add-way-head" aria-expanded={on} onClick={() => (setWay(w.id), setFormError(null))}>
-                  <span className="add-way-radio" aria-hidden />
-                  <span className="add-way-text">
-                    <b>{w.title}</b>
-                    <span>{w.what}</span>
-                  </span>
-                  <span className={`add-kind-state${a?.ready ? " is-ok" : ""}`}>{a?.ready ? "connected" : a ? "not yet" : ""}</span>
-                </button>
-                {on && (
-                  <div className="add-way-body">
-                    {steps()}
-                    {connected && (
-                      <p className="add-note is-ok">
-                        <span className="f-dot is-ok" /> {found!.name} is connected: {found!.where === "local" ? "on this computer, nothing you ask leaves it" : `in the cloud, ${found!.service}`}.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        "after choosing the kind",
+        <div className="add-connect" data-add-connect={connected ? "ready" : kind === "claude" ? claudeWay : (t3Way ?? "none")}>
+          {kind === "claude" && (
+            <>
+              <p className="add-note">Three ways to run Claude. Pick one; each says how it stands right now.</p>
+              {older && (
+                <p className="setup-older" data-add-older>
+                  The Foundation server is older than this app: only its own Claude is offered. Restart the server for the API key and federated ways.
+                </p>
+              )}
+              {claudeWays}
+            </>
+          )}
+          {kind === "t3" && t3Body}
+          {connected && kind === "t3" && (
+            <p className="add-note is-ok">
+              <span className="f-dot is-ok" /> {found!.name} is connected: {found!.where === "local" ? "on this computer, nothing you ask leaves it" : `in the cloud, ${found!.service}`}.
+            </p>
+          )}
         </div>,
       )}
 
@@ -469,21 +668,17 @@ export function AddAgent({ onDone }: { onDone(): void }) {
               {found.name} already sits on this council. Adding it again seats another one, with a name, a character and sessions of its own.
             </p>
           )}
-          {
-            <>
-              {found?.key.startsWith("t3:") && (
-                <label className="add-check">
-                  <input type="checkbox" checked={session} onChange={(e) => setSession(e.target.checked)} />
-                  <span>
-                    Open its own session in {sectionId ? placeName : "the first section"} (it reads the grid once, on {found.where === "local" ? "this computer" : "its plan"})
-                  </span>
-                </label>
-              )}
-              <button type="button" className="f-pill is-agent" disabled={!found || busy === "add"} onClick={() => void add()} data-add-submit>
-                {busy === "add" ? "Adding…" : `${found && here.has(found.key) ? "Add another" : "Add"} ${found?.name ?? "it"} to ${placeName}`}
-              </button>
-            </>
-          }
+          {found?.key.startsWith("t3:") && (
+            <label className="add-check">
+              <input type="checkbox" checked={session} onChange={(e) => setSession(e.target.checked)} />
+              <span>
+                Open its own session in {sectionId ? placeName : "the first section"} (it reads the grid once, on {found.where === "local" ? "this computer" : "its plan"})
+              </span>
+            </label>
+          )}
+          <button type="button" className="f-pill is-accent" disabled={!found || busy === "add"} onClick={() => void add()} data-add-submit>
+            {busy === "add" ? "Adding…" : `${found && here.has(found.key) ? "Add another" : "Add"} ${found?.name ?? "it"} to ${placeName}`}
+          </button>
         </div>,
       )}
     </div>
