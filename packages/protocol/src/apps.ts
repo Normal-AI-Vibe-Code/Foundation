@@ -47,6 +47,18 @@ export function onHyperForm(url: string | null | undefined): boolean {
   }
 }
 
+/**
+ * Is a page card shown by the built-in browser (`PanelDoc.via === "browser"`) rather than a frame? What the card
+ * says wins; with nothing said, a page on HyperForm goes to the browser (2026-11-24, Josh: PartForm pasted as an
+ * address was a frame, and OnShape's sign-in, `frame-ancestors *.onshape.com`, can never load in one).
+ */
+export function pageInBrowser(p: { panel: string; url?: string | null; via?: string; fromMachine?: unknown }): boolean {
+  if ((p.panel !== "app" && p.panel !== "link") || !p.url || p.fromMachine) return false;
+  if (p.via === "browser") return true;
+  if (p.via === "frame") return false;
+  return onHyperForm(p.url);
+}
+
 export const COMPANY_APPS: CompanyAppDef[] = [
   { id: "hyperform", name: "HyperForm", role: "Where our apps are deployed: projects, builds, addresses", glyph: "◈", env: "HYPERFORM_URL", url: HYPERFORM_URL, signIn: "hyperform" },
   { id: "partform", name: "PartForm", role: "Airform BOM: every part and assembly, from OnShape", glyph: "▤", connector: "bomform", env: ["PARTFORM_URL", "BOMFORM_URL"], url: "https://partform.apps.normallab.co/", signIn: "hyperform" },

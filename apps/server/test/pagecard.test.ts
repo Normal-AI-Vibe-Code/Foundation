@@ -32,7 +32,7 @@ const hb = await import("../src/hostbrowser.ts");
 const pics = await import("../src/pagepictures.ts");
 const { companyApps } = await import("../src/today.ts");
 const { runTool } = await import("../src/tools.ts");
-const { COMPANY_APPS, onHyperForm } = await import("@foundation/protocol");
+const { COMPANY_APPS, onHyperForm, pageInBrowser } = await import("@foundation/protocol");
 
 const boss = auth.upsertUser("boss@formindustries.com", "Boss");
 const found = hb.findBrowser();
@@ -119,6 +119,18 @@ test("the company's apps: the four on HyperForm are linked where they are hosted
   assert.equal(onHyperForm("https://anything.apps.normallab.co/x"), true);
   assert.equal(onHyperForm("http://dock.apps.normallab.co/"), false, "not without https");
   assert.equal(onHyperForm("https://apps.normallab.co.evil.example/"), false);
+
+  // a page card on HyperForm is the browser's with nothing said (PartForm pasted as an address: OnShape's sign-in
+  // refuses every frame); what the card says wins; a machine's page and a card with no address are never the browser's
+  const partform = "https://partform.apps.normallab.co/";
+  assert.equal(pageInBrowser({ panel: "app", url: partform }), true);
+  assert.equal(pageInBrowser({ panel: "link", url: partform }), true);
+  assert.equal(pageInBrowser({ panel: "app", url: partform, via: "frame" }), false);
+  assert.equal(pageInBrowser({ panel: "app", url: "https://airform.space/" }), false);
+  assert.equal(pageInBrowser({ panel: "app", url: "https://airform.space/", via: "browser" }), true);
+  assert.equal(pageInBrowser({ panel: "app", url: partform, fromMachine: { panel: "p", port: 1, name: "x" } }), false);
+  assert.equal(pageInBrowser({ panel: "app" }), false);
+  assert.equal(pageInBrowser({ panel: "file", url: partform }), false);
   assert.equal(onHyperForm("https://evil.example/?x=.apps.normallab.co"), false);
   assert.equal(onHyperForm(null), false);
 });

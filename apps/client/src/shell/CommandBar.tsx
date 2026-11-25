@@ -84,9 +84,10 @@ export async function openUrlAsPanel(
       name: known.name ?? (probe.name?.slice(0, 60) || p.name),
       repo: probe.repo ?? known.repo ?? undefined,
       mcp: probe.mcp ?? known.mcp ?? undefined,
-      text: probe.embeddable ? (probe.description ?? known.description ?? undefined) : `${probe.reason ?? "can't be framed"} — opens in a tab`,
+      text: probe.description ?? known.description ?? undefined,
       ports: (probe.ports ?? []).map((pt) => ({ ...pt, id: `port_${Math.random().toString(36).slice(2, 9)}` })),
-      ...(probe.embeddable ? {} : { panel: "link" as const }),
+      // a site that refuses a frame is a page of the built-in browser (2026-11-24), not a link out
+      ...(probe.embeddable || kind !== "app" ? {} : { via: "browser" as const }),
     });
     if (probe.repo) toast(`Found its repo · ${probe.repo}`, "ok");
   } catch {

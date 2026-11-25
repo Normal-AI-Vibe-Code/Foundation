@@ -14,6 +14,8 @@ import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 import { person, settle, waitLive } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-19_hyperform";
+/** a page card at rest takes a plain click, and typing only in a field (2026-11-24) */
+const CLICKS = "../../docs/evidence/2026-11-24_page-clicks";
 const STANDIN = `http://127.0.0.1:${process.env.E2E_SLACK_PORT ?? 4440}/e2e/page.html`;
 
 type Panel = { id: string; name: string; panel: string; url?: string; via?: string; seenAt?: number; sectionId: string };
@@ -104,32 +106,69 @@ test("⤢ opens the app in Foundation: a new section it fills, live in the real 
   expect(pic.headers()["content-type"]).toBe("image/jpeg");
   expect((await pic.body()).length).toBeGreaterThan(2000);
 
-  // a plain click doesn't use the page; ⌘/Ctrl-click does: the bar, the address, and the keys
+  // at rest (2026-11-24): a plain click is the page's (its button), but the keys, the wheel and ⌘/Ctrl-wheel stay
+  // the grid's; a click in one of its fields gives it the keys, to type, until Esc twice
   await expect(page.locator(".host-page-bar")).toHaveCount(0);
-  const box = (await page.boundingBox())!;
-  await admin.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  const live = page.locator(".host-page-live");
+  const at = async (x: number, y: number) => {
+    const r = (await live.boundingBox())!;
+    const w = await live.evaluate((el: HTMLElement) => el.offsetWidth);
+    return { x: r.x + (x * r.width) / w, y: r.y + (y * r.width) / w };
+  };
+  const button = await at(120, 105);
+  await admin.mouse.click(button.x, button.y);
   await settle(admin, 300);
   await expect(page.locator(".host-page-bar")).toHaveCount(0);
-  await admin.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator("[data-host-page-typing]")).toHaveCount(0);
+  await admin.keyboard.press("x");
+  await admin.keyboard.press("ArrowDown");
+  await admin.mouse.move(button.x, button.y + 200);
+  const wide = (await page.boundingBox())!.width;
+  await admin.keyboard.down("ControlOrMeta");
+  await admin.mouse.wheel(0, -60);
+  await admin.keyboard.up("ControlOrMeta");
+  await expect.poll(async () => (await page.boundingBox())!.width / wide, { message: "Ctrl-wheel over the page zooms the grid" }).toBeGreaterThan(1.03);
+  await admin.mouse.wheel(0, 60);
+  await settle(admin, 600);
+  await expect(page).toHaveAttribute("data-host-page-state", "live");
+  const field = await at(340, 105);
+  await admin.mouse.click(field.x, field.y);
+  await expect(page.locator("[data-host-page-typing]")).toBeVisible();
+  await admin.keyboard.type("Hilo");
+  await settle(admin, 900);
+  await admin.screenshot({ path: `${CLICKS}/01-clicked-and-typing-at-rest.png` });
+  await admin.keyboard.press("Escape");
+  await admin.keyboard.press("Escape");
+  await expect(page.locator("[data-host-page-typing]")).toHaveCount(0);
+  await expect(page.locator(".host-page-bar")).toHaveCount(0);
+
+  // ⌘/Ctrl-click uses it: the bar, the address, and the keys
+  const mid = (await page.boundingBox())!;
+  await admin.mouse.move(mid.x + mid.width / 2, mid.y + mid.height / 2);
   await admin.keyboard.down("ControlOrMeta");
   await admin.mouse.down();
   await admin.mouse.up();
   await admin.keyboard.up("ControlOrMeta");
   await expect(page.locator(".host-page-bar")).toBeVisible();
   await expect(page.locator("[data-host-page-addr]")).toHaveValue(STANDIN);
+  await settle(admin, 900);
+  await admin.screenshot({ path: `${CLICKS}/02-in-use-bar.png` });
 
-  // type into the page's field: click it (found through an agent's read, which needs the person's leave)
+  // what the page got, read through an agent (which needs the person's leave)
   const tool = async (name: string, input: object = {}) => (await (await ctx.request.post(`/api/boards/company/tools/${name}`, { data: input })).json()) as { result: unknown };
   expect(JSON.stringify((await tool("browser_read")).result)).toContain("isn't open to agents");
   await page.locator("[data-host-page-agents]").click();
   await expect(page.locator("[data-host-page-agents]")).toHaveAttribute("aria-pressed", "true");
   const tabs = (await tool("browser_tabs")).result as { tabs: Array<{ id: string; card?: string; title: string }> };
   const mine = tabs.tabs.find((t) => t.card === card.id)!;
-  expect(mine?.title).toBe("DeployForm (stand-in)");
+  expect(mine?.title, "the wheel at rest never reached the page").toBe("DeployForm (stand-in)");
   await tool("browser_tabs", { select: mine.id });
   const read = JSON.stringify((await tool("browser_read")).result);
   expect(read).toContain("Three customers are being deployed");
   expect(read).toContain("Kapaa Works");
+  expect(read, "the plain click pressed the page's button").toContain("1 marked");
+  expect(read, "the typing reached the field clicked").toContain("Note: Hilo");
+  expect(read, "keys at rest stayed the grid's").not.toContain("ArrowDown");
   const ref = /\[(ref_\d+)\][^[]*Find a customer/.exec(read)?.[1] ?? /Find a customer[^[]*\[(ref_\d+)\]/.exec(read)?.[1];
   expect(ref, read.slice(0, 600)).toBeTruthy();
   await tool("browser_type", { ref, text: "Hilo" });

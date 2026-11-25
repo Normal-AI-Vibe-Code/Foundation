@@ -14,7 +14,7 @@
  * A table's cells keep their own menu (rows, columns); this one is its header's and every other card's.
  */
 
-import { isHostable } from "@foundation/protocol";
+import { isHostable, pageInBrowser } from "@foundation/protocol";
 import { toggleFullscreen } from "../lib/cardUse";
 import { openDetail } from "../lib/detail";
 import { openAppTab } from "../lib/grids";
@@ -89,8 +89,8 @@ export function cardMenuItems(id: string): MenuItem[] | null {
   // a site that shows blank in a frame (it refuses framing, or its sign-in doesn't reach a frame) runs in the built-in browser instead
   if (isPanel(o) && o.url && (o.panel === "app" || o.panel === "link") && !o.fromMachine && !viewer)
     more.push(
-      o.via === "browser"
-        ? { icon: "▭", label: "Show it in a frame", action: () => updatePanel(id, { via: undefined }) }
+      pageInBrowser(o)
+        ? { icon: "▭", label: "Show it in a frame", action: () => updatePanel(id, { via: "frame" }) }
         : { icon: "◉", label: "Show it in the real browser", action: () => updatePanel(id, { via: "browser", panel: "app" }) },
     );
   more.push({

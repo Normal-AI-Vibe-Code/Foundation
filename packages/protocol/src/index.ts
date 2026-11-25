@@ -299,8 +299,9 @@ export interface PanelDoc extends ObjectBaseDoc {
    * How a page card ("app" or "link" with a `url`) is shown. Absent: a frame. "browser": a tab of the built-in
    * browser on the server's computer (hostbrowser.ts), for a site that refuses framing or sits behind a sign-in
    * (everything on HyperForm). Far away the card shows the picture last saved of it (`seenAt`); near, the live page.
+   * "frame": a frame, chosen by a person for a page that would otherwise go to the browser (`pageInBrowser`).
    */
-  via?: "browser";
+  via?: "browser" | "frame";
   /** when the picture of a `via: "browser"` page was last saved (GET /api/boards/:id/pages/:panel/picture) */
   seenAt?: number;
 }

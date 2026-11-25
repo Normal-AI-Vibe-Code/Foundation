@@ -291,6 +291,21 @@
   position: absolute;
   inset: 0;
 }
+/* at rest a click is the page's: what ⌘/Ctrl-click would do shows only while the modifier is held over it */
+.host-page-hint {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.use-key-held .host-page-view:hover .host-page-hint {
+  opacity: 1;
+}
+.use-key-held .host-page-view:hover .host-page-live {
+  box-shadow: inset 0 0 0 2px var(--color-pulse);
+}
 .host-page-still {
   position: absolute;
   inset: 0;

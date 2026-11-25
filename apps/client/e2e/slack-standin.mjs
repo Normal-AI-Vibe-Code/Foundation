@@ -101,7 +101,12 @@ createServer((req, res) => {
         `<header>DeployForm</header><main><h1>Customers</h1><p>Three customers are being deployed.</p>` +
         `<table><tr><th>Customer</th><th>Stage</th></tr><tr><td>Kapaa Works</td><td>Installing</td></tr><tr><td>Hilo Air</td><td>Commissioned</td></tr><tr><td>Lanai Cold</td><td>Quoted</td></tr></table>` +
         `<p><input id="q" placeholder="Find a customer"> <a href="/e2e/page.html?all=1">Show all</a></p><p id="typed"></p>` +
-        `<script>q.addEventListener("input", () => (typed.textContent = "Finding: " + q.value))</script></main>`,
+        // fixed where a check can find it on the picture: a button at (20,80)–(220,130), a field at (240,80)–(440,130)
+        `<button id="press" style="position:fixed;left:20px;top:80px;width:200px;height:50px;font:inherit">Mark installed</button><input id="f" placeholder="A note" style="position:fixed;left:240px;top:80px;width:200px;height:50px;box-sizing:border-box;font:inherit">` +
+        `<p><span id="presses">0 marked</span> · <span id="noted">no note</span> · keys: <span id="keys"></span></p>` +
+        `<div style="height:1600px"></div>` +
+        `<script>q.addEventListener("input", () => (typed.textContent = "Finding: " + q.value));let n=0;press.addEventListener("click", () => (presses.textContent = ++n + " marked"));f.addEventListener("input", () => (noted.textContent = "Note: " + f.value));` +
+        `addEventListener("keydown", (e) => { if (e.target === document.body) keys.textContent += e.key + " "; });addEventListener("wheel", () => (document.title = "DeployForm (stand-in) scrolled"), { once: true })</script></main>`,
     );
   }
   // the stand-in's own door, for checks: someone says something in a channel

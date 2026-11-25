@@ -20,6 +20,10 @@ export interface HostBrowserOpts {
   layout?: boolean;
   /** the server kept a picture of the page (a page card) */
   onSeen?: (at: number) => void;
+  /** a page card at rest: a press goes to the page but doesn't take the keys (only a press in a field does: `onEditing`) */
+  rest?: boolean;
+  /** a press was let go: whether the page's caret is now in a field */
+  onEditing?: (editing: boolean) => void;
 }
 
 export interface TabInfo {
@@ -140,6 +144,8 @@ export function useHostBrowser(opts: HostBrowserOpts = {}) {
     const el = page.current;
     if (state !== "open" || !el) return;
     const onWheel = (e: WheelEvent) => {
+      // the grid had it first (a card at rest, or the zoom key): it isn't the page's
+      if (e.defaultPrevented) return;
       e.preventDefault();
       const p = point(e);
       if (!p) return;
@@ -237,6 +243,7 @@ export function useHostBrowser(opts: HostBrowserOpts = {}) {
       } else if (m.t === "note") toast(String(m.text), m.bad ? "bad" : undefined);
       else if (m.t === "closed") setWhy(String(m.why ?? ""));
       else if (m.t === "seen") o.current.onSeen?.(Number(m.at));
+      else if (m.t === "focus") o.current.onEditing?.(m.editing === true);
     };
     s.onclose = () => {
       if (ws.current !== s) return;
@@ -279,7 +286,7 @@ export function useHostBrowser(opts: HostBrowserOpts = {}) {
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (dialog) return;
-    page.current?.focus({ preventScroll: true });
+    if (!o.current.rest) page.current?.focus({ preventScroll: true });
     // a mouse's back and forward buttons are the browser's
     if (e.button === 3 || e.button === 4) {
       e.preventDefault();

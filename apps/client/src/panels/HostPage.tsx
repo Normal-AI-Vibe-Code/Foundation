@@ -8,7 +8,13 @@
  *
  *   far (or off screen)   the picture the server last kept of the page, with when it was seen;
  *   near                  the live page (the browser's pictures on a canvas), once this person has started it;
- *   in use (⌘/Ctrl-click) the pointer and the keys are the page's, with back, reload, the address and Agents.
+ *   in use (⌘/Ctrl-click) the pointer, the wheel and the keys are the page's, with back, reload, the address and Agents.
+ *
+ * Near and at rest (2026-11-24, Josh: "clicking on buttons, or using ctrl + scroll wheel zoom should work", but the
+ * page mustn't "take over scroll and zoom interactions, or navigation key strokes to move between panels"): a plain
+ * left click is the page's, so its buttons and links work; the wheel, ⌘/Ctrl-wheel, the middle and right buttons
+ * and the keys stay the grid's. A click that leaves the caret in one of the page's fields (the server says so) gives
+ * the page the keys, to type in it, until Esc twice or a click anywhere else.
  *
  * Nothing starts without a person: the browser starts on a press ("Go live" here, "Open in Foundation" on Today, or
  * the Browser tool's own Start), and that press holds for this visit (session storage), so the next card you come
@@ -91,8 +97,18 @@ export function HostPage({ panel, near }: { panel: PanelMeta; near: boolean }) {
       wrote.current = at;
       updatePanel(panel.id, { seenAt: at });
     },
+    rest: !engaged,
+    // at rest, a press in one of the page's fields gives it the keys; a press anywhere else in it gives them back
+    onEditing: (editing) => {
+      if (engaged) return;
+      const el = b.page.current;
+      if (editing) el?.focus({ preventScroll: true });
+      else if (el && document.activeElement === el) el.blur();
+    },
   });
   const { state, tab, painted, dialog, did, agents, held } = b;
+  /** this press went to the page (at rest only a plain left press does) */
+  const pressed = useRef(false);
 
   // near, and a person has started the browser on this visit: go live. Away for a while: let the socket go.
   const want = admin && near && allowed && Boolean(url);
@@ -189,12 +205,31 @@ export function HostPage({ panel, near }: { panel: PanelMeta; near: boolean }) {
             aria-label={tab?.title ? `The page: ${tab.title}` : panel.name}
             {...{ [HOLDS_KEYS]: "" }}
             onPointerDown={(e) => {
-              e.stopPropagation();
+              if (!engaged) {
+                // at rest: ⌘/Ctrl-click uses the card; the middle and right buttons are the grid's (pan, the card's menu)
+                pressed.current = false;
+                if (e.button !== 0) return;
+                e.stopPropagation();
+                if (modHeld(e)) {
+                  e.preventDefault();
+                  putInUse(panel.id);
+                  return;
+                }
+              } else e.stopPropagation();
+              pressed.current = true;
               b.onPointerDown(e);
             }}
-            onPointerMove={b.onPointerMove}
-            onPointerUp={b.onPointerUp}
-            onContextMenu={(e) => e.preventDefault()}
+            onPointerMove={(e) => {
+              // at rest the page sees the pointer hover and its own drags, not another button's (a pan passing over)
+              if (!engaged && e.buttons !== 0 && !pressed.current) return;
+              b.onPointerMove(e);
+            }}
+            onPointerUp={(e) => {
+              if (!pressed.current) return;
+              pressed.current = false;
+              b.onPointerUp(e);
+            }}
+            onContextMenu={(e) => engaged && e.preventDefault()}
             onKeyDown={b.onKeyDown}
             onKeyUp={b.onKeyUp}
             onPaste={(e) => {
@@ -206,6 +241,11 @@ export function HostPage({ panel, near }: { panel: PanelMeta; near: boolean }) {
             onBlur={(e) => e.target === e.currentTarget && b.setHeld(false)}
           >
             <canvas ref={b.canvas} className="btool-canvas" data-host-page-canvas data-browser-painted={painted || undefined} />
+            {held && !engaged && (
+              <span className="btool-held" data-host-page-typing>
+                Typing goes to this page · Esc Esc to leave
+              </span>
+            )}
             {did && (
               <div className="btool-did" role="status" key={did.n}>
                 <i className="btool-did-mark" aria-hidden>
@@ -295,21 +335,11 @@ export function HostPage({ panel, near }: { panel: PanelMeta; near: boolean }) {
           </div>
         )}
 
-        {/* a plain click selects the card; ⌘/Ctrl-click uses the page (lib/cardUse.ts) */}
-        {showPage && !engaged && (
-          <div
-            className="frame-engage"
-            onClick={(e) => {
-              if (!modHeld(e)) return;
-              e.preventDefault();
-              e.stopPropagation();
-              putInUse(panel.id);
-            }}
-          >
-            <span className="f-pill frame-engage-pill">
-              {keys("mod+click")} to use · {keys("mod+enter")} full screen
-            </span>
-          </div>
+        {/* at rest a plain click is the page's; holding the modifier says what a click would do (lib/cardUse.ts) */}
+        {showPage && !engaged && !held && (
+          <span className="f-pill frame-engage-pill host-page-hint" aria-hidden>
+            {keys("mod+click")} to use · {keys("mod+enter")} full screen
+          </span>
         )}
       </div>
     </div>
