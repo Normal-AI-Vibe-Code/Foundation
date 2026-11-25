@@ -624,9 +624,9 @@ export async function t3OpenLink(threadId?: string): Promise<string> {
 export const T3_PRESETS: Record<string, { name: string; cloud: { baseUrl: string; model: string }; local: { baseUrl: string; model: string } }> = {
   kimi: { name: "Kimi", cloud: { baseUrl: "https://api.moonshot.ai/anthropic", model: "kimi-k3" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
   deepseek: { name: "DeepSeek", cloud: { baseUrl: "https://api.deepseek.com/anthropic", model: "deepseek-v4-pro" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
-  // Claude on a person's own API key (2026-11-17): Anthropic's endpoint, cloud only. Beside it, T3's own
-  // Claude agent is the one signed in with an account.
-  claude: { name: "Claude (API key)", cloud: { baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
+  // No Claude here (2026-11-24): a Claude API key is Foundation's own `claude-api` agent (agentkinds.ts,
+  // PUT /api/agents/claude/key), not a T3 session. A `claude-cloud` instance added before then stays in T3's
+  // settings and keeps working, and is shown for what it is: a T3 session (posted.ts runsSentence).
 };
 
 export { isClaudeDriven };

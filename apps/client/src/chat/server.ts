@@ -15,11 +15,13 @@
  */
 
 import { ApiError, api, authHeaders, openSocket, serverUrl, SERVER } from "../lib/api";
-import { chatServerName, chatServerOrigin, isRemoteChat } from "./serverLogic";
+import { builtChatServer, chatServerName, chatServerOrigin, isRemoteChat, KNOWN_CHAT_SERVERS, readUsedChatServers, rememberChatServer, rememberedChatServers, type KnownChatServer } from "./serverLogic";
 
 const KEY = "chatform-server";
-/** the chat server this build was made for (empty: Foundation's own) */
-export const BUILT_CHAT_SERVER = chatServerOrigin((import.meta.env.VITE_CHATFORM_SERVER as string | undefined) ?? "") ?? "";
+/** the addresses this device has used (Settings offers them again) */
+const USED_KEY = "chatform-servers";
+/** the chat server this build was made for (empty: Foundation's own); the desktop app's is the team's */
+export const BUILT_CHAT_SERVER = builtChatServer(import.meta.env.VITE_CHATFORM_SERVER as string | undefined, import.meta.env.MODE);
 
 function chosen(): string | null {
   try {
@@ -47,6 +49,17 @@ export const CHAT_SERVER = (() => {
 export const CHAT_REMOTE = CHAT_SERVER !== "";
 export const CHAT_SERVER_NAME = CHAT_SERVER ? chatServerName(CHAT_SERVER) : "";
 
+function usedServers(): string[] {
+  try {
+    return readUsedChatServers(localStorage.getItem(USED_KEY));
+  } catch {
+    return [];
+  }
+}
+
+/** the servers Settings offers with a Use each: the team's, then the ones this device has used */
+export const REMEMBERED_CHAT_SERVERS: KnownChatServer[] = rememberedChatServers(KNOWN_CHAT_SERVERS, [...(CHAT_SERVER ? [CHAT_SERVER] : []), ...usedServers()], foundationOrigin);
+
 /**
  * Point this device's ChatForm at a chat server ("" or the Foundation server's own address: back to Foundation's).
  * The page reloads. Throws when it isn't an address.
@@ -62,6 +75,7 @@ export function chooseChatServer(input: string) {
       else localStorage.removeItem(KEY);
     } else if (origin === BUILT_CHAT_SERVER) localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, origin);
+    if (origin && origin !== foundationOrigin) localStorage.setItem(USED_KEY, JSON.stringify(rememberChatServer(usedServers(), origin)));
   } catch { /* private window */ }
   window.location.reload();
 }

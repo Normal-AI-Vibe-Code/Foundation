@@ -25,7 +25,7 @@ export function ChatButtonView({ on, total, tip, words, onClick }: { on: boolean
   return (
     <button type="button" className={`top-today top-chat${on ? " is-on" : ""}`} aria-current={on ? "page" : undefined} onClick={onClick} data-tip={tip} data-top-chat data-place="chat">
       <ChatMark size={16} />
-      ChatForm
+      <span className="top-word">ChatForm</span>
       {total > 0 && (
         <span className="pane-badge" data-chat-badge={total} aria-label={`${total} for you: ${words}`}>
           {total > 99 ? "99+" : total}

@@ -20,6 +20,7 @@ import { WIDTHS, setUi, toast, useUi } from "../state/ui";
 import { Avatar } from "./Avatar";
 import { SEAT_STATUS, tellSeat, useCouncilSeats, type CouncilSeat } from "./Council";
 import { PROVIDER_NAME, ProviderMark } from "./providers";
+import { RunCard } from "./RunCard";
 import { chooseAvatar, readyCharacters, useRoster } from "./roster";
 
 const sectionsOf = () => getState().allSections;
@@ -159,7 +160,12 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
       {(seat.task || seat.doing) && (
         <section className="agent-info-now">
           {seat.task && <p className="council-task">“{seat.task}”</p>}
-          {seat.doing && <p className="council-doing">{seat.doing}</p>}
+          {/* the run card in full (2026-11-24): every step and the reasoning; an older server's run is its doing line */}
+          {seat.status === "working" && (seat.plan || seat.thought) ? (
+            <RunCard run={{ status: "working", doing: seat.doing, plan: seat.plan, thought: seat.thought, started: seat.started, hue: seat.hue }} variant="full" />
+          ) : (
+            seat.doing && <p className="council-doing">{seat.doing}</p>
+          )}
           {(seat.askerName || seat.leadName) && (
             <p className="council-for">
               {seat.leadName ? `called in by ${seat.leadName}` : ""}

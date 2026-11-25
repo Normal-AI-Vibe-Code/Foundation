@@ -530,13 +530,13 @@ test("2. Hosted ChatForm: #general live, unread badge, thread, reaction, DM, ima
   await ada.screenshot({ path: join(EVIDENCE_DIR, "05_hosted-chat-browser.png") });
   await kai.screenshot({ path: join(EVIDENCE_DIR, "06_hosted-chat-desktop-bearer.png") });
 
-  // Verify desktop bearer window stored the image in `foundation-image-cache-v2` and survives reload with 0 network refetches!
+  // Verify desktop bearer window stored the image in `foundation-image-cache-v3` and survives reload with 0 network refetches!
   await expect
     .poll(
       async () =>
         kai.evaluate(async () => {
-          if (!(await caches.has("foundation-image-cache-v2"))) return 0;
-          const c = await caches.open("foundation-image-cache-v2");
+          if (!(await caches.has("foundation-image-cache-v3"))) return 0;
+          const c = await caches.open("foundation-image-cache-v3");
           return (await c.keys()).length;
         }),
       { timeout: 10_000 },
@@ -544,7 +544,7 @@ test("2. Hosted ChatForm: #general live, unread badge, thread, reaction, DM, ima
     .toBeGreaterThanOrEqual(1);
 
   const l2KeysBefore = await kai.evaluate(async () => {
-    const c = await caches.open("foundation-image-cache-v2");
+    const c = await caches.open("foundation-image-cache-v3");
     return (await c.keys()).map((k) => k.url);
   });
   hostedMetrics.bearerL2EntriesBeforeReload = l2KeysBefore.length;
@@ -563,7 +563,7 @@ test("2. Hosted ChatForm: #general live, unread badge, thread, reaction, DM, ima
   await kai.waitForTimeout(600);
   kai.off("request", onKaiReloadReq);
 
-  expect(kaiReloadImgReqs, "desktop bearer must serve cached image from foundation-image-cache-v2 across reload without refetching").toEqual([]);
+  expect(kaiReloadImgReqs, "desktop bearer must serve cached image from foundation-image-cache-v3 across reload without refetching").toEqual([]);
   hostedMetrics.bearerReloadImageRequests = kaiReloadImgReqs.length;
 
   // ---- Start & exchange a DM + verify unread count ----

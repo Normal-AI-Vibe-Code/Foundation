@@ -145,16 +145,43 @@ export async function runScript(opts: { prompt: string; signal: AbortSignal; per
   }
 
   const section = quoted(opts.prompt) ?? "Supply chain";
+  // its reasoning, as a model's comes: in pieces, a little ahead of each stretch of work (docs/agent-harness.md §2)
+  const think = async (text: string) => {
+    for (const piece of text.match(/.{1,24}(\s|$)/g) ?? [text]) {
+      if (opts.signal.aborted) throw new Error("stopped");
+      emit({ type: "thinking", text: piece });
+    }
+    await wait();
+  };
+  await think(`The ask is a section called “${section}” with the parts in it. I'll read the board first, so I build beside what's there, then make the section and a table of parts.`);
+  // a run that fails part-way (browser checks of a run's error, and of no unhandled rejection): "[fail]" in the ask
+  if (/\[fail\]/.test(opts.prompt)) throw new Error("the scripted runtime was asked to fail");
+  // a run that reads the asker's own chats, then reasons about them (its thought must stay off the grid): "[private]"
+  if (/\[private\]/.test(opts.prompt)) {
+    await step("chat_channels", { limit: 5 });
+    await think("Their channels hold something only they should see, so this reasoning is theirs alone.");
+  }
   await step("set_plan", {
     goal: `${section}: the parts on the board, with their data`,
     steps: [
-      { text: "Make the section", status: "active" },
+      { text: "Read the board", status: "active" },
+      { text: "Make the section", status: "pending" },
       { text: "Put the parts in a table", status: "pending" },
       { text: "Show you", status: "pending" },
     ],
   });
   await step("read_board", {});
+  await step("set_plan", {
+    goal: `${section}: the parts on the board, with their data`,
+    steps: [
+      { text: "Read the board", status: "done" },
+      { text: "Make the section", status: "active" },
+      { text: "Put the parts in a table", status: "pending" },
+      { text: "Show you", status: "pending" },
+    ],
+  });
   await step("add_section", { name: section });
+  await think("The section is there. Now the parts: a vane, a hub bearing and the cap screws, with their quantities, suppliers and unit prices, and a total at the foot.");
   const table = (await step("add_table", {
     section,
     name: "Parts",
@@ -187,6 +214,7 @@ export async function runScript(opts: { prompt: string; signal: AbortSignal; per
   await step("set_plan", {
     goal: `${section}: the parts on the board, with their data`,
     steps: [
+      { text: "Read the board", status: "done" },
       { text: "Make the section", status: "done" },
       { text: "Put the parts in a table", status: "done" },
       { text: "Show you", status: "active" },

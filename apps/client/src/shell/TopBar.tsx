@@ -22,7 +22,7 @@ import { ToolButtons } from "./Tools";
 import { goToday } from "../lib/place";
 import { ShibaDot, useNotices } from "../today/notices";
 import { ChatButton } from "../chat/ChatButton";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { keys } from "../lib/keys";
 import { motion, AnimatePresence } from "motion/react";
 import { setUi, useUi } from "../state/ui";
@@ -85,11 +85,13 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
     <header className="top-bar">
       {/* the top left: Today in the window's corner, then the side menu's fold (over the open menu, at its right
           edge) and a line down to the menu's own edge between it and the tabs. The tabs start where the menu ends */}
-      <div className={`top-left${ui.pane ? " is-over-pane" : ""}`} style={ui.pane ? { width: Math.max(0, ui.paneW - 16) } : undefined}>
+      {/* over the open menu the group ends on the menu's edge: its width is the menu's less the bar's own inset,
+          which a Mac widens for its lights (spaces.css, --bar-inset), so the line lands on the menu's edge there too */}
+      <div className={`top-left${ui.pane ? " is-over-pane" : ""}`} style={ui.pane ? ({ "--pane-w": `${ui.paneW}px` } as CSSProperties) : undefined}>
         {/* Today, in the window's top-left corner (2026-11-17, Josh): the Shiba very small, the word, and what's waiting right beside it */}
         <button type="button" className={`top-today${place.kind === "today" ? " is-on" : ""}`} onClick={goToday} data-tip={notices.total ? `Today: ${notices.words}` : "Today: the Shiba, your todos, the apps"} data-top-today data-place="today">
           <ShibaDot size={16} />
-          Today
+          <span className="top-word">Today</span>
           {notices.total > 0 && (
             <span className="pane-badge" data-today-badge={notices.total} aria-label={`${notices.total} waiting on you: ${notices.words}`}>
               {notices.total > 99 ? "99+" : notices.total}

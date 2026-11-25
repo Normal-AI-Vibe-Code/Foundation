@@ -70,11 +70,12 @@ export function usePosted(): Posted {
 
 export const fetchAvailable = () => api<{ agents: AvailableAgent[]; t3: "off" | "starting" | "running" | "error" }>("/api/agents/available");
 
-/** seat an agent on a council: a new seat each time (the same agent can sit twice), with its own name; the seat comes back */
-export async function postAgent(place: string, agent: string): Promise<PostedAgent | null> {
+/** seat an agent on a council: a new seat each time (the same agent can sit twice), with its own name; the seat comes back.
+ * `model`: a Claude on the API (claude-api, claude-fed) may run a model of its own; without one it follows the default */
+export async function postAgent(place: string, agent: string, model?: string): Promise<PostedAgent | null> {
   const board = activeBoard()?.boardId;
   if (!board) return null;
-  const r = await api<{ agents: PostedAgent[]; seat: PostedAgent }>(`/api/boards/${encodeURIComponent(board)}/agents`, { method: "POST", json: { place, agent } });
+  const r = await api<{ agents: PostedAgent[]; seat: PostedAgent }>(`/api/boards/${encodeURIComponent(board)}/agents`, { method: "POST", json: model ? { place, agent, model } : { place, agent } });
   return r.seat ?? null;
 }
 

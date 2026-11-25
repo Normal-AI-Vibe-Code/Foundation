@@ -9,22 +9,27 @@ import { api } from "./api";
 import type { AvailableAgent } from "./posted";
 import type { T3Host } from "../shell/AgentsPane";
 
+/** an agent that could be assigned, with (from a current server) one sentence on where it runs and who pays */
+export type OfferedAgent = AvailableAgent & { runs?: string };
+
 export interface Available {
-  agents: AvailableAgent[];
+  agents: OfferedAgent[];
   t3: "off" | "starting" | "running" | "error";
   /** this computer's agent host, as it last answered (its agents' sign-in state, its work) */
   host: T3Host | null;
+  /** the server's /mcp takes `mode=code` (docs/agent-harness.md §3): it says so with `codeMode: true` */
+  codeMode: boolean;
   loaded: boolean;
 }
 
-let now: Available = { agents: [], t3: "off", host: null, loaded: false };
+let now: Available = { agents: [], t3: "off", host: null, codeMode: false, loaded: false };
 const subs = new Set<() => void>();
 let asking: Promise<void> | null = null;
 
 export function refreshAvailable(): Promise<void> {
-  asking ??= Promise.all([api<{ agents: AvailableAgent[]; t3: Available["t3"] }>("/api/agents/available"), api<T3Host>("/api/t3host").catch(() => null)])
+  asking ??= Promise.all([api<{ agents: OfferedAgent[]; t3: Available["t3"]; codeMode?: boolean }>("/api/agents/available"), api<T3Host>("/api/t3host").catch(() => null)])
     .then(([a, host]) => {
-      now = { agents: a.agents, t3: a.t3, host, loaded: true };
+      now = { agents: a.agents, t3: a.t3, host, codeMode: a.codeMode === true, loaded: true };
       subs.forEach((f) => f());
     })
     .catch(() => {

@@ -119,8 +119,10 @@ test("the grid's council stands at the right; the bar steps to the bottom left; 
   await admin.locator("[data-council-open]").click();
   const council = admin.locator(".council.is-board");
   await expect(council).toBeVisible();
-  // three places, nobody in them: three silhouettes
-  await expect(council.locator(".council-ghost")).toHaveCount(3);
+  // nobody in it: one silhouette, asleep, and the small one beside it that adds (2026-11-24)
+  await expect(council.locator(".council-ghost")).toHaveCount(1);
+  await expect(council.locator(".council-ghost-small")).toHaveCount(1);
+  await expect(council.locator("[data-council-add]")).toHaveCount(1);
   await settle(admin, 900);
   const hud = await box(admin, "[data-hud]");
   const tools = await box(admin, ".council.is-board .council-tools");
@@ -132,12 +134,15 @@ test("the grid's council stands at the right; the bar steps to the bottom left; 
   // the council's buttons: 16 px from the right and from the bottom, like the bar
   expect(Math.abs(W - (tools.x + tools.width) - 16)).toBeLessThan(2);
   expect(Math.abs(H - (tools.y + tools.height) - 16)).toBeLessThan(2);
-  // the figures are at the right, beside the buttons, past the bar
-  const seats = await admin.locator(".council.is-board .council-seat").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ l: r.left, r: r.right })));
-  expect(seats[0].l).toBeGreaterThan(hud.x + hud.width);
-  expect(tools.x - seats[seats.length - 1].r).toBeLessThan(16);
-  // close together
-  for (let i = 1; i < seats.length; i++) expect(seats[i].l - seats[i - 1].r).toBeLessThan(6);
+  // the silhouettes are at the right, beside the buttons, past the bar
+  const ghosts = await box(admin, ".council.is-board .council-ghosts");
+  expect(ghosts.x).toBeGreaterThan(hud.x + hud.width);
+  expect(tools.x - (ghosts.x + ghosts.width)).toBeLessThan(16);
+  expect(tools.x - (ghosts.x + ghosts.width)).toBeGreaterThanOrEqual(-1);
+  // the + is the small one: it stands over it, not beside it
+  const small = await box(admin, ".council.is-board .council-ghost-small");
+  const plus = await box(admin, ".council.is-board [data-council-add]");
+  expect(Math.abs(plus.x + plus.width / 2 - (small.x + small.width / 2))).toBeLessThan(3);
   await admin.screenshot({ path: `${SHOTS}/04_council-of-the-grid.png` });
   await admin.keyboard.press("Escape");
   await expect(admin.locator(".council")).toHaveCount(0);
@@ -147,7 +152,7 @@ test("the grid's council stands at the right; the bar steps to the bottom left; 
   expect(Math.abs(back.x + back.width / 2 - W / 2)).toBeLessThan(4);
 });
 
-test("a section's council: three places at the section's right, by its Council button, close together, and the empty places breathe", async () => {
+test("a section's council: one silhouette at the section's right, by its Council button, and it breathes", async () => {
   const sid = await admin.evaluate(() => Object.values((window as unknown as { __foundation: Store }).__foundation.getState().sections)[0].id);
   const card = admin.locator(`.section-card[data-section-id="${sid}"]`);
   await admin.evaluate((id) => (window as unknown as { __foundation: Store }).__foundation.setState({ snapRequest: { kind: "section", id, nonce: Math.random() } }), sid);
@@ -156,16 +161,17 @@ test("a section's council: three places at the section's right, by its Council b
   await card.locator(".sec-council").first().click();
   const council = card.locator(".council.is-section");
   await expect(council).toBeVisible();
-  await expect(council.locator(".council-ghost")).toHaveCount(3);
+  await expect(council.locator(".council-ghost")).toHaveCount(1);
+  await expect(council.locator("[data-council-add]")).toHaveCount(1);
   await settle(admin, 900);
   const sec = (await card.boundingBox())!;
-  const seats = await council.locator(".council-seat").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ l: r.left, r: r.right })));
+  const ghosts = (await council.locator(".council-ghosts").boundingBox())!;
   const tools = (await council.locator(".council-tools").boundingBox())!;
-  // at the right: the last figure is beside the buttons, and the buttons at the section's right edge
+  // at the right: the silhouette is beside the buttons, and the buttons at the section's right edge
   expect(sec.x + sec.width - (tools.x + tools.width)).toBeLessThan(40);
-  expect(seats[seats.length - 1].l).toBeGreaterThan(sec.x + sec.width / 2);
-  for (let i = 1; i < seats.length; i++) expect(seats[i].l - seats[i - 1].r).toBeLessThan(6);
-  // the silhouettes move a little (an animation that runs on and on)
+  expect(ghosts.x + ghosts.width / 2).toBeGreaterThan(sec.x + sec.width / 2);
+  expect(tools.x - (ghosts.x + ghosts.width)).toBeLessThan(16);
+  // the silhouette moves a little (an animation that runs on and on)
   const anim = await council.locator(".council-ghost .council-figure > *").first().evaluate((el) => {
     const s = getComputedStyle(el);
     return { name: s.animationName, n: s.animationIterationCount };

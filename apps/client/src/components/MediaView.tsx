@@ -12,7 +12,7 @@ import {
 import { ObjectFrame } from "./ObjectFrame";
 import { useFileSrc } from "../lib/fileSrc";
 import { fetchFile } from "../lib/api";
-import { camera, onCamera } from "../state/camera";
+import { camera, FAR_ZOOM, onCamera } from "../state/camera";
 import { useCalmAdmit } from "../lib/calm";
 import {
   isLocalDataUrl,
@@ -80,6 +80,36 @@ export const MediaView = memo(function MediaView({ item, pos, isActive, getScale
       v.pause();
     }
   }, [item.autoplay, item.muted, nearVideo]);
+
+  // an autoplaying video plays only while it's on screen and the board isn't drawn small (2026-11-24): each playing
+  // frame is a repaint, and a studio's clips played on at 12 % a screen away. Paused, it holds its frame: its poster
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || !item.autoplay || typeof IntersectionObserver === "undefined") return;
+    let onScreen = false;
+    let far = camera.scale < FAR_ZOOM;
+    const set = () => {
+      const want = onScreen && !far;
+      if (want === !v.paused) return;
+      if (want) void v.play().catch(() => {});
+      else v.pause();
+    };
+    const io = new IntersectionObserver(([e]) => {
+      onScreen = e.isIntersecting;
+      set();
+    });
+    io.observe(v);
+    const off = onCamera((c) => {
+      const f = c.scale < FAR_ZOOM;
+      if (f === far) return;
+      far = f;
+      set();
+    });
+    return () => {
+      io.disconnect();
+      off();
+    };
+  }, [item.autoplay, nearVideo]);
 
   // the chrome is a couple of round icons that slide out from behind the card on hover
   const icons =
