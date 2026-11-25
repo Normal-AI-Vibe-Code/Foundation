@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-23T06:07:39.341Z",
+  "syncedAt": "2026-11-25T04:18:04.692Z",
   "columns": [
     {
       "id": "needs-you",
@@ -359,7 +359,8 @@
       "milestone": "polish",
       "area": "perf",
       "status": "next",
-      "body": "frames.spec.ts measures Edge (WebView2) only; the Mac app is WebKit and was 20× slower than Chromium on the same board until 2026-11-24 (§0.16). Seed a Character studio with characters, inspiration and wired pipeline nodes, and measure pan, zoom and pan at far zoom in Playwright's WebKit (installed 27.2). Then the last 40 → 60 fps at far zoom: the wires drawn into one canvas when far, or cards' DOM culled off screen. The probe scripts are in docs/evidence/2026-11-24_mac-studio-perf/scripts/."
+      "body": "frames.spec.ts measures Edge (WebView2) only; the Mac app is WebKit and was 20× slower than Chromium on the same board until 2026-11-24 (§0.16). Seed a Character studio with characters, inspiration and wired pipeline nodes, and measure pan, zoom and pan at far zoom in Playwright's WebKit (installed 27.2). Then the last 40 → 60 fps at far zoom: the wires drawn into one canvas when far, or cards' DOM culled off screen. The probe scripts are in docs/evidence/2026-11-24_mac-studio-perf/scripts/.",
+      "issue": 244
     },
     {
       "id": "hyperform-projects",
@@ -2478,7 +2479,8 @@
       "milestone": "polish",
       "area": "perf",
       "status": "review",
-      "body": "2026-11-24, Josh: 30–60 fps at all times on the Mac, even on the Character studio; progressive loading; cached images and videos. Measured in Playwright's WebKit (the Mac app's engine) on a copy of this Mac's data: zoom 4.7 → 45 fps, pan after a zoom 1.7 → 60, pan at 12 % 2.6 → 40. The cause was the port-wire layer: a live wire's pulse under an SVG tunnel mask, which WebKit re-renders as the camera moves; both now rest while the board is far or moving. useOnScreen keeps one state and batches its reads; character cards fetch pictures once near; stills use the 512 tier; autoplaying videos pause off screen or far. The image cache never hit on a Mac (WebKit made a cache per racing open, 79 called v2): opened once per page now (v3), and mesh avatars and clips are kept in a byte cache; a relaunch fetches 0 bytes of them. SPEC §0.16, docs/evidence/2026-11-24_mac-studio-perf/. A person checks: the studio in the installed Mac app after the next release (pan, zoom far out and back, relaunch and see the pictures arrive at once)."
+      "body": "2026-11-24, Josh: 30–60 fps at all times on the Mac, even on the Character studio; progressive loading; cached images and videos. Measured in Playwright's WebKit (the Mac app's engine) on a copy of this Mac's data: zoom 4.7 → 45 fps, pan after a zoom 1.7 → 60, pan at 12 % 2.6 → 40. The cause was the port-wire layer: a live wire's pulse under an SVG tunnel mask, which WebKit re-renders as the camera moves; both now rest while the board is far or moving. useOnScreen keeps one state and batches its reads; character cards fetch pictures once near; stills use the 512 tier; autoplaying videos pause off screen or far. The image cache never hit on a Mac (WebKit made a cache per racing open, 79 called v2): opened once per page now (v3), and mesh avatars and clips are kept in a byte cache; a relaunch fetches 0 bytes of them. SPEC §0.16, docs/evidence/2026-11-24_mac-studio-perf/. A person checks: the studio in the installed Mac app after the next release (pan, zoom far out and back, relaunch and see the pictures arrive at once).",
+      "issue": 246
     },
     {
       "id": "mac-top-left",
@@ -2487,7 +2489,8 @@
       "milestone": "polish",
       "area": "shell",
       "status": "review",
-      "body": "2026-11-24, Josh: 'the tabs are too far out on mac and should be brought back to that panel line'. The group over the open menu was sized paneW − 16, but a Mac's bar starts 84 px in for its lights, so it ran 68 px past the menu. One --bar-inset now (12 px, 84 on a Mac) and the group is the menu's width less it; at a narrow menu ChatForm, then Today, keep their marks (names kept). e2e/today-corner.spec.ts holds it at 220, 272, 340 and 420 px. A person checks: the installed Mac app after the next release."
+      "body": "2026-11-24, Josh: 'the tabs are too far out on mac and should be brought back to that panel line'. The group over the open menu was sized paneW − 16, but a Mac's bar starts 84 px in for its lights, so it ran 68 px past the menu. One --bar-inset now (12 px, 84 on a Mac) and the group is the menu's width less it; at a narrow menu ChatForm, then Today, keep their marks (names kept). e2e/today-corner.spec.ts holds it at 220, 272, 340 and 420 px. A person checks: the installed Mac app after the next release.",
+      "issue": 247
     }
   ]
 }
