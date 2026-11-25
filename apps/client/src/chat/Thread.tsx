@@ -45,16 +45,16 @@ export function ThreadPane(p: ThreadPaneProps) {
     >
       <header className="chat-thread-head">
         <span className="chat-thread-title">Thread</span>
-        <span className="chat-thread-where">{p.where}</span>
+        <span className="chat-thread-where" title={p.where}>{p.where}</span>
         <span className="chat-head-gap" />
         {p.onClose && (
-          <button className="chat-head-btn" onClick={p.onClose} data-tip="Close the thread" data-kbd="Esc" aria-label="Close the thread">
+          <button type="button" className="chat-head-btn" onClick={p.onClose} data-tip="Close the thread" data-kbd="Esc" aria-label="Close the thread">
             <IconClose />
           </button>
         )}
       </header>
       <div className="chat-thread-scroll">
-        {p.root ? <MessageView message={p.root} me={p.me} actions={p.actions} inThread editing={p.editingId === p.root.id} flash={p.flashId === p.root.id} srcOf={p.srcOf} /> : <p className="chat-thread-wait">{p.loading ? "Loading the thread…" : "This thread isn't here any more."}</p>}
+        {p.root ? <MessageView message={p.root} me={p.me} actions={p.actions} inThread editing={p.editingId === p.root.id} flash={p.flashId === p.root.id} srcOf={p.srcOf} /> : <p className="chat-thread-wait" role="status">{p.loading ? "Loading the thread…" : "This thread isn't here any more."}</p>}
         <div className="chat-thread-rule" role="separator">
           <span>{replies ? `${replies} ${replies === 1 ? "reply" : "replies"}` : p.loading ? "" : "No replies yet"}</span>
         </div>
@@ -68,7 +68,7 @@ export function ThreadPane(p: ThreadPaneProps) {
       </div>
       <div className="chat-thread-foot">
         {p.composer}
-        <div className="chat-typing">{p.typing}</div>
+        <div className="chat-typing" aria-live="polite">{p.typing}</div>
       </div>
     </motion.aside>
   );

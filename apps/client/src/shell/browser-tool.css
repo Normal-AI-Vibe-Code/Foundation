@@ -18,6 +18,7 @@
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
   border-bottom: 1px solid var(--color-line);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 .btool-tabs > .f-dot {
@@ -29,19 +30,31 @@
   height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-2) 0 var(--space-4);
+  gap: var(--space-1);
+  padding: 0 var(--space-2) 0 0;
   border-radius: var(--radius-pill);
   color: var(--color-mist);
   font: 500 var(--text-12) / 1 var(--font-sans);
+}
+.btool-tab-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 0 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  outline: 0;
 }
-.btool-tab:hover {
-  color: var(--color-frost);
-}
-.btool-tab:focus-visible {
-  box-shadow: 0 0 0 1px var(--color-line-strong);
+.btool-tab-main:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -1px;
 }
 .btool-tab.is-on {
   background: var(--color-raise);
@@ -75,9 +88,18 @@
   font: 500 var(--text-11) / 1 var(--font-sans);
   cursor: pointer;
 }
-.btool-tab-x:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
+.btool-tab-x:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+@media (hover: hover) {
+  .btool-tab:hover {
+    color: var(--color-frost);
+  }
+  .btool-tab-x:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
 }
 .btool-tab-new {
   width: 26px;
@@ -132,6 +154,10 @@
   cursor: default;
   touch-action: none;
   user-select: none;
+}
+.btool-page:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
 }
 .btool-canvas {
   display: block;
@@ -191,9 +217,9 @@
     var(--shadow-sheet),
     0 0 0 1px var(--color-line);
   color: var(--color-mist);
-  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
   pointer-events: none;
-  animation: btool-rise var(--dur-pane) var(--ease-out-soft);
+  animation: btool-rise var(--dur-quick) var(--ease-out-soft);
 }
 .btool-did span {
   min-width: 0;
@@ -250,10 +276,12 @@
 }
 .btool-sheet p {
   margin: 0;
-  max-height: 40vh;
+  max-height: 40dvh;
   overflow: auto;
+  overscroll-behavior: contain;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 .btool-sheet-from {
   color: var(--color-dim);

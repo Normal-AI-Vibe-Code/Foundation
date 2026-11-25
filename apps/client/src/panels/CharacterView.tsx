@@ -17,7 +17,7 @@
  * page shows it without a board); `CharacterBody` is the one on the grid.
  */
 
-import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { boardMaps, CHARACTER_STAGES, MOODS, nextStage, stagePassed, type CharacterStageKey, type CharacterState, type Mood } from "@foundation/protocol";
 import { api, authHeaders, serverUrl } from "../lib/api";
 import { loadCosts, pressStage, STAGE_WORDS, useCosts, useInspiration, type Costs, type Inspiration } from "../lib/characterStudio";
@@ -50,26 +50,46 @@ export function useCharacter(panelId: string): CharacterState | undefined {
   return state;
 }
 
+/**
+ * Whether the card has come near the screen (a screen's width or height to spare), and so may fetch its pictures.
+ * A studio holds a card per character and each shows its set's whole inspiration: fetched at once, that was every
+ * picture on the board before the first one you look at. Once near it stays so (the pictures are in the cache).
+ */
+const CardNear = createContext(true);
+function useSeenNear(ref: React.RefObject<HTMLElement | null>) {
+  const [near, setNear] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || near) return;
+    if (typeof IntersectionObserver === "undefined") return setNear(true);
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setNear(true), { rootMargin: "100%" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, near]);
+  return near;
+}
+
 /** a picture the character has, by role; `still` is a picture given instead of the archive's (the design page) */
 function Picture({ character, role, label, still, large = false }: { character: CharacterState; role: string; label: string; still?: string; large?: boolean }) {
   const id = (character.files as Record<string, string | undefined>)[role];
-  const fetched = useFileSrc(id && !still ? characterFilePath(character.id, role) : null);
+  const near = useContext(CardNear);
+  const fetched = useFileSrc(id && !still ? characterFilePath(character.id, role) : null, near, { width: large ? 512 : 256 });
   const src = still ?? fetched;
   const [broken, setBroken] = useState(false);
   if ((!id && !still) || broken) return null;
   return (
     <figure className={`char-thumb${large ? " is-large" : ""}`} data-char-file={role}>
-      {src ? <img src={src} alt={`${character.name}, ${label}`} draggable={false} onError={() => setBroken(true)} /> : <span />}
+      {src ? <img src={src} alt={`${character.name}, ${label}`} loading="lazy" decoding="async" draggable={false} onError={() => setBroken(true)} /> : <span />}
       <figcaption>{label}</figcaption>
     </figure>
   );
 }
 
 function Pick({ item, on, disabled, onToggle }: { item: Inspiration; on: boolean; disabled: boolean; onToggle: () => void }) {
-  const src = useFileSrc(item.src);
+  const src = useFileSrc(item.src, useContext(CardNear), { width: 256 });
   return (
     <button type="button" className={`char-pick${on ? " is-on" : ""}`} aria-pressed={on} disabled={disabled && !on} data-tip={on ? "Drawn from this · press to leave it out" : disabled ? "Five at most reach the image model" : "Draw from this"} onClick={onToggle}>
-      {src && <img src={src} alt={item.name} draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />}
+      {src && <img src={src} alt={item.name} loading="lazy" decoding="async" draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />}
     </button>
   );
 }
@@ -356,6 +376,7 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
   // every card draws itself: the ones on screen at a size worth it play (as many as the frames allow:
   // characters/stageBudget.ts), and a card without a place holds its picture, never an empty frame
   const onScreen = useOnScreen(host, 0.3);
+  const near = useSeenNear(host);
   const { live, take: takeStage } = useStage(onScreen);
   const c = useCharacter(panel.id);
   const ui = useUi();
@@ -395,22 +416,24 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
     );
 
   return (
-    <CharacterSheet
-      character={c}
-      boardId={board()}
-      panelId={panel.id}
-      // a copy (dragged out of a collection, or laid out by one) shows the character; its original is where it's pressed
-      viewer={ui.role === "viewer" || Boolean(c?.copyOf)}
-      price={price}
-      inspiration={inspiration}
-      live={live}
-      busy={busy}
-      hostRef={host}
-      onPointer={takeStage}
-      onPress={(s) => void press(s)}
-      onEdit={edit}
-      onMavatar={(f) => void bringMavatar(f)}
-      onApprove={approve}
-    />
+    <CardNear.Provider value={near}>
+      <CharacterSheet
+        character={c}
+        boardId={board()}
+        panelId={panel.id}
+        // a copy (dragged out of a collection, or laid out by one) shows the character; its original is where it's pressed
+        viewer={ui.role === "viewer" || Boolean(c?.copyOf)}
+        price={price}
+        inspiration={inspiration}
+        live={live}
+        busy={busy}
+        hostRef={host}
+        onPointer={takeStage}
+        onPress={(s) => void press(s)}
+        onEdit={edit}
+        onMavatar={(f) => void bringMavatar(f)}
+        onApprove={approve}
+      />
+    </CardNear.Provider>
   );
 }

@@ -88,10 +88,16 @@ test('it checks in, forwards what Foundation follows, and lets the app’s own l
   line.stop();
   await settle();
   assert.equal(ran, 3, 'every event still reaches the app');
-  const events = heard.filter((h) => h.body.type === 'event').map((h) => h.body.event);
-  assert.deepEqual(events, [{ type: 'message', channel: 'C1' }]);
+  const events = heard
+    .filter((h) => h.body.type === 'event')
+    .map((h) => h.body.event)
+    .sort((a, b) => a.type.localeCompare(b.type));
+  assert.deepEqual(events, [
+    { type: 'message', channel: 'C1' },
+    { type: 'reaction_added', channel: 'C1' },
+  ]);
   assert.ok(!JSON.stringify(heard).includes('hello there'), 'no message text is forwarded');
-  assert.ok(FORWARDED.has('channel_rename') && !FORWARDED.has('reaction_added'));
+  assert.ok(FORWARDED.has('channel_rename') && FORWARDED.has('reaction_added') && !FORWARDED.has('app_mention'));
 });
 
 test('the bot token never goes to another host', async () => {

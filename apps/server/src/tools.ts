@@ -70,7 +70,7 @@ import { agentBrowser } from "./hostbrowser.ts";
 import { describeIo, ensureMachinePorts, watchMachine } from "./machineio.ts";
 import { writeDigest } from "./digest.ts";
 import { flowformCall, flowformTools } from "./flowformlink.ts";
-import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, stepTarget, travel, type CrewMember } from "./crew.ts";
+import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, setPlan, stepTarget, travel, type CrewMember } from "./crew.ts";
 import { audit, callScope, type AuditInput, type CallScope, type Door } from "./audit.ts";
 import { contentRefusal, decide, EgressHeld, heldSentence, sendsFor, type Send, type SendKind } from "./egress.ts";
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
@@ -79,6 +79,7 @@ import { layFlowExamples } from "./flows.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
 import { CHAT_TOOLS } from "./chattools.ts";
 import { addReplayCard, placeFile, timelineText, userById } from "./replay.ts";
+import { codeHash, codeTools, NO_REPLAY } from "./codemode.ts";
 
 /** the person a tool acts for (Today's tools are theirs, not the board's) */
 function personOf(ctx: ToolCtx): UserInfo {
@@ -332,6 +333,19 @@ export const TOOLS: BoardTool[] = [
     run: (ctx) => describeBoard(getBoard(ctx.boardId).doc),
   }),
   def({
+    name: "read_card",
+    description: "Read one card in full: a note's whole markdown, every cell of a table, or a panel's fields. read_board shows only the first line of each; use this before summarizing, copying or rewriting a card.",
+    schema: z.object({ id: z.string() }),
+    run: (ctx, { id }) => {
+      const doc = getBoard(ctx.boardId).doc;
+      const o = boardMaps(doc).objects.get(id) as ({ id: string; kind: string; name?: string; text?: string; sectionId?: string } & Record<string, unknown>) | undefined;
+      if (!o) throw new HttpError(404, `No card ${id} on this board`);
+      if (o.kind === "note") return { id, kind: "note", name: o.name ?? "", section: o.sectionId, markdown: noteTextOf(doc, o) };
+      if (o.kind === "table") return { id, kind: "table", name: o.name ?? "", section: o.sectionId, cells: tableCellsOf(doc, id) };
+      return { ...o };
+    },
+  }),
+  def({
     name: "search",
     description: "Search everything Foundation can see: board cards, uploaded files (full text and CAD headers), Slack, GitHub repos and registered apps.",
     schema: z.object({ query: z.string() }),
@@ -365,7 +379,7 @@ export const TOOLS: BoardTool[] = [
     run: (ctx, { goal, steps }) => {
       // a lead's plan goes to the helpers it calls in (crew_work)
       const member = crewMember(ctx.crew);
-      if (member) member.plan = { goal, steps };
+      if (member) setPlan(member, { goal, steps });
       return `plan set: ${steps.filter((x) => x.status === "done").length}/${steps.length} done`;
     },
   }),
@@ -1589,6 +1603,8 @@ export const TOOLS: BoardTool[] = [
   }),
   // ChatForm (chattools.ts): channels, read, search, post, react — the person's own access, no board
   ...CHAT_TOOLS,
+  // code mode (codemode.ts): find tools by what they do, and run a script that calls them through runTool
+  ...codeTools({ tools: () => TOOLS, run: (ctx, name, input) => runTool(ctx, name, input) }),
 ];
 
 export function toolByName(name: string) {
@@ -1668,7 +1684,8 @@ export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Pr
     throw new HttpError(403, `View only: this person can read the board “${ctx.boardId}” but not change it, so ${name} can't run. Say what you would change instead.`);
   }
   const rid = (parsed.data as { request_id?: string }).request_id;
-  const key = rid ? `${ctx.boardId}:${ctx.userId}:${rid}` : null;
+  // the same request_id replays only the same tool (and, for run_code, the same script)
+  const key = rid ? `${ctx.boardId}:${ctx.userId}:${name}${name === "run_code" ? `:${codeHash(String((parsed.data as { code?: string }).code ?? ""))}` : ""}:${rid}` : null;
   if (key && seenRequests.has(key)) {
     rec({ decision: "allowed", reason: "same request_id: the first call's result", result: "ok" });
     return seenRequests.get(key);
@@ -1730,7 +1747,7 @@ export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Pr
   recW(scope.asked ? { decision: "asked", reason: scope.asked } : { decision: "allowed", approved_by: approved(), result: "ok" });
   // what a partial tool couldn't reach is said beside what it found
   if (heldNote) out = typeof out === "string" ? `${out}\n\n${heldNote}` : out && typeof out === "object" && !Array.isArray(out) ? { ...(out as object), not_sent: heldNote } : out;
-  if (key) {
+  if (key && !(out && typeof out === "object" && NO_REPLAY.has(out))) {
     seenRequests.set(key, out);
     if (seenRequests.size > 2000) seenRequests.delete(seenRequests.keys().next().value!);
   }

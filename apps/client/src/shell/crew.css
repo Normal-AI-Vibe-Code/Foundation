@@ -148,9 +148,16 @@
   height: 28px;
   border-radius: 50%;
   color: var(--color-dim);
+  cursor: pointer;
 }
-.crew-guide-x:hover {
-  color: var(--color-frost);
+@media (hover: hover) {
+  .crew-guide-x:hover {
+    color: var(--color-frost);
+  }
+}
+.crew-guide-x:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 
 /* ---------- the voice sheet: rises from the bottom (hold Space) ---------- */
@@ -165,10 +172,12 @@
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
+  display: inline-grid;
+  place-items: center;
   border-radius: var(--radius-pill);
   background: var(--color-agent);
   color: var(--color-void);
-  font: 700 10px / 16px var(--font-sans);
+  font: 700 10px / 1 var(--font-sans);
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -177,6 +186,7 @@
   left: 50%;
   bottom: calc(100% + var(--space-4));
   translate: -50% 0;
+  transform-origin: bottom center;
   width: min(560px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
@@ -244,18 +254,24 @@
 }
 .talk-field {
   flex: 1;
+  min-width: 0;
   min-height: 36px;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-raise);
   color: var(--color-frost);
-  font: 500 var(--text-14) / 1.35 var(--font-sans);
+  font: 500 var(--text-14) / 1.45 var(--font-sans);
   resize: none;
   outline: none;
 }
 .talk-field:focus {
   border-color: var(--color-agent);
+  box-shadow: 0 0 0 3px var(--color-agent-dim);
+}
+.talk-field:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: -1px;
   box-shadow: 0 0 0 3px var(--color-agent-dim);
 }
 .talk-hints {
@@ -335,10 +351,17 @@
   border-radius: var(--radius-pill);
   color: var(--color-mist);
   font: 600 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
 }
-.crew-row-btn:hover {
-  color: var(--color-frost);
-  background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+.crew-row-btn:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .crew-row-btn:hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+  }
 }
 .crew-row-btn.is-stop {
   color: var(--color-bad);
@@ -548,12 +571,25 @@
   font-size: var(--text-14);
   cursor: pointer;
 }
-.level-back:hover,
-.level-step:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
+.level-back:focus-visible,
+.level-step:focus-visible,
+.level-make:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .level-back:hover,
+  .level-step:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
+  .level-make:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
 }
 .level-step {
+  min-width: 0;
   height: 26px;
   padding: 0 var(--space-3);
   border: 0;
@@ -576,6 +612,7 @@
   padding: 0 var(--space-1);
 }
 .level-here {
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -602,10 +639,6 @@
   color: var(--color-mist);
   font: 500 var(--text-12) / 1 var(--font-sans);
   cursor: pointer;
-}
-.level-make:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
 }
 .level-make.is-go {
   background: var(--color-pulse);

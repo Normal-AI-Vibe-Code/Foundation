@@ -63,6 +63,7 @@ import type { WebSocket } from "ws";
 import { HYPERFORM_URL, type UserInfo } from "@foundation/protocol";
 import { requirePerson } from "./auth.ts";
 import { config } from "./config.ts";
+import { requireLocalFeature } from "./hosted.ts";
 import { HttpError, type Req } from "./http.ts";
 import { computerUseDefault } from "./prefs.ts";
 import { pageIdsOk, savePagePicture } from "./pagepictures.ts";
@@ -214,6 +215,7 @@ export const HOST_BROWSER_PATH = /^\/host\/browser\/([A-Za-z0-9_-]{8,64})$/;
 export function requestHostBrowser(req: Req, page?: CardPage) {
   const u = requirePerson(req, "Opening the browser");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can open the browser on the server's computer.");
+  requireLocalFeature("browser", "The server's built-in browser");
   const found = findBrowser();
   if (!found) throw new HttpError(503, noBrowserSentence());
   return { ...openHostBrowser(u, page), browser: found.name, running: hostBrowserRunning() };

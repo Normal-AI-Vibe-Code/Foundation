@@ -36,6 +36,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { onLook } from "@foundation/ui";
 import type { SearchHit } from "@foundation/protocol";
 import { api, wsUrl } from "../lib/api";
+import { useCapabilities } from "../lib/capabilities";
 import { refreshAvailable, useAvailable } from "../lib/agentsAvailable";
 import { HOLDS_KEYS } from "../lib/keysHeld";
 import { WIDTHS, setUi, toast, toggleTool, useUi, type ToolId } from "../state/ui";
@@ -73,7 +74,16 @@ export function ToolButtons() {
   return (
     <div className="tool-buttons" role="group" aria-label="Tools">
       {TOOLS.map((t) => (
-        <button key={t.id} className={`top-btn${ui.tool === t.id ? " is-on" : ""}`} onClick={() => toggleTool(t.id)} aria-pressed={ui.tool === t.id} aria-label={t.name} data-tip={t.tip} data-tool-open={t.id}>
+        <button
+          key={t.id}
+          type="button"
+          className={`top-btn${ui.tool === t.id ? " is-on" : ""}`}
+          onClick={() => toggleTool(t.id)}
+          aria-pressed={ui.tool === t.id}
+          aria-label={ui.tool === t.id ? `Close ${t.name}` : `Open ${t.name}`}
+          data-tip={t.tip}
+          data-tool-open={t.id}
+        >
           {t.glyph}
           {t.id === "t3" && t3 !== "off" && <i className={`tool-btn-dot is-${t3}`} aria-hidden />}
         </button>
@@ -102,7 +112,7 @@ export function ToolPane() {
             <span>{t.name}</span>
           </button>
         ))}
-        <button className="top-btn tool-close" onClick={() => setUi({ tool: null })} aria-label="Close the tools" data-tip="Close">
+        <button type="button" className="top-btn tool-close" onClick={() => setUi({ tool: null })} aria-label="Close tools pane" data-tip="Close">
           ✕
         </button>
       </nav>
@@ -121,6 +131,7 @@ type TermState = "idle" | "opening" | "open" | "closed";
 
 function TerminalTool({ shown }: { shown: boolean }) {
   const role = useUi().role;
+  const caps = useCapabilities();
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TermState>("idle");
   const [where, setWhere] = useState<{ shell: string; cwd: string } | null>(null);
@@ -268,11 +279,11 @@ function TerminalTool({ shown }: { shown: boolean }) {
   // saves). Once per opening of the pane: if it fails, the button below is how to try again
   const auto = useRef(false);
   useEffect(() => {
-    if (!shown || role !== "admin" || auto.current) return;
+    if (!shown || role !== "admin" || !caps.loaded || !caps.local.terminal || auto.current) return;
     auto.current = true;
     void start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shown, role]);
+  }, [shown, role, caps.loaded, caps.local.terminal]);
 
   const again = () => {
     xt.current?.ws.close();
@@ -280,6 +291,14 @@ function TerminalTool({ shown }: { shown: boolean }) {
     xt.current = null;
     void start();
   };
+
+  if (!caps.local.terminal)
+    return (
+      <div className="tool-empty" data-hosted-terminal>
+        <b>A terminal on the server's computer</b>
+        <p>The built-in terminal runs on a local computer and is turned off on a hosted Foundation server.</p>
+      </div>
+    );
 
   if (role !== "admin")
     return (
@@ -521,6 +540,7 @@ function t3Origin(page: string): string | null {
  */
 export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean }) {
   const ui = useUi();
+  const caps = useCapabilities();
   const { t3, host } = useAvailable();
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState<string | null>(null);
@@ -529,20 +549,30 @@ export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean
   const frameCtx = useFrameContext();
   const t3Frame = page ? frameFor(page, { ...frameCtx, t3: t3Origin(page) }) : null;
   useEffect(() => {
+    if (!caps.loaded || !caps.local.t3) return;
     void refreshAvailable();
     const t = setInterval(() => void refreshAvailable(), t3 === "running" ? 8000 : 3000);
     return () => clearInterval(t);
-  }, [t3]);
+  }, [t3, caps.loaded, caps.local.t3]);
   // T3's own page, once it runs and someone (not a viewer) has the tool open: a link minted for this opening
   useEffect(() => {
-    if (!shown || t3 !== "running" || page || viewer) return;
+    if (!caps.loaded || !caps.local.t3 || !shown || t3 !== "running" || page || viewer) return;
     void api<{ url: string }>("/api/t3host/open", { method: "POST", json: {} })
       .then((r) => setPage(t3PageUrl(r.url)))
       .catch((e: Error) => setFailed(e.message));
-  }, [shown, t3, page, viewer]);
+  }, [caps.loaded, caps.local.t3, shown, t3, page, viewer]);
   useEffect(() => {
     if (t3 !== "running") setPage(null);
   }, [t3]);
+  if (!caps.local.t3)
+    return (
+      <div className={`tool-t3${full ? " is-full" : ""}`} data-hosted-t3>
+        <div className="tool-empty">
+          <b>This computer's agents</b>
+          <p>Local T3 agents run on a local computer and are turned off on a hosted Foundation server. Connect your own local agent over MCP in Settings → Agents, or use the server's API agent.</p>
+        </div>
+      </div>
+    );
   const press = (what: "start" | "stop") => {
     setBusy(true);
     setFailed(null);

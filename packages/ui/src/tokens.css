@@ -47,17 +47,17 @@
   --color-line-strong: color-mix(in srgb, rgb(255 255 255 / 0.26) calc(var(--night-hard) * 100%), rgb(32 30 25 / 0.26));
   --color-frost: color-mix(in srgb, #ededed calc(var(--night-hard) * 100%), #201e19);
   --color-mist: color-mix(in srgb, #a3a3a3 calc(var(--night-hard) * 100%), #5f5b51);
-  --color-dim: color-mix(in srgb, #6f6f6f calc(var(--night-hard) * 100%), #8a8577);
+  --color-dim: color-mix(in srgb, #868686 calc(var(--night-hard) * 100%), #6f6a5d);
   --color-pulse: color-mix(in srgb, #f2f2f2 calc(var(--night-hard) * 100%), #325bb4);
   --color-volt: color-mix(in srgb, #c4c4c4 calc(var(--night-hard) * 100%), #27488f);
   --color-pulse-dim: color-mix(in srgb, rgb(255 255 255 / 0.1) calc(var(--night-hard) * 100%), rgb(50 91 180 / 0.1));
   --color-moss: color-mix(in srgb, #8c8c8c calc(var(--night-hard) * 100%), #2e5d43);
-  --color-ok: color-mix(in srgb, #d9d9d9 calc(var(--night-hard) * 100%), #2e7d54);
-  --color-warn: color-mix(in srgb, #f5c542 calc(var(--night-hard) * 100%), #a16207);
+  --color-ok: color-mix(in srgb, #d9d9d9 calc(var(--night-hard) * 100%), #287850);
+  --color-warn: color-mix(in srgb, #f5c542 calc(var(--night-hard) * 100%), #995c02);
   --color-bad: color-mix(in srgb, #f27a3a calc(var(--night-hard) * 100%), #b3261e);
 
   /* Foundation's two additions: the agent layer and the data wires */
-  --color-agent: color-mix(in srgb, #8f76ee calc(var(--night-hard) * 100%), #6b5bd6);
+  --color-agent: color-mix(in srgb, #8f76ee calc(var(--night-hard) * 100%), #6858d3);
   /* text and marks on a solid state, accent or person colour: white in any room (the fills are saturated) */
   --color-on-fill: color-mix(in srgb, #121212 calc(var(--night-hard) * 100%), #fff);
   /* type drawn straight over a picture or the Shiba's room (Today's panel): white in any room, on --color-room-shade */
@@ -65,7 +65,9 @@
   --color-room-shade: #14110c;
   /* a gloss on a raised bead (ports): stays light at night, like the highlight inside --shadow-lift */
   --color-highlight: rgb(255 255 255 / 0.6);
-  --color-agent-dim: color-mix(in srgb, rgb(143 118 238 / 0.16) calc(var(--night-hard) * 100%), rgb(107 91 214 / 0.1));
+  /* pure black/white 10% inset outline for content images (no warm-ink fringe on photos) */
+  --color-media-outline: color-mix(in srgb, rgb(255 255 255 / 0.1) calc(var(--night-hard) * 100%), rgb(0 0 0 / 0.1));
+  --color-agent-dim: color-mix(in srgb, rgb(143 118 238 / 0.16) calc(var(--night-hard) * 100%), rgb(104 88 211 / 0.1));
   /* the crew: six agents told apart, all from the agent's violet family (an agent is always violet) */
   --color-crew-0: var(--color-agent);
   --color-crew-1: color-mix(in srgb, #7b8cf4 calc(var(--night-hard) * 100%), #4f5fd0);
@@ -157,6 +159,9 @@
 }
 
 html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-underline-position: from-font;
   transition:
     --night 1.4s var(--ease-out-soft),
     --night-hard 0.5s var(--ease-out-soft);
@@ -190,7 +195,7 @@ html[data-theme="room"] :is(.top-bar, .floor-pane),
 html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   --color-frost: var(--color-over-room);
   --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
-  --color-dim: color-mix(in srgb, var(--color-over-room) 62%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 74%, transparent);
   --color-moss: color-mix(in srgb, var(--color-over-room) 74%, transparent);
   --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
   --color-raise: color-mix(in srgb, var(--color-over-room) 16%, transparent);
@@ -204,6 +209,7 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   --color-agent: var(--color-over-room);
   --color-agent-dim: color-mix(in srgb, var(--color-over-room) 18%, transparent);
   --color-on-fill: var(--color-room-shade);
+  --color-media-outline: rgb(255 255 255 / 0.1);
   --shadow-sheet: none;
   background: transparent;
   color: var(--color-over-room);
@@ -251,6 +257,88 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   --glass-edge: color-mix(in srgb, var(--color-frost) 14%, transparent);
 }
 
+/* ---------- focus, accessibility & media primitives ---------- */
+
+:where(
+    button,
+    a,
+    input,
+    textarea,
+    select,
+    [tabindex],
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"]
+  ):focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  :where(
+      button,
+      a,
+      input,
+      textarea,
+      select,
+      [tabindex],
+      [role="button"],
+      [role="tab"],
+      [role="menuitem"]
+    ):focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
+
+.f-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.f-skip-link {
+  position: fixed;
+  inset-block-start: var(--space-4);
+  inset-inline-start: var(--space-4);
+  z-index: 2000;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.f-skip-link:focus-visible {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: var(--h-pill);
+  margin: 0;
+  padding: 0 var(--space-4);
+  overflow: visible;
+  clip-path: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-frost);
+  color: var(--color-void);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+  text-decoration: none;
+  box-shadow: var(--shadow-lift);
+}
+
+.f-media-outline {
+  outline: 1px solid var(--color-media-outline);
+  outline-offset: -1px;
+}
+
 /* ---------- primitives every surface uses ---------- */
 
 .f-eyebrow {
@@ -281,16 +369,19 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) {
   color: var(--color-frost);
   font: 500 var(--text-12) / 1 var(--font-sans);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   /* never transition background/color here: the night engine animates every
      token for 1.4 s, and a per-element transition restarting each frame lags behind it */
   transition:
     transform var(--dur-press) var(--ease-out-soft),
     border-color var(--dur-quick) var(--ease-out-soft);
 }
-.f-pill:hover {
-  border-color: var(--color-line-strong);
+@media (hover: hover) {
+  .f-pill:not(:disabled):hover {
+    border-color: var(--color-line-strong);
+  }
 }
-.f-pill:active {
+.f-pill:not(:disabled):active {
   transform: scale(0.97);
 }
 .f-pill.is-primary {

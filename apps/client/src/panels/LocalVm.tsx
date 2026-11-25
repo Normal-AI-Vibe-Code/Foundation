@@ -5,6 +5,7 @@ import type { PanelMeta } from "../state/store";
 import { useUi } from "../state/ui";
 import { activeBoard } from "../sync/board";
 import { api } from "../lib/api";
+import { useCapabilities } from "../lib/capabilities";
 import { DesktopScreen } from "./MachineViewDesktop";
 import { useOnScreen } from "./PanelView";
 import { toggleFullscreen } from "../lib/cardUse";
@@ -41,9 +42,10 @@ export function VmSetupView({ files = [], host, busy, error, viewer, onImport, o
 }
 function VmSetup({ panel }: { panel: PanelMeta }) {
   const viewer = useUi().role === "viewer", requestId = useRef(crypto.randomUUID());
+  const caps = useCapabilities();
   const [files, setFiles] = useState<Iso[]>([]), [host, setHost] = useState<Host>();
   const [busy, setBusy] = useState<string>(), [error, setError] = useState<string>();
-  useEffect(() => { let active = true; Promise.all([api<Host>("/api/vms/host"), api<{ files: Iso[] }>(`/api/boards/${board()}/vm-isos`)]).then(([h, f]) => { if (active) { setHost(h); setFiles(f.files); } }).catch((e) => active && setError(e.message)); return () => { active = false; }; }, []);
+  useEffect(() => { if (!caps.loaded || !caps.local.vms) return; let active = true; Promise.all([api<Host>("/api/vms/host"), api<{ files: Iso[] }>(`/api/boards/${board()}/vm-isos`)]).then(([h, f]) => { if (active) { setHost(h); setFiles(f.files); } }).catch((e) => active && setError(e.message)); return () => { active = false; }; }, [caps.loaded, caps.local.vms]);
   const importIso = async (file: File) => { setBusy(`Archiving ${file.name}…`); setError(undefined); try { const r = await api<{ file: Iso }>(`/api/boards/${board()}/vm-isos?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file, headers: { "content-type": "application/octet-stream" } }); setFiles((old) => [r.file, ...old.filter((f) => f.id !== r.file.id)]); } catch (e) { setError((e as Error).message); } finally { setBusy(undefined); } };
   const create = async (form: VmForm) => { setBusy("Adding the VM…"); setError(undefined); try { await api(`${path(panel.id)}/configure`, { method: "POST", json: { ...form, request_id: requestId.current } }); } catch (e) { setError((e as Error).message); } finally { setBusy(undefined); } };
   return <VmSetupView files={files} host={host} busy={busy} error={error} viewer={viewer} onImport={(f) => void importIso(f)} onCreate={(f) => void create(f)} />;
@@ -58,13 +60,14 @@ export function VmStatusView({ vm, busy, viewer, error, onAction }: { vm: LocalV
 function ConfiguredVm({ panel }: { panel: PanelMeta }) {
   const host = useRef<HTMLDivElement>(null), onScreen = useOnScreen(host, 0.25);
   const viewer = useUi().role === "viewer";
+  const caps = useCapabilities();
   const [vm, setVm] = useState(panel.vm!), [tab, setTab] = useState<"desktop" | "commands">("desktop");
   const [busy, setBusy] = useState(false), [error, setError] = useState<string>(), [confirm, setConfirm] = useState<string>();
   const [keys, setKeys] = useState(false), [command, setCommand] = useState(""), [result, setResult] = useState("");
   const [pid, setPid] = useState<string>();
   const commandRequest = useRef<{ command: string; id: string } | undefined>(undefined);
   useEffect(() => { setVm(panel.vm!); }, [panel.vm]);
-  useEffect(() => { if (!onScreen) return; let active = true; const read = () => api<{ vm: LocalVmState }>(path(panel.id)).then((r) => { if (active) setVm(r.vm); }).catch((e) => active && setError(e.message)); void read(); const timer = setInterval(() => void read(), 3000); return () => { active = false; clearInterval(timer); }; }, [panel.id, onScreen]);
+  useEffect(() => { if (!onScreen || !caps.loaded || !caps.local.vms) return; let active = true; const read = () => api<{ vm: LocalVmState }>(path(panel.id)).then((r) => { if (active) setVm(r.vm); }).catch((e) => active && setError(e.message)); void read(); const timer = setInterval(() => void read(), 3000); return () => { active = false; clearInterval(timer); }; }, [panel.id, onScreen, caps.loaded, caps.local.vms]);
   useEffect(() => {
     if (pid === undefined) return;
     let active = true, timer: ReturnType<typeof setTimeout>;
@@ -80,4 +83,21 @@ function ConfiguredVm({ panel }: { panel: PanelMeta }) {
       {tab === "desktop" ? <DesktopScreen nativeVm panelId={panel.id} name={vm.name} viewer={false} onKeys={setKeys} onFull={() => void toggleFullscreen(panel.id)}>{keys && <span className="vm-note">Keys go to WildOS · Esc Esc to leave</span>}</DesktopScreen> : <div className="vm-commands" onPointerDown={(e) => e.stopPropagation()}><p>Commands run inside the VM. You can also open its terminal on the Desktop.</p><details><summary>Enable the command connection</summary><p>In the VM’s terminal, run this once:</p><pre>{SETUP}</pre><p>Requires a Debian-based guest with systemd.</p></details><label>Guest shell command<textarea aria-label="Guest shell command" value={command} onChange={(e) => setCommand(e.target.value)} maxLength={16000} rows={4} placeholder="uname -a" /></label><button className="f-pill is-accent" disabled={busy || pid !== undefined || !command.trim()} onClick={() => void run()}>Run in VM</button>{pid !== undefined && <p role="status">The command is running. Leaving this tab does not stop it.</p>}{result && <pre className="vm-output" role="status">{result}</pre>}</div>}</> : <div className="vm-rest"><DesktopGlyph size={32} /><h3>{viewer ? "A full OS on this board" : vm.state === "archived" ? "The VM is archived" : "Your operating system, here"}</h3><p>{viewer ? "An editor at their screen can open the VM console. Its status is visible to everyone on this board." : "Start boots its own system. Its disk stays on this computer between runs."}</p><span>{vm.isoName}</span></div>}
   </div>;
 }
-export function LocalVm({ panel }: { panel: PanelMeta }) { return panel.vm ? <ConfiguredVm panel={panel} /> : <VmSetup panel={panel} />; }
+export function LocalVm({ panel }: { panel: PanelMeta }) {
+  const caps = useCapabilities();
+  if (!caps.local.vms) {
+    return (
+      <div className="vm-setup" data-hosted-vms onPointerDown={(e) => e.stopPropagation()}>
+        <div className="vm-intro">
+          <DesktopGlyph size={32} />
+          <div>
+            <div className="f-eyebrow">Hosted server</div>
+            <h3>Local virtual machines are turned off</h3>
+            <p>Local QEMU virtual machines run on a local computer and are turned off on a hosted Foundation server.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return panel.vm ? <ConfiguredVm panel={panel} /> : <VmSetup panel={panel} />;
+}

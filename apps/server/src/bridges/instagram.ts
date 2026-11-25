@@ -111,6 +111,13 @@ export const instagram: BridgeAdapter = {
 
   window: (portal: Portal) => dayWindow("Instagram", portal.lastInboundAt),
 
+  async check(step) {
+    if (step === "secret") return env("INSTAGRAM_APP_SECRET") && env("INSTAGRAM_VERIFY_TOKEN") ? { ok: true, said: "Both are set. Meta's first webhook proves the app secret: a message with a bad signature is refused." } : { ok: false, said: `Still missing: ${["INSTAGRAM_APP_SECRET", "INSTAGRAM_VERIFY_TOKEN"].filter((k) => !env(k)).join(", ")}.` };
+    if (!token() || !accountId()) return { ok: false, said: `Paste ${!token() ? "the access token" : "the account id"} first.` };
+    const r = await fetchJson<{ name?: string; username?: string; id?: string }>(`${base()}/${encodeURIComponent(accountId())}?fields=name,username`, { what: "Instagram", headers: { authorization: `Bearer ${token()}` } });
+    return { ok: true, said: `Instagram answered: ${r.username ? `@${r.username}` : `account ${r.id ?? accountId()}`}${r.name ? ` (${r.name})` : ""}. The token can read this account.` };
+  },
+
   async send(portal, out) {
     if (out.files.length) throw new Error("Instagram takes attachments only by a public link, and this server's files aren't public: send the words alone, or share the file another way.");
     const text = out.text.trim();

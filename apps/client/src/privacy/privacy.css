@@ -2,6 +2,8 @@
 .privacy-page {
   height: 100%;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-6);
   padding: var(--space-7) clamp(16px, 4vw, 56px) var(--space-6);
   background: var(--color-void);
   user-select: text;
@@ -15,25 +17,28 @@
   flex: 1;
 }
 .privacy-body {
-  max-width: 720px;
+  max-width: 70ch;
   margin: var(--space-6) auto 0;
   color: var(--color-mist);
-  font: 400 var(--text-14) / 1.6 var(--font-sans);
+  font: 400 var(--text-14) / 1.55 var(--font-sans);
 }
 .privacy-lede {
   margin: 0 0 var(--space-5);
   color: var(--color-frost);
   font: 300 var(--text-20) / 1.45 var(--font-display);
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 .privacy-body h2 {
   margin: var(--space-6) 0 var(--space-2);
   color: var(--color-frost);
   font: 600 var(--text-16) / 1.3 var(--font-sans);
+  text-wrap: balance;
 }
 .privacy-body p,
 .privacy-body ul {
   margin: 0 0 var(--space-3);
+  text-wrap: pretty;
 }
 .privacy-body ul {
   padding-left: var(--space-5);
@@ -43,6 +48,11 @@
 }
 .privacy-body a {
   color: var(--color-pulse);
+}
+.privacy-body a:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 .privacy-updated {
   margin-top: var(--space-6) !important;

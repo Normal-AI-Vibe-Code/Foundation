@@ -1,56 +1,45 @@
 /**
- * ChatForm's Inbox tab (docs/chatform.md §3; B1): the bridges. Mail, WhatsApp, Instagram and WeChat, each
- * with its state dot and a sentence (from the server: `GET /api/chat/bridges`), and
- *  - when it isn't connected: which keys are set and which are missing (never their values) and the steps;
- *  - its portals: the conversations it brought in, newest first, each with its unread count and, where the
- *    service sets one, its reply window (open, closing, shut); pressing one opens it in the Chat tab;
- *  - for admins: who a new conversation goes to (the inbox), on or off, and (with FOUNDATION_BRIDGE_DEMO)
- *    a sample conversation through the real pipeline;
- *  - Mail: Connect mail (your own mailbox, by Google's consent), the label that bounds what comes in;
- *    starting a conversation where the service allows it (mail, WeCom), and saying why not where it doesn't.
- * Then the Slack history panel (I1's `History.tsx`, mounted when it's there).
+ * ChatForm's Inbox tab (docs/chatform.md §3; Josh: "The Inbox should give you information on what is
+ * connected but also give you buttons that start the process of connecting your inbox to foundation or
+ * foundation servers").
+ *
+ *  - **This Foundation** first: which server this window talks to (this computer or another), its version,
+ *    and its public address; mail and messaging connections live on that server, so connecting here
+ *    connects for everyone on it. *Change server…* opens the shell's server panel.
+ *  - Then one card per service: a monogram in ink, the state in one line (*Connected as … since …*, *Not
+ *    connected*, *Needs an admin*, the error and why), what's flowing (last in, last out), **the one
+ *    forward button** that starts connecting from here, and the detail folded underneath (the keys, set or
+ *    missing, never a value; the steps) for whoever does the setup.
+ *     · Mail: *Connect your Gmail* (each person their own mailbox, by Google's consent in the browser; the
+ *       card flips to Connected live); whose are connected (admins see every address, never a token);
+ *       Disconnect, asked first. Without the server's Google client, the button explains in place and an
+ *       admin gets *Set it up*.
+ *     · Slack: linked channels, the history brought in, the transition guide (SlackGuide.tsx).
+ *     · WhatsApp, Instagram, WeChat: company connections an admin makes, *Set it up* (SetupWizard.tsx).
+ *  - It follows the server live: the chat socket's `{t:"bridge"}` events (bridges.ts `useBridges`), not a
+ *    timer. `InboxView` draws it from data alone (the design page).
  */
 
 import { ErrorCard } from "../../components/ErrorCard";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ChatBridgeStatus, ChatParty, UserInfo } from "@foundation/protocol";
-import { api } from "../../lib/api";
+import { api, authConfig, SERVER_NAME } from "../../lib/api";
 import { goChat } from "../../lib/place";
 import { useChat } from "../model";
 import { PartyAvatar } from "../Avatar";
 import { requestId } from "../logic";
+import History from "./History";
+import { SetupWizard, type WizardService } from "./SetupWizard";
+import { LinkList, SlackGuide, useLinkActions } from "./SlackGuide";
+import { ago, since, useBridges, type BridgeView, type Bridges, type ReplyWindow, type SlackView } from "./bridges";
 import "./inbox.css";
+import "./slackguide.css";
 
-interface ReplyWindow {
-  open: boolean;
-  rule: string;
-  closesAt?: number;
-  why?: string;
-}
-interface BridgeView extends ChatBridgeStatus {
-  settings: { enabled: boolean; inbox: string[]; puppet: string | null; inboxIsAdmins: boolean };
-  list: Array<{ id: string; name: string; topic: string; lastPostAt: number; lastText?: string; unread: number; demo: boolean; window?: ReplyWindow }>;
-  canStart: boolean;
-  startRule?: string;
-  accounts?: Array<{ email: string; userId: string; label: string; labelFound: boolean; lastSyncAt: number | null; error: string | null }>;
-}
-interface Bridges {
-  bridges: BridgeView[];
-  demo: boolean;
-  admin: boolean;
-}
-
-// I1's Slack history panel, when its file is there (a glob that finds nothing is an empty object)
-const historyFile = import.meta.glob<{ default: ComponentType<{ user: UserInfo }> }>("./History.tsx");
-const History = historyFile["./History.tsx"] ? lazy(historyFile["./History.tsx"]) : null;
+/** the shell's server panel opens on this event (another builder's ServerSwitch listens for it) */
+export const OPEN_SERVER_PANEL = "foundation:open-server-panel";
 
 const DOT: Record<ChatBridgeStatus["state"], string> = { off: "", "needs-setup": "is-warn", connecting: "is-warn is-live", live: "is-ok", error: "is-bad" };
-const STATE: Record<ChatBridgeStatus["state"], string> = { off: "Off", "needs-setup": "Needs setup", connecting: "Connecting", live: "Live", error: "Needs attention" };
-
-const ago = (at: number) => {
-  const m = Math.max(0, Math.round((Date.now() - at) / 60000));
-  return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} d ago`;
-};
+const MONO: Record<string, string> = { gmail: "M", slack: "S", whatsapp: "Wa", instagram: "Ig", wechat: "Wc" };
 
 function windowWords(w: ReplyWindow): string {
   if (!w.open) return "Reply window shut";
@@ -60,48 +49,300 @@ function windowWords(w: ReplyWindow): string {
 }
 
 export default function InboxTab({ user, rest }: { user: UserInfo; rest: string }) {
-  void rest;
-  const [data, setData] = useState<Bridges | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const load = useCallback(() => api<Bridges>("/api/chat/bridges").then((d) => (setData(d), setErr(null)), (e: Error) => setErr(e.message)), []);
+  const { data, err, load, waitFor } = useBridges();
+  const [version, setVersion] = useState<string | null>(null);
   useEffect(() => {
-    void load();
-    // the list follows what comes in (the chat socket carries the messages; this catches new portals and states)
-    const t = setInterval(() => void load(), 20_000);
-    const focus = () => void load();
-    window.addEventListener("focus", focus);
-    return () => (clearInterval(t), window.removeEventListener("focus", focus));
-  }, [load]);
-
+    void authConfig().then((c) => setVersion(c.version ?? null), () => setVersion(null));
+  }, []);
   return (
     <div className="inbox" data-chat-tab="inbox">
       <div className="inbox-page">
-        <p className="inbox-lede">
-          Mail, WhatsApp, Instagram and WeChat as conversations here. What someone sends comes into a conversation of its own; what a person writes there goes out as they press Enter. An agent's reply waits as a draft until a person sends it.
-        </p>
         {err && <ErrorCard message={err} />}
-        {!data && !err && <div className="inbox-quiet">Asking the server…</div>}
-        {data?.bridges.map((b) => <Bridge key={b.service} b={b} admin={data.admin} demo={data.demo} user={user} reload={load} />)}
-        <section className="inbox-bridge" data-bridge="slack">
-          <header className="inbox-head">
-            <span className="f-dot is-ok" />
-            <h2>Slack history</h2>
-            <span className="inbox-state">Brought in</span>
-          </header>
-          {History ? (
-            <Suspense fallback={<div className="inbox-quiet">Loading…</div>}>
-              <History user={user} />
-            </Suspense>
-          ) : (
-            <p className="inbox-detail">Slack's export comes in here once the history import is installed on this build.</p>
-          )}
-        </section>
+        {!data && !err && <div className="inbox-quiet" role="status">Asking the server…</div>}
+        {data && <InboxView data={data} user={user} version={version} reload={() => void load()} waitFor={waitFor} openGuide={rest === "slack-guide"} />}
       </div>
     </div>
   );
 }
 
-function Bridge({ b, admin, demo, user, reload }: { b: BridgeView; admin: boolean; demo: boolean; user: UserInfo; reload: () => void }) {
+export function InboxView({ data, user, version, reload, waitFor, still = false, openGuide = false }: { data: Bridges; user: UserInfo; version: string | null; reload: () => void; waitFor?: (t: (b: Bridges) => boolean) => void; still?: boolean; openGuide?: boolean }) {
+  const [wizard, setWizard] = useState<WizardService | null>(null);
+  const [guide, setGuide] = useState(openGuide);
+  const by = Object.fromEntries(data.bridges.map((b) => [b.service, b])) as Record<string, BridgeView>;
+  return (
+    <>
+      <p className="inbox-lede">What's connected to this ChatForm, and the buttons that connect the rest. What someone sends from mail, WhatsApp, Instagram or WeChat comes into a conversation of its own; what a person writes there goes out as they press Enter. An agent's reply waits as a draft until a person sends it.</p>
+      <ThisFoundation data={data} version={version} />
+      {by.gmail && <MailCard b={by.gmail} user={user} admin={data.admin} still={still} reload={reload} waitFor={waitFor} setUp={() => setWizard("gmail")} />}
+      <SlackCard view={data.slack} user={user} still={still} reload={reload} openGuide={() => setGuide(true)} />
+      {(["whatsapp", "instagram", "wechat"] as const).map((s) => by[s] && <CompanyCard key={s} b={by[s]} admin={data.admin} demo={data.demo} still={still} reload={reload} setUp={() => setWizard(s)} />)}
+      {wizard && <SetupWizard service={wizard} bridge={by[wizard] ?? null} server={data.server} admin={data.admin} onClose={() => (setWizard(null), reload())} onChanged={reload} />}
+      {guide && <SlackGuide user={user} onClose={() => (setGuide(false), reload())} />}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------- the server
+
+function isLocal(origin: string) {
+  try {
+    const h = new URL(origin.includes("://") ? origin : `http://${origin}`).hostname;
+    return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h.endsWith(".localhost");
+  } catch {
+    return false;
+  }
+}
+
+export function ThisFoundation({ data, version }: { data: Bridges; version: string | null }) {
+  const here = isLocal(SERVER_NAME);
+  return (
+    <section className="inbox-bridge inbox-server" data-bridge="server">
+      <header className="inbox-head">
+        <span className="fx-mono" aria-hidden>
+          F
+        </span>
+        <h2>This Foundation</h2>
+        <span className="f-dot is-ok" />
+        <span className="inbox-line">
+          {SERVER_NAME}
+          {here ? " · this computer" : ""}
+          {version ? ` · version ${version}` : ""}
+        </span>
+        <span className="chat-head-gap" />
+        <button type="button" className="f-pill" onClick={() => window.dispatchEvent(new CustomEvent(OPEN_SERVER_PANEL))} data-change-server>
+          Change server…
+        </button>
+      </header>
+      <p className="inbox-detail">
+        Mail and messaging connections live on this server: connecting a service here connects it for everyone who uses {here ? "this computer's server" : SERVER_NAME}. Services reach it at <code>{data.server.publicUrl}</code>
+        {data.server.reachable ? ", a public https address." : ": only from this computer or this network, so webhooks (WhatsApp, Instagram, WeChat) can't arrive yet. A rack server with its own address, or a tunnel, fixes that."}
+      </p>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------- a card
+
+function Card({ service, name, state, line, flow, children, acts, data }: { service: string; name: string; state: ChatBridgeStatus["state"]; line: ReactNode; flow?: string; children?: ReactNode; acts?: ReactNode; data?: string }) {
+  return (
+    <section className={`inbox-bridge is-${state}`} data-bridge={service} data-state={data ?? state}>
+      <header className="inbox-head">
+        <span className="fx-mono" aria-hidden>
+          {MONO[service] ?? name[0]}
+        </span>
+        <h2>{name}</h2>
+        <span className={`f-dot ${DOT[state]}`} />
+        <span className="inbox-line" data-state-line>
+          {line}
+        </span>
+        <span className="chat-head-gap" />
+        <span className="inbox-forward">{acts}</span>
+      </header>
+      {flow && <p className="inbox-rule">{flow}</p>}
+      {children}
+    </section>
+  );
+}
+
+function Keys({ b }: { b: BridgeView }) {
+  const keys = b.keys ?? b.needs?.map((n) => ({ key: n.key, what: n.what, set: n.set, source: null as null, tail: undefined as string | undefined }));
+  if (!keys?.length) return null;
+  return (
+    <div className="inbox-needs" aria-label="What it reads">
+      {keys.map((n) => {
+        const optional = !n.set && /^Optional/i.test(n.what);
+        return (
+          <div key={n.key} className={`inbox-need ${n.set ? "is-set" : optional ? "is-optional" : ""}`}>
+            <span className={`f-dot ${n.set ? "is-ok" : optional ? "" : "is-warn"}`} />
+            <code>{n.key}</code>
+            <span className="inbox-need-set">{n.set ? `set${n.source === "stored" ? " here" : n.source === "env" ? " in .env" : ""}${n.tail ? ` · …${n.tail}` : ""}` : optional ? "optional" : "missing"}</span>
+            <span className="inbox-need-what">{n.what}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Portals({ b }: { b: BridgeView }) {
+  if (!b.list.length) return null;
+  const ghost: ChatParty = { kind: "ghost", id: b.service, name: b.name, service: b.service };
+  return (
+    <div className="inbox-portals">
+      {b.list.map((p) => (
+        <button key={p.id} type="button" className="inbox-portal" onClick={() => goChat("chat", p.id)} title={p.topic || p.name}>
+          <PartyAvatar party={{ ...ghost, id: p.id, name: p.name }} size={28} />
+          <span className="inbox-portal-text">
+            <span className="inbox-portal-name" title={p.name}>
+              {p.name}
+              {p.demo && <span className="inbox-tag">Demo</span>}
+            </span>
+            <span className="inbox-portal-last">{p.lastText ?? p.topic}</span>
+          </span>
+          {p.window && (
+            <span className={`inbox-window ${p.window.open ? "" : "is-shut"}`} title={p.window.why ?? p.window.rule}>
+              {windowWords(p.window)}
+            </span>
+          )}
+          <span className="inbox-portal-when">{ago(p.lastPostAt)}</span>
+          {p.unread > 0 && <span className="inbox-unread">{p.unread > 99 ? "99+" : p.unread}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const flowOf = (b: BridgeView) => [b.portals ? `${b.portals === 1 ? "1 conversation" : `${b.portals} conversations`}` : "", b.lastEventAt ? `last heard ${ago(b.lastEventAt)}` : ""].filter(Boolean).join(" · ") || undefined;
+
+// ---------------------------------------------------------------- mail
+
+function MailCard({ b, user, admin, still, reload, waitFor, setUp }: { b: BridgeView; user: UserInfo; admin: boolean; still: boolean; reload: () => void; waitFor?: (t: (x: Bridges) => boolean) => void; setUp: () => void }) {
+  const { people } = useChat();
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [waiting, setWaiting] = useState(false);
+  const [explain, setExplain] = useState(false);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [label, setLabel] = useState("Foundation");
+  const accounts = b.accounts ?? [];
+  const mine = accounts.find((a) => a.userId === user.id);
+  const clientReady = !(b.needs ?? []).some((n) => (n.key === "GMAIL_CLIENT_ID" || n.key === "GMAIL_CLIENT_SECRET") && !n.set);
+  const nameOf = (id: string) => (id === user.id ? "you" : (people.find((p) => p.id === id)?.name ?? "someone"));
+  useEffect(() => {
+    if (mine) setWaiting(false);
+  }, [mine]);
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setNote(null);
+    try {
+      await fn();
+      reload();
+    } catch (e) {
+      setNote((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const connect = () =>
+    act(async () => {
+      const r = await api<{ url: string }>("/api/chat/bridges/gmail/connect", { method: "POST", json: { label: label.trim() || "Foundation" } });
+      window.open(r.url, "_blank", "noopener");
+      setWaiting(true);
+      waitFor?.((x) => Boolean(x.bridges.find((y) => y.service === "gmail")?.accounts?.some((a) => a.userId === user.id)));
+    });
+  const state: ChatBridgeStatus["state"] = mine ? (mine.error ? "error" : "live") : !clientReady ? "needs-setup" : b.state === "error" ? "error" : "needs-setup";
+  const line = mine
+    ? mine.error
+      ? `${mine.email}: ${mine.error}`
+      : `Connected as ${mine.email} since ${since(mine.connectedAt ?? mine.lastSyncAt ?? Date.now())}${b.portals ? ` · ${b.portals === 1 ? "1 conversation" : `${b.portals} conversations`}` : ""}`
+    : waiting
+      ? "Waiting for you to approve it on Google's page…"
+      : !clientReady
+        ? "Needs an admin: the server has no Google sign-in client for mail yet"
+        : "Not connected for you";
+  return (
+    <Card
+      service="gmail"
+      name="Mail"
+      state={state}
+      data={mine ? "connected" : waiting ? "waiting" : clientReady ? "not-connected" : "needs-admin"}
+      line={line}
+      flow={accounts.length ? `${accounts.length === 1 ? "1 mailbox" : `${accounts.length} mailboxes`} connected${b.lastEventAt ? ` · last heard ${ago(b.lastEventAt)}` : ""}` : undefined}
+      acts={
+        mine ? null : (
+          <button type="button" className="f-pill is-accent" disabled={busy || still || waiting} onClick={() => (clientReady ? void connect() : setExplain(true))} data-connect-gmail>
+            {waiting ? "Waiting…" : "Connect your Gmail"}
+          </button>
+        )
+      }
+    >
+      {!mine && clientReady && (
+        <p className="inbox-detail">
+          Opens Google's page in your browser. Foundation asks to read your mail and send your replies; only threads under the label{" "}
+          <input className="inbox-inline-input" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} aria-label="The Gmail label whose threads come in" /> come in, never the whole inbox.
+        </p>
+      )}
+      {!mine && !clientReady && explain && (
+        <div className="inbox-explain" data-needs-admin>
+          <p className="inbox-detail">Before anyone can connect a mailbox, an admin adds Foundation's Google OAuth client to this server (once, for everyone). {admin ? "It takes about five minutes in Google Cloud Console." : "Ask an admin to open Inbox → Mail → Set it up."}</p>
+          {admin && (
+            <button type="button" className="f-pill is-accent" onClick={setUp} data-setup="gmail">
+              Set it up
+            </button>
+          )}
+        </div>
+      )}
+      {accounts.length > 0 && (
+        <div className="inbox-mail">
+          {accounts.map((a) => (
+            <div key={a.email} className="inbox-account">
+              <span className={`f-dot ${a.error ? "is-bad" : a.labelFound ? "is-ok" : "is-warn"}`} />
+              <span className="inbox-account-name">{a.email}</span>
+              <span className="inbox-account-detail">
+                {nameOf(a.userId)} · {a.error ? a.error : `threads labelled “${a.label}”${a.lastSyncAt ? ` · checked ${ago(a.lastSyncAt)}` : ""}`}
+              </span>
+              {(a.userId === user.id || admin) && !still && (
+                <span className="inbox-account-acts">
+                  {confirm === a.email ? (
+                    <>
+                      <button type="button" className="f-pill chat-draft-bad" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/disconnect", { method: "POST", json: { email: a.email, confirm: true } })).then(() => setConfirm(null))}>
+                        Disconnect
+                      </button>
+                      <button type="button" className="f-pill" onClick={() => setConfirm(null)}>
+                        Keep
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className="f-pill" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/sync", { method: "POST", json: {} }))}>
+                        Check now
+                      </button>
+                      <button type="button" className="f-pill" onClick={() => setConfirm(a.email)}>
+                        Disconnect…
+                      </button>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <Portals b={b} />
+      <Details b={b} admin={admin} setUp={setUp} />
+      {note && <ErrorCard message={note} />}
+    </Card>
+  );
+}
+
+function Details({ b, admin, setUp, children }: { b: BridgeView; admin: boolean; setUp: () => void; children?: ReactNode }) {
+  return (
+    <details className="inbox-settings">
+      <summary>Setup details{b.needs?.some((n) => !n.set && !/^Optional/i.test(n.what)) ? " · something missing" : ""}</summary>
+      <Keys b={b} />
+      {b.steps && b.steps.length > 0 && (
+        <ol className="inbox-steps">
+          {b.steps.map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ol>
+      )}
+      {b.window && <p className="inbox-rule">{b.window}</p>}
+      {admin && (
+        <div className="inbox-acts">
+          <button type="button" className="f-pill" onClick={setUp}>
+            Open the setup steps
+          </button>
+        </div>
+      )}
+      {children}
+    </details>
+  );
+}
+
+// ---------------------------------------------------------------- WhatsApp, Instagram, WeChat
+
+function CompanyCard({ b, admin, demo, still, reload, setUp }: { b: BridgeView; admin: boolean; demo: boolean; still: boolean; reload: () => void; setUp: () => void }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
@@ -117,165 +358,61 @@ function Bridge({ b, admin, demo, user, reload }: { b: BridgeView; admin: boolea
       setBusy(false);
     }
   };
-  const ghost: ChatParty = { kind: "ghost", id: b.service, name: b.name, service: b.service };
-  const setup = b.state === "needs-setup" || b.state === "error";
-
+  const live = b.state === "live";
+  const line = live ? `Connected · ${b.detail}` : b.state === "off" ? b.detail : b.state === "error" ? b.detail : admin ? "Not connected" : "Not connected · an admin sets it up";
   return (
-    <section className={`inbox-bridge is-${b.state}`} data-bridge={b.service}>
-      <header className="inbox-head">
-        <span className={`f-dot ${DOT[b.state]}`} />
-        <h2>{b.name}</h2>
-        <span className="inbox-state">{STATE[b.state]}</span>
-        {b.portals > 0 && <span className="inbox-count">{b.portals === 1 ? "1 conversation" : `${b.portals} conversations`}</span>}
-        {b.lastEventAt && <span className="inbox-count">last heard {ago(b.lastEventAt)}</span>}
-      </header>
-      <p className="inbox-detail">{b.detail}</p>
-      {b.window && <p className="inbox-rule">{b.window}</p>}
-
-      {b.service === "gmail" && <MailAccounts b={b} user={user} busy={busy} act={act} />}
-
-      {setup && b.needs && b.needs.length > 0 && (
-        <div className="inbox-needs" aria-label="What it reads">
-          {b.needs.map((n) => {
-            const optional = !n.set && /^Optional/i.test(n.what);
-            return (
-            <div key={n.key} className={`inbox-need ${n.set ? "is-set" : optional ? "is-optional" : ""}`}>
-              <span className={`f-dot ${n.set ? "is-ok" : optional ? "" : "is-warn"}`} />
-              <code>{n.key}</code>
-              <span className="inbox-need-set">{n.set ? "set" : optional ? "optional" : "missing"}</span>
-              <span className="inbox-need-what">{n.what}</span>
-            </div>
-            );
-          })}
-        </div>
-      )}
-      {setup && b.steps && b.steps.length > 0 && (
-        <ol className="inbox-steps">
-          {b.steps.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ol>
-      )}
-
-      {b.list.length > 0 && (
-        <div className="inbox-portals">
-          {b.list.map((p) => (
-            <button key={p.id} className="inbox-portal" onClick={() => goChat("chat", p.id)} title={p.topic}>
-              <PartyAvatar party={{ ...ghost, id: p.id, name: p.name }} size={28} />
-              <span className="inbox-portal-text">
-                <span className="inbox-portal-name">
-                  {p.name}
-                  {p.demo && <span className="inbox-tag">Demo</span>}
-                </span>
-                <span className="inbox-portal-last">{p.lastText ?? p.topic}</span>
-              </span>
-              {p.window && (
-                <span className={`inbox-window ${p.window.open ? "" : "is-shut"}`} title={p.window.why ?? p.window.rule}>
-                  {windowWords(p.window)}
-                </span>
-              )}
-              <span className="inbox-portal-when">{ago(p.lastPostAt)}</span>
-              {p.unread > 0 && <span className="inbox-unread">{p.unread > 99 ? "99+" : p.unread}</span>}
+    <Card
+      service={b.service}
+      name={b.name}
+      state={b.state}
+      line={line}
+      flow={flowOf(b)}
+      acts={
+        <>
+          {live && b.canStart && (
+            <button type="button" className="f-pill" disabled={busy || still} aria-expanded={starting} onClick={() => setStarting((s) => !s)}>
+              {starting ? "Close" : "New message…"}
             </button>
-          ))}
-        </div>
-      )}
-      {b.list.length === 0 && b.state === "live" && <p className="inbox-quiet">No conversations yet: the first message someone sends opens one here.</p>}
-
-      <div className="inbox-acts">
-        {b.state === "live" && b.canStart && (
-          <button className="f-pill" disabled={busy} onClick={() => setStarting((s) => !s)}>
-            {starting ? "Close" : b.service === "gmail" ? "New mail…" : "New message…"}
-          </button>
-        )}
-        {b.state === "live" && !b.canStart && b.startRule && <span className="inbox-quiet">{b.startRule}</span>}
-        {admin && demo && (
-          <button className="f-pill" disabled={busy} onClick={() => void act(async () => { const r = await api<{ channel: { id: string } | null }>(`/api/chat/bridges/${b.service}/demo`, { method: "POST", json: {} }); if (r.channel) goChat("chat", r.channel.id); })}>
-            Make a sample conversation
-          </button>
-        )}
-      </div>
+          )}
+          {!live && (
+            <button type="button" className={`f-pill ${admin ? "is-accent" : ""}`} disabled={still} onClick={setUp} data-setup={b.service}>
+              {admin ? "Set it up" : "See the steps"}
+            </button>
+          )}
+        </>
+      }
+    >
+      {live && !b.canStart && b.startRule && <p className="inbox-rule">{b.startRule}</p>}
+      <Portals b={b} />
+      {b.list.length === 0 && live && <p className="inbox-quiet">No conversations yet: the first message someone sends opens one here.</p>}
       {starting && <Start b={b} done={(id) => (setStarting(false), goChat("chat", id))} />}
-      {admin && <Settings b={b} busy={busy} act={act} />}
+      <Details b={b} admin={admin} setUp={setUp}>
+        {admin && <Settings b={b} busy={busy} act={act} />}
+        {admin && demo && (
+          <div className="inbox-acts">
+            <button type="button" className="f-pill" disabled={busy} onClick={() => void act(async () => { const r = await api<{ channel: { id: string } | null }>(`/api/chat/bridges/${b.service}/demo`, { method: "POST", json: {} }); if (r.channel) goChat("chat", r.channel.id); })}>
+              Make a sample conversation
+            </button>
+          </div>
+        )}
+      </Details>
       {note && <ErrorCard message={note} />}
-    </section>
-  );
-}
-
-function MailAccounts({ b, user, busy, act }: { b: BridgeView; user: UserInfo; busy: boolean; act: (fn: () => Promise<unknown>) => Promise<void> }) {
-  const [label, setLabel] = useState("Foundation");
-  const [confirm, setConfirm] = useState<string | null>(null);
-  const mine = (b.accounts ?? []).some((a) => a.userId === user.id);
-  const clientReady = !(b.needs ?? []).some((n) => (n.key === "GMAIL_CLIENT_ID" || n.key === "GMAIL_CLIENT_SECRET") && !n.set);
-  return (
-    <div className="inbox-mail">
-      {(b.accounts ?? []).map((a) => (
-        <div key={a.email} className="inbox-account">
-          <span className={`f-dot ${a.error ? "is-bad" : a.labelFound ? "is-ok" : "is-warn"}`} />
-          <span className="inbox-account-name">{a.email}</span>
-          <span className="inbox-account-detail">
-            {a.error ? a.error : `Threads labelled “${a.label}”${a.lastSyncAt ? ` · checked ${ago(a.lastSyncAt)}` : ""}`}
-          </span>
-          {(a.userId === user.id || user.role === "admin") &&
-            (confirm === a.email ? (
-              <span className="inbox-account-acts">
-                <button className="f-pill chat-draft-bad" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/disconnect", { method: "POST", json: { email: a.email, confirm: true } }))}>
-                  Disconnect
-                </button>
-                <button className="f-pill" onClick={() => setConfirm(null)}>
-                  Keep
-                </button>
-              </span>
-            ) : (
-              <span className="inbox-account-acts">
-                <button className="f-pill" disabled={busy} onClick={() => void act(() => api("/api/chat/bridges/gmail/sync", { method: "POST", json: {} }))}>
-                  Check now
-                </button>
-                <button className="f-pill" onClick={() => setConfirm(a.email)}>
-                  Disconnect…
-                </button>
-              </span>
-            ))}
-        </div>
-      ))}
-      {clientReady && !mine && (
-        <div className="inbox-connect">
-          <label>
-            <span>Label</span>
-            <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={100} aria-label="The Gmail label whose threads come in" />
-          </label>
-          <button
-            className="f-pill is-accent"
-            disabled={busy || !label.trim()}
-            onClick={() =>
-              void act(async () => {
-                const r = await api<{ url: string }>("/api/chat/bridges/gmail/connect", { method: "POST", json: { label: label.trim() } });
-                window.open(r.url, "_blank", "noopener");
-              })
-            }
-          >
-            Connect mail
-          </button>
-          <span className="inbox-quiet">Opens Google's page. Foundation asks to read your mail and send your replies; only threads under this label come in.</span>
-        </div>
-      )}
-    </div>
+    </Card>
   );
 }
 
 function Start({ b, done }: { b: BridgeView; done: (channelId: string) => void }) {
   const [to, setTo] = useState("");
-  const [subject, setSubject] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const rid = useMemo(() => requestId(), []);
-  const mail = b.service === "gmail";
+  const errId = `inbox-start-err-${b.service}`;
   const go = async () => {
     setBusy(true);
     setErr(null);
     try {
-      const r = await api<{ channel: { id: string } }>("/api/chat/portals", { method: "POST", json: { service: b.service, to, subject, text, request_id: rid } });
+      const r = await api<{ channel: { id: string } }>("/api/chat/portals", { method: "POST", json: { service: b.service, to, text, request_id: rid } });
       done(r.channel.id);
     } catch (e) {
       setErr((e as Error).message);
@@ -285,16 +422,30 @@ function Start({ b, done }: { b: BridgeView; done: (channelId: string) => void }
   };
   return (
     <div className="inbox-start">
-      <input placeholder={mail ? "To: name@example.com" : "To: their WeCom userid"} value={to} onChange={(e) => setTo(e.target.value)} />
-      {mail && <input placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />}
-      <textarea placeholder="Message" rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+      <input
+        placeholder="To: their WeCom userid"
+        aria-label="Recipient WeCom user ID"
+        aria-invalid={err ? true : undefined}
+        aria-describedby={err ? errId : undefined}
+        value={to}
+        onChange={(e) => setTo(e.target.value)}
+      />
+      <textarea
+        placeholder="Message"
+        aria-label="Message"
+        aria-invalid={err ? true : undefined}
+        aria-describedby={err ? errId : undefined}
+        rows={3}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
       <div className="inbox-acts">
-        <button className="f-pill is-accent" disabled={busy || !to.trim() || !text.trim() || (mail && !subject.trim())} onClick={() => void go()}>
+        <button type="button" className="f-pill is-accent" disabled={busy || !to.trim() || !text.trim()} onClick={() => void go()}>
           {busy ? "Sending…" : "Send"}
         </button>
-        <span className="inbox-quiet">It goes out as you{mail ? ", from your own mailbox" : ""}.</span>
+        <span className="inbox-quiet">It goes out as you.</span>
       </div>
-      {err && <ErrorCard message={err} />}
+      {err && <p className="inbox-err" id={errId} role="alert">{err}</p>}
     </div>
   );
 }
@@ -305,16 +456,16 @@ function Settings({ b, busy, act }: { b: BridgeView; busy: boolean; act: (fn: ()
   const inbox = b.settings.inbox;
   const name = (id: string) => persons.find((p) => p.id === id)?.name ?? id;
   const save = (patch: Record<string, unknown>) => act(() => api(`/api/chat/bridges/${b.service}`, { method: "POST", json: patch }));
+  const puppetId = `inbox-puppet-${b.service}`;
   return (
-    <details className="inbox-settings">
-      <summary>Who it goes to{b.settings.enabled ? "" : " · turned off"}</summary>
+    <div className="inbox-settings-body">
       <div className="inbox-setting">
         <span className="inbox-setting-name">New conversations go to</span>
         <span className="inbox-chips">
           {inbox.map((id) => (
             <span key={id} className="inbox-chip">
               {name(id)}
-              <button aria-label={`Take ${name(id)} off`} disabled={busy} onClick={() => void save({ inbox: inbox.filter((x) => x !== id) })}>
+              <button type="button" aria-label={`Take ${name(id)} off`} disabled={busy} onClick={() => void save({ inbox: inbox.filter((x) => x !== id) })}>
                 ✕
               </button>
             </span>
@@ -332,30 +483,78 @@ function Settings({ b, busy, act }: { b: BridgeView; busy: boolean; act: (fn: ()
           </select>
         </span>
       </div>
-      {b.service !== "gmail" && (
-        <div className="inbox-setting">
-          <span className="inbox-setting-name">Our own messages sent from the phone show as</span>
-          <select value={b.settings.puppet ?? ""} disabled={busy} onChange={(e) => void save({ puppet: e.target.value || null })}>
-            <option value="">The account itself</option>
-            {persons.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      <div className="inbox-setting">
+        <label htmlFor={puppetId} className="inbox-setting-name">
+          Our own messages sent from the phone show as
+        </label>
+        <select id={puppetId} value={b.settings.puppet ?? ""} disabled={busy} onChange={(e) => void save({ puppet: e.target.value || null })}>
+          <option value="">The account itself</option>
+          {persons.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="inbox-setting">
         <span className="inbox-setting-name">{b.name}</span>
-        <span className="inbox-seg" role="group">
-          <button className={b.settings.enabled ? "is-current" : ""} disabled={busy} onClick={() => void save({ enabled: true })}>
+        <span className="inbox-seg" role="group" aria-label={b.name}>
+          <button type="button" className={b.settings.enabled ? "is-current" : ""} aria-pressed={b.settings.enabled} disabled={busy} onClick={() => void save({ enabled: true })}>
             On
           </button>
-          <button className={!b.settings.enabled ? "is-current" : ""} disabled={busy} onClick={() => void save({ enabled: false })}>
+          <button type="button" className={!b.settings.enabled ? "is-current" : ""} aria-pressed={!b.settings.enabled} disabled={busy} onClick={() => void save({ enabled: false })}>
             Off
           </button>
         </span>
       </div>
-    </details>
+    </div>
   );
 }
+
+// ---------------------------------------------------------------- Slack
+
+function SlackCard({ view, user, still, reload, openGuide }: { view: SlackView; user: UserInfo; still: boolean; reload: () => void; openGuide: () => void }) {
+  const [v, setV] = useState(view);
+  useEffect(() => setV(view), [view]);
+  const la = useLinkActions(setV, reload);
+  const s = v.status;
+  const live = v.links.filter((l) => l.state === "live").length;
+  const line = !v.token.set
+    ? `Not connected${v.history.channels ? ` · ${v.history.channels} conversations brought in` : ""}`
+    : s.state === "error"
+      ? s.detail
+      : v.links.length
+        ? `${live} of ${v.links.length} ${v.links.length === 1 ? "channel" : "channels"} in step${v.app?.team ? ` with ${v.app.team}` : ""} · ${v.mode === "events" ? "events from the Slack app" : `read every ${v.pollSeconds} s`}`
+        : `Connected${v.app?.team ? ` to ${v.app.team}` : ""} · no channel linked yet`;
+  const lastIn = Math.max(0, ...v.links.map((l) => l.lastInAt ?? 0));
+  const lastOut = Math.max(0, ...v.links.map((l) => l.lastOutAt ?? 0));
+  const flow = [lastIn ? `last in ${ago(lastIn)}` : "", lastOut ? `last out ${ago(lastOut)}` : "", v.history.lastImportAt ? `history brought in ${since(v.history.lastImportAt)}` : ""].filter(Boolean).join(" · ") || undefined;
+  return (
+    <Card
+      service="slack"
+      name="Slack"
+      state={s.state}
+      line={line}
+      flow={flow}
+      acts={
+        <button type="button" className="f-pill is-accent" disabled={still} onClick={openGuide} data-open-guide>
+          {!v.token.set && !v.history.channels ? "Start the Slack guide" : v.links.length ? "Open the Slack guide" : "Link channels"}
+        </button>
+      }
+    >
+      {v.links.length > 0 && <LinkList view={v} admin={v.admin && !still} busy={la.busy} asking={la.asking} setAsking={la.setAsking} act={la.act} setView={setV} reload={reload} />}
+      {la.err && <ErrorCard message={la.err} />}
+      <p className="inbox-rule">Direct messages are never bridged: Slack doesn't let an app post into them for people. Bring them in with the history instead.</p>
+      {v.nudgeDismissed && !still && (
+        <button type="button" className="inbox-link" onClick={() => void api("/api/chat/slack/nudge", { method: "POST", json: { dismissed: false } }).then(reload)}>
+          Show “Coming from Slack?” in Chat again
+        </button>
+      )}
+      <details className="inbox-settings">
+        <summary>Slack history: bring it in, download everything</summary>
+        {!still && <History user={user} />}
+      </details>
+    </Card>
+  );
+}
+

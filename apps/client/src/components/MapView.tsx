@@ -371,23 +371,30 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
           </span>
           <div className="header-actions">
             <button
+              type="button"
               className={"icon-btn float-btn" + (meta.float ? " floating" : "")}
               data-tip={meta.float ? "Dock into the section" : "Float freely"}
+              aria-label={meta.float ? "Dock into the section" : "Float freely"}
               onClick={() => setObjectFloat(meta.id, !meta.float)}
             >
               {meta.float ? "✥" : "⌗"}
             </button>
             <FullscreenButton id={meta.id} />
             <button
+              type="button"
               className={"icon-btn map-3d" + (meta.pitched ? " on" : "")}
               data-tip="Tilt into 3D"
+              aria-label="Tilt into 3D"
+              aria-pressed={meta.pitched}
               onClick={() => toggleMapPitch(meta.id)}
             >
               3D
             </button>
             <button
+              type="button"
               className="icon-btn is-remove"
               data-tip="Delete map"
+              aria-label="Delete map"
               onClick={() => removeMap(meta.id)}
             >
               ✕
@@ -398,14 +405,23 @@ export const MapView = memo(function MapView({ map: meta, framePos, isActive, ge
         <div className="map-body-wrap" style={{ height: meta.h }}>
           <div ref={bodyRef} className="map-body" />
           {!engaged && (
-            <div
+            <button
+              type="button"
               className="map-shield"
+              aria-label={`Use ${meta.name} map`}
               onPointerDown={engage}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  putInUse(meta.id);
+                }
+              }}
             >
               <span className="map-shield-hint">
                 {keys("mod+click")} to use · {keys("mod+enter")} full screen
               </span>
-            </div>
+            </button>
           )}
         </div>
 

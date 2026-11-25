@@ -3,6 +3,8 @@
 .settings-page {
   height: 100%;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: 64px;
   display: flex;
   flex-direction: column;
   padding: var(--space-7) clamp(16px, 4vw, 56px) var(--space-6);
@@ -35,8 +37,12 @@
   text-decoration: none;
   transition: transform var(--dur-press) var(--ease-out-soft);
 }
-.settings-tab:active {
+.settings-tab:not([aria-disabled="true"]):active {
   transform: scale(0.97);
+}
+.settings-tab:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .settings-tab.is-current {
   background: var(--color-raise);
@@ -66,6 +72,7 @@
 }
 .kb-title h2 {
   font: 600 var(--text-20) / 1.2 var(--font-sans);
+  text-wrap: balance;
 }
 .kb-title-row {
   display: flex;
@@ -78,7 +85,8 @@
   color: var(--color-mist);
   font-size: var(--text-13);
   line-height: 1.5;
-  max-width: 760px;
+  max-width: 70ch;
+  text-wrap: pretty;
 }
 .kb-title a {
   color: var(--color-pulse);
@@ -121,11 +129,17 @@
     transform var(--dur-press) var(--ease-out-soft),
     border-color var(--dur-quick) var(--ease-out-soft);
 }
-.kb-chip:hover {
-  border-color: var(--color-line-strong);
+@media (hover: hover) {
+  .kb-chip:hover {
+    border-color: var(--color-line-strong);
+  }
 }
-.kb-chip:active {
+.kb-chip:not(:disabled):active {
   transform: scale(0.97);
+}
+.kb-chip:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .kb-chip.is-on {
   background: var(--color-raise);
@@ -142,14 +156,15 @@
   background: var(--color-raise);
   color: var(--color-frost);
   font: 500 var(--text-12) / 1 var(--font-sans);
-  outline: none;
 }
 .kb-search {
   width: 190px;
 }
 .kb-select:focus-visible,
-.kb-search:focus {
+.kb-search:focus-visible {
   border-color: var(--color-pulse);
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .kb-search::placeholder {
   color: var(--color-dim);
@@ -186,6 +201,7 @@
   gap: var(--space-4);
   align-items: stretch;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   padding-bottom: var(--space-2);
   min-height: 0;
   flex: 1 1 0;
@@ -255,6 +271,8 @@
   flex-direction: column;
   gap: var(--space-3);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-2);
   min-height: 0;
   flex: 1 1 0;
   /* room for the cards' shadows inside the scroller */
@@ -288,13 +306,13 @@
 .kb-card-face {
   padding: var(--space-3) var(--space-4) var(--space-3);
   cursor: pointer;
-  outline: none;
 }
 .kb-card-face[draggable="true"] {
   cursor: grab;
 }
 .kb-card-face:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--color-pulse);
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
   border-radius: var(--radius-card);
 }
 .kb-card-title {
@@ -331,6 +349,10 @@ a.kb-card-issue:hover {
   color: var(--color-pulse);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+a.kb-card-issue:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .kb-card-issue.is-local {
   color: var(--color-warn);
@@ -385,20 +407,21 @@ a.kb-card-issue:hover {
   border: 1px solid var(--color-line);
   background: var(--color-raise);
   color: var(--color-frost);
-  outline: none;
   padding: var(--space-3) var(--space-4);
 }
 .kb-new-title {
   font: 600 var(--text-14) / 1.3 var(--font-sans);
 }
 .kb-new-body {
-  font: 400 var(--text-13) / 1.45 var(--font-sans);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
   resize: vertical;
   min-height: 72px;
 }
-.kb-new-title:focus,
-.kb-new-body:focus {
+.kb-new-title:focus-visible,
+.kb-new-body:focus-visible {
   border-color: var(--color-pulse);
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -1px;
 }
 .kb-new-title::placeholder,
 .kb-new-body::placeholder {
@@ -439,6 +462,7 @@ a.kb-card-issue:hover {
 }
 .kb-card-body p {
   margin: 0 0 var(--space-3);
+  text-wrap: pretty;
 }
 .kb-card-actions {
   display: flex;
@@ -470,6 +494,11 @@ a.kb-card-issue:hover {
   background: var(--color-abyss);
   color: var(--color-frost);
   font: 500 var(--text-12) / 1 var(--font-sans);
+}
+
+.kb-move select:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 
 /* narrow: the columns stack, each one a band */
@@ -513,13 +542,19 @@ a.kb-card-issue:hover {
   font: 600 var(--text-13) / 1.3 var(--font-sans);
 }
 .services-detail {
+  min-width: 0;
   color: var(--color-mist);
   font-size: var(--text-13);
+  line-height: 1.5;
+  overflow-wrap: break-word;
 }
 .services-how {
+  min-width: 0;
   grid-column: 3;
   color: var(--color-dim);
   font-size: var(--text-12);
+  line-height: 1.5;
+  overflow-wrap: break-word;
 }
 .services-how.is-bad {
   color: var(--color-bad);
@@ -545,12 +580,6 @@ a.kb-card-issue:hover {
   .services-act {
     grid-column: 2;
   }
-}
-
-/* scrollbars on tokens, so night doesn't show light rails */
-.settings-page,
-.kb-board,
-.kb-col-cards {
 }
 
 /* #/design's sample board */
@@ -588,6 +617,10 @@ a.kb-card-issue:hover {
 .releases-item:hover {
   background: var(--color-panel);
 }
+.releases-item:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
 .releases-item.is-current {
   background: var(--color-raise);
   border-color: var(--color-line);
@@ -613,28 +646,35 @@ a.kb-card-issue:hover {
 .releases-date {
   color: var(--color-dim);
   font-size: var(--text-12);
+  font-variant-numeric: tabular-nums;
 }
 .releases-post h2 {
   margin: var(--space-2) 0 var(--space-5);
   font: 600 var(--text-24) / 1.15 var(--font-display);
   letter-spacing: -0.02em;
   color: var(--color-frost);
+  text-wrap: balance;
 }
 .releases-post .releases-body {
   /* a note's body, without the note's own padding, scroller or text cursor: it lines up under the title */
   height: auto;
+  max-width: 70ch;
   padding: 0;
   overflow: visible;
   cursor: auto;
   color: var(--color-mist);
   font-size: var(--text-14);
-  line-height: 1.6;
+  line-height: 1.55;
+}
+.releases-post .releases-body p {
+  text-wrap: pretty;
 }
 .releases-body h2 {
   margin: var(--space-6) 0 var(--space-3);
   font: 600 var(--text-16) / 1.3 var(--font-sans);
   letter-spacing: 0;
   color: var(--color-frost);
+  text-wrap: balance;
 }
 .releases-body strong {
   color: var(--color-frost);
@@ -647,6 +687,7 @@ a.kb-card-issue:hover {
     position: static;
     flex-direction: row;
     overflow-x: auto;
+    overscroll-behavior-x: contain;
   }
 }
 .design-releases {
@@ -674,14 +715,15 @@ a.kb-card-issue:hover {
   box-shadow: 0 0 0 1px var(--color-line);
   color: var(--color-frost);
   font: 400 var(--text-13) / 1 var(--font-sans);
-  outline: none;
 }
 .places-field.is-path {
   flex: 3 1 320px;
   font-family: var(--font-code);
   font-size: var(--text-12);
 }
-.places-field:focus {
+.places-field:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -1px;
   box-shadow: 0 0 0 1px var(--color-pulse);
 }
 .places-field::placeholder {

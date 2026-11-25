@@ -9,6 +9,7 @@
 import { ErrorCard } from "../components/ErrorCard";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
+import { useCapabilities } from "../lib/capabilities";
 import { longDate } from "./releases";
 import { openGrid } from "../lib/grids";
 import { LocalConnect } from "../panels/LocalView";
@@ -22,6 +23,7 @@ interface Place {
 }
 
 export function PlacesTab() {
+  const caps = useCapabilities();
   const [places, setPlaces] = useState<Place[] | null>(null);
   const [canApprove, setCanApprove] = useState(false);
   const [path, setPath] = useState("");
@@ -39,8 +41,19 @@ export function PlacesTab() {
       (e: Error) => setErr(e.message),
     );
   useEffect(() => {
+    if (!caps.loaded || !caps.local.places) return;
     void read();
-  }, []);
+  }, [caps.loaded, caps.local.places]);
+
+  if (!caps.local.places) {
+    return (
+      <section className="services places-tab" data-hosted-places>
+        <p className="design-lede">
+          Places and local project watches read folders on a local computer and are turned off on a hosted Foundation server. Upload files directly onto a grid or into ChatForm instead.
+        </p>
+      </section>
+    );
+  }
 
   const approve = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,37 +91,46 @@ export function PlacesTab() {
       <LocalConnect onOpen={openGrid} />
       {canApprove ? (
         <form className="places-form" onSubmit={approve}>
-          <input className="places-field is-path" value={path} onChange={(e) => setPath(e.target.value)} placeholder={"The folder's full path, like C:\\Users\\you\\Documents\\Drawings"} aria-label="Folder path" spellCheck={false} />
+          <input
+            className="places-field is-path"
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+            placeholder={"The folder's full path, like C:\\Users\\you\\Documents\\Drawings"}
+            aria-label="Folder path"
+            aria-invalid={err ? true : undefined}
+            aria-describedby={err ? "places-error" : undefined}
+            spellCheck={false}
+          />
           <input className="places-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name (optional)" aria-label="Name" />
-          <button className="f-pill is-accent" disabled={!path.trim() || busy}>
+          <button type="submit" className="f-pill is-accent" disabled={!path.trim() || busy}>
             {busy ? "Checking…" : "Approve folder"}
           </button>
         </form>
       ) : (
         places && <div className="kb-col-empty">Only an admin, signed in here as themselves, can approve or remove a place.</div>
       )}
-      {err && <ErrorCard message={err} />}
-      {!places && !err && <div className="kb-col-empty">Asking the server…</div>}
+      {err && <div id="places-error"><ErrorCard message={err} /></div>}
+      {!places && !err && <div className="kb-col-empty" role="status">Asking the server…</div>}
       {places && places.length === 0 && <div className="kb-col-empty">No folders are approved. Foundation can't read anything on this computer outside its own data.</div>}
       <div className="services-list">
         {(places ?? []).map((p) => (
           <div key={p.id} className="services-row">
             <span className={`f-dot ${p.reachable ? "is-ok" : "is-warn"}`} />
             <span className="services-name">{p.name}</span>
-            <span className="services-detail places-path">{p.path}</span>
+            <span className="services-detail places-path" title={p.path}>{p.path}</span>
             {canApprove && (
               <span className="services-act">
                 {removing === p.id ? (
                   <>
-                    <button className="f-pill is-danger" onClick={() => remove(p.id)}>
+                    <button type="button" className="f-pill is-danger" onClick={() => remove(p.id)}>
                       Remove
                     </button>
-                    <button className="f-pill" onClick={() => setRemoving(null)}>
+                    <button type="button" className="f-pill" onClick={() => setRemoving(null)}>
                       Keep
                     </button>
                   </>
                 ) : (
-                  <button className="f-pill" onClick={() => setRemoving(p.id)}>
+                  <button type="button" className="f-pill" onClick={() => setRemoving(p.id)}>
                     Remove…
                   </button>
                 )}

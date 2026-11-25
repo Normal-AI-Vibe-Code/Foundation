@@ -34,7 +34,7 @@ import {
 } from "../state/store";
 import { SectionView } from "./SectionView";
 import { WireLayer } from "./WireLayer";
-import { camera, publishCamera, publishPointer } from "../state/camera";
+import { camera, FAR_ZOOM, publishCamera, publishPointer } from "../state/camera";
 import { isNight, onNight } from "@foundation/ui";
 import { floorInsets, getUi, setUi, toggleSearch, toggleSession, useUi } from "../state/ui";
 import { TalkButton } from "../shell/Talk";
@@ -114,6 +114,41 @@ interface Rect {
   h: number;
 }
 
+/**
+ * What the board's decoration may skip (2026-11-24): `data-far` while the board is drawn small, `data-moving` while
+ * the camera moves and for a beat after. A flowing wire's pulse is a repaint every frame and a tunnel's cut is an
+ * SVG mask, on a layer the size of the grid: WebKit (the Mac app's engine) re-renders both as the camera moves, and a
+ * studio's wires held it to 2 fps zoomed out. They rest at those times (shell.css). The marks go on the wire layers
+ * alone, never the viewport: a mark on the viewport restyles every card under it. Written only when one flips.
+ */
+const MOVING_REST_MS = 240;
+let movingTimer = 0;
+let marked = { far: false, moving: false };
+function markLayers(el: HTMLElement, m: { far: boolean; moving: boolean }) {
+  // drawn small, both already rest: moving says nothing more, so it isn't written (each write to the layer repaints
+  // it, and in WebKit a repaint of a grid-sized layer outlasted the rest timer and flipped it again)
+  if (m.far) m = { far: true, moving: false };
+  if (m.far === marked.far && m.moving === marked.moving) return;
+  marked = m;
+  el.querySelectorAll<SVGElement>(".port-layer").forEach((layer) => {
+    if ((layer.dataset.far === "1") !== m.far) {
+      if (m.far) layer.dataset.far = "1";
+      else delete layer.dataset.far;
+    }
+    if ((layer.dataset.moving === "1") !== m.moving) {
+      if (m.moving) layer.dataset.moving = "1";
+      else delete layer.dataset.moving;
+    }
+  });
+}
+function markCamera(el: HTMLElement | null, scale: number) {
+  if (!el) return;
+  const far = scale < FAR_ZOOM;
+  markLayers(el, { far, moving: true });
+  clearTimeout(movingTimer);
+  if (!far) movingTimer = window.setTimeout(() => markLayers(el, { far, moving: false }), MOVING_REST_MS);
+}
+
 interface Candidate {
   rect: Rect;
   cap: number; // max scale for this framing
@@ -162,6 +197,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
       bg.uniforms.scale = zoom.value;
     }
     publishCamera(camera.x.value, camera.y.value, zoom.value, containerRef.current);
+    markCamera(containerRef.current, zoom.value);
   }, [camera, zoom]);
 
   useEffect(() => {

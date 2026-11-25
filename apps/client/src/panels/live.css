@@ -230,10 +230,13 @@
 .huddle-empty-title {
   font: 600 var(--text-16) / 1.25 var(--font-sans);
   color: var(--color-frost);
+  text-wrap: balance;
 }
 .huddle-empty-note {
   color: var(--color-mist);
   font: 400 var(--text-12) / 1.5 var(--font-sans);
+  max-width: 64ch;
+  text-wrap: pretty;
 }
 
 /* controls */
@@ -256,8 +259,12 @@
   flex-shrink: 0;
   transition: transform var(--dur-press) var(--ease-out-soft);
 }
-.huddle-ctl:active {
+.huddle-ctl:not(:disabled):active {
   transform: scale(0.94);
+}
+.huddle-ctl:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .huddle-ctl.is-off {
   background: color-mix(in srgb, var(--color-bad) 12%, var(--color-raise));
@@ -300,6 +307,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-2);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -309,6 +317,8 @@
   margin: 2px 0 0;
   color: var(--color-frost);
   font: 400 var(--text-13) / 1.5 var(--font-sans);
+  max-width: 68ch;
+  text-wrap: pretty;
 }
 .huddle-line-head {
   display: flex;
@@ -346,17 +356,18 @@
   background: var(--color-abyss);
   color: var(--color-frost);
   font: 400 var(--text-13) / 1.4 var(--font-sans);
-  outline: none;
 }
 .huddle-say input,
 .slack-filter {
   height: var(--h-control);
   padding: 0 10px;
 }
-.huddle-say input:focus,
-.slack-filter:focus,
-.slack-compose textarea:focus {
+.huddle-say input:focus-visible,
+.slack-filter:focus-visible,
+.slack-compose textarea:focus-visible {
+  outline: none;
   border-color: var(--color-pulse);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-pulse) 24%, transparent);
 }
 
 /* archive: sessions, newest first */
@@ -507,6 +518,8 @@
   color: var(--color-dim);
   font: 400 var(--text-12) / 1.5 var(--font-sans);
   padding: var(--space-3) 0;
+  max-width: 64ch;
+  text-wrap: pretty;
 }
 .slack-channels,
 .slack-messages {
@@ -514,6 +527,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-2);
 }
 .slack-channel-row {
   width: 100%;
@@ -588,6 +602,8 @@
   font: 400 var(--text-13) / 1.45 var(--font-sans);
   white-space: pre-wrap;
   word-break: break-word;
+  max-width: 68ch;
+  text-wrap: pretty;
 }
 .slack-msg.is-ours p {
   border-left: 2px solid var(--color-pulse);
@@ -631,6 +647,8 @@
   bottom: 96px;
   z-index: 2;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-2);
   padding: var(--space-2);
   border-radius: var(--radius-card);
   border: 1px solid var(--color-line-strong);
@@ -759,6 +777,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-2);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -783,10 +802,13 @@
   color: var(--color-bad);
   font: 400 var(--text-12) / 1.45 var(--font-code);
   word-break: break-word;
+  user-select: text;
 }
 .machine-note {
   color: var(--color-mist);
   font: 400 var(--text-12) / 1.45 var(--font-sans);
+  max-width: 64ch;
+  text-wrap: pretty;
 }
 .machine-chips {
   display: flex;
@@ -838,10 +860,11 @@
   background: var(--color-raise);
   color: var(--color-frost);
   font: 400 var(--text-12) / 1 var(--font-code);
-  outline: none;
 }
-.machine-field:focus {
+.machine-field:focus-visible {
+  outline: none;
   border-color: var(--color-pulse);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-pulse) 24%, transparent);
 }
 .machine-start {
   display: flex;
@@ -910,7 +933,8 @@
   align-items: center;
   padding: 0 7px;
   border-radius: var(--radius-pill);
-  font: 600 10px / 1 var(--font-sans);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   pointer-events: none;
@@ -1146,11 +1170,17 @@
 .machine-desk-shield {
   position: absolute;
   inset: 0;
+  border: 0;
+  background: transparent;
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
   padding: var(--space-3);
   cursor: pointer;
+}
+.machine-desk-shield:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
 }
 .fs-able:fullscreen .machine-desk-shield {
   display: none;
@@ -1160,7 +1190,12 @@
   opacity: 0;
   transition: opacity var(--dur-quick) var(--ease-out-soft);
 }
-.machine-desk-shield:hover .machine-desk-hint {
+@media (hover: hover) {
+  .machine-desk-shield:hover .machine-desk-hint {
+    opacity: 1;
+  }
+}
+.machine-desk-shield:focus-visible .machine-desk-hint {
   opacity: 1;
 }
 .machine-desk-well {
@@ -1332,11 +1367,14 @@
   color: var(--color-mist);
   font: 500 var(--text-11) / 1 var(--font-sans);
   cursor: pointer;
-  outline: none;
 }
-.machine-io-pick:hover,
-.machine-io-pick:focus-visible {
+.machine-io-pick:hover {
   border-color: var(--color-line-strong);
+}
+.machine-io-pick:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-color: var(--color-pulse);
 }
 .machine-io-value {
   flex: 1;
@@ -1450,6 +1488,8 @@
   word-break: break-word;
   max-height: 96px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  user-select: text;
 }
 .machine-ask-why {
   color: var(--color-mist);
@@ -1551,6 +1591,10 @@
   .machine-engine {
     display: none;
   }
+  /* four named tabs don't fit a 260 px card: the open one keeps its word, the others their glyph (and their tip) */
+  .machine-view-tab:not(.is-on) > span {
+    display: none;
+  }
 }
 /* #/design only: a still of the terminal in the same type and tokens */
 .machine-term-specimen {
@@ -1583,9 +1627,12 @@
 .machine-well.machine-hero,
 .machine-desk-well.machine-hero {
   align-items: center;
-  justify-content: center;
+  /* safe: in a short card the words scroll from their top, rather than centring past it out of reach */
+  justify-content: safe center;
   padding: var(--space-5) var(--space-4);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-4);
 }
 .machine-hero-mark {
   display: grid;
@@ -1623,12 +1670,14 @@
   color: var(--color-frost);
   font: 650 18px / 1.25 var(--font-sans);
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 .machine-hero-lede,
 .machine-hero .connector-offline-reason {
   max-width: 52ch;
   color: var(--color-mist);
   font: 400 13.5px / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 /* what a card says that someone may want to copy out (an error, an install's line): select it, the card stays put */
 .machine-copyable {
@@ -2115,6 +2164,8 @@ html:has(.machine-window) body {
   gap: var(--space-4);
   padding: var(--space-4);
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-4);
 }
 .machine-io-view .machine-io {
   font-size: var(--text-13);
@@ -2141,6 +2192,8 @@ html:has(.machine-window) body {
   white-space: pre-wrap;
   max-height: 180px;
   overflow: auto;
+  overscroll-behavior: contain;
+  user-select: text;
 }
 .machine-io-acts {
   display: flex;
@@ -2431,8 +2484,12 @@ html:has(.machine-window) body {
   background: color-mix(in srgb, var(--color-frost) 8%, transparent);
   color: var(--color-frost);
 }
-.machine-addr-btn:active {
+.machine-addr-btn:not(:disabled):active {
   transform: scale(0.94);
+}
+.machine-addr-btn:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .machine-addr-btn.is-share {
   border-color: var(--color-line);
@@ -2575,6 +2632,8 @@ html:has(.machine-window) body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2747,6 +2806,7 @@ html:has(.machine-window) body {
 }
 .machine-hub-field:focus-within {
   border-color: var(--color-pulse);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-pulse) 24%, transparent);
 }
 .machine-hub-field svg {
   width: calc(16px * var(--hero-k));
@@ -2758,10 +2818,12 @@ html:has(.machine-window) body {
   min-width: 0;
   height: 100%;
   border: 0;
-  outline: none;
   background: transparent;
   color: var(--color-frost);
   font: 400 calc(13.5px * var(--hero-k)) / 1 var(--font-sans);
+}
+.machine-hub-field input:focus-visible {
+  outline: none;
 }
 .machine-hub-state {
   flex-shrink: 0;
@@ -2791,6 +2853,7 @@ html:has(.machine-window) body {
   max-height: calc(300px * var(--hero-k));
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-1);
   border-radius: var(--radius-card);
   border: 1px solid var(--color-line);
   background: var(--color-raise);
@@ -2862,7 +2925,7 @@ html:has(.machine-window) body {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--color-ok) 14%, transparent);
   color: var(--color-ok);
-  font: 600 calc(10.5px * var(--hero-k)) / 1.2 var(--font-sans);
+  font: 600 calc(var(--text-11) * var(--hero-k)) / 1.2 var(--font-sans);
   letter-spacing: 0.02em;
 }
 .machine-hub-nums {
@@ -2873,6 +2936,7 @@ html:has(.machine-window) body {
   flex-shrink: 0;
   color: var(--color-mist);
   font: 500 calc(11.5px * var(--hero-k)) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
   font-variant-numeric: tabular-nums;
 }
 .machine-hub-tags {
@@ -2919,13 +2983,16 @@ html:has(.machine-window) body {
   min-width: 0;
   height: 100%;
   border: 0;
-  outline: none;
   background: transparent;
   color: var(--color-frost);
   font: 400 calc(13px * var(--hero-k)) / 1 var(--font-code);
 }
+.machine-ports-field input:focus-visible {
+  outline: none;
+}
 .machine-ports-field:focus-within {
   border-color: var(--color-pulse);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-pulse) 24%, transparent);
 }
 
 /* ---------- Ins & outs: the pipes' heading, and the machine's functions (MachineFunctions.tsx) ---------- */
@@ -3126,6 +3193,8 @@ html:has(.machine-window) body {
   margin: 0 0 0 calc(52px * var(--io-k));
   max-height: 160px;
   overflow: auto;
+  overscroll-behavior: contain;
+  user-select: text;
   padding: 8px 10px;
   border-radius: var(--radius-card);
   background: var(--color-abyss);
@@ -3147,6 +3216,8 @@ html:has(.machine-window) body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: calc(10px * var(--cl-k));
@@ -3236,7 +3307,7 @@ html:has(.machine-window) body {
   border-radius: var(--radius-pill);
   background: var(--color-panel);
   color: var(--color-mist);
-  font: 600 calc(10.5px * var(--cl-k)) / 1.2 var(--font-sans);
+  font: 600 calc(var(--text-11) * var(--cl-k)) / 1.2 var(--font-sans);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -3336,5 +3407,8 @@ html:has(.machine-window) body {
   background: var(--color-panel);
   color: var(--color-frost);
   font: 400 calc(13px * var(--cl-k)) / 1 var(--font-code);
-  outline: none;
+}
+.machine-cluster-run input:not([type]):focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }

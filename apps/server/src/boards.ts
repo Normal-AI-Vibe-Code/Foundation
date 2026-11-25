@@ -353,6 +353,47 @@ export function presence(boardId: string) {
     .filter(Boolean);
 }
 
+/** the grids open on this server right now (loaded, whether or not anyone is on them) */
+export function liveBoardIds(): string[] {
+  return [...boards.keys()];
+}
+
+/**
+ * Who is on a grid right now, from its awareness (whereabouts.ts): the people by the account each sync socket signed
+ * in as (a window's own claim to a name is shown, but who it is comes from the socket), and the agents by their crew
+ * presence. An agent's presence is the server's own (crew.ts bridges it in; no socket owns it): one a person's window
+ * sends, claiming to be an agent, is not counted as one. A presence no socket owns and that isn't an agent's is left out.
+ */
+export function whoIsOn(boardId: string): {
+  people: Array<{ id: string; name: string; color: string }>;
+  agents: Array<{ id: string; name?: string; hue: number; via?: string; status?: string; doing?: string; askerName?: string }>;
+} {
+  const board = boards.get(boardId);
+  if (!board) return { people: [], agents: [] };
+  const states = board.awareness.getStates();
+  const people: Array<{ id: string; name: string; color: string }> = [];
+  const owned = new Set<number>();
+  for (const ids of board.conns.values()) for (const c of ids) owned.add(c);
+  for (const [ws, ids] of board.conns) {
+    const id = socketUser.get(ws);
+    if (!id) continue;
+    for (const c of ids) {
+      const st = states.get(c) as { user?: { name?: string; color?: string; agent?: boolean } } | undefined;
+      if (!st?.user || st.user.agent) continue;
+      people.push({ id, name: String(st.user.name ?? ""), color: String(st.user.color ?? "") });
+      break;
+    }
+  }
+  const agents: ReturnType<typeof whoIsOn>["agents"] = [];
+  for (const [clientId, st] of states) {
+    if (owned.has(clientId)) continue;
+    const s = st as { user?: { name?: string }; crew?: { id?: string; hue?: number; via?: string; status?: string; doing?: string; askerName?: string } } | undefined;
+    if (!s?.crew?.id) continue;
+    agents.push({ id: s.crew.id, name: s.user?.name, hue: Number(s.crew.hue ?? 0), via: s.crew.via, status: s.crew.status, doing: s.crew.doing, askerName: s.crew.askerName });
+  }
+  return { people, agents };
+}
+
 /** Run an edit against a board as an agent or service (origin tags the change). */
 export function editBoard<T>(boardId: string, origin: string, fn: (doc: Y.Doc) => T): T {
   const board = getBoard(boardId);
@@ -367,8 +408,15 @@ export function boardDigest(boardId: string) {
   return describeBoard(getBoard(boardId).doc);
 }
 
+const closedListeners = new Set<() => void>();
+/** told when closeBoards runs (tests, shutdown) */
+export function onBoardsClosed(fn: () => void) {
+  closedListeners.add(fn);
+}
+
 /** release every board's timers (tests, shutdown) */
 export function closeBoards() {
+  for (const fn of closedListeners) fn();
   for (const b of boards.values()) {
     if (b.pendingIndex) clearTimeout(b.pendingIndex);
     b.awareness.destroy();

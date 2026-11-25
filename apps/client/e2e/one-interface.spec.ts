@@ -68,7 +68,9 @@ test("Settings is a place in the shell: the side menu stays, the settings come f
 
   // Agents and Avatars are tabs of their own
   await space.locator(".settings-tab", { hasText: "Agents" }).click();
-  await expect(space).toContainText("Your own agent, over MCP");
+  // 2026-11-24: Claude run by Foundation (its three ways), an MCP client of your own, and T3's agents apart
+  await expect(space.locator("[data-settings-claude] [data-settings-way]")).toHaveCount(3);
+  await expect(space.locator("[data-settings-mcp]")).toContainText("Connect Claude Code or another MCP client");
   await expect(space).toContainText("This computer's agents");
   await ada.screenshot({ path: `${SHOTS}/settings-agents.png` });
   await space.locator(".settings-tab", { hasText: "Avatars" }).click();

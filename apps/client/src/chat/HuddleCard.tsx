@@ -20,6 +20,7 @@ import { CallControls, CallStage, goToCard, PlacePicker, Portrait } from "../pan
 import { Transcript } from "../panels/HuddleView";
 import { getChat, useChat } from "./model";
 import { BringFileToGrid } from "./CadAttachment";
+import { AgentFigure } from "./AgentFigure";
 import "../panels/huddlecall.css";
 
 export interface HuddleCardProps {
@@ -162,8 +163,8 @@ export function HuddleCard({ message, live, onJoin, onReplay, brief: given }: Hu
             <Portrait key={n} name={n} size={28} />
           ))}
           {(live?.agents ?? []).map((a) => (
-            <span key={a} className="huddle-face" style={{ width: 28, height: 28, color: "var(--color-agent)" }} aria-label={`${a} (agent)`}>
-              ✦
+            <span key={a} className="hcard-agent" aria-label={`${a} (agent)`}>
+              <AgentFigure name={a} size={28} />
             </span>
           ))}
         </span>
@@ -182,11 +183,11 @@ export function HuddleCard({ message, live, onJoin, onReplay, brief: given }: Hu
       <div className="hcard-foot">
         {isLive ? (
           <>
-            <button className="f-pill is-accent" disabled={inIt} onClick={() => (onJoin ? onJoin(h.id) : void joinChannelHuddle(message.channel, h.id, Boolean(live?.recording)))} data-huddle-join>
+            <button type="button" className="f-pill is-accent" disabled={inIt} onClick={() => (onJoin ? onJoin(h.id) : void joinChannelHuddle(message.channel, h.id, Boolean(live?.recording)))} data-huddle-join>
               {inIt ? "You're in it" : "Join"}
             </button>
             {!inIt && (
-              <button className={`f-pill${listening ? " is-primary" : ""}`} onClick={() => setListening(listening ? null : { channel: message.channel, huddleId: h.id })} data-huddle-listen>
+              <button type="button" className={`f-pill${listening ? " is-primary" : ""}`} onClick={() => setListening(listening ? null : { channel: message.channel, huddleId: h.id })} aria-pressed={listening} data-huddle-listen>
                 {listening ? "Listening" : "Listen in"}
               </button>
             )}
@@ -195,12 +196,12 @@ export function HuddleCard({ message, live, onJoin, onReplay, brief: given }: Hu
           h.endedAt && (
             <>
               {h.session && (
-                <button className="f-pill is-accent" onClick={replay} data-huddle-replay>
+                <button type="button" className="f-pill is-accent" onClick={replay} data-huddle-replay>
                   Replay
                 </button>
               )}
               {brief && brief.media.length > 0 && (
-                <button className="f-pill" onClick={() => h.session && goChat("huddles", h.session)} data-huddle-recordings>
+                <button type="button" className="f-pill" onClick={() => h.session && goChat("huddles", h.session)} data-huddle-recordings>
                   {brief.media.length} {brief.media.length === 1 ? "recording" : "recordings"}
                 </button>
               )}
@@ -208,7 +209,7 @@ export function HuddleCard({ message, live, onJoin, onReplay, brief: given }: Hu
           )
         )}
         {placed && (
-          <button className="f-pill" onClick={() => goToCard(h.board!, h.id)} data-huddle-grid>
+          <button type="button" className="f-pill" onClick={() => goToCard(h.board!, h.id)} data-huddle-grid>
             Open on its grid
           </button>
         )}
@@ -228,6 +229,7 @@ export function ChannelHuddleButton({ channel }: { channel: ChatChannelView }) {
   if (channel.archivedAt || channel.kind === "portal") return null;
   return (
     <button
+      type="button"
       className={`chat-head-btn hhead-btn${live ? " is-live" : ""}`}
       data-huddle-start={channel.id}
       data-tip={inIt ? "You're in the huddle" : live ? `Join the huddle${live.people.length ? ` with ${live.people.join(", ")}` : ""}` : "Start a huddle: video, voice and a transcript"}
@@ -279,17 +281,17 @@ export function ChannelHuddleDock({ channel }: { channel: ChatChannelView }) {
           </span>
         )}
         {live?.board && live.board !== "chat" && (
-          <button className="f-pill hdock-head-btn" onClick={() => goToCard(live.board, room.huddleId)}>
+          <button type="button" className="f-pill hdock-head-btn" onClick={() => goToCard(live.board, room.huddleId)}>
             On its grid
           </button>
         )}
         <span className="hcard-gap" />
         {ear && (
           <>
-            <button className="f-pill is-accent hdock-head-btn" onClick={() => void joinChannelHuddle(channel.id, ear.huddleId, Boolean(live?.recording))}>
+            <button type="button" className="f-pill is-accent hdock-head-btn" onClick={() => void joinChannelHuddle(channel.id, ear.huddleId, Boolean(live?.recording))}>
               Join
             </button>
-            <button className="f-pill hdock-head-btn" onClick={() => setListening(null)}>
+            <button type="button" className="f-pill hdock-head-btn" onClick={() => setListening(null)}>
               Stop listening
             </button>
           </>

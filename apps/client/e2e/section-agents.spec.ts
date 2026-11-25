@@ -308,8 +308,20 @@ await council.locator("[data-council-all]").click();
   await expect(chip(ada)).toHaveClass(/is-working/, { timeout: 20_000 });
   await expect(chip(ada)).toContainText("at work");
   await expect(chip(kai)).toHaveClass(/is-working/, { timeout: 20_000 });
-  await expect(council.locator(".council-seat:not(.council-ghost)").first()).toBeVisible();
+  const seat = council.locator(".council-seat:not(.council-ghost)").first();
+  await expect(seat).toBeVisible();
+  // 2026-11-24: one bar over its head (what it's doing, while it works), its run card beside it, one silhouette; and
+  // the strip over the bottom bar leaves out an agent that has a head on the open council
+  await expect(seat.locator("[data-council-bar]")).toHaveCount(1);
+  await expect(council.locator(".council-ghost")).toHaveCount(1);
+  await expect(council.locator("[data-council-add]")).toHaveCount(1);
+  if ((await seat.getAttribute("class"))?.includes("is-working")) {
+    await expect(seat.locator("[data-run-card]")).toBeVisible();
+    const name = (await seat.getAttribute("data-council-seat"))!;
+    await expect(ada.locator(`.talk-sheet [data-crew-row="${name}"]`)).toHaveCount(0);
+  }
   await ada.screenshot({ path: `${SHOTS}/04_council-agent-at-work.png` });
+  await ada.screenshot({ path: "../../docs/evidence/2026-11-24_council-harness/10_section-council-agent-at-work.png" });
 
   // when the work is done the chip rests; what the agent made is on the section, in its name
   await expect(chip(ada)).not.toHaveClass(/is-working/, { timeout: 60_000 });

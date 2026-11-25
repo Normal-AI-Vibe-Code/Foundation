@@ -1,0 +1,74 @@
+{"t":44,"seed":{"section":"Notes A","noteChars":1009,"note":{"id":"note_mwvogeh116ltm"}}}
+{"t":56,"ask":"In the “Notes A” section: read the long note “Field report” in full, then add a table in that section that lists its three main points, and say what you did.","mode":"all"}
+{"t":61,"awareness":{"name":"Gannet","status":"working","doing":"reading the ask","plan":null,"thought":null,"started":1795584172381}}
+{"t":64,"awareness":{"name":"Gannet","status":"working","doing":"thinking","plan":null,"thought":null,"started":1795584172381}}
+{"t":80,"event":{"type":"run","id":"run_d0c569da8b7b"}}
+{"t":81,"event":{"type":"crew","id":"crew_11d17","name":"Gannet","hue":5}}
+{"t":81,"event":{"type":"status","status":"thinking"}}
+{"t":2232,"event":{"type":"tool","name":"read_card","input":{"id":"note_mwvogeh116ltm"}}}
+{"t":2232,"event":{"type":"status","status":"working"}}
+{"t":2246,"awareness":{"name":"Gannet","status":"working","doing":"read card","plan":null,"thought":null,"started":1795584172381}}
+{"t":2259,"event":{"type":"tool_result","name":"","ok":true,"summary":"[{\"type\":\"text\",\"text\":\"{\\n  \\\"id\\\": \\\"note_mwvogeh116ltm\\\",\\n  \\\"kind\\\": \\\"note\\\",\\n  \\\"name\\\": \\\"Field report\\\",\\n  \\\"section\\\": \\\"sec_mwvogegy91tuu\\\",\\n  \\\"markdown\\\": \\\"## Field report: vane test,"}}
+{"t":5740,"event":{"type":"tool","name":"add_table","input":{"section":"Notes A","name":"Field report · main points","columns":["#","Point","Detail","Next step"],"rows":[[1,"6061 vanes crack at root fillet","All 4 vanes showed hairline cracks within 1 mm of the fillet after ~400 h of cycling; crack length grew with run time. Fillet radius is 0.5 mm today.","Go to a 1.5 mm fillet: the stress model says peak stress drops ~35%"],[2,"6061 plate lead time doubled","Kapaʻa Metals: lead time went from 3 to 6 weeks because of a mill outage that lasts until mid-January. Pacific Fasteners can still ship hub bearings and cap screws from stock.","Plan the next build around the 6-week plate lead time"],[3,"Torque sensor drifted 4%","The efficiency numbers from Thursday on are suspect.","Recalibrate before the next run; mark Thu/Fri data as unreliable"]]}}}
+{"t":5740,"event":{"type":"status","status":"working"}}
+{"t":5751,"awareness":{"name":"Gannet","status":"working","doing":"making table “Field report · main points”","plan":null,"thought":null,"started":1795584172381}}
+{"t":6284,"event":{"type":"tool_result","name":"","ok":true,"summary":"[{\"type\":\"text\",\"text\":\"{\\n  \\\"id\\\": \\\"tbl_mwvogjad5iwfg\\\",\\n  \\\"cols\\\": 4,\\n  \\\"rows\\\": 6\\n}\"}]"}}
+{"t":7732,"event":{"type":"tool","name":"focus","input":{"object_id":"tbl_mwvogjad5iwfg","note":"Field report's three main points"}}}
+{"t":7733,"event":{"type":"status","status":"working"}}
+{"t":7741,"awareness":{"name":"Gannet","status":"working","doing":"Field report's three main points","plan":null,"thought":null,"started":1795584172381}}
+{"t":7748,"event":{"type":"tool_result","name":"","ok":true,"summary":"[{\"type\":\"text\",\"text\":\"ok\"}]"}}
+{"t":10851,"event":{"type":"text","text":"I read all"}}
+{"t":10852,"event":{"type":"text","text":" of \"Field report\" and added"}}
+{"t":10852,"event":{"type":"text","text":" a table called **"}}
+{"t":10853,"event":{"type":"text","text":"\"Field report · main points\""}}
+{"t":10853,"event":{"type":"text","text":"** in Notes A. It"}}
+{"t":10854,"event":{"type":"text","text":" has one row for each of the report"}}
+{"t":10854,"event":{"type":"text","text":"'s three main points,"}}
+{"t":10854,"event":{"type":"text","text":" with the details and the next step for"}}
+{"t":10855,"event":{"type":"text","text":" each:\n\n1. **The "}}
+{"t":10855,"event":{"type":"text","text":"6061 vanes are"}}
+{"t":10855,"event":{"type":"text","text":" cracking at the root fill"}}
+{"t":10856,"event":{"type":"text","text":"et.** All four vanes"}}
+{"t":10856,"event":{"type":"text","text":" had hairline cracks after"}}
+{"t":10857,"event":{"type":"text","text":" about 400 hours."}}
+{"t":10857,"event":{"type":"text","text":" The fix is to"}}
+{"t":10857,"event":{"type":"text","text":" make"}}
+{"t":10857,"event":{"type":"text","text":" the fillet 1.5"}}
+{"t":10858,"event":{"type":"text","text":" mm instead of 0"}}
+{"t":10858,"event":{"type":"text","text":".5 mm, which the"}}
+{"t":10858,"event":{"type":"text","text":" stress model says cuts pe"}}
+{"t":10859,"event":{"type":"text","text":"ak stress by about 35%"}}
+{"t":10859,"event":{"type":"text","text":".\n2. **The 6"}}
+{"t":10859,"event":{"type":"text","text":"061 plate now"}}
+{"t":10859,"event":{"type":"text","text":" takes tw"}}
+{"t":10860,"event":{"type":"text","text":"ice as long to arrive."}}
+{"t":10860,"event":{"type":"text","text":"** Kapaʻa"}}
+{"t":10860,"event":{"type":"text","text":" Metals mo"}}
+{"t":10861,"event":{"type":"text","text":"ved the lead time from 3"}}
+{"t":10861,"event":{"type":"text","text":" to 6 weeks"}}
+{"t":10861,"event":{"type":"text","text":" because of a mill outage that"}}
+{"t":10861,"event":{"type":"text","text":" lasts until mid-January"}}
+{"t":10862,"event":{"type":"text","text":". Pacific Fas"}}
+{"t":10862,"event":{"type":"text","text":"teners can still ship the h"}}
+{"t":10862,"event":{"type":"text","text":"ub bearings and cap scre"}}
+{"t":10863,"event":{"type":"text","text":"ws from stock.\n3."}}
+{"t":10863,"event":{"type":"text","text":" **The torque sensor dr"}}
+{"t":10863,"event":{"type":"text","text":"ifted "}}
+{"t":10863,"event":{"type":"text","text":"4% over the week.** It"}}
+{"t":10864,"event":{"type":"text","text":" needs rec"}}
+{"t":10864,"event":{"type":"text","text":"alibrating before the next run"}}
+{"t":10864,"event":{"type":"text","text":", and the Thursday and"}}
+{"t":10865,"event":{"type":"text","text":" Friday data should be marked"}}
+{"t":10865,"event":{"type":"text","text":" as unreliable.\n\nThe"}}
+{"t":10865,"event":{"type":"text","text":" report also says"}}
+{"t":10866,"event":{"type":"text","text":" the hub, shaft and"}}
+{"t":10866,"event":{"type":"text","text":" controller ran without"}}
+{"t":10866,"event":{"type":"text","text":" probl"}}
+{"t":10866,"event":{"type":"text","text":"ems, so I did"}}
+{"t":10867,"event":{"type":"text","text":"n't give"}}
+{"t":10867,"event":{"type":"text","text":" them a row."}}
+{"t":10867,"event":{"type":"status","status":"working"}}
+{"t":10880,"event":{"type":"done","runtime":"subscription","usage":{"input":8,"output":928}}}
+{"t":11635,"awareness":{"name":"Gannet","status":"done","doing":"done","plan":null,"thought":null,"started":1795584172381}}
+{"t":12146,"wallMs":11579,"final":{"tables":[]}}
+{"t":12500,"finalTable":{"result":{"id":"tbl_mwvogjad5iwfg","kind":"table","name":"Field report · main points","section":"sec_mwvogegy91tuu","cells":{"0,0":"#","1,0":"Point","2,0":"Detail","3,0":"Next step","0,1":"1","1,1":"6061 vanes crack at root fillet","2,1":"All 4 vanes showed hairline cracks within 1 mm of the fillet after ~400 h of cycling; crack length grew with run time. Fillet radius is 0.5 mm today.","3,1":"Go to a 1.5 mm fillet: the stress model says peak stress drops ~35%","0,2":"2","1,2":"6061 plate lead time doubled","2,2":"Kapaʻa Metals: lead time went from 3 to 6 weeks because of a mill outage that lasts until mid-January. Pacific Fasteners can still ship hub bearings and cap screws from stock.","3,2":"Plan the next build around the 6-week plate lead time","0,3":"3","1,3":"Torque sensor drifted 4%","2,3":"The efficiency numbers from Thursday on are suspect.","3,3":"Recalibrate before the next run; mark Thu/Fri data as unreliable"}}}}

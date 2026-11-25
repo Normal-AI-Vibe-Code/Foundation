@@ -165,6 +165,11 @@ test("schema 3: an older board's note text moves into its Y.Text once; tools rea
   await runTool(ctx, "update_card", { id: made.id, markdown: "second draft" });
   assert.equal(noteTextOf(doc, { id: made.id }), "second draft");
   assert.match(String(await runTool(ctx, "read_board", {})), /second draft/);
+  // read_board cuts a note at 240 characters; read_card gives all of it
+  const long = "word ".repeat(400).trim();
+  await runTool(ctx, "update_card", { id: made.id, markdown: long });
+  assert.equal(((await runTool(ctx, "read_card", { id: made.id })) as { markdown: string }).markdown, long);
+  await assert.rejects(() => runTool(ctx, "read_card", { id: "nope" }), /No card/);
   await runTool(ctx, "delete_card", { id: made.id, confirm: true });
   assert.equal(m.noteText.has(made.id), false);
 });

@@ -83,7 +83,7 @@ export function EmojiPicker({ onPick, onClose, className = "", anchor }: { onPic
     onPick(char);
   };
   const cell = (em: Emoji) => (
-    <button key={em.char} className="chat-emoji-cell" onClick={() => pick(em.char)} data-tip={`:${em.names[0]}:`} aria-label={em.names[0]}>
+    <button key={em.char} type="button" className="chat-emoji-cell" onClick={() => pick(em.char)} data-tip={`:${em.names[0]}:`} aria-label={em.names[0]}>
       {em.char}
     </button>
   );
@@ -103,6 +103,7 @@ export function EmojiPicker({ onPick, onClose, className = "", anchor }: { onPic
         className="chat-emoji-search"
         autoFocus
         placeholder="Find an emoji"
+        aria-label="Find an emoji"
         value={q}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {

@@ -11,14 +11,14 @@ export const paper = {
   raise: "#ffffff",
   frost: "#201e19",
   mist: "#5f5b51",
-  dim: "#8a8577",
+  dim: "#6f6a5d",
   pulse: "#325bb4",
   volt: "#27488f",
   moss: "#2e5d43",
-  ok: "#2e7d54",
-  warn: "#a16207",
+  ok: "#287850",
+  warn: "#995c02",
   bad: "#b3261e",
-  agent: "#6b5bd6",
+  agent: "#6858d3",
 } as const;
 
 /** night is greys and white, with yellow (attention) and orange (broken) the only pops; agents stay violet */
@@ -29,7 +29,7 @@ export const night = {
   raise: "#1f1f21",
   frost: "#ededed",
   mist: "#a3a3a3",
-  dim: "#6f6f6f",
+  dim: "#868686",
   pulse: "#f2f2f2",
   volt: "#c4c4c4",
   moss: "#8c8c8c",

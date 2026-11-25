@@ -36,6 +36,7 @@
   max-width: 64ch;
   color: var(--color-mist);
   font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .up-lede > b {
   color: var(--color-frost);
@@ -150,6 +151,8 @@
   flex: 1 1 0;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-4);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
@@ -161,10 +164,12 @@
   border-bottom: 1px solid var(--color-line);
   color: var(--color-frost);
   font: 600 var(--text-13) / 1.3 var(--font-sans);
+  text-wrap: balance;
 }
 .up-group > h4 > i {
   margin-left: var(--space-1);
   font-style: normal;
+  font-variant-numeric: tabular-nums;
   color: var(--color-dim);
   font-weight: 500;
 }
@@ -197,8 +202,10 @@
     0 0 0 1px color-mix(in srgb, var(--color-agent) 40%, var(--color-line));
   transition: transform var(--dur-quick) var(--ease-spring);
 }
-.up-pic:hover {
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .up-pic:hover {
+    transform: translateY(-2px);
+  }
 }
 .up-pic:focus-visible {
   outline: 2px solid var(--color-pulse);
@@ -209,6 +216,8 @@
   height: 100%;
   object-fit: contain;
   display: block;
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
 }
 .up-pic > i {
   font-style: normal;
@@ -293,6 +302,8 @@
 .up-empty > p {
   margin: 0;
   max-width: 44ch;
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 
 /* a backwards wire (Wire in) over a section: it rings in the character violet, the section it would wire in */

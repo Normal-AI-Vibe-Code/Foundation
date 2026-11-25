@@ -66,11 +66,18 @@ export function TrayView({ items, folded, demo }: { items: UploadItem[]; folded:
         <span className="upload-size">
           {t.busy ? `${size(t.loaded)} of ${size(t.size)}` : size(t.size)}
         </span>
-        <button className="upload-btn" data-tip={folded ? "Show the files" : "Fold"} aria-label={folded ? "Show the files" : "Fold"} onClick={act(() => foldUploads(!folded))}>
-          <span className={`upload-chev${folded ? " is-up" : ""}`}>⌄</span>
+        <button
+          type="button"
+          className="upload-btn"
+          data-tip={folded ? "Show the files" : "Fold"}
+          aria-label={folded ? "Expand uploads" : "Collapse uploads"}
+          aria-expanded={!folded}
+          onClick={act(() => foldUploads(!folded))}
+        >
+          <span className={`upload-chev${folded ? " is-up" : ""}`} aria-hidden>⌄</span>
         </button>
         {!t.busy && (
-          <button className="upload-btn" data-tip="Close" aria-label="Close" onClick={act(dismissUploads)}>
+          <button type="button" className="upload-btn" data-tip="Close" aria-label="Dismiss uploads" onClick={act(dismissUploads)}>
             ✕
           </button>
         )}
@@ -108,14 +115,14 @@ function Row({ it, onRetry }: { it: UploadItem; onRetry?: () => void }) {
         {it.state === "done" ? "✓" : it.state === "failed" ? "!" : it.state === "sending" ? "↑" : "·"}
       </span>
       <span className="upload-row-main">
-        <span className="upload-row-name">
+        <span className="upload-row-name" title={`${dir}${it.name}`}>
           {dir && <span className="upload-row-dir">{dir}</span>}
           {it.name}
         </span>
-        {it.state === "failed" && <span className="upload-row-err">{it.error}</span>}
+        {it.state === "failed" && <span className="upload-row-err" title={it.error}>{it.error}</span>}
       </span>
       {it.state === "failed" ? (
-        <button className="upload-row-retry" onClick={onRetry}>
+        <button type="button" className="upload-row-retry" onClick={onRetry}>
           Retry
         </button>
       ) : (

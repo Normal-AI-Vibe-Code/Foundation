@@ -128,6 +128,7 @@ export function Timeline(p: TimelineProps) {
       <AnimatePresence>
         {(away || p.hasNewer) && (
           <motion.button
+            type="button"
             className="chat-jump"
             onClick={() => {
               if (p.hasNewer) p.onJumpNewest?.();

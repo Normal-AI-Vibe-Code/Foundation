@@ -218,11 +218,12 @@ export function ClusterView({ panel, m, viewer, still }: { panel: Pick<PanelDoc,
                   </span>
                 </span>
                 {p.image && <code className="machine-cluster-pod-image">{p.image}</code>}
-                <button className="machine-addr-btn" disabled={viewer || busy === `open:${k}`} onClick={() => (p.card ? requestSnap({ kind: "object", id: p.card }) : void go(`open:${k}`, "/pods/open", { ns: p.ns, name: p.name }, `${p.name} opens as a card`))} data-tip={p.card ? "Go to its card" : "Open it as a card: its terminal is a shell in the pod"} data-cluster-open={p.name}>
+                <button type="button" className="machine-addr-btn" disabled={viewer || busy === `open:${k}`} onClick={() => (p.card ? requestSnap({ kind: "object", id: p.card }) : void go(`open:${k}`, "/pods/open", { ns: p.ns, name: p.name }, `${p.name} opens as a card`))} aria-label={p.card ? `Go to ${p.name}'s card` : `Open ${p.name} as a card`} data-tip={p.card ? "Go to its card" : "Open it as a card: its terminal is a shell in the pod"} data-cluster-open={p.name}>
                   <PopOutGlyph />
                 </button>
                 {!viewer && p.ns !== "kube-system" && (
                   <button
+                    type="button"
                     className={`machine-addr-btn is-remove${armed === k ? " is-armed" : ""}`}
                     disabled={busy === `del:${k}`}
                     onClick={() => {
@@ -230,6 +231,7 @@ export function ClusterView({ panel, m, viewer, still }: { panel: Pick<PanelDoc,
                       setArmed(null);
                       void go(`del:${k}`, "/pods/delete", { ns: p.ns, name: p.name, confirm: true });
                     }}
+                    aria-label={armed === k ? `Confirm delete pod ${p.name}` : `Delete pod ${p.name}`}
                     data-tip={armed === k ? "Press again to delete it" : "Delete the pod"}
                   >
                     <TrashGlyph />

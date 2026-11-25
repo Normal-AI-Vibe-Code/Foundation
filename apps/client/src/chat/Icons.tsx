@@ -157,3 +157,10 @@ export const IconQuote = () => (
     <path d="M3 3.5v9M6 5h7M6 8h7M6 11h4.5" />
   </Svg>
 );
+/** the conversations' list, folded away: a panel with its left column, and a caret saying it opens (2026-11-20) */
+export const IconSideList = () => (
+  <Svg>
+    <rect x="2" y="3" width="12" height="10" rx="1.6" />
+    <path d="M6 3v10M8.6 6.6 10 8l-1.4 1.4" />
+  </Svg>
+);

@@ -50,6 +50,7 @@ import {
 import { config } from "./config.ts";
 import { db, one, run } from "./db.ts";
 import { editBoard, ensureBoardRow, getBoard } from "./boards.ts";
+import { hostedFeatureReason, localFeatureAllowed, requireLocalFeature } from "./hosted.ts";
 import { HttpError } from "./http.ts";
 import { audit } from "./audit.ts";
 import { setMember } from "./members.ts";
@@ -664,6 +665,18 @@ function tick() {
 
 /** where the watch stands, for anyone who can see the grid */
 export function localStatus(user: UserInfo, person: boolean) {
+  if (!localFeatureAllowed("localDev")) {
+    return {
+      grid: LOCAL_GRID_ID,
+      connected: false,
+      on: false,
+      by: null,
+      watch: null,
+      canConnect: false,
+      hosted: true,
+      note: hostedFeatureReason("localDev", "This computer's local projects watch"),
+    };
+  }
   const w = row();
   const state = w ? boardMaps(getBoard(LOCAL_GRID_ID).doc).localWatch.get("state") ?? null : null;
   return { grid: LOCAL_GRID_ID, connected: !!w, on: w?.on_flag === 1, by: w?.by_name ?? null, watch: state, canConnect: user.role === "admin" && person };
@@ -671,6 +684,7 @@ export function localStatus(user: UserInfo, person: boolean) {
 
 /** an admin, in person, connects this computer: the grid is made (members-only, theirs) and the watch starts */
 export async function connectLocal(user: UserInfo, person: boolean) {
+  requireLocalFeature("localDev", "This computer's local projects watch");
   if (user.role !== "admin") throw new HttpError(403, "Only an admin can connect this computer: its sessions are someone's conversations.");
   if (!person) throw new HttpError(403, "Connecting this computer needs a person, from their own browser.");
   ensureBoardRow(LOCAL_GRID_ID, LOCAL_GRID_NAME);
@@ -690,6 +704,7 @@ export async function connectLocal(user: UserInfo, person: boolean) {
 
 /** stop watching: the grid stays as it was and says it stopped */
 export function stopLocal(user: UserInfo, person: boolean) {
+  requireLocalFeature("localDev", "This computer's local projects watch");
   if (user.role !== "admin" || !person) throw new HttpError(403, "Only an admin, in person, stops watching this computer.");
   run("update local_watch set on_flag = 0 where id = 'this'");
   if (timer) clearTimeout(timer);
@@ -703,6 +718,7 @@ export function stopLocal(user: UserInfo, person: boolean) {
 
 /** at boot: carry on a watch a person started and didn't stop */
 export function resumeLocal() {
+  if (!localFeatureAllowed("localDev")) return;
   if (row()?.on_flag === 1) {
     timer = setTimeout(tick, 2000);
     timer.unref?.();

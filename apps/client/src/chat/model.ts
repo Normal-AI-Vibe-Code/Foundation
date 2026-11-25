@@ -15,6 +15,9 @@
  *    newest message is in view; it moves my mark to the newest seq at once and tells the server.
  *  - The socket reconnects with backoff (1 s doubling to 30 s); a server without ChatForm (404) is
  *    *unavailable* and asked again a minute later.
+ *  - **Which server**: Foundation's own, unless this device points ChatForm at a chat server (chat/server.ts).
+ *    Then every call here goes there under that server's own sign-in: `remote` is true, `account` is who this
+ *    device is there, `features` what that server has, and the status is *signin* until someone signs in.
  */
 
 import { useSyncExternalStore } from "react";
@@ -31,7 +34,9 @@ import {
   type ChatParty,
   type ChatSay,
 } from "@foundation/protocol";
-import { ApiError, api, authHeaders, openSocket, serverUrl } from "../lib/api";
+import { ApiError } from "../lib/api";
+import { CHAT_REMOTE, CHAT_SERVER_NAME, chatApi as api, chatAuthHeaders as authHeaders, chatBearer, chatConfig, chatSignOut, chatUrl as serverUrl, chatWho, forgetChatBearer, openChatSocket as openSocket, type ChatAccount } from "./server";
+import { loadWhereabouts, setWhereabouts } from "../lib/whereabouts";
 import { bumpRoot, failPending, mergeMessages, requestId, retryPending, settlePending, toggleReaction, upsertMessage, type PendingMessage } from "./logic";
 
 export interface ChatTimeline {
@@ -57,7 +62,7 @@ export interface Typist {
   until: number;
 }
 
-export type ChatStatus = "off" | "connecting" | "live" | "offline" | "unavailable";
+export type ChatStatus = "off" | "connecting" | "live" | "offline" | "unavailable" | "signin";
 
 export interface ChatState {
   status: ChatStatus;
@@ -66,6 +71,12 @@ export interface ChatState {
   /** the list has been fetched at least once */
   loaded: boolean;
   me: { id: string; name: string } | null;
+  /** ChatForm is on a chat server of its own (chat/server.ts), not the Foundation server */
+  remote: boolean;
+  /** on a chat server: who this device is signed in as there */
+  account: ChatAccount | null;
+  /** on a chat server: what of ChatForm it says it has (null: it doesn't say) */
+  features: string[] | null;
   channels: Record<string, ChatChannelView>;
   people: ChatParty[];
   agents: ChatAgentRef[];
@@ -77,7 +88,7 @@ export interface ChatState {
   typing: Typist[];
 }
 
-const EMPTY: ChatState = { status: "off", why: "", loaded: false, me: null, channels: {}, people: [], agents: [], online: [], timelines: {}, threads: {}, pending: [], typing: [] };
+const EMPTY: ChatState = { status: "off", why: "", loaded: false, me: null, remote: CHAT_REMOTE, account: null, features: null, channels: {}, people: [], agents: [], online: [], timelines: {}, threads: {}, pending: [], typing: [] };
 
 let state: ChatState = EMPTY;
 const subs = new Set<() => void>();
@@ -89,6 +100,13 @@ function set(next: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) 
 }
 
 export const getChat = () => state;
+
+const bridgeSubs = new Set<(b: Extract<ChatEvent, { t: "bridge" }>["bridge"]) => void>();
+/** hear a bridge's state as the server publishes it (`{t:"bridge"}` on the chat socket) */
+export function onBridge(fn: (b: Extract<ChatEvent, { t: "bridge" }>["bridge"]) => void): () => void {
+  bridgeSubs.add(fn);
+  return () => void bridgeSubs.delete(fn);
+}
 
 function subscribe(fn: () => void) {
   subs.add(fn);
@@ -121,27 +139,85 @@ let heardAt = 0;
 
 /** start once someone is signed in (the top bar's button does this, so the badge is live everywhere) */
 export function startChat(me?: { id: string; name: string }) {
-  if (me && (!state.me || state.me.id !== me.id || state.me.name !== me.name)) set({ me: { id: me.id, name: me.name } });
+  // on a chat server, who I am is that server's to say (its own sign-in), not the Foundation session's
+  if (!CHAT_REMOTE && me && (!state.me || state.me.id !== me.id || state.me.name !== me.name)) set({ me: { id: me.id, name: me.name } });
   if (started) return;
+  if (CHAT_REMOTE && !chatBearer()) {
+    if (state.status !== "signin") set({ status: "signin", why: "", loaded: false });
+    return;
+  }
   started = true;
   set({ status: "connecting" });
-  void loadList().then((ok) => ok && connect());
-  window.addEventListener("online", () => {
-    if (state.status === "offline") {
-      tries = 0;
-      clearTimeout(retryTimer);
-      connect();
+  if (CHAT_REMOTE) void startRemote();
+  else void loadList().then((ok) => ok && connect());
+  if (!listening) {
+    listening = true;
+    window.addEventListener("online", () => {
+      if (state.status === "offline") {
+        tries = 0;
+        clearTimeout(retryTimer);
+        if (state.loaded) connect();
+        else later();
+      }
+    });
+  }
+}
+let listening = false;
+
+/** on a chat server: who I am there and what it has, then the list and the socket */
+async function startRemote() {
+  if (!state.account) {
+    try {
+      const { user } = await chatWho();
+      set({ account: user, me: { id: user.id, name: user.name } });
+    } catch (e) {
+      if (signedOut(e)) return;
+      // unreachable: the list's own failure says so and tries again
     }
-  });
+  }
+  if (!state.features) void chatConfig().then((c) => set({ features: c.features ?? null }), () => undefined);
+  if (await loadList()) connect();
+}
+
+/** a chat server that refuses the session: this device stops sending it and asks the person to sign in again */
+function signedOut(e: unknown): boolean {
+  if (!CHAT_REMOTE || !(e instanceof ApiError) || e.status !== 401) return false;
+  const had = !!state.account;
+  forgetChatBearer();
+  haltChat();
+  set({ ...EMPTY, status: "signin", why: had ? `Your sign-in on ${CHAT_SERVER_NAME} ended. Sign in again.` : "" });
+  return true;
+}
+
+function haltChat() {
+  started = false;
+  clearTimeout(retryTimer);
+  clearInterval(pingTimer);
+  const sock = ws;
+  ws = null;
+  sock?.close();
+  rev = -1;
+  everLive = false;
+  tries = 0;
+}
+
+/** on a chat server: this device just signed in there (chat/ChatServer.tsx) */
+export function chatSignedIn(user: ChatAccount) {
+  haltChat();
+  set({ ...EMPTY, account: user, me: { id: user.id, name: user.name } });
+  startChat();
+}
+
+/** on a chat server: sign this device out of it (Foundation's own sign-in stays) */
+export async function signOutOfChat() {
+  haltChat();
+  await chatSignOut();
+  set({ ...EMPTY, status: "signin" });
 }
 
 /** for tests and sign-out: everything forgotten */
 export function stopChat() {
-  started = false;
-  clearTimeout(retryTimer);
-  clearInterval(pingTimer);
-  ws?.close();
-  ws = null;
+  haltChat();
   state = EMPTY;
   subs.forEach((f) => f());
 }
@@ -156,6 +232,7 @@ async function loadList(): Promise<boolean> {
     return true;
   } catch (e) {
     const status = e instanceof ApiError ? e.status : 0;
+    if (signedOut(e)) return false;
     if (status === 404) {
       set({ status: "unavailable", why: "This server doesn't have ChatForm yet.", loaded: true });
       retryTimer = setTimeout(() => void loadList().then((ok) => ok && connect()), 60_000);
@@ -204,7 +281,8 @@ function connect() {
         pingTimer = setInterval(() => say({ t: "ping" }), 25_000);
       };
     })
-    .catch(() => {
+    .catch((e) => {
+      if (signedOut(e)) return;
       set({ status: "offline", why: "Can't reach the chat server." });
       later();
     });
@@ -224,6 +302,9 @@ function onEvent(ev: ChatEvent) {
     tries = 0;
     rev = ev.rev;
     set((s) => ({ status: "live", why: "", me: s.me && s.me.id === ev.you ? s.me : { id: ev.you, name: s.me?.name ?? s.people.find((p) => p.id === ev.you)?.name ?? "" } }));
+    // who is where on the grids (lib/whereabouts.ts): read now, then kept by this socket's `where`.
+    // A chat server has no grids: there it stays as Foundation's own answer.
+    void loadWhereabouts();
     if (again) void catchUp();
     return;
   }
@@ -354,13 +435,18 @@ function apply(ev: ChatEvent) {
       sweepTyping();
       return;
     }
+    case "where":
+      if (!CHAT_REMOTE) setWhereabouts(ev.boards);
+      return;
     case "presence":
       set({ online: ev.online });
       // someone new is here (signed in for the first time since the list came): the list again, for their name
       if (ev.online.some((id) => !state.people.some((p) => p.id === id))) refreshList();
       return;
     case "bridge":
-      return; // the Inbox tab's
+      // the Inbox tab's (and the Slack guide's): they follow a bridge's state live
+      for (const fn of bridgeSubs) fn(ev.bridge);
+      return;
   }
 }
 

@@ -227,12 +227,12 @@ export function PlanBoard({
             {canMove && (onCreate || onSync) && (
               <div className="kb-actions">
                 {onCreate && (
-                  <button className="f-pill kb-toggle" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
+                  <button type="button" className="f-pill kb-toggle" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
                     + New card
                   </button>
                 )}
                 {onSync && (
-                  <button className="f-pill kb-sync" onClick={onSync} disabled={sync?.busy} title={`Reads every issue on ${plan.repo}, then sends the columns moved here and the cards made here`}>
+                  <button type="button" className="f-pill kb-sync" onClick={onSync} disabled={sync?.busy} title={`Reads every issue on ${plan.repo}, then sends the columns moved here and the cards made here`}>
                     {sync?.busy ? (
                       <>
                         <span className="kb-spin" aria-hidden /> Syncing…
@@ -242,7 +242,7 @@ export function PlanBoard({
                     )}
                   </button>
                 )}
-                {sync?.said && !sync.busy && <span className="kb-said">{sync.said}</span>}
+                {sync?.said && !sync.busy && <span className="kb-said" role="status">{sync.said}</span>}
               </div>
             )}
           </div>
@@ -295,7 +295,7 @@ export function PlanBoard({
               </option>
             ))}
           </select>
-          <input className="kb-search" placeholder="Find a card or #issue" value={filter.query ?? ""} onChange={(e) => setFilter((f) => ({ ...f, query: e.target.value }))} />
+          <input className="kb-search" placeholder="Find a card or #issue" aria-label="Find a card or issue" value={filter.query ?? ""} onChange={(e) => setFilter((f) => ({ ...f, query: e.target.value }))} />
         </div>
       </div>
       <AnimatePresence initial={false}>
@@ -368,7 +368,7 @@ export function PlanBoard({
 
 function FilterChip({ on, onClick, children }: { on: boolean; onClick(): void; children: React.ReactNode }) {
   return (
-    <button className={`kb-chip${on ? " is-on" : ""}`} onClick={onClick} aria-pressed={on}>
+    <button type="button" className={`kb-chip${on ? " is-on" : ""}`} onClick={onClick} aria-pressed={on}>
       {children}
     </button>
   );
@@ -512,7 +512,17 @@ function NewCardForm({ plan, onCreate, onDone }: { plan: Plan; onCreate(input: N
   };
   return (
     <form className="kb-new" onSubmit={submit}>
-      <input className="kb-new-title" autoFocus placeholder="What's wrong, or what should we build?" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={140} aria-label="Title" />
+      <input
+        className="kb-new-title"
+        autoFocus
+        placeholder="What's wrong, or what should we build?"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        maxLength={140}
+        aria-label="Title"
+        aria-invalid={err ? true : undefined}
+        aria-describedby={err ? "kb-new-error" : undefined}
+      />
       <div className="kb-new-row">
         <div className="kb-new-kinds" role="group" aria-label="Kind">
           {(["bug", "plan", "hookup"] as CardKind[]).map((k) => (
@@ -541,7 +551,7 @@ function NewCardForm({ plan, onCreate, onDone }: { plan: Plan; onCreate(input: N
           {busy ? "Adding…" : "Add card"}
         </button>
       </div>
-      {err && <ErrorCard message={err} />}
+      {err && <div id="kb-new-error"><ErrorCard message={err} /></div>}
     </form>
   );
 }
@@ -702,17 +712,17 @@ function FlowformRow() {
       </span>
       <span className="services-act">
         {on ? (
-          <button className="f-pill" onClick={disconnect} data-tip="Revokes Foundation's access at Flowform and forgets it here">
+          <button type="button" className="f-pill" onClick={disconnect} data-tip="Revokes Foundation's access at Flowform and forgets it here">
             Disconnect
           </button>
         ) : (
-          <button className="f-pill is-accent" onClick={connect} disabled={!link || waiting}>
+          <button type="button" className="f-pill is-accent" onClick={connect} disabled={!link || waiting}>
             {waiting ? "Waiting…" : "Connect Flowform"}
           </button>
         )}
       </span>
       {!on && link && <span className="services-how">Opens Flowform's own page to approve. Foundation asks only to read your boards and search your files (never to write), as you, and you can disconnect here.</span>}
-      {err && <span className="services-how is-bad">{err}</span>}
+      {err && <span className="services-how is-bad" role="alert">{err}</span>}
       {on && (
         <>
           <span className={`f-dot ${link?.downloads ? "is-ok" : "is-warn"}`} />
@@ -726,11 +736,11 @@ function FlowformRow() {
           </span>
           <span className="services-act">
             {link?.downloads ? (
-              <button className="f-pill" onClick={stop} data-tip="Ends that Flowform session and forgets it here. Files already brought in stay">
+              <button type="button" className="f-pill" onClick={stop} data-tip="Ends that Flowform session and forgets it here. Files already brought in stay">
                 Stop
               </button>
             ) : (
-              <button className="f-pill is-accent" onClick={allow} disabled={allowing}>
+              <button type="button" className="f-pill is-accent" onClick={allow} disabled={allowing}>
                 {allowing ? "Waiting…" : "Allow file downloads"}
               </button>
             )}
@@ -773,7 +783,7 @@ export function ServicesTab() {
     <section className="services">
       <p className="design-lede">What this server is connected to. Every integration is off until its key exists; the server always starts. SPEC §6 has the full list.</p>
       {err && <ErrorCard message={err} />}
-      {!s && !err && <div className="kb-col-empty">Asking the server…</div>}
+      {!s && !err && <div className="kb-col-empty" role="status">Asking the server…</div>}
       <div className="services-list">
         <FlowformRow />
         {rows.map((r) => (

@@ -213,7 +213,39 @@ export function Transport({ clock, timeline, compact = false }: { clock: Clock; 
         {clockText(clock.t)}
         {!compact && <i> / {clockText(d)}</i>}
       </span>
-      <div ref={bar} className="rp-bar" onPointerDown={onDown} role="slider" aria-label="Time in the session" aria-valuemin={0} aria-valuemax={Math.round(d / 1000)} aria-valuenow={Math.round(clock.t / 1000)} tabIndex={-1} data-rp-bar>
+      <div
+        ref={bar}
+        className="rp-bar"
+        onPointerDown={onDown}
+        onKeyDown={(e) => {
+          const step = e.shiftKey ? 15_000 : 5_000;
+          if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+            e.preventDefault();
+            e.stopPropagation();
+            clock.seek(Math.max(0, clock.t - step));
+          } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+            e.preventDefault();
+            e.stopPropagation();
+            clock.seek(Math.min(d, clock.t + step));
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            e.stopPropagation();
+            clock.seek(0);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            e.stopPropagation();
+            clock.seek(d);
+          }
+        }}
+        role="slider"
+        aria-label="Time in the session"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(d / 1000)}
+        aria-valuenow={Math.round(clock.t / 1000)}
+        aria-valuetext={clockText(clock.t)}
+        tabIndex={0}
+        data-rp-bar
+      >
         <span className="rp-track" />
         {timeline.recordings.map((r, i) => (
           <span key={`r${i}`} className="rp-rec" style={{ left: pct(r.startedAt), width: `calc(${pct(r.stoppedAt ?? t0 + d)} - ${pct(r.startedAt)})` }} />

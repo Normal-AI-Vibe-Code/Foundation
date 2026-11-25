@@ -109,6 +109,14 @@ test("messages stay in seq order, without doubles, however they arrive", () => {
   assert.deepEqual(mergeMessages([b, c], [a, b, { ...c, text: "edited" }]).map((m) => m.text), [a.text, b.text, "edited"]);
 });
 
+test("a message's way out never goes back to Sending when the POST's answer arrives after the socket said Sent", () => {
+  const m = msg(ADA, T0);
+  const sending = { ...m, outbound: { state: "sending" as const, by: "Ada", at: T0 } };
+  const sent = { ...m, outbound: { state: "sent" as const, by: "Ada", at: T0 + 5 } };
+  assert.equal(upsertMessage([sent], sending)[0].outbound?.state, "sent");
+  assert.equal(upsertMessage([sending], sent)[0].outbound?.state, "sent");
+});
+
 test("a reply moves its root on once; the server's own change already counted it", () => {
   const root = msg(ADA, T0);
   const r = msg(KAI, T0 + 5000, { root: root.id });

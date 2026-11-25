@@ -64,8 +64,8 @@ function priceOf(node: PipelineNodeKey, price: Costs | null): string {
 }
 
 function Pic({ src, name }: { src: string; name: string }) {
-  const url = useFileSrc(src);
-  return url ? <img src={url} alt={name} draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <span />;
+  const url = useFileSrc(src, true, { width: 256 });
+  return url ? <img src={url} alt={name} loading="lazy" decoding="async" draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <span />;
 }
 
 export interface NodeHandlers {
@@ -77,7 +77,7 @@ export interface NodeHandlers {
 
 /** a character at a node: its latest picture, its name, what its stage is doing, and the press that runs it */
 function Tile({ c, node, price, viewer, busy, still, onGenerate, onMavatar, onOpen }: { c: StudioCharacter; node: PipelineNodeKey; price: Costs | null; viewer: boolean; busy: boolean; still?: string } & NodeHandlers) {
-  const fetched = useFileSrc(c.files.thumb && !still ? characterFilePath(c.id, "thumb") : null);
+  const fetched = useFileSrc(c.files.thumb && !still ? characterFilePath(c.id, "thumb") : null, true, { width: 256 });
   const src = still ?? fetched;
   const file = useRef<HTMLInputElement>(null);
   const at = standing(c);

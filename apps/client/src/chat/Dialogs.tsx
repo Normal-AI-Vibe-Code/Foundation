@@ -31,6 +31,7 @@ function Modal({ onClose, children, label, className = "" }: { onClose(): void; 
       <motion.div
         className={`chat-modal ${className}`}
         role="dialog"
+        aria-modal="true"
         aria-label={label}
         initial={{ opacity: 0, y: 10, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -70,8 +71,17 @@ export function NewChannelDialog({ people, online, meId, onCreate, onClose }: { 
       <label className="chat-field">
         <span>Name</span>
         <span className="chat-field-input has-mark">
-          <span className="chat-field-mark">#</span>
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. fan-shroud" onKeyDown={(e) => e.key === "Enter" && void submit()} data-new-channel-name />
+          <span className="chat-field-mark" aria-hidden>#</span>
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. fan-shroud"
+            aria-invalid={why ? true : undefined}
+            aria-describedby={why ? "chat-new-channel-why" : undefined}
+            onKeyDown={(e) => e.key === "Enter" && void submit()}
+            data-new-channel-name
+          />
         </span>
         {name && slug !== name.trim() && <em className="chat-field-note">It will be #{slug || "…"}</em>}
       </label>
@@ -84,10 +94,10 @@ export function NewChannelDialog({ people, online, meId, onCreate, onClose }: { 
       <div className="chat-field">
         <span>Who can find it</span>
         <div className="chat-seg is-wide" role="radiogroup" aria-label="Who can find it">
-          <button role="radio" aria-checked={kind === "open"} className={`chat-seg-btn${kind === "open" ? " is-on" : ""}`} onClick={() => setKind("open")}>
+          <button type="button" role="radio" aria-checked={kind === "open"} className={`chat-seg-btn${kind === "open" ? " is-on" : ""}`} onClick={() => setKind("open")}>
             Open · anyone can join
           </button>
-          <button role="radio" aria-checked={kind === "private"} className={`chat-seg-btn${kind === "private" ? " is-on" : ""}`} onClick={() => setKind("private")}>
+          <button type="button" role="radio" aria-checked={kind === "private"} className={`chat-seg-btn${kind === "private" ? " is-on" : ""}`} onClick={() => setKind("private")}>
             Private · invited only
           </button>
         </div>
@@ -96,13 +106,17 @@ export function NewChannelDialog({ people, online, meId, onCreate, onClose }: { 
         <span>People</span>
         <PeoplePicker people={people} chosen={members} onChange={setMembers} exclude={meId ? [meId] : []} online={online} placeholder="Add people now, or later" />
       </div>
-      {why && <p className="chat-modal-why">{why}</p>}
+      {why && (
+        <p className="chat-modal-why" id="chat-new-channel-why" role="alert">
+          {why}
+        </p>
+      )}
       <div className="chat-modal-foot">
-        <button className="f-pill" onClick={onClose}>
+        <button type="button" className="f-pill" onClick={onClose}>
           Cancel
         </button>
-        <button className="f-pill is-accent" disabled={!slug || busy} onClick={() => void submit()} data-new-channel-create>
-          {busy ? "Making it…" : "Create channel"}
+        <button type="button" className="f-pill is-accent" disabled={!slug || busy} onClick={() => void submit()} data-new-channel-create>
+          {busy ? "Creating…" : "Create channel"}
         </button>
       </div>
     </Modal>
@@ -127,14 +141,18 @@ export function NewDirectDialog({ people, online, meId, onStart, onClose }: { pe
     <Modal onClose={onClose} label="New message">
       <h3 className="chat-modal-title">New message</h3>
       <p className="chat-modal-lede">One person is a direct message; a few (up to eight) are a group. Only they can read it.</p>
-      <PeoplePicker people={people} chosen={chosen} onChange={setChosen} exclude={meId ? [meId] : []} online={online} autoFocus />
-      {why && <p className="chat-modal-why">{why}</p>}
+      <PeoplePicker people={people} chosen={chosen} onChange={setChosen} exclude={meId ? [meId] : []} online={online} autoFocus invalid={!!why} describedBy={why ? "chat-new-direct-why" : undefined} />
+      {why && (
+        <p className="chat-modal-why" id="chat-new-direct-why" role="alert">
+          {why}
+        </p>
+      )}
       <div className="chat-modal-foot">
-        <button className="f-pill" onClick={onClose}>
+        <button type="button" className="f-pill" onClick={onClose}>
           Cancel
         </button>
-        <button className="f-pill is-accent" disabled={!chosen.length || busy} onClick={() => void start()} data-new-direct-start>
-          {chosen.length > 1 ? "Start the group" : "Start"}
+        <button type="button" className="f-pill is-accent" disabled={!chosen.length || busy} onClick={() => void start()} data-new-direct-start>
+          {chosen.length > 1 ? "Start group" : "Start message"}
         </button>
       </div>
     </Modal>
@@ -180,6 +198,11 @@ export function QuickSwitcher({ channels, people, meId, online, onChannel, onPer
         autoFocus
         value={q}
         placeholder="Go to a channel or a person"
+        aria-label="Go to a channel or a person"
+        role="combobox"
+        aria-expanded={rows.length > 0}
+        aria-controls="chat-switcher-listbox"
+        aria-activedescendant={rows[at] ? `chat-switch-opt-${at}` : undefined}
         onChange={(e) => setQ(e.target.value)}
         onKeyDown={(e) => {
           const mod = e.metaKey || e.ctrlKey;
@@ -200,13 +223,23 @@ export function QuickSwitcher({ channels, people, meId, online, onChannel, onPer
         }}
         data-chat-switcher
       />
-      <div className="chat-switcher-list" ref={list} role="listbox">
+      <div className="chat-switcher-list" id="chat-switcher-listbox" ref={list} role="listbox">
         {rows.map((r, i) => (
-          <button key={r.key} role="option" aria-selected={i === at} className={`chat-switcher-row${i === at ? " is-on" : ""}`} onMouseEnter={() => setAt(i)} onClick={() => choose(r)} data-switch-row={r.kind === "channel" ? chatTitle(r.c, meId) : r.p.name}>
+          <button
+            key={r.key}
+            id={`chat-switch-opt-${i}`}
+            type="button"
+            role="option"
+            aria-selected={i === at}
+            className={`chat-switcher-row${i === at ? " is-on" : ""}`}
+            onMouseEnter={() => setAt(i)}
+            onClick={() => choose(r)}
+            data-switch-row={r.kind === "channel" ? chatTitle(r.c, meId) : r.p.name}
+          >
             {r.kind === "channel" ? (
               <>
                 <span className="chat-side-mark">{channelMark(r.c, meId, online)}</span>
-                <span className="chat-switcher-name">{chatTitle(r.c, meId)}</span>
+                <span className="chat-switcher-name" title={chatTitle(r.c, meId)}>{chatTitle(r.c, meId)}</span>
                 <span className="chat-switcher-detail">{!r.c.me ? "Not joined" : isDirect(r.c) ? (r.c.kind === "agent" ? "Agent" : "Direct message") : r.c.purpose || r.c.topic}</span>
                 {r.c.unread > 0 && r.c.me?.notify !== "none" && <span className={`chat-count${isDirect(r.c) || r.c.me?.mentions ? " is-accent" : ""}`}>{r.c.unread}</span>}
               </>
@@ -215,7 +248,7 @@ export function QuickSwitcher({ channels, people, meId, online, onChannel, onPer
                 <span className="chat-side-mark">
                   <PartyAvatar party={r.p} size={18} online={online.includes(r.p.id)} />
                 </span>
-                <span className="chat-switcher-name">{r.p.name}</span>
+                <span className="chat-switcher-name" title={r.p.name}>{r.p.name}</span>
                 <span className="chat-switcher-detail">Start a direct message</span>
               </>
             )}

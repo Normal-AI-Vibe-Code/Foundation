@@ -1,0 +1,281 @@
+/*
+ * Progressive image surfaces & design specimens.
+ * Tokens only — never raw hex/rgb/hsl, never transition background/color/all.
+ */
+
+.f-prog {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--color-panel);
+  border-radius: inherit;
+}
+
+.f-prog.is-fill {
+  width: 100%;
+  height: 100%;
+}
+
+.f-prog.is-sharp {
+  background: transparent;
+}
+
+.f-prog-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transform: scale(1);
+  filter: none;
+  transition:
+    opacity var(--dur-quick) var(--ease-out-soft),
+    filter var(--dur-quick) var(--ease-out-soft),
+    transform var(--dur-quick) var(--ease-out-soft);
+}
+
+.f-prog-img.is-visible {
+  opacity: 1;
+}
+.f-prog.is-sharp .f-prog-img.is-visible {
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
+}
+
+/* 64px micro-preview: soft blur + tiny overscan so edges stay crisp while target decodes */
+.f-prog-img.is-preview {
+  opacity: 1;
+  filter: blur(8px);
+  transform: scale(1.04);
+}
+
+/* L1 synchronous cache hit: skip fade so remounts and board switches never blink */
+.f-prog-img.is-instant {
+  opacity: 1;
+  transition: none;
+}
+
+.f-prog-fit-cover {
+  object-fit: cover;
+}
+
+.f-prog-fit-contain {
+  object-fit: contain;
+}
+
+/* Natural sizing inside single chat pictures & lightbox */
+.f-prog.is-natural {
+  display: inline-block;
+  max-width: 100%;
+}
+
+.f-prog.is-natural .f-prog-img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+}
+
+.chat-picture .f-prog.is-natural {
+  min-width: 160px;
+  min-height: 120px;
+  max-height: 280px;
+}
+
+.chat-picture .f-prog.is-natural.is-sharp {
+  min-width: 0;
+  min-height: 0;
+}
+
+.chat-picture .f-prog.is-natural .f-prog-img {
+  max-height: 280px;
+}
+
+.chat-pictures.is-many .chat-picture .f-prog {
+  width: 100%;
+  height: 100%;
+}
+
+.chat-lightbox .f-prog {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(1400px, 90%);
+  max-height: calc(100dvh - 140px);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lift);
+}
+
+.chat-lightbox .f-prog .f-prog-img {
+  width: auto;
+  height: auto;
+  max-width: min(1400px, 90%);
+  max-height: calc(100dvh - 140px);
+  object-fit: contain;
+  border-radius: var(--radius-card);
+}
+
+.file-preview .f-prog {
+  width: 100%;
+  height: 100%;
+}
+
+/* MediaView single-<img> progressive reveal (tokens only; only filter/transform/opacity) */
+.media-body img.f-img-preview {
+  filter: blur(8px);
+  transform: scale(1.03);
+  transition:
+    opacity var(--dur-quick) var(--ease-out-soft),
+    filter var(--dur-quick) var(--ease-out-soft),
+    transform var(--dur-quick) var(--ease-out-soft);
+}
+
+.media-body img.f-img-preview.is-inverted {
+  filter: blur(8px) invert(var(--night-hard)) hue-rotate(calc(var(--night-hard) * 180deg));
+}
+
+/* ---------- #/design specimen (ProgressiveImageDemo) ---------- */
+
+.prog-demo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.prog-demo-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-4);
+}
+
+.prog-demo-stage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-sheet), 0 0 0 1px var(--color-line);
+}
+
+.prog-demo-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  border-radius: var(--radius-paper);
+  overflow: hidden;
+  background: var(--color-panel);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+}
+
+.prog-demo-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prog-demo-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+  color: var(--color-frost);
+}
+
+.prog-demo-note {
+  font: 400 var(--text-11) / 1.4 var(--font-sans);
+  color: var(--color-mist);
+}
+
+.prog-demo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1 var(--font-code);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.prog-demo-badge.is-preview {
+  border-color: color-mix(in srgb, var(--color-pulse) 40%, transparent);
+  background: var(--color-pulse-dim);
+  color: var(--color-pulse);
+}
+
+.prog-demo-badge.is-sharp {
+  border-color: color-mix(in srgb, var(--color-ok) 40%, transparent);
+  background: color-mix(in srgb, var(--color-ok) 12%, transparent);
+  color: var(--color-ok);
+}
+
+.prog-demo-badge.is-cache {
+  border-color: var(--color-line-strong);
+  background: var(--color-panel);
+  color: var(--color-frost);
+}
+
+.prog-demo-live {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) 1fr;
+  gap: var(--space-5);
+  align-items: start;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-sheet), 0 0 0 1px var(--color-line);
+}
+
+@media (max-width: 720px) {
+  .prog-demo-live {
+    grid-template-columns: 1fr;
+  }
+}
+
+.prog-demo-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.prog-demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.prog-demo-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.prog-demo-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+
+.prog-demo-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prog-demo-stat b {
+  font: 600 var(--text-14) / 1.2 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-frost);
+}
+
+.prog-demo-stat span {
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+  color: var(--color-dim);
+}

@@ -58,8 +58,20 @@ export function Tip() {
       timer = window.setTimeout(() => target === t && show(t), warm ? 0 : 320);
     };
 
+    const onFocusIn = (e: FocusEvent) => {
+      const t = (e.target as Element | null)?.closest?.<HTMLElement>("[data-tip]") ?? null;
+      if (!t || !t.matches(":focus-visible")) return;
+      hide();
+      target = t;
+      timer = window.setTimeout(() => target === t && show(t), 120);
+    };
+
+    const onFocusOut = () => hide();
+
     document.addEventListener("pointerover", onOver, true);
     document.addEventListener("pointerdown", hide, true);
+    document.addEventListener("focusin", onFocusIn, true);
+    document.addEventListener("focusout", onFocusOut, true);
     window.addEventListener("wheel", hide, { capture: true, passive: true });
     window.addEventListener("keydown", hide, true);
     window.addEventListener("blur", hide);
@@ -67,6 +79,8 @@ export function Tip() {
       window.clearTimeout(timer);
       document.removeEventListener("pointerover", onOver, true);
       document.removeEventListener("pointerdown", hide, true);
+      document.removeEventListener("focusin", onFocusIn, true);
+      document.removeEventListener("focusout", onFocusOut, true);
       window.removeEventListener("wheel", hide, true);
       window.removeEventListener("keydown", hide, true);
       window.removeEventListener("blur", hide);

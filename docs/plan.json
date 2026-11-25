@@ -103,6 +103,26 @@
       "issue": 242
     },
     {
+      "id": "council-harness",
+      "title": "The council at work, kinds of agent, MCP and code mode",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agents",
+      "status": "review",
+      "body": "Josh, 2026-11-24 (SPEC §0.17, docs/agent-harness.md). Built: one bar over each agent's head that carries its work and becomes the text box; seats as wide as their figures; one sleeping silhouette with a small one to add; a run card (plan and reasoning) for everyone on the grid; Claude as three kinds (account on this computer, API key with a model picker, federated identity) and T3 as its own; Connect Claude Code or another MCP client; read_card, search_tools, run_code in a QuickJS isolate, /mcp mode=code (about 14,100 tokens of tools down to about 1,270). Checked: 637 server and 290 client tests, the council, section-agents, agent-setup, crew, build and one-interface browser specs, two real Claude Code turns, an independent review whose ten findings were fixed. For Josh to check: restart the server on :4410; try a real API key and, if wanted, a federation rule (neither has run against Anthropic); say whether code mode should be the default (FOUNDATION_AGENT_TOOLS=code). Evidence: docs/evidence/2026-11-24_council-harness/.",
+      "issue": 248
+    },
+    {
+      "id": "usability-pass-2026-11-22",
+      "title": "Whole-app usability, legibility, spacing, accessibility & motion pass (jakubkrehel/skills)",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-22 (SPEC §0.15): comprehensive whole-app pass using jakubkrehel/skills (better-interface across accessibility, layout, writing, typography, colors, UI polish, motion) preserving Foundation's warm-paper / graphite / federal-blue / violet-agent look and features. Built: OKLCH lightness-tuned WCAG 2.2 AA (>= 4.5:1) tokens in packages/ui/src/tokens.css + packages/ui/src/index.ts; global :focus-visible + forced-colors ring, .f-skip-link + <main> landmark, <MotionConfig reducedMotion=\"user\"> + synchronous prefers-reduced-motion settlement in physics/spring.ts; body user-select restored (scoped to .grid-viewport and drag handles); overscroll-behavior: contain (11 -> 92), scroll-padding-block (0 -> 61), text-wrap (2 -> 136), @media (hover: hover) (0 -> 63), :focus-visible (31 -> 217), :not(:disabled):active, aria-modal dialogs, pure-neutral --color-media-outline, and #/design -> Usability & contrast live specimen. Verified: test/usability.test.ts (11/11), test/design.test.ts (4/4), e2e/usability.spec.ts (5/5, Day/Night/Room/CommandBar/ChatForm/Settings/reduced-motion), typecheck, build, check:security. Evidence: docs/evidence/2026-11-22_usability-pass/. Still unverified on physical touch hardware, OS forced-colors, screen readers, and packaged desktop app.",
+      "issue": 241
+    },
+    {
       "id": "hosted-signin-decision",
       "title": "Decide how Google sign-in reaches a hosted address: Flowform widened, or Foundation's own Google client",
       "kind": "hookup",
@@ -223,6 +243,56 @@
       "issue": 203
     },
     {
+      "id": "chatform-second-round",
+      "title": "ChatForm, second round: chats in the side menu, agents on a line, an Inbox that connects, Slack in step, the server on your network",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "review",
+      "body": "Built 2026-11-20 (SPEC §0.14, docs/server.md) and left uncommitted in its worktree; merged onto main 2026-11-21 beside the hosted server (§0.13): both modes stay, On your network for the office switch on this computer, hosted for a server behind HTTPS. Checked on merge: typecheck, the server, client and slack-agent suites (one T3 timing test flaked under load and passes alone). Nothing has met the real Slack, Google or a second computer yet.",
+      "issue": 236
+    },
+    {
+      "id": "council-silhouettes-one-add",
+      "title": "The council's silhouettes: three close together until an agent joins, then one to add another",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"the silhouettes should be closer to each other until an agent is added, and then there should only be one silhouette to add new agents\". Built and seen on a copy of the real data and #/design, day and night (docs/evidence/2026-11-21_council-silhouettes/). A person checks the spacing with their own characters.",
+      "issue": 237
+    },
+    {
+      "id": "who-is-where",
+      "title": "Who is where: people and agents on each grid, on the side menu's rows and ChatForm's people",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"show when people are in the boards and collaborating, as well as the agents\". Built: whereabouts.ts (server), shell/HereStack.tsx, a DM row's \"in <grid>\". Checked with a second person from a script on a copy of the real data (docs/evidence/2026-11-21_who-is-where/). A person checks it with a real teammate and a real agent at work.",
+      "issue": 238
+    },
+    {
+      "id": "chatform-rust-vercel",
+      "title": "ChatForm's server in Rust on Vercel: accounts, channels, messages and the live socket on Postgres",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"Host it on vercel for now. build a rust based server there.\" Built: apps/chatserver (axum on Vercel's Rust runtime, Postgres, LISTEN/NOTIFY across instances, Google accounts with an allowlist), the Node server's chat routes and JSON. 2026-11-22: an app signs in on it like a device (/auth/app/begin, the code, the press on the server's own page, /auth/app/poll: app_signin.rs), and ChatForm in the app points at it: Settings → General → ChatForm's server (per device; VITE_CHATFORM_SERVER for a build), its own bearer and socket ticket (chat/server.ts), the Chat tab's sign-in, and what the server lacks left out. Checked: cargo test (6 unit, 7 end to end, the app sign-in against a stand-in Google), apps/client/test/chat-server.test.ts, and in a browser on this computer, day and night (docs/evidence/2026-11-22_chat-server/). Not checked: the desktop app's window, a deployed server, real Google: those wait on chatform-vercel-setup. Next on it: files in messages, pins and typing in threads.",
+      "issue": 239
+    },
+    {
+      "id": "chatform-vercel-setup",
+      "title": "Set up ChatForm's server on Vercel: the project, Neon Postgres and the Google OAuth client",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "needs-you",
+      "body": "Steps in apps/chatserver/README.md: import the repo with Root Directory apps/chatserver, add Neon from Storage, create the Google OAuth client (redirect https://<project>.vercel.app/auth/google/callback), set GOOGLE_CLIENT_ID/SECRET, CHATFORM_ALLOWLIST (@formindustries.co,@normallab.co), CHATFORM_ADMIN_EMAILS, CHATFORM_CORS_ORIGINS. Then /api/health says database and listening true.",
+      "issue": 240
+    },
+    {
       "id": "chatform-core",
       "title": "ChatForm core: channels, DMs, threads, reactions, files, search and unread on the server",
       "kind": "plan",
@@ -249,7 +319,7 @@
       "milestone": "apps",
       "area": "apps",
       "status": "needs-you",
-      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size.",
+      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size. PartForm then asks for OnShape's sign-in: since 2026-11-24 the PartForm card is a page of that browser by itself (OnShape refuses frames), and a plain click on its button works.",
       "issue": 220
     },
     {
@@ -259,7 +329,7 @@
       "milestone": "hosted",
       "area": "auth",
       "status": "review",
-      "body": "Foundation's side of *hosted-signin-decision* (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) When FOUNDATION_PUBLIC_URL is an https address that isn't this computer: the web sign-in and the desktop app's device sign-in (code and \"This is me\") finish on that address, not a loopback one; the session cookie is Secure on https; the desktop app on a remote server signs in for a bearer (it already does, SPEC §7) and the server switch's Remote server connects to it. Who may join: a person new to a hosted server gets a sensible default role, and an admin can see and change it (no one from outside the company's Google domain by default). Build it against a stand-in Flowform (and a stand-in Google client if (b) is chosen) so it doesn't wait on the decision; the invariants hold (tokens hashed and never in URLs, viewers can't write). Tests in apps/server/test; check in a browser against a server run behind an https proxy. Built 2026-11-20 as option (b), Foundation's own Google client: the browser and the desktop app's code-and-press sign-in both finish on the hosted address through the routes released clients already call; Secure cookies on https; someone new is a member, FOUNDATION_ADMIN_EMAILS are admins, anyone off the allowlist gets a page and no session; the app's window is admitted as a caller on a hosted server. Tests: apps/server/test/hosted-signin.test.ts. Checked in real browsers behind Caddy with a stand-in Google (docs/evidence/2026-11-20_hosted/). Not built: an admin's screen for seeing and changing a person's role on a hosted server (not looked at); Flowform's widened callback (option a).",
+      "body": "Foundation's side of *hosted-signin-decision* (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Built 2026-11-20 as option (b), Foundation's own Google client: browser and desktop device-code sign-in finish on the hosted address, Secure cookies on https, allowlist + admin emails, desktop window CORS admitted. Updated 2026-11-21: added Admin People & Role management (`GET /api/admin/users`, `POST /api/admin/users/:id/role`, last-admin guard, audit log, `PeopleSection` in Settings → General & `#/design` day/night). Tests: `apps/server/test/hosted-signin.test.ts`, `apps/server/test/hosted-features.test.ts`, `apps/client/e2e/hosted-chat.spec.ts`. Evidence: `docs/evidence/2026-11-20_hosted/`, `docs/evidence/2026-11-21_images-hosted-chat/`. Not built: Flowform's widened callback (option a).",
       "issue": 227
     },
     {
@@ -269,7 +339,7 @@
       "milestone": "hosted",
       "area": "ship",
       "status": "review",
-      "body": "Make Foundation's server runnable on a machine that isn't a person's computer (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) A container (or the desktop app's bundled server, scripts/desktop-server.mjs, as a service) with the client built in; HTTPS in front (Caddy or similar); the data folder (SQLite and the file archive) on a kept volume, with a nightly backup and a written restore; health and a version on a page; every setting a hosted server needs in one place (docs/hosting.md: FOUNDATION_PUBLIC_URL, FOUNDATION_HOSTS, FOUNDATION_CORS_ORIGINS, sign-in keys, FOUNDATION_ICE_SERVERS). Uploaded files stay archived, never deleted. SQLite is fine to start; S3 and Postgres or libsql stay on *hosted-server*. Checked by deploying to a scratch VM or a local container with a real certificate. Built 2026-11-20: Dockerfile (the desktop app's server bundle on the pinned Node, serving the built web client itself via FOUNDATION_CLIENT_DIR), deploy/compose.yml (server, Caddy, nightly backup; a Cloudflare Tunnel profile), deploy/foundation.env.example, scripts/hosted-backup.mjs, docs/hosting.md. Checked by running the compose file locally at https://foundation.localhost with Caddy's local certificate: health, version, sign-in, sockets, a backup that passed its integrity check. Not done: a real certificate on a real name; the restore run end to end.",
+      "body": "Built 2026-11-20: Dockerfile (desktop server bundle on pinned Node serving built web client via FOUNDATION_CLIENT_DIR), deploy/compose.yml (server, Caddy, nightly backup, Cloudflare Tunnel profile), deploy/foundation.env.example, scripts/hosted-backup.mjs, docs/hosting.md. Hardened 2026-11-21: Caddy HSTS/nosniff/referrer headers, Compose json-file log rotation, verified restore CLI (`scripts/hosted-restore.mjs` with `--confirm`, `pragma integrity_check`, archive preservation), preflight checker (`npm run hosted:check` / `scripts/hosted-preflight.mjs`), and image disk cache excluded from backups. Checked in `apps/server/test/hosted-features.test.ts` (backup → mutate → restore end-to-end). Not done: a real certificate on a real domain.",
       "issue": 228
     },
     {
@@ -278,9 +348,19 @@
       "kind": "plan",
       "milestone": "hosted",
       "area": "machines",
-      "status": "next",
-      "body": "These run on the server's own computer, which on a hosted server is the cloud box, not the person's (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Until a person decides otherwise, a hosted server says so plainly and doesn't offer them (machines, the built-in browser in work/host-browser, Kiri, T3 and Vision Code hand-offs), and chat, boards, files and agents work without them. Write down the choice to make later (who may start what on whose hardware) as a needs-you card; Vision's half is *vision-pairing*. Nothing that spends money or runs third-party code starts without a person.",
+      "status": "review",
+      "body": "Built and checked 2026-11-21 (`apps/server/src/hosted.ts`, `GET /api/capabilities`, `apps/client/src/lib/capabilities.ts`). On a hosted server (`hostedServer() === true`, unless `FOUNDATION_ALLOW_HOST_TOOLS=1`), local-computer features (built-in terminal, built-in browser, container machines, local QEMU VMs, T3 host, Vision threads, Places, local projects watch) are refused at the server with 403 and honest plain explanations, and client surfaces (`Tools.tsx`, `BrowserTool.tsx`, `MachineView.tsx`, `LocalVm.tsx`, `PlacesTab.tsx`) show quiet hosted notices with zero auto-POST race conditions while ChatForm, boards, files, search and API agents run cleanly. Follow-up policy choice filed as `hosted-hardware-policy` (needs-you). Tests: `apps/server/test/hosted-features.test.ts`, `apps/client/e2e/hosted-chat.spec.ts`. Evidence: `docs/evidence/2026-11-21_images-hosted-chat/`.",
       "issue": 229
+    },
+    {
+      "id": "hosted-hardware-policy",
+      "title": "Decide who may start containers, VMs or a server browser on hosted hardware later",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "Follow-up from *hosted-local-features* (2026-11-21): local-computer tools (terminal, built-in browser, Kiri/Docker machines, local QEMU VMs, T3, Places) are turned off by default on a hosted Foundation server. Decide later whether any hosted machine should ever run sandboxed containers/browsers on shared cloud hardware, or whether those always pair back to each person's own computer (like *vision-pairing*).",
+      "issue": 235
     },
     {
       "id": "hosted-chat-check",
@@ -288,9 +368,19 @@
       "kind": "plan",
       "milestone": "hosted",
       "area": "chatform",
-      "status": "next",
-      "body": "The check that says company chat works (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) An e2e run (apps/client/e2e) against a server set up as hosted (an https address, not loopback, through a proxy): two people sign in, one from a browser and one as the desktop app's page, and share a channel, a DM, a thread, a reaction, a file and unread; a reconnect after the network drops. Then the real one, a person's check once *hosted-deploy* is up: Josh at home and at work, and a third person. Huddles across networks need TURN (*huddle-sfu*). Evidence in docs/evidence/<date>_hosted-chat/. Run 2026-11-20 as a script, not yet a spec under apps/client/e2e (docs/evidence/2026-11-20_hosted/check.mjs): against the compose file behind https, Ada in a browser and Kai as the desktop app's page share #general live, a note on the company board, and a reconnect after Kai's network drops. Not covered: a DM, a thread, a reaction, a file and unread on the hosted setup (they are in chatform.spec.ts against a local server); the real check with people on two networks waits on the server being up.",
+      "status": "review",
+      "body": "Automated Playwright E2E built and verified 2026-11-21 (`apps/client/e2e/hosted-chat.spec.ts`, 4/4 pass): against a real hosted Foundation server (`http://foundation.localhost:<port>`, stand-in Google, `FOUNDATION_DEV_LOGIN=0`), Ada (browser cookie, admin) and Kai (desktop app bearer with device code + 'This is me', member) share `#general`, a private DM, a thread reply, a reaction, an uploaded 1600×1200 cached image (512w inline, 0 network fetches on reload in desktop bearer mode), live unread counts and badges, offline drop + catch-up reconnect, hosted local-tool 403 boundaries, and Admin People role management. Evidence: `docs/evidence/2026-11-21_images-hosted-chat/`. Still waiting on the live VM: real two-computer check across networks (Josh home + work + third person) and TURN for huddles.",
       "issue": 230
+    },
+    {
+      "id": "webkit-frames",
+      "title": "Hold the Mac's engine to 60 fps in the harness: a WebKit frames spec on a studio board",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "next",
+      "body": "frames.spec.ts measures Edge (WebView2) only; the Mac app is WebKit and was 20× slower than Chromium on the same board until 2026-11-24 (§0.16). Seed a Character studio with characters, inspiration and wired pipeline nodes, and measure pan, zoom and pan at far zoom in Playwright's WebKit (installed 27.2). Then the last 40 → 60 fps at far zoom: the wires drawn into one canvas when far, or cards' DOM culled off screen. The probe scripts are in docs/evidence/2026-11-24_mac-studio-perf/scripts/.",
+      "issue": 244
     },
     {
       "id": "hyperform-projects",
@@ -1298,8 +1388,8 @@
       "kind": "plan",
       "milestone": "polish",
       "area": "perf",
-      "status": "backlog",
-      "body": "Levels are made in the browser from the original, once per device (`lib/imageLod.ts`), so the first visit to a heavy board still downloads every original (110 MB on the Flowform room). The server has no image decoder; one (sharp, or a WASM decoder) would let it serve `/files/<id>?w=512` and share levels across devices.",
+      "status": "review",
+      "body": "Built and verified 2026-11-21 (`apps/server/src/imagelod.ts`, `apps/client/src/lib/imageCache.ts`, `ProgressiveImage.tsx`): pure-JS server pyramid (`jpeg-js` + `fast-png`, bundles into single-file desktop server) serving quantized `?w=64|256|512|1024|2048` tiers with decompression-bomb guard (64 MP / 16,384 px), single-flight dedup, single-decode `512→64` upload pre-warm, O(1) disk LRU cache outside `data/files/`, `ETag`/`304`, and `width`/`height` on `files` & `ChatFile`. Client unifies L1 ref-counted RAM LRU + L2 persistent Cache Storage (`foundation-image-cache-v2`, cookie & bearer, wiped on logout), viewport priority queue with pan-away abort, 64 px progressive preview -> off-main-thread `img.decode()` opacity swap, and 2.5 s off-screen VRAM shedding across grid, ChatForm, Lightbox, search, clipboard, collections and characters. Measured 98.4% cold-load byte reduction (2,652.4 KB -> 43.1 KB) and 0 network fetches on reload. Evidence: `docs/evidence/2026-11-21_images-hosted-chat/`.",
       "issue": 107
     },
     {
@@ -2421,6 +2511,35 @@
       "status": "review",
       "body": "Josh, 2026-11-24: port roll-overs did not come to the front; no way to disconnect or undo it; sample the data coming out of a card; examples in the Form Industries grid (table → map, BomForm → table with filters, prompt → 3D character); test that connecting and disconnecting changes the flow; loading and generating states. Built: the port card on the page top layer with a sample; a chip on each live wire with its real state; a wire bar with Disconnect (⌘Z puts it back); the server fills a wired table through its lens and reads a connector only while wired; lay_flow_examples. Not yet: a prompt lens (a paid model call a person presses), prompt → character, and the examples on the company board (needs the :4410 server restarted). docs/flows.md; apps/server/test/flows.test.ts; apps/client/e2e/flows.spec.ts; docs/evidence/2026-11-24_flows.",
       "issue": null
+    },
+    {
+      "id": "mac-studio-perf",
+      "title": "The Mac: the Character studio at 40–60 fps in WebKit, and its pictures and avatars cached between launches",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "review",
+      "body": "2026-11-24, Josh: 30–60 fps at all times on the Mac, even on the Character studio; progressive loading; cached images and videos. Measured in Playwright's WebKit (the Mac app's engine) on a copy of this Mac's data: zoom 4.7 → 45 fps, pan after a zoom 1.7 → 60, pan at 12 % 2.6 → 40. The cause was the port-wire layer: a live wire's pulse under an SVG tunnel mask, which WebKit re-renders as the camera moves; both now rest while the board is far or moving. useOnScreen keeps one state and batches its reads; character cards fetch pictures once near; stills use the 512 tier; autoplaying videos pause off screen or far. The image cache never hit on a Mac (WebKit made a cache per racing open, 79 called v2): opened once per page now (v3), and mesh avatars and clips are kept in a byte cache; a relaunch fetches 0 bytes of them. SPEC §0.16, docs/evidence/2026-11-24_mac-studio-perf/. A person checks: the studio in the installed Mac app after the next release (pan, zoom far out and back, relaunch and see the pictures arrive at once).",
+      "issue": 246
+    },
+    {
+      "id": "mac-top-left",
+      "title": "The Mac: Today, ChatForm and the fold end on the side menu's edge",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "shell",
+      "status": "review",
+      "body": "2026-11-24, Josh: 'the tabs are too far out on mac and should be brought back to that panel line'. The group over the open menu was sized paneW − 16, but a Mac's bar starts 84 px in for its lights, so it ran 68 px past the menu. One --bar-inset now (12 px, 84 on a Mac) and the group is the menu's width less it; at a narrow menu ChatForm, then Today, keep their marks (names kept). e2e/today-corner.spec.ts holds it at 220, 272, 340 and 420 px. A person checks: the installed Mac app after the next release.",
+      "issue": 247
+    },
+    {
+      "id": "page-clicks",
+      "title": "PartForm in the built-in browser; a page card takes a click, not the wheel or the keys",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "review",
+      "body": "Josh, 2026-11-24: PartForm on the Form Industries grid was turned away by OnShape's sign-in; pages should take button clicks and leave scroll, zoom and the panel keys to the grid. Found: the card was a frame (pasted address), and OnShape's sign-in refuses every frame (frame-ancestors *.onshape.com). Built (SPEC §0.10): pages on HyperForm are the built-in browser's unless the card says frame; a site that refuses a frame becomes a browser card; at rest a plain click (and hover) is the page's, the wheel, Ctrl-wheel, middle/right buttons and keys are the grid's, and a click in a field gives the page the keys until Esc Esc. Checked in e2e/pages.spec.ts against a stand-in. Not done: frames unchanged; nobody has signed in to OnShape in that browser (hyperform-sign-in)."
     }
   ]
 }

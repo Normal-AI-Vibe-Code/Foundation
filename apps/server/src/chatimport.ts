@@ -59,6 +59,7 @@ import { requirePerson, requireUser } from "./auth.ts";
 import { canSeeBoard } from "./members.ts";
 import { storeFile } from "./files.ts";
 import { getPlace, resolveInPlace } from "./places.ts";
+import { slackBotToken } from "./slack.ts";
 import {
   CHAT_BOARD,
   SYSTEM_PARTY,
@@ -438,7 +439,7 @@ interface SlackProfile {
   image_192?: string;
   bot_id?: string;
 }
-interface SlackUser {
+export interface SlackUser {
   id: string;
   name?: string;
   real_name?: string;
@@ -447,7 +448,7 @@ interface SlackUser {
   is_app_user?: boolean;
   profile?: SlackProfile;
 }
-interface SlackFile {
+export interface SlackFile {
   id?: string;
   name?: string;
   title?: string;
@@ -488,7 +489,7 @@ interface SlackBlockElement {
   fields?: Array<{ type?: string; text?: string }>;
   timestamp?: number;
 }
-interface SlackMessage {
+export interface SlackMessage {
   type?: string;
   subtype?: string;
   user?: string;
@@ -514,7 +515,7 @@ interface SlackMessage {
   room?: { name?: string; date_start?: number; date_end?: number; participant_history?: string[]; participants?: string[] };
   metadata?: { event_type?: string };
 }
-interface SlackConversation {
+export interface SlackConversation {
   id: string;
   kind: ChatChannelKind;
   name: string;
@@ -584,7 +585,7 @@ export interface ImportJob {
   error?: string;
 }
 
-function emptyReport(kind: "export" | "api", dryRun: boolean, source: string): ImportReport {
+export function emptyReport(kind: "export" | "api", dryRun: boolean, source: string): ImportReport {
   return {
     kind,
     dryRun,
@@ -914,7 +915,7 @@ interface ImportOptions {
   token?: string;
 }
 
-interface Prepared {
+export interface Prepared {
   author: ChatParty;
   type: ChatMessageType;
   text: string;
@@ -925,7 +926,8 @@ interface Prepared {
   threadTs?: string;
 }
 
-class Importer {
+/** the one mapping from Slack to ChatForm (people, words, files, threads, reactions); the live Slack bridge (bridges/slack.ts) uses it too */
+export class Importer {
   users = new Map<string, SlackUser>();
   /** a bot's bot id (on its messages) → its user id (in users.json), so a bot is one ghost however it posts */
   botUsers = new Map<string, string>();
@@ -1409,7 +1411,7 @@ function resequence(channelId: string): boolean {
 }
 
 /** the list's line for a channel: its newest top-level message by time (history may have arrived after newer posts) */
-function refreshLast(channelId: string) {
+export function refreshLast(channelId: string) {
   const m = one<{ author_json: string; author_kind: string; text: string; files_json: string; created_at: number }>(
     "select author_json, author_kind, text, files_json, created_at from chat_messages where channel_id = ? and root_id is null and type != 'system' and deleted_at is null order by created_at desc, seq desc limit 1",
     channelId,
@@ -1544,7 +1546,9 @@ async function runExport(src: ExportSource, imp: Importer) {
 
 export function slackImportToken(): { token: string; kind: "user" | "bot" } | null {
   if (process.env.SLACK_USER_TOKEN) return { token: process.env.SLACK_USER_TOKEN, kind: "user" };
-  if (process.env.SLACK_BOT_TOKEN) return { token: process.env.SLACK_BOT_TOKEN, kind: "bot" };
+  // the bot token as slack.ts holds it: stored from ChatForm's Slack guide, else the env's, else the Slack app's lent one
+  const bot = slackBotToken();
+  if (bot) return { token: bot, kind: "bot" };
   return null;
 }
 

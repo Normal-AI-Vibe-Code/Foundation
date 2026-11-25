@@ -43,8 +43,8 @@ export interface EgressState {
 export function EgressView({ state, busy, error, onToggle }: { state: EgressState; busy?: string | null; error?: string | null; onToggle?: (service: string, kind: string, on: boolean) => void }) {
   const shown = state.services.filter((s) => s.configured);
   return (
-    <section className="pane-group egress" aria-label="Agents on this board may send to">
-      <div className="pane-eyebrow">Agents on this board may send to</div>
+    <section className="pane-group egress" aria-label="Agents on this grid may send to">
+      <div className="pane-eyebrow">Agents on this grid may send to</div>
       {shown.length === 0 && <div className="pane-empty">This server has no outside services set up, so agents here send nothing outside.</div>}
       {shown.map((s) => (
         <div key={s.service} className="egress-service">

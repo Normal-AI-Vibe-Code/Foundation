@@ -9,7 +9,13 @@
   width: 100%;
   height: 100%;
   z-index: 0;
-  outline: none;
+}
+.rune-canvas:focus:not(:focus-visible) {
+  outline: 2px solid transparent;
+}
+.rune-canvas:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
 }
 
 /* Rune mirrors what it draws into the page for screen readers (a see-through layer over the window,
@@ -37,6 +43,10 @@
 }
 .rune-mark:hover {
   color: var(--color-frost);
+}
+.rune-mark:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .rune-mark-dot {
   width: 6px;
@@ -86,8 +96,17 @@
   cursor: pointer;
   transition: transform var(--dur-press) var(--ease-out-soft);
 }
-.rune-option:active {
+@media (hover: hover) {
+  .rune-option:hover:not(.is-current) {
+    border-color: var(--color-line-strong);
+  }
+}
+.rune-option:not(:disabled):active {
   transform: scale(0.97);
+}
+.rune-option:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 .rune-option.is-current {
   border-color: var(--color-pulse);
@@ -108,6 +127,7 @@
   background: radial-gradient(circle, var(--color-pulse) 0 3.5px, transparent 4px);
 }
 .rune-option-text {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -124,7 +144,8 @@
 }
 .rune-option-what {
   color: var(--color-mist);
-  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .rune-facts code,
 .rune-tab code {
@@ -140,6 +161,7 @@
   margin: var(--space-7) 0 var(--space-4);
   font: 600 var(--text-16) / 1.2 var(--font-sans);
   color: var(--color-frost);
+  text-wrap: balance;
 }
 .rune-ledger-count {
   font: 400 var(--text-12) / 1.2 var(--font-sans);
@@ -149,7 +171,7 @@
 .rune-ledger {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-7);
   padding-bottom: var(--space-7);
 }
 .rune-group {
@@ -170,11 +192,17 @@
   font-size: var(--text-13);
 }
 .rune-what {
+  min-width: 0;
   color: var(--color-frost);
+  overflow-wrap: break-word;
 }
 .rune-note {
+  min-width: 0;
   color: var(--color-mist);
   font-size: var(--text-12);
+  line-height: 1.5;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
 }
 .rune-state {
   display: inline-flex;

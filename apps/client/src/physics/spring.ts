@@ -27,22 +27,41 @@ export const presets = {
 
 type Listener = (value: number) => void;
 
+/** True when the user asked for reduced motion; safe in Node tests without window/matchMedia. */
+export function prefersReducedMotion(): boolean {
+  const mm =
+    (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia.bind(window)) ||
+    (typeof globalThis !== "undefined" && typeof (globalThis as { matchMedia?: unknown }).matchMedia === "function"
+      ? (globalThis as unknown as { matchMedia: (query: string) => { matches: boolean } }).matchMedia.bind(globalThis)
+      : null);
+  if (!mm) return false;
+  try {
+    return Boolean(mm("(prefers-reduced-motion: reduce)")?.matches);
+  } catch {
+    return false;
+  }
+}
+
 const active = new Set<Spring>();
 let rafId: number | null = null;
 let backupId: ReturnType<typeof setTimeout> | null = null;
 let scheduled = false;
 let lastTime = 0;
 
-function onFrame(now: number) {
+function clearScheduled() {
   scheduled = false;
   if (rafId !== null) {
-    cancelAnimationFrame(rafId);
+    if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(rafId);
     rafId = null;
   }
   if (backupId !== null) {
     clearTimeout(backupId);
     backupId = null;
   }
+}
+
+function onFrame(now: number) {
+  clearScheduled();
   const dt = Math.min((now - lastTime) / 1000, 1 / 20); // clamp to avoid tab-suspend blowups
   lastTime = now;
   for (const s of active) s.step(dt);
@@ -57,7 +76,9 @@ function onFrame(now: number) {
 function schedule() {
   if (scheduled) return;
   scheduled = true;
-  rafId = requestAnimationFrame(onFrame);
+  if (typeof requestAnimationFrame === "function") {
+    rafId = requestAnimationFrame(onFrame);
+  }
   backupId = setTimeout(() => onFrame(performance.now()), 64);
 }
 
@@ -100,6 +121,10 @@ export class Spring {
 
   /** animate toward a new target, preserving current velocity */
   to(target: number, velocity?: number) {
+    if (prefersReducedMotion()) {
+      this.set(target);
+      return;
+    }
     this.target = target;
     if (velocity !== undefined) this.velocity = velocity;
     wake(this);
@@ -111,19 +136,28 @@ export class Spring {
     this.target = value;
     this.velocity = 0;
     active.delete(this);
+    if (active.size === 0) clearScheduled();
     this.emit();
   }
 
   /** throw with velocity, target = wherever it lands (decay-style) */
   fling(velocity: number) {
-    this.velocity = velocity;
     // project a resting point from current velocity for a natural glide
     const projected = this.current + velocity / (this.config.damping * 0.9);
+    if (prefersReducedMotion()) {
+      this.set(projected);
+      return;
+    }
+    this.velocity = velocity;
     this.target = projected;
     wake(this);
   }
 
   nudgeVelocity(v: number) {
+    if (prefersReducedMotion()) {
+      this.set(this.target);
+      return;
+    }
     this.velocity += v;
     wake(this);
   }

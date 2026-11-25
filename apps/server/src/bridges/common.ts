@@ -2,9 +2,11 @@
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { HttpError, type Req } from "../http.ts";
+import { storedSecret } from "../bridgesecrets.ts";
+import { guardEgress } from "../egressguard.ts";
 
-/** an env var, read when asked (tests and the Inbox see changes without a restart) */
-export const env = (k: string) => (process.env[k] ?? "").trim();
+/** a setting, read when asked: the value an admin stored in the Inbox's wizard (sealed, bridgesecrets.ts), else the env var */
+export const env = (k: string) => storedSecret(k) || (process.env[k] ?? "").trim();
 
 /** which keys a bridge reads and whether each is set: never their values */
 export const needsOf = (list: Array<[key: string, what: string, set?: boolean]>) => list.map(([key, what, set]) => ({ key, what, set: set ?? Boolean(env(key)) }));
@@ -57,6 +59,8 @@ export const scrub = (s: string) =>
 /** fetch JSON; a refusal becomes an Error carrying the service's own words (scrubbed), never the request */
 export async function fetchJson<T>(url: string, init: RequestInit & { what: string; timeoutMs?: number }): Promise<T> {
   const { what, timeoutMs = 15000, ...rest } = init;
+  // an agent's call reaches a service only where a person allowed it (egress.ts); the bridges' own work and a person's press pass
+  guardEgress(what.split(/[ :]/)[0]);
   let res: Response;
   try {
     res = await fetch(url, { ...rest, signal: AbortSignal.timeout(timeoutMs) });

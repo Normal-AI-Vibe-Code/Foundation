@@ -128,6 +128,8 @@ export interface BridgeAdapter {
   startRule?: string;
   /** routes of its own (Gmail's Connect mail) */
   routes?(r: Router, ctx: BridgeContext): void;
+  /** a setup wizard's Check: ask the service what can be asked now with the keys as they stand (only on a person's press) */
+  check?(step: string): Promise<{ ok: boolean; said: string }>;
   /** sample events for FOUNDATION_BRIDGE_DEMO */
   demo(): InboundEvent[];
 }

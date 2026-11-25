@@ -28,9 +28,13 @@ export function FloorEdge({ side, value, min, max, initial, onChange, label }: P
     <div
       className={`floor-edge is-${side}${dragging ? " is-dragging" : ""}`}
       role="separator"
+      tabIndex={0}
       aria-orientation="vertical"
-      aria-label={label}
-      data-tip={`Drag to resize · double-click resets`}
+      aria-label={`Resize ${label}`}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      data-tip="Drag or use arrow keys to resize · double-click or Enter resets"
       onPointerDown={(e) => {
         e.stopPropagation();
         drag.current = { x: e.clientX, w: value };
@@ -47,6 +51,26 @@ export function FloorEdge({ side, value, min, max, initial, onChange, label }: P
       onPointerUp={end}
       onPointerCancel={end}
       onDoubleClick={() => onChange(initial)}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? 40 : 16;
+        const dir = side === "right" ? 1 : -1;
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          onChange(Math.round(Math.max(min, Math.min(max, value + step * dir))));
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          onChange(Math.round(Math.max(min, Math.min(max, value - step * dir))));
+        } else if (e.key === "Home") {
+          e.preventDefault();
+          onChange(min);
+        } else if (e.key === "End") {
+          e.preventDefault();
+          onChange(max);
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          onChange(initial);
+        }
+      }}
     >
       <span className="floor-edge-line" />
     </div>

@@ -159,9 +159,9 @@ export function FlowformBrowser({ filter }: { filter: string }) {
 
   const again = (
     <div className="places-foot">
-      <a href="#" onClick={(e) => (e.preventDefault(), setRooms(null), setHits(null), setAttempt((n) => n + 1))}>
+      <button type="button" className="f-pill" onClick={() => (setRooms(null), setHits(null), setAttempt((n) => n + 1))}>
         Try again
-      </a>
+      </button>
     </div>
   );
   if (err && !rooms && !hits)
@@ -207,34 +207,37 @@ export function FlowformBrowser({ filter }: { filter: string }) {
           : viewer
             ? "View only in Flowform: an editor can bring it in"
             : `${r.asset_count} file${r.asset_count === 1 ? "" : "s"} · press to bring it in`;
+        const canRefresh = Boolean(r.live && !viewer);
         return (
-          <div key={r.room_id} className={`flowform-room${isOpen ? " is-open" : ""}`}>
+          <div key={r.room_id} className={`flowform-room${isOpen ? " is-open" : ""}${canRefresh ? " has-refresh" : ""}`}>
             <button
+              type="button"
               className="search-row is-folder"
               disabled={busy !== null || (viewer && !r.live)}
               onClick={() => (r.live && !busy ? openBoard(r.live.board_id) : bring(r))}
-              data-tip={r.live ? "Open its board" : "Bring it in as a board, kept in step with Flowform"}
+              data-tip={r.live ? `Open ${r.name}` : `Bring ${r.name} in as a grid, kept in step with Flowform`}
             >
-              <span className="search-row-glyph">▦</span>
+              <span className="search-row-glyph" aria-hidden>▦</span>
               <span className="search-row-main">
-                <span className="search-row-title">{r.name}</span>
+                <span className="search-row-title" title={r.name}>{r.name}</span>
                 <span className={`search-row-snip${r.live?.error ? " is-bad" : ""}`}>{busy === r.room_id ? "Reading it from Flowform…" : status}</span>
               </span>
-              {r.live && !viewer ? (
-                <span
-                  className="search-row-src flowform-again"
-                  role="button"
-                  tabIndex={0}
-                  data-tip="Read it from Flowform again now"
-                  onClick={(e) => (e.stopPropagation(), busy === null && bring(r))}
-                >
-                  ↻
-                </span>
-              ) : (
-                <span className="search-row-src">{r.role}</span>
-              )}
+              {!canRefresh && <span className="search-row-src">{r.role}</span>}
             </button>
+            {canRefresh && (
+              <button
+                type="button"
+                className="flowform-again-btn"
+                disabled={busy !== null}
+                aria-label={`Refresh ${r.name} from Flowform`}
+                data-tip="Read it from Flowform again now"
+                onClick={() => busy === null && bring(r)}
+              >
+                ↻
+              </button>
+            )}
             <button
+              type="button"
               className="flowform-files-toggle"
               aria-expanded={isOpen}
               aria-label={isOpen ? `Close ${r.name}'s files` : `Show ${r.name}'s files`}
@@ -247,7 +250,7 @@ export function FlowformBrowser({ filter }: { filter: string }) {
               <div className="flowform-room-files">
                 {files === null && <div className="pane-empty">Reading its files…</div>}
                 {typeof files === "string" && <ErrorCard message={files} />}
-                {Array.isArray(files) && files.length === 0 && <div className="pane-empty">No files on this room's boards.</div>}
+                {Array.isArray(files) && files.length === 0 && <div className="pane-empty">No files on this room's grids.</div>}
                 {Array.isArray(files) && <FlowformFiles files={files} />}
               </div>
             )}

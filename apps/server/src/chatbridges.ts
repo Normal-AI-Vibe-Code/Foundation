@@ -33,6 +33,10 @@ import { gmailAccounts, gmailAdapter } from "./bridges/gmail.ts";
 import { whatsapp } from "./bridges/whatsapp.ts";
 import { instagram } from "./bridges/instagram.ts";
 import { wechat } from "./bridges/wechat.ts";
+import { deliverSlack, slackLinked, slackView } from "./bridges/slack.ts";
+import { KEYS, secretStates, setSecret } from "./bridgesecrets.ts";
+import { config } from "./config.ts";
+import { audit } from "./audit.ts";
 
 export type { BridgeAdapter, BridgeService, InboundEvent, Portal } from "./bridges/types.ts";
 
@@ -389,6 +393,28 @@ chat.onChatMessage((m, ch) => {
 
 // ---------- HTTP ----------
 
+/** the address services reach this server at, and whether they can (a webhook needs public https) */
+export function serverFacts() {
+  const publicUrl = (process.env.FOUNDATION_PUBLIC_URL || config.publicUrl).replace(/\/$/, "");
+  let host = "";
+  let https = false;
+  try {
+    const u = new URL(publicUrl);
+    host = u.hostname;
+    https = u.protocol === "https:";
+  } catch {
+    /* not a URL */
+  }
+  const local = !host || host === "localhost" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.)/.test(host) || host === "::1" || host.endsWith(".local") || host.endsWith(".localhost");
+  const reachable = https && !local;
+  return {
+    publicUrl,
+    reachable,
+    ...(reachable ? {} : { why: local ? `This server's public address is ${publicUrl}, which only this computer or this network can reach. Meta and WeCom deliver messages to a public https address, so they can't reach it yet.` : `${publicUrl} isn't https: Meta and WeCom only deliver to https.` }),
+  };
+}
+const hookUrl = (service: string) => `${serverFacts().publicUrl}/api/chat/hooks/${service}`;
+
 const isMember = (c: ChatChannel, userId: string) => (c.members ?? []).some((p) => p.kind === "person" && p.id === userId);
 
 function remembered(userId: string, requestId: unknown): string | null {
@@ -475,7 +501,58 @@ export function chatBridgeRoutes(r: Router) {
 
   r.get("/api/chat/bridges", (req) => {
     const user = requireUser(req);
-    return { bridges: BRIDGE_ORDER.filter((s) => adapters.has(s)).map((s) => viewOf(s, user)), demo: demoOn(), admin: user.role === "admin" };
+    const admin = user.role === "admin";
+    return {
+      bridges: BRIDGE_ORDER.filter((s) => adapters.has(s)).map((s) => ({ ...viewOf(s, user), ...(admin ? { keys: secretStates(s), hook: hookUrl(s) } : {}) })),
+      demo: demoOn(),
+      admin,
+      server: serverFacts(),
+      slack: slackView(user),
+    };
+  });
+
+  // a key a wizard was given (a token, an app secret, a phone number id): stored sealed, never sent back. An admin, in person
+  r.post("/api/chat/bridges/:service/keys", async (req) => {
+    const user = requirePerson(req, "Setting a bridge's keys");
+    if (user.role !== "admin") throw new HttpError(403, "Only an admin sets a bridge's keys.");
+    const service = req.params.service;
+    if (!KEYS[service] || service === "slack") throw new HttpError(404, "no such bridge");
+    const body = await readJson<{ keys?: unknown }>(req);
+    if (!body.keys || typeof body.keys !== "object" || Array.isArray(body.keys)) throw new HttpError(400, "keys: { NAME: value }");
+    const entries = Object.entries(body.keys as Record<string, unknown>);
+    for (const [k, v] of entries) {
+      if (typeof v !== "string") throw new HttpError(400, `${k}: a string`);
+      if (!KEYS[service].some((x) => x.key === k)) throw new HttpError(400, `${k} isn't one of ${KEYS[service].map((x) => x.key).join(", ")}`);
+    }
+    for (const [k, v] of entries) setSecret(user, k, v as string);
+    const a = adapters.get(service as BridgeService)!;
+    if (started && enabled(a.service)) a.start?.(ctxFor(a.service));
+    changed(service as BridgeService);
+    return { keys: secretStates(service), bridge: { ...viewOf(service as BridgeService, user), keys: secretStates(service), hook: hookUrl(service) } };
+  });
+
+  // Check, in a wizard: asks the provider what can be asked now, with the keys as they stand. A person's press
+  r.post("/api/chat/bridges/:service/check", async (req) => {
+    const user = requirePerson(req, "Checking a bridge");
+    if (user.role !== "admin") throw new HttpError(403, "Only an admin checks a bridge's setup.");
+    const a = adapters.get(req.params.service as BridgeService);
+    if (!a) throw new HttpError(404, "no such bridge");
+    const body = await readJson<{ step?: unknown }>(req);
+    const step = typeof body.step === "string" ? body.step : "";
+    let out: { ok: boolean; said: string };
+    if (step === "address") {
+      const f = serverFacts();
+      out = f.reachable ? { ok: true, said: `${f.publicUrl} is a public https address: ${a.name} can reach ${hookUrl(a.service)}.` } : { ok: false, said: f.why ?? "No public address." };
+    } else if (!a.check) out = { ok: false, said: `${a.name} has nothing to check from here yet.` };
+    else {
+      try {
+        out = await a.check(step);
+      } catch (e) {
+        out = { ok: false, said: scrub((e as Error).message) };
+      }
+    }
+    audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, door: "http", action: "bridge.check", target: `${a.service}:${step || "all"}`, service: a.service, provenance: "external", decision: "allowed", result: out.ok ? "ok" : "error" });
+    return { check: out, bridge: { ...viewOf(a.service, user), keys: secretStates(a.service), hook: hookUrl(a.service) } };
   });
 
   // settings: who's in a new portal, whose our side's own messages are, on or off. An admin, in person
@@ -546,8 +623,10 @@ export function chatBridgeRoutes(r: Router) {
     const m = chat.getMessage(req.params.id);
     if (!m) throw new HttpError(404, "no such message");
     const c = chat.requireChannel(user, m.channel);
-    if (c.kind !== "portal" || !portalOf(c)) throw new HttpError(400, "only a message in a bridged conversation is sent out");
-    if (!isMember(c, user.id)) throw new HttpError(403, "join this conversation first");
+    // a channel linked to Slack (bridges/slack.ts) sends through the Slack bridge; a portal through its adapter
+    const viaSlack = c.kind !== "portal" && c.origin?.service === "slack" && slackLinked(c.id);
+    if (!viaSlack && (c.kind !== "portal" || !portalOf(c))) throw new HttpError(400, "only a message in a bridged conversation is sent out");
+    if (c.kind !== "open" && !isMember(c, user.id)) throw new HttpError(403, "join this conversation first");
     if (c.archivedAt) throw new HttpError(409, "this conversation is archived");
     if (remembered(user.id, body.request_id) === m.id) return { message: chat.getMessage(m.id) };
     if (m.deletedAt) throw new HttpError(409, "that message was discarded");
@@ -561,7 +640,7 @@ export function chatBridgeRoutes(r: Router) {
       chat.updateMessage(m.id, { text: body.text }, { edited: true });
     }
     remember(user.id, body.request_id, m.id);
-    await later(deliver(m.id, user.name));
+    await later(viaSlack ? deliverSlack(m.id, user.name) : deliver(m.id, user.name));
     return { message: chat.getMessage(m.id) };
   });
 
@@ -572,7 +651,7 @@ export function chatBridgeRoutes(r: Router) {
     const m = chat.getMessage(req.params.id);
     if (!m) throw new HttpError(404, "no such message");
     const c = chat.requireChannel(user, m.channel);
-    if (!isMember(c, user.id)) throw new HttpError(403, "join this conversation first");
+    if (c.kind !== "open" && !isMember(c, user.id)) throw new HttpError(403, "join this conversation first");
     if (body.confirm !== true) throw new HttpError(400, "discarding needs confirm: true");
     if (m.outbound?.state !== "draft" && m.outbound?.state !== "failed") throw new HttpError(409, "only a draft or a message that failed is discarded");
     return { message: chat.removeMessage(m.id) };

@@ -22,11 +22,11 @@ export function BrowseView({ channels, meId, onOpen, onJoin }: { channels: ChatC
       <div className="chat-view-list">
         {open.map((c) => (
           <div key={c.id} className="chat-browse-row" data-browse-row={c.name}>
-            <button className="chat-browse-main" onClick={() => onOpen(c.id)}>
+            <button type="button" className="chat-browse-main" onClick={() => onOpen(c.id)}>
               <span className="chat-side-mark">{channelMark(c, meId)}</span>
               <span className="chat-browse-text">
-                <span className="chat-browse-name">{chatTitle(c, meId)}</span>
-                <span className="chat-browse-meta">
+                <span className="chat-browse-name" title={chatTitle(c, meId)}>{chatTitle(c, meId)}</span>
+                <span className="chat-browse-meta" title={c.purpose || undefined}>
                   {c.memberCount} {c.memberCount === 1 ? "member" : "members"}
                   {c.purpose ? ` · ${c.purpose}` : ""}
                   {c.lastPostAt ? ` · last message ${ago(c.lastPostAt)}` : ""}
@@ -36,7 +36,7 @@ export function BrowseView({ channels, meId, onOpen, onJoin }: { channels: ChatC
             {c.me ? (
               <span className="chat-browse-joined">Joined</span>
             ) : (
-              <button className="f-pill" onClick={() => onJoin(c.id)}>
+              <button type="button" className="f-pill" onClick={() => onJoin(c.id)}>
                 Join
               </button>
             )}
@@ -62,7 +62,7 @@ export function ThreadsView({ threads, busy, why, onOpen }: { threads: ThreadRow
       </header>
       <div className="chat-view-list">
         {threads?.map(({ root: m, channel }) => (
-          <button key={m.id} className="chat-hit" onClick={() => onOpen(m)} data-thread-row={m.id}>
+          <button key={m.id} type="button" className="chat-hit" onClick={() => onOpen(m)} data-thread-row={m.id}>
             <PartyAvatar party={m.author} size={28} />
             <span className="chat-hit-main">
               <span className="chat-hit-where">
@@ -77,7 +77,7 @@ export function ThreadsView({ threads, busy, why, onOpen }: { threads: ThreadRow
             </span>
           </button>
         ))}
-        {busy && !threads && <p className="chat-view-empty">Looking…</p>}
+        {busy && !threads && <p className="chat-view-empty" role="status">Looking…</p>}
         {why && <ErrorCard message={why} />}
         {threads && !threads.length && <p className="chat-view-empty">No threads yet. Reply in thread from a message's hover bar, and it's kept here.</p>}
       </div>
@@ -103,7 +103,7 @@ export function SearchView({ q, hits, busy, why, onOpen }: { q: string; hits: Ch
       </header>
       <div className="chat-view-list">
         {hits?.map((h) => (
-          <button key={h.message.id} className="chat-hit" onClick={() => onOpen(h)} data-search-hit={h.message.id}>
+          <button key={h.message.id} type="button" className="chat-hit" onClick={() => onOpen(h)} data-search-hit={h.message.id}>
             <PartyAvatar party={h.message.author} size={28} />
             <span className="chat-hit-main">
               <span className="chat-hit-where">
@@ -114,7 +114,7 @@ export function SearchView({ q, hits, busy, why, onOpen }: { q: string; hits: Ch
             </span>
           </button>
         ))}
-        {busy && !hits && <p className="chat-view-empty">Looking…</p>}
+        {busy && !hits && <p className="chat-view-empty" role="status">Looking…</p>}
         {why && <ErrorCard message={why} />}
         {hits && !hits.length && !busy && <p className="chat-view-empty">Nothing said matches that. Fewer words, or a different filter, may find it.</p>}
       </div>

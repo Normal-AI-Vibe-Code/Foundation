@@ -67,6 +67,8 @@ export interface PostedAgent {
   model?: string;
   /** it can read and write the grid (false: it works in a folder of its own) */
   tools: boolean;
+  /** what it is (absent on older seats: "claude" is claude-account, "t3:…" is t3) */
+  kind?: AgentKind;
   by: string;
   byName: string;
   at: number;
@@ -75,6 +77,18 @@ export interface PostedAgent {
   /** the seat's own name ("Zephyr"), worn over its head, on its cursor while it works, and the name its character is chosen by; absent on older ones (they go by `name`) */
   alias?: string;
 }
+
+/** what an agent is, as the server knows it (docs/agent-harness.md §1) */
+export type AgentKind = "claude-account" | "claude-api" | "claude-federated" | "t3";
+
+/** a run's plan as everyone on the grid sees it: carried on the crew's awareness (docs/agent-harness.md §2) */
+export interface CrewPlan {
+  goal: string;
+  /** at most 8 */
+  steps: { text: string; status: "pending" | "active" | "done" }[];
+}
+export const CREW_PLAN_STEPS = 8;
+export const CREW_THOUGHT_CHARS = 200;
 
 export function postedAgentsOf(doc: Y.Doc, place: string): PostedAgent[] {
   const v = doc.getMap<PostedAgent[]>(BOARD.agents).get(place);
@@ -1027,6 +1041,8 @@ export type AgentEvent =
   /** a helper this run called in: its own run and session, so its tab can be opened */
   | { type: "helper"; name: string; runId: string; session: string }
   | { type: "text"; text: string }
+  /** the agent's reasoning, as it comes (docs/agent-harness.md §2) */
+  | { type: "thinking"; text: string }
   | { type: "tool"; name: string; input: unknown }
   | { type: "tool_result"; name: string; ok: boolean; summary: string }
   | { type: "status"; status: string }
@@ -1037,11 +1053,14 @@ export type AgentEvent =
  * Where an agent turn runs.
  * - "subscription": Claude Code on this machine (`claude -p`), the T3-style
  *   session mechanism — the user's plan pays, never an API key.
- * - "api": the Anthropic API with the workspace key (credits).
+ * - "api": the Anthropic API with the key an admin stored (credits).
+ * - "federated": the same loop on a short-lived token exchanged from the
+ *   organization's identity provider (workload identity federation).
  * - "script": a fixed playbook for tests and e2e (FOUNDATION_AGENT_SCRIPT=1
  *   only): the same tools, no model.
+ * Which one a run uses follows from its seat's kind (docs/agent-harness.md §1).
  */
-export type AgentRuntime = "subscription" | "api" | "script";
+export type AgentRuntime = "subscription" | "api" | "federated" | "script";
 
 export interface SearchHit {
   source: "board" | "file" | "slack" | "github" | "app" | "activity" | "huddle" | "flowform" | "chat";

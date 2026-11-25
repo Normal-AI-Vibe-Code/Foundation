@@ -33,8 +33,10 @@
 .hist-note,
 .hist-why {
   margin: 0;
+  max-width: 68ch;
   color: var(--color-dim);
   font: 400 var(--text-12) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .hist-why {
   color: var(--color-warn);
@@ -209,7 +211,12 @@
 .hist-job.is-on {
   background: var(--color-raise);
 }
+.hist-job:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
 .hist-job-what {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

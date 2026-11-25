@@ -105,7 +105,9 @@ export function upsertMessage(list: ChatMessage[], m: ChatMessage): ChatMessage[
   const at = list.findIndex((x) => x.id === m.id);
   if (at >= 0) {
     const next = list.slice();
-    next[at] = m;
+    const had = list[at];
+    // a stale copy (a send's HTTP answer arriving after the socket said it went out) never takes its way out back
+    next[at] = had.outbound && m.outbound && (had.outbound.at ?? 0) > (m.outbound.at ?? 0) ? { ...m, outbound: had.outbound } : m;
     return next;
   }
   // nearly always the newest: look from the end

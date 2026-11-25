@@ -34,6 +34,7 @@ import { createServer } from "node:net";
 import { join } from "node:path";
 import WebSocket from "ws";
 import { config } from "./config.ts";
+import { hostedFeatureReason, localFeatureAllowed, requireLocalFeature } from "./hosted.ts";
 import { findT3Cli, ON_PATH, t3Command } from "./t3paths.ts";
 
 /** an agent T3 can run: one configured instance of a provider */
@@ -152,6 +153,15 @@ export function t3HostRunning(): boolean {
 }
 
 export function t3Host(): T3HostStatus {
+  if (!localFeatureAllowed("t3")) {
+    return {
+      state: "off",
+      detail: hostedFeatureReason("t3", "Local T3 agents"),
+      since: status.since,
+      agents: [],
+      work: [],
+    };
+  }
   return { ...status, agents: status.agents, work: [...threads.values()].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)) };
 }
 
@@ -383,8 +393,9 @@ function killTree(c: ChildProcess) {
 
 /** a person pressed Start. Resolves once T3 is running (or says why it isn't); a second press while it starts joins the first */
 let starting: Promise<T3HostStatus> | null = null;
-export function startT3(by: string): Promise<T3HostStatus> {
-  if (status.state === "running") return Promise.resolve(t3Host());
+export async function startT3(by: string): Promise<T3HostStatus> {
+  requireLocalFeature("t3", "Local T3 agents");
+  if (status.state === "running") return t3Host();
   starting ??= run(by).finally(() => (starting = null));
   return starting;
 }
@@ -457,6 +468,7 @@ async function run(by: string): Promise<T3HostStatus> {
 
 /** a person pressed Stop: T3 and the agents it runs end; its threads are kept in its home */
 export function stopT3(): T3HostStatus {
+  requireLocalFeature("t3", "Local T3 agents");
   generation++;
   ws?.close();
   ws = null;
@@ -612,9 +624,9 @@ export async function t3OpenLink(threadId?: string): Promise<string> {
 export const T3_PRESETS: Record<string, { name: string; cloud: { baseUrl: string; model: string }; local: { baseUrl: string; model: string } }> = {
   kimi: { name: "Kimi", cloud: { baseUrl: "https://api.moonshot.ai/anthropic", model: "kimi-k3" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
   deepseek: { name: "DeepSeek", cloud: { baseUrl: "https://api.deepseek.com/anthropic", model: "deepseek-v4-pro" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
-  // Claude on a person's own API key (2026-11-17): Anthropic's endpoint, cloud only. Beside it, T3's own
-  // Claude agent is the one signed in with an account.
-  claude: { name: "Claude (API key)", cloud: { baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5" }, local: { baseUrl: "http://127.0.0.1:11434", model: "" } },
+  // No Claude here (2026-11-24): a Claude API key is Foundation's own `claude-api` agent (agentkinds.ts,
+  // PUT /api/agents/claude/key), not a T3 session. A `claude-cloud` instance added before then stays in T3's
+  // settings and keeps working, and is shown for what it is: a T3 session (posted.ts runsSentence).
 };
 
 export { isClaudeDriven };
@@ -640,6 +652,7 @@ export interface AddAgentInput {
 }
 
 export async function addT3Agent(input: AddAgentInput): Promise<T3Agent[]> {
+  requireLocalFeature("t3", "Local T3 agents");
   const preset = T3_PRESETS[input.preset];
   if (!preset) throw new Error(`No such agent to add: ${input.preset}. Known: ${Object.keys(T3_PRESETS).join(", ")}.`);
   if (input.where !== "cloud" && input.where !== "local") throw new Error("Say where it runs: cloud or local.");
@@ -692,6 +705,7 @@ export async function addT3Agent(input: AddAgentInput): Promise<T3Agent[]> {
  * computer, and signed in; T3 says so after the refresh.
  */
 export async function enableT3Agent(id: string): Promise<T3Agent[]> {
+  requireLocalFeature("t3", "Local T3 agents");
   const a = status.agents.find((x) => x.id === id);
   if (!a) throw new Error(`T3 has no agent called ${id}.`);
   const settings = obj(await rpc("server.getSettings", {}));
@@ -709,6 +723,7 @@ export async function enableT3Agent(id: string): Promise<T3Agent[]> {
 }
 
 export async function removeT3Agent(id: string): Promise<T3Agent[]> {
+  requireLocalFeature("t3", "Local T3 agents");
   if (!added.has(id)) throw new Error("Only agents added from Foundation can be removed here.");
   const settings = obj(await rpc("server.getSettings", {}));
   const instances = { ...(obj(settings?.providerInstances) ?? {}) };
@@ -741,6 +756,7 @@ export function loopbackOrigin(base: string): string | null {
 
 /** model servers on this computer that a local agent could use (Ollama's address; asked when the form opens) */
 export async function localModels(base = T3_PRESETS.kimi.local.baseUrl): Promise<{ baseUrl: string; up: boolean; models: string[] }> {
+  requireLocalFeature("t3", "Local T3 agents");
   const origin = loopbackOrigin(base);
   if (!origin) throw new Error("Only a model server on this computer can be asked: an address like http://127.0.0.1:11434 (http or https, localhost, 127.0.0.1 or [::1], a port, and nothing after it).");
   try {

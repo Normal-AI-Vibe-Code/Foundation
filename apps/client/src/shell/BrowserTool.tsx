@@ -16,6 +16,7 @@
 import { ErrorCard } from "../components/ErrorCard";
 import "./browser-tool.css";
 import { useState } from "react";
+import { useCapabilities } from "../lib/capabilities";
 import { HOLDS_KEYS } from "../lib/keysHeld";
 import { hostOf, useHostBrowser } from "./hostBrowser";
 import { toast, useUi } from "../state/ui";
@@ -25,6 +26,8 @@ import { frameAllow, frameFor } from "../panels/frameSandbox";
 import { useFrameContext } from "../lib/frames";
 
 export function BrowserTool() {
+  const caps = useCapabilities();
+  if (!caps.local.browser) return <FramedBrowser hosted />;
   return useUi().role === "admin" ? <HostBrowser /> : <FramedBrowser />;
 }
 
@@ -50,30 +53,42 @@ function HostBrowser() {
 
   return (
     <div className="tool-browser btool" data-browser-state={state}>
-      <div className="btool-tabs" role="tablist" aria-label="Tabs" data-browser-tabs>
+      <div className="btool-tabs" role="tablist" aria-label="Browser tabs" data-browser-tabs>
         <span className={`f-dot ${state === "open" ? "is-ok" : "is-warn"}`} data-tip={state === "open" ? `${name}, on the server's computer` : "The browser has closed"} />
-        {tabs.map((t) => (
-          <div key={t.id} role="tab" tabIndex={0} aria-selected={t.id === at} className={`btool-tab${t.id === at ? " is-on" : ""}${t.agent ? " is-agent" : ""}`} onClick={() => send({ t: "tab.select", tab: t.id })} onKeyDown={(e) => e.key === "Enter" && send({ t: "tab.select", tab: t.id })} data-browser-tab={t.id} data-tip={t.agent ? "An agent is working in this tab" : undefined}>
-            {t.loading && <i className="f-dot is-live" aria-hidden />}
-            <span className="btool-tab-name">{t.title || hostOf(t.url) || "New tab"}</span>
-            <button
-              type="button"
-              className="btool-tab-x"
-              aria-label={`Close ${t.title || hostOf(t.url) || "this tab"}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                send({ t: "tab.close", tab: t.id });
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+        {tabs.map((t) => {
+          const tabTitle = t.title || hostOf(t.url) || "New tab";
+          return (
+            <div key={t.id} className={`btool-tab${t.id === at ? " is-on" : ""}${t.agent ? " is-agent" : ""}`} data-browser-tab={t.id}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={t.id === at}
+                className="btool-tab-main"
+                onClick={() => send({ t: "tab.select", tab: t.id })}
+                data-tip={t.agent ? `${tabTitle} · An agent is working in this tab` : tabTitle}
+              >
+                {t.loading && <i className="f-dot is-live" aria-hidden />}
+                <span className="btool-tab-name" title={tabTitle}>{tabTitle}</span>
+              </button>
+              <button
+                type="button"
+                className="btool-tab-x"
+                aria-label={`Close ${tabTitle}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  send({ t: "tab.close", tab: t.id });
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
         {state === "open" && (
           <button
             type="button"
             className="top-btn btool-tab-new"
-            aria-label="New tab"
+            aria-label="Open new tab"
             data-tip="New tab"
             onClick={() => {
               send({ t: "tab.new" });
@@ -85,7 +100,7 @@ function HostBrowser() {
           </button>
         )}
         {state === "closed" && (
-          <button className="f-pill btool-again" onClick={again} data-browser-again>
+          <button type="button" className="f-pill btool-again" onClick={again} data-browser-again>
             Start again
           </button>
         )}
@@ -97,13 +112,13 @@ function HostBrowser() {
           go(text);
         }}
       >
-        <button type="button" className="top-btn" disabled={state !== "open" || !tab?.canBack} onClick={() => send({ t: "back" })} aria-label="Back" data-tip="Back">
+        <button type="button" className="top-btn" disabled={state !== "open" || !tab?.canBack} onClick={() => send({ t: "back" })} aria-label="Go back" data-tip="Back">
           ←
         </button>
-        <button type="button" className="top-btn" disabled={state !== "open" || !tab?.canForward} onClick={() => send({ t: "forward" })} aria-label="Forward" data-tip="Forward">
+        <button type="button" className="top-btn" disabled={state !== "open" || !tab?.canForward} onClick={() => send({ t: "forward" })} aria-label="Go forward" data-tip="Forward">
           →
         </button>
-        <button type="button" className="top-btn" disabled={state !== "open" || !tab} onClick={() => send({ t: tab?.loading ? "stop" : "reload" })} aria-label={tab?.loading ? "Stop" : "Reload"} data-tip={tab?.loading ? "Stop loading" : "Reload"} data-browser-reload>
+        <button type="button" className="top-btn" disabled={state !== "open" || !tab} onClick={() => send({ t: tab?.loading ? "stop" : "reload" })} aria-label={tab?.loading ? "Stop loading" : "Reload page"} data-tip={tab?.loading ? "Stop loading" : "Reload"} data-browser-reload>
           {tab?.loading ? "✕" : "↻"}
         </button>
         <input
@@ -192,7 +207,8 @@ function HostBrowser() {
             <form
               className="btool-sheet"
               role="alertdialog"
-              aria-label="The page says"
+              aria-modal="true"
+              aria-label="Page message"
               onSubmit={(e) => {
                 e.preventDefault();
                 settle(true);
@@ -216,7 +232,7 @@ function HostBrowser() {
                   </button>
                 )}
                 <button type="submit" className="f-pill is-accent" autoFocus={dialog.kind !== "prompt"}>
-                  OK
+                  {dialog.kind === "alert" ? "Close" : dialog.kind === "prompt" ? "Submit" : "Continue"}
                 </button>
               </span>
             </form>
@@ -224,10 +240,10 @@ function HostBrowser() {
         )}
         {state === "closed" && (
           <div className="btool-veil">
-            <div className="btool-sheet" data-browser-closed>
+            <div className="btool-sheet" role="dialog" aria-modal="true" aria-label="Browser closed" data-browser-closed>
               <p>{why || "The browser has closed."}</p>
               <span className="btool-sheet-presses">
-                <button className="f-pill is-accent" onClick={again}>
+                <button type="button" className="f-pill is-accent" onClick={again}>
                   Start again
                 </button>
               </span>
@@ -251,7 +267,7 @@ const normal = (raw: string) => {
   return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`;
 };
 
-function FramedBrowser() {
+function FramedBrowser({ hosted = false }: { hosted?: boolean }) {
   const [stack, setStack] = useState<{ list: string[]; at: number }>({ list: [], at: -1 });
   const [text, setText] = useState("");
   const [nonce, setNonce] = useState(0);
@@ -279,17 +295,17 @@ function FramedBrowser() {
           go(text);
         }}
       >
-        <button type="button" className="top-btn" disabled={stack.at <= 0} onClick={() => step(-1)} aria-label="Back" data-tip="Back">
+        <button type="button" className="top-btn" disabled={stack.at <= 0} onClick={() => step(-1)} aria-label="Go back" data-tip="Back">
           ←
         </button>
-        <button type="button" className="top-btn" disabled={stack.at >= stack.list.length - 1} onClick={() => step(1)} aria-label="Forward" data-tip="Forward">
+        <button type="button" className="top-btn" disabled={stack.at >= stack.list.length - 1} onClick={() => step(1)} aria-label="Go forward" data-tip="Forward">
           →
         </button>
-        <button type="button" className="top-btn" disabled={!url} onClick={() => setNonce((n) => n + 1)} aria-label="Reload" data-tip="Reload">
+        <button type="button" className="top-btn" disabled={!url} onClick={() => setNonce((n) => n + 1)} aria-label="Reload page" data-tip="Reload">
           ↻
         </button>
         <input className="tool-addr-field" value={text} onChange={(e) => setText(e.target.value)} placeholder="An address, or words to search" aria-label="Address" data-browser-addr />
-        <button type="button" className="top-btn" disabled={!url} onClick={() => void openExternal(url)} aria-label="Open outside" data-tip="Open in your browser">
+        <button type="button" className="top-btn" disabled={!url} onClick={() => void openExternal(url)} aria-label="Open page in browser" data-tip="Open in your browser">
           ↗
         </button>
         <button type="button" className="f-pill" disabled={!url} onClick={() => void openUrlAsPanel(url, "app").then(() => toast("On the grid, in the section in use", "ok"))} data-tip="A live card on the grid, in the section in use">
@@ -308,7 +324,11 @@ function FramedBrowser() {
         <div className="tool-empty">
           <b>A page, beside the grid</b>
           <p>Type an address or a search. Some sites won't show inside another app (they say so with a blank page); ↗ opens those in your browser. "On the grid" makes the page a live card everyone on the grid sees.</p>
-          <p className="tool-note">An admin gets the full browser here: a real one on the server's computer, where every site works.</p>
+          <p className="tool-note" data-hosted-browser={hosted || undefined}>
+            {hosted
+              ? "The server's built-in browser runs on a local computer and is turned off on a hosted Foundation server. Pages that allow framing open here; use ↗ to open any other page in your own browser."
+              : "An admin gets the full browser here: a real one on the server's computer, where every site works."}
+          </p>
           <span className="tool-chips">
             {["localhost:1430/#/design", "github.com/joshleong/Foundation", "docs.anthropic.com"].map((u) => (
               <button key={u} className="f-pill" onClick={() => go(u)}>

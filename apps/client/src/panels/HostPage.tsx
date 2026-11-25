@@ -335,11 +335,15 @@ export function HostPage({ panel, near }: { panel: PanelMeta; near: boolean }) {
           </div>
         )}
 
-        {/* at rest a plain click is the page's; holding the modifier says what a click would do (lib/cardUse.ts) */}
+        {/* at rest a plain click is the page's; holding the modifier says what a click would do (lib/cardUse.ts).
+            The keyboard still reaches "use": a button only a keyboard or a screen reader lands on (Tab, then Enter). */}
         {showPage && !engaged && !held && (
-          <span className="f-pill frame-engage-pill host-page-hint" aria-hidden>
-            {keys("mod+click")} to use · {keys("mod+enter")} full screen
-          </span>
+          <>
+            <span className="f-pill frame-engage-pill host-page-hint" aria-hidden>
+              {keys("mod+click")} to use · {keys("mod+enter")} full screen
+            </span>
+            <button type="button" className="f-sr-only" aria-label={`Use ${panel.name}`} onClick={() => putInUse(panel.id)} data-host-page-use />
+          </>
         )}
       </div>
     </div>

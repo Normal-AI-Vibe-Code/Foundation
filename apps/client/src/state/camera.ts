@@ -15,6 +15,9 @@ export interface Camera {
   height: number;
 }
 
+/** below this zoom the board is drawn small: a wire's pulse rests (GridViewport markCamera, shell.css) */
+export const FAR_ZOOM = 0.35;
+
 export const camera: Camera = { x: 0, y: 0, scale: 0.5, left: 0, top: 0, width: 0, height: 0 };
 const camListeners = new Set<(c: Camera) => void>();
 

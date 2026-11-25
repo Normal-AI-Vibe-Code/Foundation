@@ -24,7 +24,8 @@ import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
-import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
+import { claudeAccount, followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
+import { apiState, claudeModels, clearApiKey, federationState, setApiKey, setDefaultModel, setFederation } from "./agentkinds.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { hostTerminals, requestHostTerminal } from "./hostterm.ts";
 import { cardPageOf, hostBrowserRunning, requestHostBrowser } from "./hostbrowser.ts";
@@ -54,7 +55,7 @@ import { beginGrant, downloadsStatus, dropSession, fileThumb } from "./flowformf
 import { isPerson, requirePerson } from "./auth.ts";
 import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
 import { connectLocal, localStatus, resumeLocal, stopLocal } from "./localdev.ts";
-import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
+import { availableAgents, findSeat, postAgent, seatKind, seatModel, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { answerAppToolAsk } from "./apptools.ts";
@@ -72,13 +73,16 @@ import { addWorker, clusterStatus, deletePod, kubeconfig, layCluster, openPodCar
 import { addMachineStep, functionWiring, installExamples, readFunctions, runFunction } from "./machinefunctions.ts";
 import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.ts";
 import { startMachineIo, tryOut } from "./machineio.ts";
-import { prefsOf, setPref } from "./prefs.ts";
-import { cookieOriginRefusal, hostRefusal, originAllowed } from "./origins.ts";
+import { listPrefsOf, prefsOf, setPref } from "./prefs.ts";
+import { cookieOriginRefusal, hostRefusal, originAllowed, originAllowedFor } from "./origins.ts";
+import { attachNetwork, networkFront, networkRoutes, networkUpgradeRefusal, signInDoors } from "./network.ts";
 import { serveClient } from "./clientfiles.ts";
+import { whereaboutsFor } from "./whereabouts.ts";
 import { gridOutline } from "./subgrids.ts";
 import { canSeeChatFile, chatRoutes } from "./chat.ts";
 import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
 import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
+import { listServerUsers, requireLocalFeature, serverCapabilities, setServerUserRole, type ServerRole } from "./hosted.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
@@ -92,13 +96,31 @@ setCurator((o) => startRun(o));
 const r = new Router();
 registerVmRoutes(r);
 
-r.get("/api/health", () => ({ ok: true, name: "foundation", at: Date.now() }));
+r.get("/api/health", () => ({ ok: true, name: "foundation", version: SERVER_VERSION, hosted: flowform.hostedServer(), at: Date.now() }));
+r.get("/api/capabilities", () => serverCapabilities());
+
+// ---------- admin people (hosted.ts) ----------
+
+r.get("/api/admin/users", (req) => {
+  const u = requirePerson(req, "Viewing people on this server");
+  if (u.role !== "admin") throw new HttpError(403, "Only an admin can view people on this server.");
+  return { users: listServerUsers() };
+});
+r.post("/api/admin/users/:id/role", async (req) => {
+  const u = requirePerson(req, "Changing someone's role on this server");
+  const { role } = await readJson<{ role?: ServerRole }>(req);
+  return { users: setServerUserRole(u, req.params.id, role as ServerRole) };
+});
 
 // ---------- auth ----------
 
 // public: also what this server is, and the oldest client it still works with (clientversion.ts)
+// asked by a network name (network.ts), Google and dev sign-in can't finish there: an invitation can.
 // (`flowform` stays for the clients that read it to find the Google button: its routes sign in with this server's own Google client when it has one)
-r.get("/auth/config", () => ({ google: Boolean(config.google.clientId), devLogin: config.devLogin, flowform: { url: flowform.flowformUrl() }, provider: googleSignIn() ? "google" : "flowform", hosted: flowform.hostedServer(), version: SERVER_VERSION, minClient: minClient() || null }));
+r.get("/auth/config", (req) => {
+  const doors = signInDoors(req);
+  return { google: doors.google, devLogin: doors.devLogin, flowform: doors.flowform ? { url: flowform.flowformUrl() } : undefined, invite: doors.invite, provider: googleSignIn() ? "google" : "flowform", hosted: flowform.hostedServer(), version: SERVER_VERSION, minClient: minClient() || null };
+});
 r.get("/api/me", (req) => ({ user: userFromRequest(req) }));
 /** what on this computer has a shell now, if anything: dev sign-in waits until it stops (auth.ts devSignInRefusal) */
 function shellRunning(): string | false {
@@ -389,6 +411,8 @@ r.post("/api/boards/:id/sections/:section/extract", async (req) => {
   const out = await runTool(httpToolCtx(req.params.id, u, isPerson(req)), "extract_section", { section: req.params.section, ...(typeof body.request_id === "string" ? { request_id: body.request_id } : {}) });
   return { result: out, board: listBoards().find((b) => b.id === (out as { board: string }).board) };
 });
+// who is on each grid this person can see, people and agents (whereabouts.ts; the chat socket's `where` keeps it current)
+r.get("/api/whereabouts", (req) => ({ boards: whereaboutsFor(requireUser(req)) }));
 r.get("/api/boards/:id/presence", (req) => {
   requireBoard(requireUser(req), req.params.id);
   return { people: presence(req.params.id) };
@@ -430,7 +454,7 @@ r.get("/api/files/:id/cad", async (req) => {
 });
 r.get("/files/:id", (req, res) => {
   requireFileBoard(requireUser(req), req.params.id);
-  serveFile(req, res, req.params.id);
+  return serveFile(req, res, req.params.id);
 });
 
 /** a file on a members-only board is that board's; a chat upload is its uploader's and its messages' readers' (chat.ts) */
@@ -440,11 +464,16 @@ function requireFileBoard(user: UserInfo, fileId: string) {
   requireBoard(user, board);
 }
 
+// ---------- which server this is, and the office network (network.ts) ----------
+
+networkRoutes(r);
+
 // ---------- ChatForm (chat.ts) ----------
 
 chatRoutes(r);
 (await import("./chatimport.ts")).chatImportRoutes(r); // history: Slack export zip and API pull in, ChatForm export out
 (await import("./chatbridges.ts")).chatBridgeRoutes(r); // bridges: mail, WhatsApp, Instagram, WeChat portals, their webhooks, a person's send
+(await import("./bridges/slack.ts")).chatSlackRoutes(r); // the live Slack bridge: linked channels in step both ways, the token, the transition guide
 (await import("./chatagents.ts")).chatAgentRoutes(r); // agents in chat: mentions answer in the thread, Agents tab
 
 // ---------- this computer: the projects being built here, as a grid (localdev.ts) ----------
@@ -924,7 +953,7 @@ r.post("/api/boards/:id/machines/load", async (req) => {
 
 // ---------- a person's own preferences (prefs.ts) ----------
 
-r.get("/api/prefs", (req) => ({ prefs: prefsOf(requireUser(req).id) }));
+r.get("/api/prefs", (req) => ({ prefs: prefsOf(requireUser(req).id), lists: listPrefsOf(requireUser(req).id) }));
 // theirs to change, from their own browser: an agent's token reads them and can't set them
 r.post("/api/prefs", async (req) => {
   const u = requirePerson(req, "Changing your preferences");
@@ -946,21 +975,72 @@ r.get("/api/characters/costs", async (req) => {
 /** a character's file by role (thumb, clips, mavatar, front …): characters are the company's, so this doesn't ask which board */
 r.get("/api/characters/:id/files/:role", (req, res) => {
   requireUser(req);
-  serveFile(req, res, characterFile(req.params.id, req.params.role));
+  return serveFile(req, res, characterFile(req.params.id, req.params.role));
 });
 // ---------- agents assigned to a section or a grid: who is on its council (posted.ts) ----------
 
 r.get("/api/agents/available", (req) => {
   requireUser(req);
-  return availableAgents();
+  return { ...availableAgents(), codeMode: true };
+});
+
+// ---------- the server's own Claude, by kind (agentkinds.ts; docs/agent-harness.md §1) ----------
+// a person reads how each stands; an admin, in person, changes the key, the default model or federation.
+// The key is never in a response (last4 at most), a log line, a URL or a child's environment
+const claudeAdmin = (req: Req, what: string) => {
+  const u = requirePerson(req, what);
+  if (u.role !== "admin") throw new HttpError(403, `Only an admin can do that (${what.toLowerCase()}).`);
+  return u;
+};
+r.get("/api/agents/claude", async (req) => {
+  const u = requirePerson(req, "Reading how Claude is set up");
+  // where the identity token is kept on the server is for admins
+  const fed = federationState({ admin: u.role === "admin" });
+  return { account: await claudeAccount(), api: apiState(), federated: { configured: fed.configured, ...(fed.why ? { why: fed.why } : {}) } };
+});
+r.on("PUT", "/api/agents/claude/key", async (req) => {
+  const u = claudeAdmin(req, "Setting Claude's API key");
+  const { key } = await readJson<{ key?: unknown }>(req);
+  return { api: await setApiKey(u, key) };
+});
+r.delete("/api/agents/claude/key", async (req) => {
+  const u = claudeAdmin(req, "Forgetting Claude's API key");
+  const { confirm } = await readJson<{ confirm?: unknown }>(req);
+  if (confirm !== true) throw new HttpError(400, "Forgetting the key needs confirm: true. Seats that run on it stop until another is added.");
+  return { api: clearApiKey(u) };
+});
+r.get("/api/agents/claude/models", async (req) => {
+  requirePerson(req, "Listing Claude's models");
+  return claudeModels();
+});
+r.on("PUT", "/api/agents/claude/model", async (req) => {
+  const u = claudeAdmin(req, "Choosing Claude's model");
+  const { model } = await readJson<{ model?: unknown }>(req);
+  return { api: await setDefaultModel(u, model) };
+});
+r.get("/api/agents/claude/federation", (req) => {
+  claudeAdmin(req, "Reading Claude's federated identity");
+  return { federated: federationState() };
+});
+r.on("PUT", "/api/agents/claude/federation", async (req) => {
+  const u = claudeAdmin(req, "Setting Claude's federated identity");
+  const body = await readJson<Record<string, unknown>>(req);
+  return { federated: setFederation(u, body) };
+});
+r.delete("/api/agents/claude/federation", async (req) => {
+  const u = claudeAdmin(req, "Forgetting Claude's federated identity");
+  const { confirm } = await readJson<{ confirm?: unknown }>(req);
+  if (confirm !== true) throw new HttpError(400, "Forgetting federated identity needs confirm: true.");
+  return { federated: setFederation(u, null) };
 });
 r.post("/api/boards/:id/agents", async (req) => {
   const u = requireUser(req);
   requireBoard(u, req.params.id);
   requireWriter(u, req.params.id);
-  const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
+  const { place, agent, model } = await readJson<{ place?: string; agent?: string; model?: unknown }>(req);
   if (!place || !agent) throw new HttpError(400, "place (a section id, or * for the grid) and agent required");
-  return postAgent(req.params.id, place, agent, u);
+  // a seat's own model (claude-api, claude-federated only; postAgent refuses it for the others)
+  return postAgent(req.params.id, place, agent, u, await seatModel(model));
 });
 r.post("/api/boards/:id/agents/remove", async (req) => {
   const u = requireUser(req);
@@ -1091,6 +1171,7 @@ r.post("/api/today/profile", async (req) => {
 
 // whole coding transcripts, on no board: an admin, in person
 function requireT3Reader(req: Req) {
+  requireLocalFeature("vision", "Vision Code on this computer");
   const u = requirePerson(req, "Reading Vision Code's threads");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can read Vision Code's threads.");
   return u;
@@ -1204,13 +1285,20 @@ r.get("/api/t3host/presets", (req) => {
 // in-process (agent.ts startRun), not through this route. Still in READ_POSTS: a viewer who is a person may ask
 r.post("/api/agent", async (req, res) => {
   const user = requirePerson(req, "Asking the agent");
-  const body = await readJson<{ board?: string; prompt?: string; runtime?: string; session?: string; persona?: string; as?: string }>(req);
+  const body = await readJson<{ board?: string; prompt?: string; session?: string; persona?: string; as?: string; seat?: string }>(req);
   if (!body.prompt?.trim()) throw new HttpError(400, "say something");
   requireBoard(user, body.board || "company");
+  // which seat it's for (its id, or the name it goes by): how it runs is that seat's kind as this server knows it,
+  // never a runtime the request names (a `runtime` in the body is not read). No seat: the server's own default
+  const seat = findSeat(body.board || "company", { seat: body.seat, as: body.as });
+  // a seat named but not on this grid is not the default agent in disguise: it might have been a claude seat
+  if ((body.seat || body.as) && !seat) throw new HttpError(404, "No such seat on this grid: it may have been taken off. Pick an agent on the council again.");
+  const kind = seat ? seatKind(seat) : undefined;
+  if (kind === "t3") throw new HttpError(409, `${seat?.alias ?? seat?.name} is one of T3's agents: ask it through T3 (/api/t3host/threads).`);
   const send = sse(res);
   const session = body.session && /^ses_[a-z0-9]{6,24}$/.test(body.session) ? body.session : undefined;
   // the run lives on the server: closing this stream detaches, it doesn't stop it
-  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, runtime: body.runtime, session, persona: body.persona === "shiba" ? "shiba" : undefined, as: body.as });
+  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, kind, model: seat?.model, session, persona: body.persona === "shiba" ? "shiba" : undefined, as: body.as });
   await new Promise<void>((done) => {
     const detach = followRun(r.id, user.id, send, done);
     res.on("close", () => (detach?.(), done()));
@@ -1315,11 +1403,12 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
   // exactly the client (FOUNDATION_CLIENT_URL), the desktop app's window (http://localhost:31440, tauri://localhost)
   // and FOUNDATION_CORS_ORIGINS. The app on a hosted server sends a bearer (Authorization), so preflights are kept 10 minutes
   const origin = req.headers.origin;
-  if (origin && originAllowed(origin)) {
+  if (origin && originAllowedFor(origin, req)) {
     res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("access-control-allow-headers", "content-type, authorization, range, mcp-session-id, mcp-protocol-version");
-    res.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+    res.setHeader("access-control-expose-headers", "etag, x-image-level, x-image-natural-width, x-image-natural-height, x-image-width, x-image-height, x-image-alpha");
+    res.setHeader("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.setHeader("access-control-max-age", "600");
     res.setHeader("vary", "origin");
   }
@@ -1327,6 +1416,8 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     res.writeHead(204);
     return res.end();
   }
+  // the page on network names, and the doors that open only at this computer (network.ts)
+  if (networkFront(req, res, url.pathname)) return;
   // a machine's web port, relayed for anyone signed in here who can see its board (machineshare.ts): a viewer
   // may read it, writing to it (any other method) needs someone who can edit
   if (url.pathname.startsWith("/m/")) {
@@ -1378,6 +1469,7 @@ server.on("upgrade", (req, socket, head) => {
     socket.destroy();
     return;
   }
+  if (networkUpgradeRefusal(req, socket)) return; // this computer's sockets, and who is connected (network.ts)
   handleUpgrade(wss, req, socket, head);
 });
 
@@ -1437,6 +1529,7 @@ server.on("error", (e: NodeJS.ErrnoException) => {
 });
 
 server.listen(config.port, config.host, () => {
+  attachNetwork(server); // on your network: its listeners open now if a person left it on (network.ts)
   const rt = runtimes();
   console.log(`\n  Foundation server  ${config.publicUrl}`);
   console.log(`  data               ${config.dataDir}`);

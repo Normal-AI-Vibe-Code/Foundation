@@ -51,9 +51,61 @@ export function prefsOf(userId: string): { [K in PrefKey]: PrefValue<K> } {
   return out as { [K in PrefKey]: PrefValue<K> };
 }
 
+/**
+ * Preferences that are an ordered list of ids rather than one of a few words. None of them touches what
+ * an agent may do: they only arrange what a person sees.
+ *
+ * `chat.pinned`: the ChatForm conversations this person keeps in the side menu (channel ids, in their
+ * order). At most 100, each a short id, no repeats. A pin to a channel they can no longer see is
+ * harmless (the client drops it quietly: it lists only channels the chat list gives it).
+ */
+export const LIST_PREFS = {
+  "chat.pinned": { max: 100, maxLength: 120 },
+} as const satisfies Record<string, { max: number; maxLength: number }>;
+
+export type ListPrefKey = keyof typeof LIST_PREFS;
+const isListKey = (k: string): k is ListPrefKey => Object.hasOwn(LIST_PREFS, k);
+
+/** every list preference of a person (empty when never set, or when what's stored no longer reads) */
+export function listPrefsOf(userId: string): { [K in ListPrefKey]: string[] } {
+  const set = new Map(all<{ key: string; value: string }>("select key, value from person_prefs where user_id = ?", userId).map((r) => [r.key, r.value]));
+  const out: Record<string, string[]> = {};
+  for (const k of Object.keys(LIST_PREFS) as ListPrefKey[]) {
+    let v: unknown = [];
+    try {
+      v = JSON.parse(set.get(k) ?? "[]");
+    } catch { /* unreadable: empty */ }
+    out[k] = Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, LIST_PREFS[k].max) : [];
+  }
+  return out as { [K in ListPrefKey]: string[] };
+}
+
+/** an ordered list of distinct short strings, or a 400 saying what's wrong */
+function readList(key: ListPrefKey, value: unknown): string[] {
+  const { max, maxLength } = LIST_PREFS[key];
+  if (!Array.isArray(value)) throw new HttpError(400, `${key} is a list of ids`);
+  if (value.length > max) throw new HttpError(400, `${key} holds at most ${max}`);
+  const out: string[] = [];
+  for (const v of value) {
+    if (typeof v !== "string" || !v || v.length > maxLength || /[\u0000-\u001f]/.test(v)) throw new HttpError(400, `${key} is a list of ids (each 1–${maxLength} characters)`);
+    if (!out.includes(v)) out.push(v);
+  }
+  return out;
+}
+
 /** set one of a person's preferences; an unknown key or value is refused (400) */
 export function setPref(userId: string, key: string, value: unknown) {
-  if (!isKey(key)) throw new HttpError(400, `no preference called “${key}” (there is: ${Object.keys(PREFS).join(", ")})`);
+  if (isListKey(key)) {
+    run(
+      "insert into person_prefs (user_id, key, value, updated_at) values (?, ?, ?, ?) on conflict (user_id, key) do update set value = excluded.value, updated_at = excluded.updated_at",
+      userId,
+      key,
+      JSON.stringify(readList(key, value)),
+      Date.now(),
+    );
+    return prefsOf(userId);
+  }
+  if (!isKey(key)) throw new HttpError(400, `no preference called “${key}” (there is: ${[...Object.keys(PREFS), ...Object.keys(LIST_PREFS)].join(", ")})`);
   if (typeof value !== "string" || !(PREFS[key].values as readonly string[]).includes(value)) {
     throw new HttpError(400, `${key} is one of: ${PREFS[key].values.join(", ")}`);
   }

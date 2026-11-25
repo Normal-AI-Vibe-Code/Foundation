@@ -50,5 +50,19 @@
     "match": "import { parentPort } from \"node:worker_threads\";",
     "line": "import { parentPort } from \"node:worker_threads\";",
     "why": "The worker side of the server's own text extraction (filetext.ts): it reads bytes it is handed and answers; it starts nothing."
+  },
+  {
+    "rule": "child-process",
+    "file": "apps/server/src/codemode.ts",
+    "match": "import { Worker } from \"node:worker_threads\";",
+    "line": "import { Worker } from \"node:worker_threads\";",
+    "why": "run_code's scripts run in a worker thread of the server itself (codemode-worker.mjs), one per script, with an empty environment, no loaders, a memory limit and terminated at the deadline: no program is started, and the script inside is a QuickJS isolate that reaches only runTool."
+  },
+  {
+    "rule": "child-process",
+    "file": "apps/server/src/codemode-worker.mjs",
+    "match": "import { parentPort, workerData } from \"node:worker_threads\";",
+    "line": "import { parentPort, workerData } from \"node:worker_threads\";",
+    "why": "The worker side of code mode (codemode.ts): it runs one script in a QuickJS WebAssembly isolate and posts its tool calls back to the server thread; it starts nothing."
   }
 ]

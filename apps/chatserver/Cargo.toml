@@ -1,0 +1,38 @@
+[package]
+name = "chatserver"
+version = "0.1.0"
+edition = "2024"
+description = "ChatForm's server in Rust, for Vercel: accounts, channels, messages and the live socket on Postgres"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+# Vercel's Rust runtime: one function per file in api/, declared as a bin; vercel.json sends every path to it
+[[bin]]
+name = "chatform"
+path = "api/chatform.rs"
+
+[dependencies]
+vercel_runtime = { version = "2.4", features = ["axum"] }
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures-util = "0.3"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls-ring-webpki", "postgres", "macros", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+sha2 = "0.10"
+rand = "0.8"
+base64 = "0.22"
+url = "2"
+
+[dev-dependencies]
+tokio-tungstenite = "0.26"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3

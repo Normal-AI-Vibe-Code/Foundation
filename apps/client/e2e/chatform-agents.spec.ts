@@ -72,7 +72,8 @@ test("a mention is answered in its thread by the agent, live for everyone; the A
   await expect(reply.locator(".chat-msg-name")).toHaveText("Claude");
   await expect(reply.locator(".chat-agent-mark")).toHaveText("Agent");
   await expect(reply.locator(".chat-msg-for")).toHaveText("for Ada Lovelace");
-  await expect(reply.locator(".chat-avatar.is-agent")).toBeVisible();
+  // an agent is a figure on a baseline, never a disc (2026-11-20; chat/AgentFigure.tsx)
+  await expect(reply.locator("[data-agent-figure]")).toBeVisible();
   await expect(reply).toContainText("You asked:", { timeout: 20_000 });
   await expect(reply).toContainText("looked at your channels", { timeout: 20_000 });
   // the agent saw it first: 👀 on the ask

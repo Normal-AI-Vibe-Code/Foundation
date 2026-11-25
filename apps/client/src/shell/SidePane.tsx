@@ -8,7 +8,8 @@
  * device last opened it, a grid inside another saying which) and **All Grids** (the tree: a grid
  * can hold grids). Drag a grid onto another and it becomes its child, here and on the parent grid
  * itself, where a section stands for it (the server keeps that link: boards.ts). Drag it onto
- * "All Grids" to bring it back to the top. Then **Settings**, and you.
+ * "All Grids" to bring it back to the top. The third segment, **Chats**, lists the ChatForm conversations
+ * kept here (chat/SideChats.tsx; pulled out of ChatForm's list, 2026-11-20). Then **Settings**, and you.
  *
  * What belongs to the open grid (its people, its activity) is the other pane (SpaceInfo.tsx),
  * opened from the grid's tab.
@@ -30,6 +31,9 @@ import { SpaceGlyph } from "./SpaceGlyph";
 import { LOCAL_GRID_ID } from "@foundation/protocol";
 import { LocalRowDot } from "../panels/LocalView";
 import { isNight, setNight } from "@foundation/ui";
+import { SideChats } from "../chat/SideChats";
+import { usePins } from "../chat/pins";
+import { HereStack } from "./HereStack";
 
 interface Props {
   user: UserInfo;
@@ -49,6 +53,8 @@ const DRAG = "application/x-foundation-grid";
 
 export function SidePane({ user, boards, current, place, onSwitch, onNew }: Props) {
   const ui = useUi();
+  /** a ChatForm conversation in the hand (chat/carryChat.ts): this menu can keep it, under Chats */
+  const held = usePins().held;
   const viewer = user.role === "viewer";
   const [shut, setShut] = useState<Set<string>>(() => new Set());
   /** where the server switch draws its panel: above the Settings band */
@@ -132,6 +138,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
         >
           {tree && kids.length > 0 ? (
             <button
+              type="button"
               className={`grid-caret${open ? " is-open" : ""}`}
               aria-expanded={open}
               aria-label={open ? `Fold ${b.name}` : `Unfold ${b.name}`}
@@ -149,17 +156,26 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           ) : (
             tree && <span className="grid-caret is-none" aria-hidden />
           )}
-          <button className="pane-row space-open" onClick={() => onSwitch(b.id)} data-tip={`${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : " · drag onto a grid to put it inside"}`}>
-            <span className="pane-glyph">
+          <button
+            type="button"
+            className="pane-row space-open"
+            onClick={() => onSwitch(b.id)}
+            data-tip={`${b.name} · ${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : " · drag onto a grid to put it inside"}`}
+          >
+            <span className="pane-glyph" aria-hidden>
               <SpaceGlyph space={b} />
             </span>
-            <span className="pane-label">{b.name}</span>
+            <span className="pane-label" title={b.name}>
+              {b.name}
+            </span>
+            {/* who else is on it, people and agents (2026-11-21) */}
+            <HereStack boardId={b.id} me={user.id} />
             {b.id === LOCAL_GRID_ID && <LocalRowDot />}
-            {!tree && parent && <span className="pane-when">{parent.name}</span>}
+            {!tree && parent && <span className="pane-when" title={parent.name}>{parent.name}</span>}
             {tree && kids.length > 0 && <span className="pane-when">{kids.length}</span>}
           </button>
           {tree && !viewer && b.role !== "viewer" && !isPageKind(kind) && (
-            <button className="space-move" onClick={() => onNew("grid", b.id)} aria-label={`New grid inside ${b.name}`} data-tip="New grid inside">
+            <button type="button" className="space-move" onClick={() => onNew("grid", b.id)} aria-label={`Create new grid inside ${b.name}`} data-tip="New grid inside">
               ＋
             </button>
           )}
@@ -176,20 +192,25 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           {/* how the grids are listed, at the top of them; the rows start at the selector's own left edge */}
           <div className="pane-pick">
             <div className="pane-seg" role="tablist" aria-label="How grids are listed">
-              {(["recent", "all"] as const).map((v) => (
-                <button key={v} role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${v === "all" && over === "top" ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} {...(v === "all" ? dropProps(null) : {})}>
-                  {v === "recent" ? "Recent" : "All Grids"}
+              {(["recent", "all", "chats"] as const).map((v) => (
+                <button key={v} type="button" role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${(v === "all" && over === "top") || (v === "chats" && held) ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} data-pane-seg={v} {...(v === "all" ? dropProps(null) : {})}>
+                  {v === "recent" ? "Recent" : v === "all" ? "All Grids" : "Chats"}
                 </button>
               ))}
             </div>
             {!viewer && (
-              <button className="pane-new" onClick={() => onNew("grid")} aria-label="New grid" data-tip="New grid">
+              <button type="button" className="pane-new" onClick={() => onNew("grid")} aria-label="Create new grid" data-tip="New grid">
                 <PlusGlyph />
               </button>
             )}
           </div>
 
-          <div className="pane-scroll">
+          <div className={`pane-scroll${held ? " is-chat-target" : ""}${held?.over ? " is-chat-over" : ""}`}>
+            {ui.spacesView === "chats" ? (
+              <section className="pane-group">
+                <SideChats place={place} />
+              </section>
+            ) : (
             <section className="pane-group">
               {ui.spacesView === "recent" ? recent.map((b) => row(b, 0, false)) : childrenOf(null, listed).map((b) => row(b, 0, true))}
               {listed.length === 0 && (
@@ -208,14 +229,15 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
                 </div>
               )}
             </section>
+            )}
           </div>
 
           {/* the server pill's panel opens here, in the menu's flow right above the Settings band (2026-11-18) */}
           <div className="pane-server-slot" ref={setServerSlot} />
           {/* Settings, and the server this app talks to as a small pill to its right in the same band (2026-11-17) */}
           <section className="pane-band pane-low pane-low-row">
-            <button className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
-              <span className="pane-glyph">
+            <button type="button" className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
+              <span className="pane-glyph" aria-hidden>
                 <GearGlyph />
               </span>
               <span className="pane-label">Settings</span>
@@ -227,8 +249,9 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
               {initials(user.name)}
             </span>
             <span className="pane-me">
-              <b>{user.name}</b>
+              <b title={user.name}>{user.name}</b>
               <button
+                type="button"
                 className="pane-signout"
                 onClick={async () => {
                   await logout();

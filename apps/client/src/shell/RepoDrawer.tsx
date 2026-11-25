@@ -17,6 +17,7 @@ export function RepoDrawer() {
   const [repo, setRepo] = useState<string | null>(null);
   const [data, setData] = useState<RepoView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const on = (e: Event) => setRepo((e as CustomEvent<string>).detail);
@@ -26,30 +27,50 @@ export function RepoDrawer() {
 
   useEffect(() => {
     if (!repo) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setRepo(null);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [repo]);
+
+  useEffect(() => {
+    if (!repo) return;
     setData(null);
     setError(null);
     api<RepoView>(`/api/repo?repo=${encodeURIComponent(repo)}`)
       .then(setData)
       .catch((e) => setError((e as Error).message));
-  }, [repo]);
+  }, [repo, attempt]);
 
   return (
     <AnimatePresence>
       {repo && (
         <motion.aside
           className="repo-drawer f-glass"
+          aria-label={`Repository ${repo}`}
           initial={{ x: 40, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          exit={{ x: 40, opacity: 0 }}
+          exit={{ x: 40, opacity: 0, transition: { duration: 0.14 } }}
           transition={{ type: "spring", stiffness: 260, damping: 28 }}
         >
           <header className="dock-head">
-            <span className="dock-title">{repo}</span>
-            <button className="icon-btn" onClick={() => setRepo(null)}>
+            <span className="dock-title" title={repo}>{repo}</span>
+            <button type="button" className="icon-btn" aria-label="Close repository drawer" data-tip="Close" onClick={() => setRepo(null)}>
               ✕
             </button>
           </header>
-          {error && <ErrorCard message={error} />}
+          {error && (
+            <>
+              <ErrorCard message={error} />
+              <button type="button" className="f-pill" onClick={() => setAttempt((n) => n + 1)}>
+                Try again
+              </button>
+            </>
+          )}
           {!data && !error && <div className="repo-loading">Reading the repository…</div>}
           {data && (
             <div className="repo-body">
@@ -60,7 +81,7 @@ export function RepoDrawer() {
                 <a className="f-pill" href={data.info.url} target="_blank" rel="noreferrer">
                   GitHub ↗
                 </a>
-                <button className="f-pill is-agent" onClick={() => askAgent(`Read ${data.info.fullName} and tell me how it works and how to connect it to the rest of the board.`)}>
+                <button type="button" className="f-pill is-agent" onClick={() => askAgent(`Read ${data.info.fullName} and tell me how it works and how to connect it to the rest of the grid.`)}>
                   ✦ Explain it
                 </button>
               </div>

@@ -11,6 +11,12 @@ import { chatTitle, type ChatChannelView, type ChatParty } from "@foundation/pro
 import { PartyAvatar } from "./Avatar";
 import { isDirect } from "./logic";
 import { IconChevron, IconHash, IconLock, IconPlus, IconThread } from "./Icons";
+import { carryHandlers } from "./carryChat";
+import { isKept, keepInSideMenu, takeOutOfSideMenu } from "./pins";
+import { openContextMenu } from "../components/ContextMenu";
+import { setUi } from "../state/ui";
+import { gridsOf, useWhereabouts } from "../lib/whereabouts";
+import { useGrids } from "../lib/grids";
 
 export interface SidebarProps {
   channels: ChatChannelView[];
@@ -20,9 +26,13 @@ export interface SidebarProps {
   view?: "threads" | "browse" | "search" | null;
   onOpen(id: string): void;
   onView(v: "threads" | "browse"): void;
+  /** the server has no list of my threads (a chat server of its own): the row is left out */
+  noThreads?: boolean;
   onNew(kind: "channel" | "direct"): void;
   /** channels someone is typing in */
   typing?: Set<string>;
+  /** rows can be pulled out into the side menu, and kept there from their menu (the live place; not the design page) */
+  carry?: boolean;
 }
 
 const FOLD = "chatform-folds";
@@ -53,17 +63,19 @@ export function Sidebar(p: SidebarProps) {
   const channels = live.filter((c) => !c.me?.starred && (c.kind === "open" || c.kind === "private")).sort(byName);
   const direct = live.filter((c) => !c.me?.starred && isDirect(c)).sort(byRecent);
 
-  const row = (c: ChatChannelView, where: string) => <Row key={`${where}-${c.id}`} c={c} meId={p.meId} online={p.online} current={p.current === c.id && !p.view} onOpen={p.onOpen} typing={p.typing?.has(c.id)} />;
+  const row = (c: ChatChannelView, where: string) => <Row key={`${where}-${c.id}`} c={c} meId={p.meId} online={p.online} current={p.current === c.id && !p.view} onOpen={p.onOpen} typing={p.typing?.has(c.id)} carry={p.carry} />;
 
   return (
     <nav className="chat-sidebar" aria-label="Conversations">
       <div className="chat-side-scroll">
-        <button className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads>
-          <span className="chat-side-mark">
-            <IconThread />
-          </span>
-          <span className="chat-side-name">Threads</span>
-        </button>
+        {!p.noThreads && (
+          <button type="button" className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads>
+            <span className="chat-side-mark">
+              <IconThread />
+            </span>
+            <span className="chat-side-name">Threads</span>
+          </button>
+        )}
         {unreads.length > 0 && (
           <Section id="unreads" name="Unreads" folded={!!folds.unreads} onFold={fold} count={unreads.length}>
             {unreads.map((c) => row(c, "u"))}
@@ -76,7 +88,7 @@ export function Sidebar(p: SidebarProps) {
         )}
         <Section id="channels" name="Channels" folded={!!folds.channels} onFold={fold} onAdd={() => p.onNew("channel")} addTip="New channel">
           {channels.map((c) => row(c, "c"))}
-          <button className={`chat-side-row is-quiet${p.view === "browse" ? " is-current" : ""}`} onClick={() => p.onView("browse")} data-side-browse>
+          <button type="button" className={`chat-side-row is-quiet${p.view === "browse" ? " is-current" : ""}`} onClick={() => p.onView("browse")} data-side-browse>
             <span className="chat-side-mark">
               <IconPlus />
             </span>
@@ -96,13 +108,13 @@ function Section({ id, name, folded, onFold, onAdd, addTip, count, children }: {
   return (
     <section className={`chat-side-section${folded ? " is-folded" : ""}`} data-side-section={id}>
       <div className="chat-side-head">
-        <button className="chat-side-fold" onClick={() => onFold(id)} aria-expanded={!folded}>
+        <button type="button" className="chat-side-fold" onClick={() => onFold(id)} aria-expanded={!folded}>
           <IconChevron open={!folded} />
           <span>{name}</span>
           {folded && count ? <span className="chat-side-headcount">{count}</span> : null}
         </button>
         {onAdd && (
-          <button className="chat-side-add" onClick={onAdd} data-tip={addTip} aria-label={addTip}>
+          <button type="button" className="chat-side-add" onClick={onAdd} data-tip={addTip} aria-label={addTip}>
             <IconPlus />
           </button>
         )}
@@ -122,22 +134,65 @@ export function channelMark(c: Pick<ChatChannelView, "kind" | "members" | "agent
   return <PartyAvatar party={who} size={size} online={c.kind === "dm" && who.kind === "person" ? !!online?.includes(who.id) : undefined} />;
 }
 
-export function Row({ c, meId, online, current, onOpen, typing }: { c: ChatChannelView; meId?: string; online: string[]; current: boolean; onOpen(id: string): void; typing?: boolean }) {
+/**
+ * Which grid the person in a direct message is on right now (2026-11-21): "in Form Industries", dim, after their
+ * name; press the conversation as before. Nothing when they're on none (lib/whereabouts.ts).
+ */
+function PersonWhere({ c, meId }: { c: ChatChannelView; meId?: string }) {
+  const all = useWhereabouts();
+  const grids = useGrids();
+  const other = (c.members ?? []).find((m) => m.id !== meId && m.kind === "person");
+  if (!other) return null;
+  const on = gridsOf(all, other.id);
+  if (!on.length) return null;
+  const names = on.map((id) => grids.find((g) => g.id === id)?.name ?? "a grid");
+  const label = names.length > 1 ? `in ${names[0]} +${names.length - 1}` : `in ${names[0]}`;
+  return (
+    <span className="chat-side-where" data-person-where={other.id} data-tip={`${other.name} is on ${names.join(", ")}`}>
+      {label}
+    </span>
+  );
+}
+
+/** what a conversation is, in a word (the slip in the hand says it) */
+export const kindWord = (c: Pick<ChatChannelView, "kind">) => (c.kind === "open" || c.kind === "private" ? "channel" : c.kind === "dm" ? "direct message" : c.kind === "group" ? "group" : c.kind === "agent" ? "agent" : "conversation");
+
+/**
+ * `carry`: the row can be pulled out into the side menu (chat/carryChat.ts) and its right-click (or the
+ * menu key, Shift+F10) menu keeps it there or takes it out (2026-11-20).
+ */
+export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: ChatChannelView; meId?: string; online: string[]; current: boolean; onOpen(id: string): void; typing?: boolean; carry?: boolean }) {
   const mentions = c.me?.mentions ?? 0;
   const muted = c.me?.notify === "none";
   const unread = c.unread > 0 && !muted;
   const direct = isDirect(c);
   const n = direct ? c.unread : mentions;
+  const title = chatTitle(c, meId);
+  const hand = carry ? carryHandlers(() => ({ id: c.id, title: c.kind === "open" || c.kind === "private" ? `#${title}` : title, kind: kindWord(c) })) : null;
   return (
     <button
+      type="button"
       className={`chat-side-row${current ? " is-current" : ""}${unread ? " is-unread" : ""}${muted ? " is-muted" : ""}${c.kind === "agent" ? " is-agent" : ""}`}
       onClick={() => onOpen(c.id)}
+      onPointerDown={hand?.onPointerDown}
+      onContextMenu={
+        carry
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const r = e.currentTarget.getBoundingClientRect();
+              const at = e.clientX || e.clientY ? { x: e.clientX, y: e.clientY } : { x: r.left + 24, y: r.bottom };
+              openContextMenu(at.x, at.y, [isKept(c.id) ? { label: "Take out of the side menu", action: () => takeOutOfSideMenu(c.id) } : { label: "Keep in the side menu", action: () => (keepInSideMenu(c.id), setUi({ spacesView: "chats", pane: true, paneView: "spaces" })) }]);
+            }
+          : undefined
+      }
       data-channel-row={c.id}
-      data-channel-name={chatTitle(c, meId)}
+      data-channel-name={title}
       aria-current={current ? "page" : undefined}
     >
       <span className="chat-side-mark">{channelMark(c, meId, online)}</span>
-      <span className="chat-side-name">{chatTitle(c, meId)}</span>
+      <span className="chat-side-name" title={title}>{title}</span>
+      {c.kind === "dm" && <PersonWhere c={c} meId={meId} />}
       {typing && !current && <span className="chat-side-typing" aria-label="typing" />}
       {n > 0 && !muted ? (
         <span className="chat-count is-accent" data-tip={direct ? `${n} unread` : `${n} ${n === 1 ? "mention" : "mentions"} of you`}>

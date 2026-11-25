@@ -18,6 +18,8 @@
  *   the server's or the client's port, the host of FOUNDATION_PUBLIC_URL or FOUNDATION_CLIENT_URL, or
  *   one in FOUNDATION_HOSTS. That is the fence against DNS rebinding (a page on evil.example whose
  *   name now points at 127.0.0.1), which a loopback-peer test like dev sign-in's can't see.
+ * - **On your network** (network.ts): while an admin has it on, also this computer's LAN addresses and name,
+ *   with the port, and (asked by those names only) their own page origins and the desktop app's window.
  */
 
 import type { IncomingMessage } from "node:http";
@@ -72,6 +74,23 @@ export function allowedOrigins(): Set<string> {
 
 export const originAllowed = (origin: string) => allowedOrigins().has(origin);
 
+/**
+ * The names this server answers to on the office network, while a person has it open there (network.ts):
+ * its LAN addresses and this computer's name, each with the port, and the page origins those give. Empty
+ * when it isn't (exactly today's rules). A request that names one of these hosts may come from that page
+ * (cookie, same origin) or from the desktop app on a teammate's computer (its window is
+ * http://localhost:31440 there, and it sends a bearer: a SameSite cookie never crosses to a LAN address).
+ */
+let networkNames: { hosts: Set<string>; origins: Set<string> } = { hosts: new Set(), origins: new Set() };
+export function setNetworkNames(hosts: Iterable<string>, origins: Iterable<string>) {
+  networkNames = { hosts: new Set([...hosts].map((h) => h.toLowerCase())), origins: new Set(origins) };
+}
+/** this request names the server by one of its network names (not loopback, not FOUNDATION_HOSTS) */
+export const isNetworkHost = (req: IncomingMessage) => networkNames.hosts.has(String(req.headers.host ?? "").trim().toLowerCase());
+/** may a page at `origin` use this server for this request: the fixed list, or (asked by a network name) the network's pages */
+export const originAllowedFor = (origin: string, req: IncomingMessage) =>
+  originAllowed(origin) || (isNetworkHost(req) && (networkNames.origins.has(origin) || DESKTOP_PAGE_ORIGINS.includes(origin)));
+
 const defaultPort = (protocol: string) => (protocol === "https:" ? "443" : "80");
 
 function hostOf(url: string): { host: string; port: string } | null {
@@ -101,7 +120,7 @@ export function hostRefusal(req: IncomingMessage): string | null {
   const no = `This server doesn't answer to “${raw.slice(0, 80) || "no name"}”. Open Foundation at its own address, or add that name to FOUNDATION_HOSTS.`;
   if (!raw) return no;
   const rules = hostRules();
-  if (rules.exact.has(raw)) return null;
+  if (rules.exact.has(raw) || networkNames.hosts.has(raw)) return null;
   const m = /^(\[[0-9a-f:.]+\]|[^:[\]]+)(?::(\d{1,5}))?$/.exec(raw);
   if (!m) return no;
   const port = m[2] ?? "80";
@@ -121,7 +140,7 @@ export function cookieOriginRefusal(req: IncomingMessage, opts: { upgrade?: bool
   if (opts.ticket || req.headers.authorization || !hasSessionCookie(req)) return null;
   const origin = req.headers.origin;
   if (origin !== undefined) {
-    if (originAllowed(String(origin))) return null;
+    if (originAllowedFor(String(origin), req)) return null;
     return `A page at ${String(origin).slice(0, 80)} can't use your Foundation sign-in. Open Foundation itself (or add that page to FOUNDATION_CORS_ORIGINS).`;
   }
   const site = String(req.headers["sec-fetch-site"] ?? "");

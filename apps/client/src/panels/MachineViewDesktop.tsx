@@ -350,9 +350,15 @@ export function DesktopScreen({ panelId, name, viewer, onKeys, alone, board, onF
       {hasKeys && !viewer && !alone && <span className={`machine-desk-ring${shape ? " is-screen" : ""}`} style={shape ? ({ "--screen-ar": String(shape.w / shape.h) } as CSSProperties) : undefined} />}
       {!inUse && (
         // a plain click uses the desktop, as it puts the caret in the terminal; until then the wheel and the pointer are the grid's
-        <div className="machine-desk-shield" onPointerDown={(e) => e.stopPropagation()} onClick={use}>
+        <button
+          type="button"
+          className="machine-desk-shield"
+          aria-label={viewer ? `Look closer at ${name}'s desktop` : `Use ${name}'s desktop`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={use}
+        >
           {!note && <span className="f-pill machine-desk-hint">{viewer ? "Click to look closer" : "Click to use the desktop"}</span>}
-        </div>
+        </button>
       )}
       {viewer && <div className="machine-watching">View only: you're watching</div>}
       {note && (

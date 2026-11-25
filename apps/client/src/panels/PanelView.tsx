@@ -28,6 +28,7 @@ import { landingsOf, toneOf } from "../shell/ports";
 import { CHARACTER_TYPE, pageInBrowser } from "@foundation/protocol";
 import { api, fetchFile, uploadFile } from "../lib/api";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
+import { ProgressiveImage } from "../components/ProgressiveImage";
 import { askAgent, toast, useUi } from "../state/ui";
 import { camera, onCamera } from "../state/camera";
 import { activeBoard } from "../sync/board";
@@ -287,51 +288,74 @@ export { GLYPH as PANEL_GLYPH };
  * poster. Checked when it mounts, as the camera moves and as the fit changes.
  */
 export function useOnScreen(ref: React.RefObject<HTMLElement | null>, minScale = 0.3) {
-  const [visible, setVisible] = useState(false);
-  const [bigEnough, setBigEnough] = useState(false);
+  // one state, near AND big enough: a card that comes near while drawn too small (a studio zoomed out) doesn't
+  // render again for it. Two states re-rendered every character card passing the screen's edge as you panned
+  const [live, setLive] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // fitted when it's in a section's flow; a hosted app fills its section at full size
+    const section = el.closest(".section-content") ? (el.closest<HTMLElement>("[data-section-id]")?.dataset.sectionId ?? null) : null;
+    let zoom = camera.scale;
+    let near = false;
+    // the section's fit says how big its docked cards are drawn; a card floating in a flow section (a machine laid
+    // after a studio's collection, 2026-11-17) is drawn at its own size, so when the fit says too small the page is
+    // asked how big it really is. That asking is a layout read (2026-11-24): it's asked only of a card near the
+    // screen, only when the zoom or the fit may have changed (a pan changes neither), and every card's question
+    // waits for one pass a frame that reads them all and then writes (onScreenPass), never a read after a write
+    let big = false;
+    const measure = () => drawnScale(zoom, section) >= minScale || (near && drawnScaleOf(el) >= minScale);
+    const apply = (b: boolean) => {
+      if (b === big && el.dataset.big !== undefined) return;
+      big = b;
+      setLive(near && b);
+      el.dataset.big = b ? "1" : "0"; // what it read, for a check to see
+    };
+    const check = () => askOnScreen(el, measure, apply);
     const io = new IntersectionObserver(
       ([e]) => {
-        setVisible(e.isIntersecting);
-        el.dataset.seen = e.isIntersecting ? "1" : "0";
+        near = e.isIntersecting;
+        setLive(near && big);
+        el.dataset.seen = near ? "1" : "0";
+        // measured mid-animation (a snap, a section's fit still springing) it can read small: asked again as it comes into view
+        if (near) check();
       },
       { rootMargin: "200px" },
     );
     io.observe(el);
-    // fitted when it's in a section's flow; a hosted app fills its section at full size
-    const section = el.closest(".section-content") ? (el.closest<HTMLElement>("[data-section-id]")?.dataset.sectionId ?? null) : null;
-    let zoom = camera.scale;
-    // the section's fit says how big its docked cards are drawn; a card floating in a flow section (a machine laid
-    // after a studio's collection, 2026-11-17) is drawn at its own size, so when the fit says too small the page is
-    // asked how big it really is
-    let big = false;
-    const check = () => {
-      big = drawnScale(zoom, section) >= minScale || drawnScaleOf(el) >= minScale;
-      setBigEnough(big);
-      el.dataset.big = big ? "1" : "0"; // what it read, for a check to see
-    };
-    check();
+    apply(drawnScale(zoom, section) >= minScale);
     const off = onCamera((c) => {
+      if (c.scale === zoom) return;
       zoom = c.scale;
       check();
     });
-    const offFit = section ? subscribe(check) : () => {};
-    // measured mid-animation (a snap, a section's fit still springing) it can read small and nothing moves after:
-    // asked again as it comes into view, and each second while it reads too small
-    const io2 = new IntersectionObserver(() => check(), { rootMargin: "200px" });
-    io2.observe(el);
-    const again = setInterval(() => !big && check(), 1000);
+    const offFit = section ? subscribe(() => near && check()) : () => {};
+    // …and each second while it reads too small and is near
+    const again = setInterval(() => !big && near && check(), 1000);
     return () => {
       io.disconnect();
-      io2.disconnect();
       clearInterval(again);
       off();
       offFit();
+      ON_SCREEN_ASKS.delete(el);
     };
   }, [ref, minScale]);
-  return visible && bigEnough;
+  return live;
+}
+
+/** the cards waiting to be measured this frame: one rAF reads every card's size, then sets what each read */
+const ON_SCREEN_ASKS = new Map<HTMLElement, { measure: () => boolean; apply: (big: boolean) => void }>();
+let onScreenFrame = 0;
+function askOnScreen(el: HTMLElement, measure: () => boolean, apply: (big: boolean) => void) {
+  ON_SCREEN_ASKS.set(el, { measure, apply });
+  if (!onScreenFrame) onScreenFrame = requestAnimationFrame(onScreenPass);
+}
+function onScreenPass() {
+  onScreenFrame = 0;
+  const asks = [...ON_SCREEN_ASKS.values()];
+  ON_SCREEN_ASKS.clear();
+  const read = asks.map((a) => a.measure());
+  asks.forEach((a, i) => a.apply(read[i]));
 }
 
 /** a page shown by the built-in browser (HostPage.tsx): live when it's on screen, big enough to read and the camera is calm */
@@ -480,10 +504,12 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
       )}
       {!engaged && mount && (
         // a plain click selects the card (the wheel and the pointer stay the grid's); ⌘/Ctrl-click uses the app (lib/cardUse.ts)
-        <div
+        <button
+          type="button"
           className="frame-engage"
+          aria-label={`Use ${panel.name}`}
           onClick={(e) => {
-            if (!modHeld(e)) return;
+            if (e.detail !== 0 && !modHeld(e)) return;
             e.preventDefault();
             e.stopPropagation();
             putInUse(panel.id);
@@ -492,7 +518,7 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
           <span className="f-pill frame-engage-pill">
             {keys("mod+click")} to use · {keys("mod+enter")} full screen
           </span>
-        </div>
+        </button>
       )}
       {panel.mcp && <AppToolAsks panelId={panel.id} viewer={viewer} />}
     </div>
@@ -615,8 +641,8 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
   useEffect(() => {
     if (live) setSeenLive(true);
   }, [live]);
-  // what an <img>, <video> or <iframe> loads: the server URL, or (bearer) a blob once it's been on screen
-  const shown = useFileSrc(url, (live || seenLive) && (mime.startsWith("image/") || mime.startsWith("video/") || mime === "application/pdf"));
+  // what a <video> or <iframe> loads: the server URL, or (bearer) a blob once it's been on screen (images use ProgressiveImage)
+  const shown = useFileSrc(url, (live || seenLive) && (mime.startsWith("video/") || mime === "application/pdf"));
 
   useEffect(() => {
     if (!live || text !== null || !url) return;
@@ -643,7 +669,7 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
           <span>Uploading {name}…</span>
         </div>
       ) : mime.startsWith("image/") ? (
-        <img src={shown} alt={name} loading="lazy" decoding="async" />
+        <ProgressiveImage src={url} alt={name} targetWidth={512} enabled={live || seenLive} fit="contain" />
       ) : mime.startsWith("video/") ? (
         <video src={shown} muted loop playsInline controls preload="metadata" />
       ) : mime === "application/pdf" ? (

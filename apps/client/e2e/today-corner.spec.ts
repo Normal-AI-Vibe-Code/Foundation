@@ -8,6 +8,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { CLIENT, settle, waitLive } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-17_today-top-left";
+const MAC_SHOTS = "../../docs/evidence/2026-11-24_mac-corner";
 
 async function boxes(p: Page) {
   const box = async (sel: string) => (await p.locator(sel).first().boundingBox())!;
@@ -16,6 +17,7 @@ async function boxes(p: Page) {
 
 test("Today is the top bar's first thing, in the left corner, with the side menu open and folded; day and night", async ({ browser }) => {
   mkdirSync(SHOTS, { recursive: true });
+  mkdirSync(MAC_SHOTS, { recursive: true });
   for (const scheme of ["dark", "light"] as const) {
     const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme });
     await c.request.post(`${CLIENT}/auth/dev`, { data: { name: "Ada Test", email: "ada@normal.dev" } });
@@ -45,6 +47,31 @@ test("Today is the top bar's first thing, in the left corner, with the side menu
     expect(b.today.x + b.today.width).toBeLessThanOrEqual(b.fold.x);
     expect(b.fold.x + b.fold.width).toBeLessThanOrEqual(b.tabs.x);
     await p.screenshot({ path: `${SHOTS}/02_menu-folded-${name}.png`, clip: { x: 0, y: 0, width: 1440, height: 260 } });
+
+    // a Mac's window (2026-11-24, Josh: "the tabs are too far out on mac and should be brought back to that panel
+    // line"): the lights take the corner, and the group's line still lands on the menu's edge at every width
+    await p.locator(".top-bar .pane-fold").click();
+    await expect(p.locator(".side-pane")).toBeVisible();
+    await settle(p, 500); // the menu slides in: measured mid-slide, its edge is still moving
+    await p.evaluate(() => document.documentElement.classList.add("is-desktop", "is-mac"));
+    for (const w of [220, 272, 340, 420]) {
+      const m = await p.evaluate(async (w) => {
+        const tl = document.querySelector<HTMLElement>(".top-left")!;
+        const pane = document.querySelector<HTMLElement>("aside.side-pane")!;
+        tl.style.setProperty("--pane-w", `${w}px`);
+        pane.style.width = `${w}px`;
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+        return { line: tl.getBoundingClientRect().right + 4, edge: pane.getBoundingClientRect().right, today: r(".top-left [data-top-today]"), chat: r(".top-left [data-top-chat]"), fold: r(".top-left .pane-fold") };
+      }, w);
+      expect(Math.abs(m.line - m.edge), `${w}px menu: the line on its edge`).toBeLessThanOrEqual(1);
+      expect(m.fold.right, `${w}px menu: the fold inside it`).toBeLessThanOrEqual(m.edge);
+      expect(m.today.left, `${w}px menu: Today clear of the lights`).toBeGreaterThanOrEqual(80);
+      expect(m.chat.right, `${w}px menu: ChatForm before the fold`).toBeLessThanOrEqual(m.fold.left);
+    }
+    await expect(p.locator(".top-bar [data-top-chat]")).toHaveAccessibleName(/ChatForm/);
+    await p.screenshot({ path: `${MAC_SHOTS}/mac-menu-420-${name}.png`, clip: { x: 0, y: 0, width: 720, height: 160 } });
+    await p.evaluate(() => document.documentElement.classList.remove("is-desktop", "is-mac"));
 
     // it still goes to Today
     await p.locator(".top-bar [data-top-today]").click();

@@ -79,6 +79,7 @@
   box-shadow:
     var(--shadow-lift),
     0 0 0 1px var(--color-line);
+  transform-origin: top left;
 }
 .tab-new-item {
   display: grid;
@@ -184,6 +185,7 @@
   opacity: 0;
 }
 .space-row:hover .space-move,
+.space-row:focus-within .space-move,
 .space-move:focus-visible,
 .space-move.is-on {
   opacity: 1;
@@ -242,6 +244,17 @@
   outline: 0;
   border-color: var(--color-pulse);
   background: var(--color-raise);
+}
+.info-name:not([readonly]):focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+  border-color: var(--color-pulse);
+  background: var(--color-raise);
+}
+.space-info .pane-group + .pane-group {
+  margin-top: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
 }
 .info-facts {
   display: grid;
@@ -343,6 +356,8 @@
   right: var(--space-4);
   max-height: 60%;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -352,6 +367,7 @@
   box-shadow:
     var(--shadow-lift),
     0 0 0 1px var(--color-line);
+  transform-origin: top right;
 }
 
 /* ---------- scroll bars: a 2 px light line by the pane's edge, there only while the pane is in use ----------
@@ -581,6 +597,7 @@
   margin: 0;
   padding: var(--space-4);
   overflow: auto;
+  overscroll-behavior: contain;
   border-radius: var(--radius-card);
   background: var(--color-panel);
   box-shadow: inset 0 0 0 1px var(--color-line);
@@ -616,7 +633,8 @@
 }
 .detail-goal {
   margin: 0 0 var(--space-4);
-  font: 600 var(--text-14) / 1.4 var(--font-sans);
+  font: 600 var(--text-14) / 1.45 var(--font-sans);
+  text-wrap: balance;
 }
 .detail-plan li {
   display: flex;
@@ -709,6 +727,14 @@
   /* 2026-11-17: outlined, so the pill reads as a control and its left edge is the line the rows start on */
   box-shadow: inset 0 0 0 1px var(--color-line-strong);
 }
+/* three segments since 2026-11-20 (Recent · All Grids · Chats): each as wide as its word, the rest shared, so the
+   words stay whole at the menu's narrowest (220) */
+.side-pane .pane-pick .pane-seg-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 2px;
+  white-space: nowrap;
+}
 .pane-new {
   flex: none;
   width: 28px;
@@ -721,9 +747,11 @@
   color: var(--color-mist);
   cursor: pointer;
 }
-.pane-new:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
+@media (hover: hover) {
+  .pane-new:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
 }
 .side-pane .pane-scroll {
   padding: 0 0 var(--space-4);
@@ -762,9 +790,11 @@
   display: none;
 }
 /* hover: a quiet ink wash, the full row */
-.side-pane .pane-row:hover,
-.side-pane .space-row:hover .space-open {
-  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+@media (hover: hover) {
+  .side-pane .pane-row:hover,
+  .side-pane .space-row:hover .space-open {
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
 }
 /* selected: the accent's tint and a 2 px bar at the pane's edge. Never the same as hover */
 .side-pane .space-row.is-current .space-open,
@@ -773,9 +803,11 @@
   box-shadow: inset 2px 0 0 var(--color-pulse);
   color: var(--color-frost);
 }
-.side-pane .space-row.is-current .space-open:hover,
-.side-pane .pane-place.is-current:hover {
-  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+@media (hover: hover) {
+  .side-pane .space-row.is-current .space-open:hover,
+  .side-pane .pane-place.is-current:hover {
+    background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+  }
 }
 .side-pane .space-row .space-move {
   position: absolute;
@@ -839,6 +871,38 @@
 /* 2026-11-17: over the open menu the fold sits at the menu's right edge */
 .top-left.is-over-pane {
   justify-content: flex-end;
+  /* from the bar's inset to the menu's edge, less the gap its line sits out by (::after), so the line is the menu's
+     edge on every computer, a Mac's lights included (2026-11-24, Josh: "brought back to that panel line") */
+  width: max(0px, calc(var(--pane-w) - var(--bar-inset) - var(--space-2)));
+  container: top-left / inline-size;
+}
+/* a narrow menu (its least, or a Mac's at the usual width, the lights taking the corner) can't hold both words and
+   the fold: ChatForm keeps its mark and its tip, and the fold its edge */
+@container top-left (max-width: 236px) {
+  .top-left .top-chat .top-word {
+    /* out of sight, still the button's name */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .top-left .top-chat {
+    padding-right: var(--space-3);
+  }
+}
+/* narrower still (a Mac's menu at its least): Today keeps its Shiba too, so nothing slides under the lights */
+@container top-left (max-width: 150px) {
+  .top-left .top-today .top-word {
+    /* out of sight, still the button's name */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 /* and a line, the bar's height, between it and the tabs (over the menu, it lands on the menu's own edge) */
 .top-left::after {
@@ -864,9 +928,11 @@
   font: 500 var(--text-13) / 1 var(--font-sans);
   cursor: pointer;
 }
-.top-today:hover {
-  color: var(--color-frost);
-  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+@media (hover: hover) {
+  .top-today:hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
 }
 .top-today.is-on {
   color: var(--color-frost);
@@ -1003,8 +1069,10 @@
   height: 2px;
   background: var(--color-void);
 }
-.top-bar .tab.is-space:not(.is-current):hover {
-  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+@media (hover: hover) {
+  .top-bar .tab.is-space:not(.is-current):hover {
+    background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+  }
 }
 .top-bar .tab-new-wrap {
   margin-left: var(--space-2);
@@ -1024,9 +1092,14 @@
   box-shadow: none;
   border-bottom: 1px solid var(--color-line);
 }
-/* the line under the search line is the grid's own hairline, focused or not (2026-11-17, Josh) */
+/* the line under the search line is the grid's own hairline on pointer click; keyboard focus shows a clear pulse ring */
 .search-pane .search-head:focus-within {
   box-shadow: none;
+}
+.search-pane .search-field:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 .search-pane .search-glyph {
   display: inline-grid;
@@ -1050,4 +1123,49 @@
 .side-pane .pane-server-slot {
   flex: none;
   min-height: 0;
+}
+
+/* ---------- who is on a grid, on its row (HereStack.tsx, 2026-11-21) ---------- */
+
+/* the others with it open, then its agents: 16 px faces, overlapping, on the row's right before its count */
+.here-stack {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding-left: var(--space-2);
+}
+.here-face {
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1.5px var(--color-void);
+  color: var(--color-on-fill);
+  font: 700 7px / 1 var(--font-sans);
+  letter-spacing: 0.02em;
+}
+.here-face:first-child {
+  margin-left: 0;
+}
+/* an agent: the ✦ on its crew colour, a rounded tile rather than a face (agents are never a disc in ChatForm either) */
+.here-face.is-agent {
+  border-radius: 4px;
+  font-size: 9px;
+}
+.here-face.is-agent.is-working {
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+.here-more {
+  margin-left: 3px;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .here-face.is-agent.is-working {
+    animation: none;
+  }
 }

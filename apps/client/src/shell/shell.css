@@ -14,8 +14,62 @@ body {
 .shell {
   position: relative;
 }
+.shell-main {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.shell-main:focus {
+  outline: none;
+}
+.shell-main:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
 .shell .grid-viewport {
   flex: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.f-skip-link {
+  position: fixed;
+  z-index: 1100;
+  top: var(--space-2);
+  left: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-frost);
+  color: var(--color-void);
+  font: 600 var(--text-12) / 1.2 var(--font-sans);
+  text-decoration: none;
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-200%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform var(--dur-quick) var(--ease-out-soft),
+    opacity var(--dur-quick) var(--ease-out-soft);
+}
+.f-skip-link:focus-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
 }
 
 /* ---------- the floor: chrome drawn on the paper (DESIGN.md → The floor) ----------
@@ -119,8 +173,13 @@ body.is-presenting .world-mask {
   transition: opacity var(--dur-quick) var(--ease-out-soft) 120ms;
 }
 .floor-edge:hover .floor-edge-line,
+.floor-edge:focus-visible .floor-edge-line,
 .floor-edge.is-dragging .floor-edge-line {
   opacity: 1;
+}
+.floor-edge:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
 }
 
 /* ---------- top bar: fold · tabs · tools ---------- */
@@ -135,7 +194,8 @@ body.is-presenting .world-mask {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-3) 0 var(--space-4);
+  --bar-inset: var(--space-4);
+  padding: 0 var(--space-3) 0 var(--bar-inset);
   pointer-events: none;
   /* the bar's edge is a hairline too: the cards stop under it, cut clean */
   border-bottom: 1px solid var(--color-line);
@@ -157,9 +217,11 @@ body.is-presenting .world-mask {
   font: 500 var(--text-14) / 1 var(--font-sans);
   cursor: pointer;
 }
-.top-btn:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
+@media (hover: hover) {
+  .top-btn:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
 }
 .top-btn.is-on {
   color: var(--color-pulse);
@@ -176,6 +238,7 @@ body.is-presenting .world-mask {
   align-items: center;
   gap: var(--space-2);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   pointer-events: none;
 }
@@ -206,9 +269,11 @@ button.tab,
   font: 500 var(--text-13) / 1 var(--font-sans);
   cursor: pointer;
 }
-.tab:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
+@media (hover: hover) {
+  .tab:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
 }
 .tab.is-current {
   background: var(--color-raise);
@@ -243,6 +308,7 @@ button.tab,
   opacity: 0;
 }
 .tab:hover .tab-close,
+.tab:focus-within .tab-close,
 .tab.is-current .tab-close {
   opacity: 1;
 }
@@ -260,7 +326,7 @@ button.tab,
 .top-tools {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 .top-tools .presence-stack {
   margin-right: var(--space-3);
@@ -278,9 +344,10 @@ button.tab,
 .has-window-controls .top-bar {
   padding-right: calc(138px + var(--space-3));
 }
-/* a Mac keeps its own lights, at the left */
+/* a Mac keeps its own lights, at the left: the bar's inset makes room for them (and the top left group,
+   sized from the same inset, still ends on the side menu's edge; spaces.css) */
 .is-mac .top-bar {
-  padding-left: 84px;
+  --bar-inset: 84px;
 }
 .window-controls {
   position: fixed;
@@ -353,6 +420,8 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
 .pane-scroll {
   flex: 1;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
   padding: var(--space-2) var(--space-3) var(--space-4) var(--space-3);
 }
 .pane-group {
@@ -394,6 +463,7 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   color: var(--color-dim);
   font-size: var(--text-12);
   line-height: 1.45;
+  text-wrap: pretty;
 }
 /* the server's "looked in…" list: one path a line, long paths wrap anywhere */
 .pane-empty.is-paths {
@@ -414,8 +484,10 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   text-align: left;
   cursor: pointer;
 }
-.pane-row:hover {
-  background: var(--color-pulse-dim);
+@media (hover: hover) {
+  .pane-row:hover {
+    background: var(--color-pulse-dim);
+  }
 }
 .pane-row.is-current {
   background: var(--color-raise);
@@ -555,8 +627,10 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   border-radius: var(--radius-pane);
   background: var(--color-raise);
   box-shadow: 0 0 0 1px var(--color-line);
-  max-height: 38vh;
+  max-height: 38dvh;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
 }
 .plan-head {
   display: flex;
@@ -574,7 +648,8 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
 }
 .plan-goal {
   margin: var(--space-3) 0 var(--space-4);
-  font: 500 var(--text-14) / 1.4 var(--font-sans);
+  font: 500 var(--text-14) / 1.45 var(--font-sans);
+  text-wrap: balance;
 }
 .plan-steps {
   list-style: none;
@@ -590,7 +665,7 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   gap: var(--space-3);
   align-items: start;
   color: var(--color-mist);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 .plan-box {
   width: 14px;
@@ -630,16 +705,19 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
 .session-list {
   flex: 1;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-4);
   padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
   user-select: text;
 }
 .session-empty p {
   color: var(--color-mist);
   margin: var(--space-3) 0 var(--space-5);
   line-height: 1.5;
+  text-wrap: pretty;
 }
 .session-empty .pane-eyebrow {
   padding: 0;
@@ -674,9 +752,11 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   color: var(--color-void);
   white-space: pre-wrap;
   line-height: 1.45;
+  text-wrap: pretty;
 }
 .s-text {
   line-height: 1.55;
+  text-wrap: pretty;
 }
 .s-reasoning {
   color: var(--color-dim);
@@ -780,7 +860,9 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   box-shadow: 0 0 0 1px var(--color-line);
 }
 .session-input:focus-within {
-  box-shadow: 0 0 0 1px var(--color-agent);
+  box-shadow:
+    0 0 0 2px var(--color-agent),
+    0 0 0 5px var(--color-agent-dim);
 }
 .session-input textarea {
   resize: none;
@@ -836,7 +918,9 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   box-shadow: 0 0 0 1px var(--color-line);
 }
 .search-head:focus-within {
-  box-shadow: 0 0 0 1px var(--color-pulse);
+  box-shadow:
+    0 0 0 2px var(--color-pulse),
+    0 0 0 4px var(--color-pulse-dim);
 }
 .search-glyph {
   color: var(--color-mist);
@@ -869,8 +953,10 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   font: 500 var(--text-12) / 1 var(--font-sans);
   cursor: pointer;
 }
-.search-chip:hover {
-  background: var(--color-pulse-dim);
+@media (hover: hover) {
+  .search-chip:hover {
+    background: var(--color-pulse-dim);
+  }
 }
 .search-chip.is-on {
   background: var(--color-frost);
@@ -883,6 +969,8 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
 .search-results {
   flex: 1;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
   padding: var(--space-2) var(--space-3) var(--space-4) var(--space-4);
   display: flex;
   flex-direction: column;
@@ -890,6 +978,9 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
 }
 .search-results > .pane-eyebrow {
   padding: 0 var(--space-3);
+  margin-top: var(--space-4);
+}
+.search-results > .pane-eyebrow:first-child {
   margin-top: var(--space-2);
 }
 .search-tiles {
@@ -932,7 +1023,9 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   opacity: 0;
   transition: opacity var(--dur-quick) var(--ease-out-soft);
 }
-.search-tile:hover .search-tile-name {
+.search-tile:hover .search-tile-name,
+.search-tile:focus-visible .search-tile-name,
+.search-tile:focus-within .search-tile-name {
   opacity: 1;
 }
 .search-tile:hover {
@@ -953,8 +1046,10 @@ html[data-theme="room"] .window-controls:not(.f-day, .is-demo) .win-btn.is-close
   cursor: grab;
   touch-action: none;
 }
-.search-row:hover {
-  background: var(--color-pulse-dim);
+@media (hover: hover) {
+  .search-row:hover {
+    background: var(--color-pulse-dim);
+  }
 }
 .search-row-glyph {
   width: 28px;
@@ -1034,7 +1129,9 @@ body.is-dragging-hit * {
   translate: none;
 }
 .search-row:hover > .clip-btn,
+.search-row:focus-within > .clip-btn,
 .search-tile:hover > .clip-btn,
+.search-tile:focus-within > .clip-btn,
 .is-clipped > .clip-btn {
   opacity: 1;
   scale: 1;
@@ -1049,7 +1146,7 @@ body.is-dragging-hit * {
   color: var(--color-on-fill);
 }
 /* the source tag gives its corner to the button */
-.search-row:has(> .clip-btn):hover .search-row-src,
+.search-row:has(> .clip-btn):is(:hover, :focus-within) .search-row-src,
 .search-row.is-clipped .search-row-src {
   visibility: hidden;
 }
@@ -1250,6 +1347,7 @@ body.is-dragging-hit * {
   color: var(--color-dim);
   font-size: var(--text-12);
   line-height: 1.45;
+  text-wrap: pretty;
 }
 .clipboard.is-empty b {
   color: var(--color-mist);
@@ -1376,7 +1474,8 @@ body.is-dragging-hit * {
   opacity: 0;
   cursor: pointer;
 }
-.clip-card:hover .clip-x {
+.clip-card:hover .clip-x,
+.clip-card:focus-within .clip-x {
   opacity: 1;
 }
 /* the whole stack's handle: three slips fanned, and how many */
@@ -1437,6 +1536,34 @@ body.is-dragging-hit * {
 }
 .flowform-room > .search-row {
   padding-right: 34px;
+}
+.flowform-room.has-refresh > .search-row {
+  padding-right: 60px;
+}
+.flowform-again-btn {
+  position: absolute;
+  right: 30px;
+  top: 10px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-dim);
+  font-size: var(--text-14);
+  line-height: 1;
+  cursor: pointer;
+}
+.flowform-again-btn:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+@media (hover: hover) {
+  .flowform-again-btn:hover:not(:disabled) {
+    background: var(--color-pulse-dim);
+    color: var(--color-pulse);
+  }
 }
 .flowform-files-toggle {
   position: absolute;
@@ -1659,9 +1786,11 @@ body.is-carrying * {
   color: var(--color-mist);
   cursor: pointer;
 }
-.hud-icon:hover {
-  background: color-mix(in srgb, var(--color-frost) 7%, transparent);
-  color: var(--color-frost);
+@media (hover: hover) {
+  .hud-icon:hover {
+    background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+    color: var(--color-frost);
+  }
 }
 .hud-icon-text {
   font: 500 var(--text-14) / 1 var(--font-sans);
@@ -1727,7 +1856,7 @@ body.is-carrying * {
   left: 0;
   bottom: calc(100% + var(--space-3));
   width: min(440px, calc(100vw - 32px));
-  height: min(560px, calc(100vh - 140px));
+  height: min(560px, calc(100dvh - 140px));
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -1739,7 +1868,7 @@ body.is-carrying * {
   color: var(--color-frost);
   overflow: hidden;
   transform-origin: 20% 100%;
-  animation: search-pop-in var(--dur-pane) var(--ease-out-soft) both;
+  animation: search-pop-in var(--dur-quick) var(--ease-out-soft) both;
 }
 @keyframes search-pop-in {
   from {
@@ -1777,10 +1906,19 @@ body.is-carrying * {
 .presence-avatar.is-agent {
   background: var(--color-agent);
 }
+.presence-avatar.is-interactive {
+  padding: 0;
+  cursor: pointer;
+}
+.presence-avatar.is-interactive:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 2px;
+}
 .presence-more {
   margin-left: 4px;
   color: var(--color-dim);
   font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- night orb ---------- */
@@ -1929,6 +2067,19 @@ body.is-presenting .empty-cell {
 .pipe.is-live .pipe-pulse {
   opacity: var(--pipe-opacity);
   animation: pipe-flow 4s linear infinite;
+}
+/* the pulse is a repaint a frame: it rests while the board is drawn small (a few pixels there) and while the camera
+   moves, so a Mac's WebKit isn't repainting every wire under its mask as you pan and zoom (GridViewport markCamera) */
+.port-layer[data-far] .pipe.is-live .pipe-pulse,
+.port-layer[data-moving] .pipe.is-live .pipe-pulse {
+  animation-play-state: paused;
+}
+/* …and a tunnel's cut (an SVG mask) waits for the camera to rest at a readable size: WebKit re-renders a mask as
+   anything above it moves, and the studio's one tunnelled wire alone cost it 20 fps zoomed out. The trace and the
+   portal marks either side still say where it passes under */
+.port-layer[data-far] .pipe-body,
+.port-layer[data-moving] .pipe-body {
+  mask: none;
 }
 @keyframes pipe-flow {
   to {
@@ -2204,6 +2355,7 @@ body.is-connecting .port-in.is-snap {
   max-width: 100%;
 }
 .port-link b {
+  min-width: 0;
   color: var(--color-frost);
   font-weight: 600;
   overflow: hidden;
@@ -2317,6 +2469,7 @@ body.is-connecting .port-in.is-snap {
 .frame-poster-name {
   font: 600 var(--text-20) / 1.2 var(--font-sans);
   letter-spacing: -0.01em;
+  text-wrap: balance;
 }
 .frame-poster-domain {
   color: var(--color-dim);
@@ -2325,6 +2478,8 @@ body.is-connecting .port-in.is-snap {
 .frame-poster-text {
   max-width: 420px;
   color: var(--color-mist);
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 .frame-poster-loading {
   width: 120px;
@@ -2360,6 +2515,7 @@ body.is-connecting .port-in.is-snap {
 .machine-hold-title {
   font: 600 var(--text-14) / 1.3 var(--font-sans);
   color: var(--color-frost);
+  text-wrap: balance;
 }
 .machine-hold-reason {
   color: var(--color-mist);
@@ -2415,6 +2571,7 @@ body.is-connecting .port-in.is-snap {
   margin: 0;
   padding: var(--space-5);
   overflow: auto;
+  overscroll-behavior: contain;
   font: 400 var(--text-12) / 1.5 var(--font-code);
   white-space: pre-wrap;
   color: var(--color-frost);
@@ -2531,6 +2688,7 @@ body.is-connecting .port-in.is-snap {
   color: var(--color-dim);
 }
 .connector-role {
+  min-width: 0;
   color: var(--color-mist);
   font-size: var(--text-12);
   white-space: nowrap;
@@ -2620,6 +2778,7 @@ body.is-connecting .port-in.is-snap {
   margin-left: auto;
   color: var(--color-dim);
   font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
 }
 
 /* asks */
@@ -2685,6 +2844,8 @@ body.is-connecting .port-in.is-snap {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-end: 56px;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -2700,6 +2861,7 @@ body.is-connecting .port-in.is-snap {
   color: var(--color-frost);
   font: 600 var(--text-14) / 1.3 var(--font-sans);
   margin-bottom: var(--space-2);
+  text-wrap: balance;
 }
 .agent-what-text {
   margin: 0 0 var(--space-3);
@@ -2737,6 +2899,7 @@ body.is-connecting .port-in.is-snap {
   flex: 1;
   margin: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   font: 400 var(--text-12) / 1.5 var(--font-code);
   white-space: pre-wrap;
   color: var(--color-frost);
@@ -2749,19 +2912,21 @@ body.is-connecting .port-in.is-snap {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: color-mix(in srgb, var(--color-void) 30%, transparent);
+  background: color-mix(in srgb, var(--color-frost) 10%, transparent);
   display: flex;
   justify-content: center;
-  padding-top: 14vh;
+  padding-top: 14dvh;
 }
 .cmd {
   width: min(680px, calc(100% - 32px));
-  max-height: 64vh;
+  max-height: 64dvh;
   display: flex;
   flex-direction: column;
-  background: var(--glass-fill-strong);
+  background: color-mix(in srgb, var(--color-abyss) 94%, transparent);
+  border-color: var(--color-line-strong);
   box-shadow: var(--shadow-pane);
   overflow: hidden;
+  transform-origin: top center;
 }
 .cmd-field {
   display: flex;
@@ -2771,12 +2936,16 @@ body.is-connecting .port-in.is-snap {
   height: 56px;
   border-bottom: 1px solid var(--color-line);
 }
+.cmd-field:focus-within {
+  box-shadow: inset 0 -2px 0 var(--color-pulse);
+}
 .cmd-glyph {
   color: var(--color-dim);
   font-size: var(--text-16);
 }
 .cmd-field input {
   flex: 1;
+  min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
@@ -2802,7 +2971,12 @@ body.is-connecting .port-in.is-snap {
 }
 .cmd-list {
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-2);
   padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 .cmd-row {
   width: 100%;
@@ -2819,6 +2993,9 @@ body.is-connecting .port-in.is-snap {
   text-align: left;
   cursor: pointer;
 }
+.cmd-row:not(.is-hit) + .cmd-row.is-hit {
+  margin-top: var(--space-3);
+}
 .cmd-row.is-sel {
   background: var(--color-pulse-dim);
 }
@@ -2828,6 +3005,7 @@ body.is-connecting .port-in.is-snap {
   color: var(--color-mist);
 }
 .cmd-row-label {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2835,6 +3013,7 @@ body.is-connecting .port-in.is-snap {
   max-width: 60%;
 }
 .cmd-row-hint {
+  min-width: 0;
   color: var(--color-dim);
   font-size: var(--text-12);
   white-space: nowrap;
@@ -2926,6 +3105,8 @@ body.is-connecting .port-in.is-snap {
 }
 .repo-body {
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-4);
   padding: var(--space-5);
   display: flex;
   flex-direction: column;
@@ -2934,6 +3115,8 @@ body.is-connecting .port-in.is-snap {
 }
 .repo-desc {
   color: var(--color-mist);
+  line-height: 1.5;
+  text-wrap: pretty;
 }
 .repo-meta {
   display: flex;
@@ -2986,8 +3169,10 @@ body.is-connecting .port-in.is-snap {
   font-size: var(--text-12);
   cursor: pointer;
 }
-.activity-row:hover {
-  background: var(--color-pulse-dim);
+@media (hover: hover) {
+  .activity-row:hover {
+    background: var(--color-pulse-dim);
+  }
 }
 .activity-who {
   font-weight: 600;
@@ -2998,6 +3183,7 @@ body.is-connecting .port-in.is-snap {
   color: var(--color-agent);
 }
 .activity-text {
+  min-width: 0;
   color: var(--color-mist);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3006,6 +3192,7 @@ body.is-connecting .port-in.is-snap {
 .activity-when {
   color: var(--color-dim);
   font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
 }
 .toast {
   position: fixed;
@@ -3049,12 +3236,16 @@ body.is-connecting .port-in.is-snap {
   left: 40px;
   top: 32px;
 }
+.present-title .f-eyebrow {
+  font-variant-numeric: tabular-nums;
+}
 .present-title h2 {
   margin-top: var(--space-3);
   font: 600 var(--text-32) / 1.1 var(--font-display);
   letter-spacing: -0.02em;
   display: flex;
   flex-wrap: wrap;
+  text-wrap: balance;
 }
 .present-title h2 span {
   display: inline-block;
@@ -3062,6 +3253,7 @@ body.is-connecting .port-in.is-snap {
 .present-meta {
   margin-top: var(--space-2);
   color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
 }
 .present-strip {
   position: absolute;
@@ -3112,8 +3304,10 @@ body.is-connecting .port-in.is-snap {
   font: 700 var(--text-11) / 1 var(--font-sans);
   color: var(--color-moss);
   letter-spacing: var(--track-caps);
+  font-variant-numeric: tabular-nums;
 }
 .present-slide-name {
+  min-width: 0;
   font: 600 var(--text-14) / 1.2 var(--font-sans);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3122,6 +3316,7 @@ body.is-connecting .port-in.is-snap {
 .present-slide-count {
   color: var(--color-dim);
   font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
 }
 .present-exit {
   position: absolute;
@@ -3146,6 +3341,12 @@ body.is-connecting .port-in.is-snap {
 }
 .f-input:focus {
   border-color: var(--color-pulse);
+}
+.f-input:focus-visible {
+  border-color: var(--color-pulse);
+  box-shadow: 0 0 0 3px var(--color-pulse-dim);
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -1px;
 }
 
 /* ---------- login ---------- */
@@ -3206,6 +3407,7 @@ body.is-connecting .port-in.is-snap {
   margin: 0 0 var(--space-5);
   font: 600 var(--text-32) / 1.05 var(--font-display);
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 /* pills in the paper's own tone, raised off it: they lift on hover and press
    3 % on springs (motion) */
@@ -3291,12 +3493,14 @@ body.is-connecting .port-in.is-snap {
   margin: 0;
   color: var(--color-mist);
   font-size: var(--text-12);
-  line-height: 1.4;
+  line-height: 1.45;
+  text-wrap: pretty;
 }
 .login-error {
   color: var(--color-bad);
   font-size: var(--text-12);
-  line-height: 1.4;
+  line-height: 1.45;
+  text-wrap: pretty;
 }
 .login-foot {
   position: absolute;
@@ -3321,10 +3525,225 @@ body.is-connecting .port-in.is-snap {
 .design-page {
   height: 100%;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: var(--space-7) clamp(16px, 5vw, 72px) 120px;
   background: var(--color-void);
   user-select: text;
 }
+/* #/design as a library: the menu on the left (search, chapters, their sections), the sections on the right */
+.design-page.design-library {
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+  padding: 0;
+  overflow: hidden;
+}
+.design-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-6) var(--space-4) var(--space-5);
+  border-right: 1px solid var(--color-line);
+  background: var(--color-abyss);
+}
+.design-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  color: var(--color-frost);
+  font: 600 var(--text-14) / 1.2 var(--font-sans);
+  text-decoration: none;
+}
+.design-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-raise);
+  color: var(--color-dim);
+  cursor: text;
+}
+.design-search:focus-within {
+  border-color: var(--color-pulse);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-pulse) 18%, transparent);
+}
+.design-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1 var(--font-sans);
+}
+.design-search input::placeholder {
+  color: var(--color-dim);
+}
+.design-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.design-search-clear {
+  border: 0;
+  background: none;
+  color: var(--color-mist);
+  font-size: var(--text-16);
+  line-height: 1;
+  cursor: pointer;
+}
+.design-nav-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0 var(--space-4) var(--space-6);
+}
+.design-nav-group ul {
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+.design-nav-chapter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+  padding: 7px var(--space-3);
+  border-radius: var(--radius-card);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.25 var(--font-sans);
+  text-decoration: none;
+}
+.design-nav-chapter:hover {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.design-nav-chapter.is-open {
+  background: color-mix(in srgb, var(--color-pulse) 12%, transparent);
+  color: var(--color-pulse);
+}
+.design-nav-count {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.design-nav-section {
+  display: block;
+  width: 100%;
+  padding: 5px var(--space-3) 5px calc(var(--space-3) + var(--space-4));
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  margin-left: var(--space-3);
+  width: calc(100% - var(--space-3));
+  background: none;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.35 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.design-nav-section:hover {
+  color: var(--color-frost);
+  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+}
+.design-nav-section.is-here {
+  border-left-color: var(--color-pulse);
+  background: color-mix(in srgb, var(--color-pulse) 8%, transparent);
+  color: var(--color-frost);
+  font-weight: 500;
+}
+.design-nav-found {
+  padding: var(--space-3) var(--space-3) 0;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+.design-main {
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: 56px;
+  padding: var(--space-7) clamp(16px, 4vw, 64px) 160px;
+}
+.design-main .design-section {
+  scroll-margin-top: 56px;
+}
+.design-chapter + .design-chapter {
+  margin-top: var(--space-7);
+}
+.design-chapter-head {
+  position: sticky;
+  top: calc(-1 * var(--space-7));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 calc(-1 * clamp(16px, 4vw, 64px));
+  padding: var(--space-4) clamp(16px, 4vw, 64px);
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-void) 92%, transparent);
+  backdrop-filter: blur(8px);
+}
+.design-chapter-head .f-eyebrow {
+  color: var(--color-frost);
+}
+/* the sticky chapter head already draws the line the first section's rule would */
+.design-chapter-head + .design-section {
+  border-top: 0;
+}
+.design-empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  padding: var(--space-7) 0;
+  color: var(--color-mist);
+}
+.design-empty p:first-child {
+  color: var(--color-frost);
+  font-size: var(--text-16);
+}
+.design-empty .f-pill {
+  margin-top: var(--space-3);
+}
+/* the page is the window, so the library folds on the window: the menu becomes a row of chapters over the page */
+@media (max-width: 760px) {
+  .design-page.design-library {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .design-nav {
+    padding: var(--space-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .design-nav-list {
+    display: flex;
+    flex: none;
+    gap: var(--space-2);
+    overflow: auto hidden;
+    overscroll-behavior-x: contain;
+    padding-bottom: var(--space-2);
+  }
+  .design-nav-group ul,
+  .design-nav-found {
+    display: none;
+  }
+  .design-nav-chapter {
+    white-space: nowrap;
+  }
+}
+.has-window-controls .design-page.design-library {
+  padding-top: 0;
+}
+.has-window-controls .design-main {
+  padding-top: 56px;
+}
+
 .design-head {
   display: flex;
   align-items: center;
@@ -3334,6 +3753,7 @@ body.is-connecting .port-in.is-snap {
 .design-head h1 {
   font: 600 var(--text-32) / 1.1 var(--font-display);
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 .design-head a {
   text-decoration: none;
@@ -3362,10 +3782,15 @@ body.is-connecting .port-in.is-snap {
   font-size: var(--text-16);
   line-height: 1.55;
   margin-bottom: var(--space-7);
+  text-wrap: pretty;
 }
 .design-section {
   padding: var(--space-7) 0;
   border-top: 1px solid var(--color-line);
+}
+/* the blocks of a section (rows of specimens, demos) stand a step apart */
+.design-section > :not(.design-section-head) + :not(.design-section-head) {
+  margin-top: var(--space-6);
 }
 .design-section-head {
   display: flex;
@@ -3375,12 +3800,14 @@ body.is-connecting .port-in.is-snap {
   flex-wrap: wrap;
 }
 .design-section-head h2 {
-  font: 600 var(--text-20) / 1 var(--font-sans);
+  font: 600 var(--text-20) / 1.2 var(--font-sans);
   min-width: 160px;
+  text-wrap: balance;
 }
 .design-section-head p {
   color: var(--color-mist);
   max-width: 640px;
+  text-wrap: pretty;
 }
 .swatches {
   display: flex;
@@ -3572,6 +3999,19 @@ body.is-connecting .port-in.is-snap {
   background: var(--color-void);
   border: 1px solid var(--color-line);
 }
+/* a specimen's caption sits under it, in the flow: never over the specimen, never under it, and never wider than it */
+.oncall-cell > .effect-label {
+  position: static;
+  width: 0;
+  min-width: 100%;
+  margin-top: auto;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--color-line);
+  border-radius: 0;
+  background: none;
+  font-size: var(--text-12);
+  line-height: 1.45;
+}
 .oncall-static {
   position: relative !important;
   top: auto !important;
@@ -3640,7 +4080,7 @@ body.is-connecting .port-in.is-snap {
 }
 .adapt-row {
   display: flex;
-  gap: var(--space-5);
+  gap: var(--space-6);
   align-items: flex-start;
   flex-wrap: wrap;
 }
@@ -3675,6 +4115,7 @@ body.is-connecting .port-in.is-snap {
 }
 .adapt-metrics b {
   font-size: var(--text-16);
+  font-variant-numeric: tabular-nums;
 }
 .adapt-metrics span {
   color: var(--color-dim);
@@ -3683,6 +4124,7 @@ body.is-connecting .port-in.is-snap {
 .adapt-w {
   color: var(--color-dim);
   font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
 }
 @container (max-width: 300px) {
   .adapt-deco {
@@ -3740,6 +4182,11 @@ body.is-connecting .port-in.is-snap {
   font: 400 var(--text-13) / 1.45 var(--font-sans);
   outline: none;
   user-select: text;
+}
+.stage-edit:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px var(--color-pulse-dim);
 }
 .stage-head {
   display: flex;
@@ -3845,10 +4292,17 @@ body.is-connecting .port-in.is-snap {
 .stage-settings select:focus {
   border-color: var(--color-pulse);
 }
+.stage-settings input:focus-visible,
+.stage-settings select:focus-visible {
+  border-color: var(--color-pulse);
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
 .stage-artifacts {
   display: flex;
   gap: var(--space-3);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   min-height: 92px;
   padding-bottom: 2px;
 }
@@ -3937,13 +4391,14 @@ body.is-connecting .port-in.is-snap {
   transition: opacity var(--dur-quick) var(--ease-out-soft), transform var(--dur-press) var(--ease-out-soft);
 }
 .artifact:hover .artifact-star,
+.artifact:focus-within .artifact-star,
 .artifact-star.is-on {
   opacity: 1;
 }
 .artifact-star.is-on {
   color: var(--color-warn);
 }
-.artifact-star:active {
+.artifact-star:not(:disabled):active {
   transform: scale(0.88);
 }
 .stage-checklist {
@@ -4379,7 +4834,8 @@ body.is-viewer .port {
 }
 .egress-sends {
   color: var(--color-mist);
-  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-wrap: pretty;
 }
 .egress-state {
   color: var(--color-dim);
@@ -4584,6 +5040,7 @@ body.is-viewer .port {
 }
 .agent-handoff p {
   margin: 0;
+  text-wrap: pretty;
 }
 .agent-handoff .f-pill {
   text-decoration: none;
@@ -4595,7 +5052,7 @@ body.is-viewer .port {
   position: fixed;
   z-index: 62;
   bottom: 16px;
-  width: min(340px, calc(100vw - 32px));
+  width: min(340px, calc(100% - 32px));
 }
 /* above the call chip while you're in a huddle */
 .huddle-pip ~ .upload-tray-place {
@@ -4637,6 +5094,9 @@ body.is-viewer .port {
   animation: spin 0.8s linear infinite;
 }
 .upload-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font: 600 var(--text-13) / 1 var(--font-sans);
   white-space: nowrap;
 }
@@ -4803,12 +5263,6 @@ body.is-viewer .port {
   width: 100%;
   border-radius: var(--radius-pane);
 }
-.uploads-demo .oncall-cell {
-  padding-bottom: 68px;
-}
-.uploads-demo .effect-label {
-  right: var(--space-4);
-}
 
 /* ---------- This computer: approved places, in the search pane (PlacesBrowser) ---------- */
 
@@ -4818,6 +5272,8 @@ body.is-viewer .port {
 .places {
   flex: 1;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
   padding: var(--space-2) var(--space-3) var(--space-4) var(--space-4);
   display: flex;
   flex-direction: column;
@@ -4873,6 +5329,8 @@ body.is-viewer .port {
 .places-foot {
   padding: var(--space-3);
   font-size: var(--text-12);
+  line-height: 1.45;
+  text-wrap: pretty;
 }
 .places a {
   color: var(--color-pulse);
@@ -4903,6 +5361,7 @@ body.is-viewer .port {
   opacity: 0;
 }
 .places-item:hover .places-remove,
+.places-item:focus-within .places-remove,
 .places-remove:focus-visible {
   opacity: 1;
 }
@@ -4922,7 +5381,8 @@ body.is-viewer .port {
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3) var(--space-3);
   color: var(--color-mist);
-  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-wrap: pretty;
 }
 .places-ask span {
   flex: 1 1 100%;
@@ -4964,7 +5424,12 @@ body.is-viewer .port {
   font-size: var(--text-12);
 }
 .places-approve-field:focus {
-  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  box-shadow: inset 0 0 0 1.5px var(--color-pulse);
+}
+.places-approve-field:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 3px var(--color-pulse-dim);
 }
 .places-approve-field::placeholder {
   color: var(--color-dim);
@@ -4972,7 +5437,8 @@ body.is-viewer .port {
 .places-approve-note {
   margin: 0;
   color: var(--color-dim);
-  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-wrap: pretty;
 }
 
 /* ---------- Flowform, in the search pane (FlowformBrowser) ---------- */
@@ -5196,6 +5662,7 @@ body.is-viewer .port {
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-line);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
 }
 .tool-tab {
@@ -5252,15 +5719,18 @@ body.is-viewer .port {
 .tool-empty b {
   color: var(--color-frost);
   font: 600 var(--text-14) / 1.3 var(--font-sans);
+  text-wrap: balance;
 }
 .tool-empty p {
   margin: 0;
   max-width: 52ch;
+  text-wrap: pretty;
 }
 .tool-note {
   margin: var(--space-4) 0;
   color: var(--color-dim);
   font: 400 var(--text-12) / 1.5 var(--font-sans);
+  text-wrap: pretty;
 }
 .tool-note.is-inline {
   margin: 0 0 0 auto;
@@ -5332,7 +5802,12 @@ body.is-viewer .port {
 }
 .tool-addr-field:focus,
 .tool-filter:focus {
-  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  box-shadow: inset 0 0 0 1.5px var(--color-pulse);
+}
+.tool-addr-field:focus-visible,
+.tool-filter:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
 }
 .tool-frame {
   flex: 1;
@@ -5357,6 +5832,8 @@ body.is-viewer .port {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
   padding: var(--space-2) var(--space-4) var(--space-6) var(--space-5);
 }
 .tool-files .places,
@@ -5364,14 +5841,20 @@ body.is-viewer .port {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
 }
 .tool-group {
-  padding-top: var(--space-4);
+  padding-top: var(--space-5);
+}
+.tool-group:first-child {
+  padding-top: var(--space-2);
 }
 .tool-count {
   margin-left: var(--space-2);
   color: var(--color-dim);
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 .tool-log {
   list-style: none;
@@ -5406,6 +5889,7 @@ body.is-viewer .port {
 .tool-log-meta {
   color: var(--color-dim);
   font: 400 var(--text-11) / 1.3 var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 .tool-log-meta code {
   font: 500 var(--text-11) / 1 var(--font-code);
@@ -5492,4 +5976,87 @@ html[data-theme="room"] .tool-frame.is-themed {
 .app-canvas .tool-frame.is-themed,
 .app-canvas iframe {
   color-scheme: normal;
+}
+
+/* ---------- keyboard focus rings, scroll containment & press guards across shell chrome ---------- */
+
+.agents-pane .agents-scroll {
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
+}
+
+.f-pill:disabled:active {
+  transform: none;
+}
+
+:is(
+  .top-btn,
+  .top-today,
+  .tab-info,
+  .tab-close,
+  .pane-seg-btn,
+  .pane-new,
+  .pane-signout,
+  .pane-eyebrow-act,
+  .grid-caret,
+  .space-move,
+  .search-chip,
+  .clip-btn,
+  .clip-clear,
+  .clip-x,
+  .flowform-files-toggle,
+  .places-remove,
+  .places-crumbs button,
+  .hud-search,
+  .hud-zoom,
+  .hud-icon,
+  .night-orb,
+  .tool-tab,
+  .upload-btn,
+  .upload-row-retry,
+  .present-slide,
+  .f-pill,
+  .info-pick,
+  .person-role-pick,
+  .session-runtime,
+  .design-nav-chapter,
+  .design-nav-section,
+  .design-search-clear,
+  .login-or
+):focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+
+:is(
+  .tab-main,
+  .pane-row,
+  .tab-new-item,
+  .search-row,
+  .search-tile,
+  .cmd-row,
+  .activity-row,
+  .s-step,
+  .tool-log-head,
+  .stage-checklist button
+):focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
+
+:is(.hud-ask, .hud-ask-gear, .hud-council, .hud-talk, .top-btn.is-agent):focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 2px;
+}
+
+.turn-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  color: var(--color-bad);
+  font-size: var(--text-12);
+  line-height: 1.45;
+  text-wrap: pretty;
 }

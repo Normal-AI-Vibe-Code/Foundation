@@ -24,13 +24,13 @@ export function DetailPane() {
     <aside className="agents-pane detail-pane floor-pane" style={{ width: ui.agentsW }} aria-label={d.title} data-detail={d.kind}>
       <FloorEdge side="left" value={ui.agentsW} {...WIDTHS.agents} onChange={(w) => setUi({ agentsW: w })} label="Detail" />
       <header className="agents-head">
-        <span className="detail-title">{d.title}</span>
+        <span className="detail-title" title={d.title}>{d.title}</span>
         {d.kind === "code" && (
-          <button className="f-pill detail-copy" onClick={() => copy(d.text)}>
+          <button type="button" className="f-pill detail-copy" onClick={() => copy(d.text)}>
             {copied ? "Copied" : "Copy"}
           </button>
         )}
-        <button className="top-btn" onClick={closeDetail} aria-label="Close" data-tip="Close">
+        <button type="button" className="top-btn" onClick={closeDetail} aria-label="Close detail pane" data-tip="Close">
           ✕
         </button>
       </header>

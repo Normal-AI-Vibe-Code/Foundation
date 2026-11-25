@@ -1,0 +1,51 @@
+{
+  "jpegOriginalBytes": 2001223,
+  "pngOriginalBytes": 714842,
+  "totalOriginalBytes": 2716065,
+  "coldTransferredBytes": 44091,
+  "byteSavingsPct": 98.4,
+  "coldRequests": [
+    {
+      "path": "/files/f_205f6d85a4412911",
+      "w": "64",
+      "level": "64",
+      "bytes": 1159,
+      "alpha": "0"
+    },
+    {
+      "path": "/files/f_205f6d85a4412911",
+      "w": "256",
+      "level": "256",
+      "bytes": 7349,
+      "alpha": "0"
+    },
+    {
+      "path": "/files/f_380f2433fdf1ecba",
+      "w": "256",
+      "level": "256",
+      "bytes": 33505,
+      "alpha": "1"
+    },
+    {
+      "path": "/files/f_380f2433fdf1ecba",
+      "w": "64",
+      "level": "64",
+      "bytes": 2078,
+      "alpha": "1"
+    }
+  ],
+  "l2CacheEntryCount": 4,
+  "remountNetworkRequests": 0,
+  "reloadNetworkRequests": 0,
+  "cacheClearedOnLogout": true,
+  "chatImageNatural": [
+    1600,
+    1200
+  ],
+  "chatInlineTier": "512",
+  "chatLightboxInitialPhase": "sharp",
+  "chatLightboxFinalNatural": [
+    1600,
+    1200
+  ]
+}

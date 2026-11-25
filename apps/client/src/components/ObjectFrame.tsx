@@ -326,13 +326,14 @@ export function ObjectFrame({
             <div className="header-actions">
               {!folded && headerExtras}
               {folded ? (
-                <button className="icon-btn" data-tip="Restore" aria-label="Restore" onClick={() => setObjectFolded(id, false)} data-card-restore>
+                <button type="button" className="icon-btn" data-tip="Restore" aria-label="Restore" onClick={() => setObjectFolded(id, false)} data-card-restore>
                   ▢
                 </button>
               ) : (
                 <FullscreenButton id={id} />
               )}
               <button
+                type="button"
                 className={"icon-btn float-btn" + (float ? " floating" : "")}
                 data-tip={float ? "Dock into the section" : "Float freely"}
                 aria-label={float ? "Dock into the section" : "Float freely"}
@@ -340,7 +341,7 @@ export function ObjectFrame({
               >
                 {float ? "✥" : "⌗"}
               </button>
-              <button className="icon-btn is-remove" data-tip={confirmRemove ? "Remove…" : "Remove"} aria-label="Remove" onClick={askRemove}>
+              <button type="button" className="icon-btn is-remove" data-tip={confirmRemove ? "Remove…" : "Remove"} aria-label="Remove" onClick={askRemove}>
                 ✕
               </button>
             </div>

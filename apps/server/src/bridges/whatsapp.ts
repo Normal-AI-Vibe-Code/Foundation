@@ -240,6 +240,13 @@ export const whatsapp: BridgeAdapter = {
 
   mediaHosts: () => ["graph.facebook.com", ".fbsbx.com", ".fbcdn.net", ".whatsapp.net", ...overrideHost("WHATSAPP_API_BASE")],
 
+  async check(step) {
+    if (step === "secret") return env("WHATSAPP_APP_SECRET") && env("WHATSAPP_VERIFY_TOKEN") ? { ok: true, said: "Both are set. Meta's first webhook proves the app secret: a message with a bad signature is refused." } : { ok: false, said: `Still missing: ${["WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"].filter((k) => !env(k)).join(", ")}.` };
+    if (!token() || !phoneId()) return { ok: false, said: `Paste ${!token() ? "the access token" : "the phone number id"} first.` };
+    const r = await fetchJson<{ display_phone_number?: string; verified_name?: string; id?: string }>(`${base()}/${encodeURIComponent(phoneId())}?fields=display_phone_number,verified_name`, { what: "WhatsApp", headers: { authorization: `Bearer ${token()}` } });
+    return { ok: true, said: `WhatsApp answered: ${r.display_phone_number ?? `number ${r.id ?? phoneId()}`}${r.verified_name ? `, “${r.verified_name}”` : ""}. The token can use this number.` };
+  },
+
   startRule: "WhatsApp only lets a business start a conversation with an approved template message, which Meta charges for. Foundation doesn't send templates: send one from WhatsApp Manager, and their reply opens a portal here.",
 
   demo(): InboundEvent[] {

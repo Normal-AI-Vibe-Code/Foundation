@@ -1,6 +1,7 @@
 import type { Router, Req } from "./http.ts";
 import { HttpError, readJson } from "./http.ts";
 import { requirePerson, requireUser } from "./auth.ts";
+import { hostedFeatureReason, localFeatureAllowed, requireLocalFeature } from "./hosted.ts";
 import { canSeeBoard } from "./members.ts";
 import { requireWriter } from "./roles.ts";
 import { uploadVmIso, listFiles } from "./files.ts";
@@ -15,9 +16,16 @@ export function registerVmRoutes(r: Router) {
   };
   const person = (req: Req) => {
     const u = requirePerson(req, "Controlling a full OS VM");
+    requireLocalFeature("vms", "Local QEMU virtual machines");
     member(req); requireWriter(u, req.params.id); return u;
   };
-  r.get("/api/vms/host", (req) => { requireUser(req); return vmHost(); });
+  r.get("/api/vms/host", (req) => {
+    requireUser(req);
+    if (!localFeatureAllowed("vms")) {
+      return { ...vmHost(), available: false, hosted: true, note: hostedFeatureReason("vms", "Local QEMU virtual machines") };
+    }
+    return vmHost();
+  });
   r.get("/api/boards/:id/vm-isos", (req) => { member(req); return { files: listFiles(req.params.id).filter((f) => /\.iso$/i.test(f.name)) }; });
   r.post("/api/boards/:id/vm-isos", async (req) => { const u = person(req); return { file: await uploadVmIso(req, req.params.id, u.id) }; });
   r.post("/api/boards/:id/vms/:panel/configure", async (req) => { const u = person(req); return { vm: configureVm(req.params.id, req.params.panel, await readJson(req), u) }; });

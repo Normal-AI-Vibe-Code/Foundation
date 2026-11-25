@@ -23,6 +23,7 @@ import { hashToken, isPerson } from "./auth.ts";
 import { one } from "./db.ts";
 import type { Req } from "./http.ts";
 import { agentParty, canSeeChannel, getChannel, onPublish, personParty, setOnlineSource, type ChatAudience, type ChatEventBody } from "./chat.ts";
+import { setWhereTeller } from "./whereabouts.ts";
 
 export const CHAT_SOCKET_PATH = "/chat";
 const TYPING_EVERY_MS = 1500;
@@ -68,6 +69,17 @@ function deliver(event: ChatEventBody, audience: ChatAudience, except?: (c: Conn
 }
 
 onPublish((event, audience) => deliver(event, audience));
+
+// who is where (whereabouts.ts): each window gets the grids its person can see, people's windows only (an agent's
+// socket has no side menu to show it in)
+setWhereTeller((forUser) => {
+  const cache = new Map<string, ReturnType<typeof forUser>>();
+  for (const c of conns) {
+    if (c.party.kind !== "person") continue;
+    if (!cache.has(c.user.id)) cache.set(c.user.id, forUser(c.user));
+    send(c, { t: "where", boards: cache.get(c.user.id)! });
+  }
+});
 
 export function chatOnline(): string[] {
   return [...new Set([...conns].map((c) => c.user.id))].sort();

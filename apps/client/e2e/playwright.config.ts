@@ -20,6 +20,9 @@ const SERVER_PORT = process.env.E2E_SERVER_PORT ?? "4430";
 const CLIENT_PORT = process.env.E2E_CLIENT_PORT ?? "1450";
 const SLACK_PORT = process.env.E2E_SLACK_PORT ?? "4440";
 const MESHY_PORT = process.env.E2E_MESHY_PORT ?? "4445";
+// a stand-in Anthropic (server/test/anthropic-standin.ts): the API-key way runs end to end (agent-setup.spec.ts)
+const ANTHROPIC_PORT = process.env.E2E_ANTHROPIC_PORT ?? String(Number(SERVER_PORT) + 7);
+process.env.E2E_ANTHROPIC_PORT = ANTHROPIC_PORT;
 process.env.E2E_MESHY_PORT = MESHY_PORT;
 process.env.E2E_CLIENT_PORT = CLIENT_PORT;
 // the stand-in Slack also serves the stand-in live app (helpers.ts FRAME): on its own origin, not Foundation's
@@ -60,6 +63,13 @@ export default defineConfig({
       timeout: 20_000,
     },
     {
+      command: `npx tsx e2e/anthropic-standin-serve.ts ${ANTHROPIC_PORT}`,
+      cwd: "..",
+      url: `http://127.0.0.1:${ANTHROPIC_PORT}/_seen`,
+      reuseExistingServer: false,
+      timeout: 30_000,
+    },
+    {
       command: `npx tsx src/index.ts`,
       cwd: "../../server",
       env: {
@@ -76,6 +86,12 @@ export default defineConfig({
         SLACK_API_BASE: `http://127.0.0.1:${SLACK_PORT}`,
         SLACK_USER_TOKEN: "xoxp-standin",
         SLACK_BOT_TOKEN: "xoxb-standin",
+        // ChatForm's Slack bridge reads linked channels this often here (chatform-slack.spec.ts), and Google's consent
+        // and Gmail are the stand-in's too: a check never reaches the real ones (the OAuth client is set in the wizard)
+        FOUNDATION_SLACK_BRIDGE_POLL_MS: "1200",
+        GOOGLE_ACCOUNTS_BASE: `http://127.0.0.1:${SLACK_PORT}/accounts`,
+        GOOGLE_OAUTH_BASE: `http://127.0.0.1:${SLACK_PORT}/oauth`,
+        GMAIL_API_BASE: `http://127.0.0.1:${SLACK_PORT}/google`,
         MESHY_API_BASE: `http://127.0.0.1:${MESHY_PORT}`,
         MESHY_API_KEY: "msy-standin",
         // the checks make their own characters: no starter set (E2E_STARTER names a folder to bring one in)
@@ -97,6 +113,8 @@ export default defineConfig({
         FOUNDATION_T3_CLI: standinLauncher(data, { T3_STANDIN_DIR: data, T3_STANDIN_FINISH_MS: "6000", T3_STANDIN_USE_TOOLS: "1" }),
         FOUNDATION_T3_PORT: process.env.E2E_T3_PORT ?? "15790",
         ANTHROPIC_API_KEY: "",
+        // Anthropic here is the stand-in: a key checked or a model list read never leaves this computer
+        ANTHROPIC_BASE_URL: `http://127.0.0.1:${ANTHROPIC_PORT}`,
       },
       url: `http://127.0.0.1:${SERVER_PORT}/api/me`,
       reuseExistingServer: false,

@@ -76,17 +76,30 @@ export function PresenceStack() {
   const shown = people.slice(0, 5);
   return (
     <div className="presence-stack" title={people.map((p) => p.user.name).join(", ")}>
-      {shown.map((p, i) => (
-        <span
-          key={p.clientId}
-          className={`presence-avatar${p.user.agent ? " is-agent" : ""}`}
-          // an agent with its own cursor wears that cursor's colour (the council's seats do too), and opens the council
-          style={{ background: p.user.agent ? (p.crew ? `var(--color-crew-${p.crew.hue % 6})` : undefined) : p.user.color, zIndex: 10 - i }}
-          onClick={p.crew ? () => openCouncil({ kind: "board" }) : undefined}
-        >
-          {p.user.agent ? "✦" : initials(p.user.name)}
-        </span>
-      ))}
+      {shown.map((p, i) =>
+        p.crew ? (
+          <button
+            key={p.clientId}
+            type="button"
+            className="presence-avatar is-agent is-interactive"
+            style={{ background: `var(--color-crew-${p.crew.hue % 6})`, zIndex: 10 - i }}
+            aria-label={`Open council for ${p.user.name}`}
+            data-tip={`${p.user.name} · Open council`}
+            onClick={() => openCouncil({ kind: "board" })}
+          >
+            ✦
+          </button>
+        ) : (
+          <span
+            key={p.clientId}
+            className={`presence-avatar${p.user.agent ? " is-agent" : ""}`}
+            style={{ background: p.user.agent ? undefined : p.user.color, zIndex: 10 - i }}
+            title={p.user.name}
+          >
+            {p.user.agent ? "✦" : initials(p.user.name)}
+          </span>
+        ),
+      )}
       {people.length > shown.length && <span className="presence-more">+{people.length - shown.length}</span>}
     </div>
   );

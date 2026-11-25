@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { ChatAgentRef, ChatChannelView, ChatParty } from "@foundation/protocol";
 import { uploadFile, type UploadedFile } from "../lib/api";
 import { keys } from "../lib/keys";
+import { toast } from "../state/ui";
 import { PartyAvatar } from "./Avatar";
 import { EmojiPicker } from "./EmojiPicker";
 import { AttachFrom } from "./AttachFrom";
@@ -44,6 +45,8 @@ export interface ComposerProps {
   /** ↑ in an empty field: edit my last message (true when there was one) */
   onEditLast?(): boolean;
   upload?: (file: File, onProgress: (f: number) => void) => Promise<UploadedFile>;
+  /** files can't be sent here (a chat server of its own has no archive): the attach buttons are left out, and a drop or a paste says this */
+  noFiles?: string;
   /** why it can't send (archived, a viewer…): the field says so instead */
   disabled?: string;
   /** a fixture's text (the design page) */
@@ -119,6 +122,7 @@ export function Composer(p: ComposerProps) {
 
   const addFiles = (files: File[]) => {
     if (!files.length) return;
+    if (p.noFiles) return toast(p.noFiles);
     const up = p.upload ?? ((f: File, on: (x: number) => void) => uploadFile(f, "chat", on));
     for (const f of files) {
       const key = `c${++chipN}`;
@@ -233,11 +237,22 @@ export function Composer(p: ComposerProps) {
     >
       <AnimatePresence>
         {trigger && options.length > 0 && (
-          <motion.div className="chat-ac" role="listbox" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 2 }} transition={{ type: "spring", stiffness: 520, damping: 40 }}>
+          <motion.div
+            id={`chat-ac-${p.root ? "thread" : "channel"}`}
+            className="chat-ac"
+            role="listbox"
+            aria-label={trigger.kind === "@" ? "People and agents" : trigger.kind === "#" ? "Channels" : "Emoji"}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 2 }}
+            transition={{ type: "spring", stiffness: 520, damping: 40 }}
+          >
             <div className="chat-ac-head">{trigger.kind === "@" ? "People and agents" : trigger.kind === "#" ? "Channels" : "Emoji"}</div>
             {options.map((o, i) => (
               <button
                 key={o.key}
+                id={`chat-ac-${p.root ? "thread" : "channel"}-${i}`}
+                type="button"
                 role="option"
                 aria-selected={i === pick}
                 className={`chat-ac-row${i === pick ? " is-on" : ""}`}
@@ -261,10 +276,13 @@ export function Composer(p: ComposerProps) {
             <div key={c.key} className={`chat-chip${c.error ? " is-bad" : ""}${c.id ? " is-done" : ""}`} data-chip={c.name}>
               {c.thumb ? <img className="chat-chip-thumb" src={c.thumb} alt="" /> : <span className="chat-chip-thumb is-file">{c.name.split(".").pop()?.toUpperCase().slice(0, 4)}</span>}
               <span className="chat-chip-text">
-                <span className="chat-chip-name">{c.name}</span>
-                <span className="chat-chip-meta">{c.error ? c.error : c.id ? bytes(c.size) : `${Math.round(c.progress * 100)} %`}</span>
+                <span className="chat-chip-name" title={c.name}>{c.name}</span>
+                <span className="chat-chip-meta" role={c.error ? "alert" : undefined} title={c.error || undefined}>
+                  {c.error ? c.error : c.id ? bytes(c.size) : `${Math.round(c.progress * 100)} %`}
+                </span>
               </span>
               <button
+                type="button"
                 className="chat-chip-x"
                 onClick={() => {
                   if (c.thumb) URL.revokeObjectURL(c.thumb);
@@ -288,6 +306,9 @@ export function Composer(p: ComposerProps) {
         disabled={!!p.disabled}
         placeholder={p.disabled ?? p.placeholder}
         aria-label={p.placeholder}
+        aria-autocomplete={trigger && options.length > 0 ? "list" : undefined}
+        aria-controls={trigger && options.length > 0 ? `chat-ac-${p.root ? "thread" : "channel"}` : undefined}
+        aria-activedescendant={trigger && options[pick] ? `chat-ac-${p.root ? "thread" : "channel"}-${pick}` : undefined}
         onChange={(e) => {
           setText(e.target.value);
           look(e.target);
@@ -337,7 +358,7 @@ export function Composer(p: ComposerProps) {
           }
           if (mod && e.key.toLowerCase() === "u") {
             e.preventDefault();
-            return filePick.current?.click();
+            return p.noFiles ? undefined : filePick.current?.click();
           }
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
@@ -373,14 +394,18 @@ export function Composer(p: ComposerProps) {
           </ToolBtn>
         </div>
         <span className="chat-compose-gap" />
-        <ToolBtn tip="Attach files" kbd={keys("mod+U")} onClick={() => filePick.current?.click()} label="Attach files">
-          <IconClip />
-        </ToolBtn>
-        <ToolBtn tip="Attach from Vision or this computer's approved folders" onClick={() => setFrom((x) => !x)} on={from} label="Attach from…">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M2.5 9.5v3a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3M8 2.5v7M5 6.5l3 3 3-3" />
-          </svg>
-        </ToolBtn>
+        {!p.noFiles && (
+          <>
+            <ToolBtn tip="Attach files" kbd={keys("mod+U")} onClick={() => filePick.current?.click()} label="Attach files">
+              <IconClip />
+            </ToolBtn>
+            <ToolBtn tip="Attach from Vision or this computer's approved folders" onClick={() => setFrom((x) => !x)} on={from} label="Attach from…">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M2.5 9.5v3a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3M8 2.5v7M5 6.5l3 3 3-3" />
+              </svg>
+            </ToolBtn>
+          </>
+        )}
         <div className="chat-compose-emoji">
           <ToolBtn tip="Emoji" onClick={() => setEmoji((x) => !x)} on={emoji} label="Emoji">
             <IconReact />
@@ -396,7 +421,7 @@ export function Composer(p: ComposerProps) {
             />
           )}
         </div>
-        <button className={`chat-send${can ? " is-ready" : ""}`} onClick={sendNow} disabled={!can} data-tip={busy ? "Waiting for the files to land" : "Send"} data-kbd="Enter" aria-label="Send">
+        <button type="button" className={`chat-send${can ? " is-ready" : ""}`} onClick={sendNow} disabled={!can} data-tip={busy ? "Waiting for the files to land" : "Send"} data-kbd="Enter" aria-label="Send">
           <IconSend />
         </button>
       </div>

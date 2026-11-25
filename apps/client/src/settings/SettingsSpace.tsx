@@ -4,8 +4,8 @@
  *
  *  - **General** — how it looks (day, night, the system's), what the app opens on, what agents may do
  *    on this computer's machines, updates, and you.
- *  - **Agents** — the agents this server can call on: Claude Code and Codex over MCP, the server's own
- *    runtimes, and this computer's agents (Claude, Codex, Kimi, DeepSeek… cloud or local).
+ *  - **Agents** — Claude's three ways (this computer's account, an API key with its model, federated),
+ *    connecting a Claude Code you run yourself as an MCP client, and T3's agents (docs/agent-harness.md).
  *  - **Avatars** — the characters made for the council, and which one each connected agent wears.
  *  - **Plan** and **Design language** — these two are grids: Foundation's own boards (the plan as a
  *    kanban card filling one section; the design language a section per chapter). On those tabs only
@@ -20,12 +20,18 @@ import { chooseNight, nightChoice, onNight } from "@foundation/ui";
 import { api, logout } from "../lib/api";
 import { TOP_BAR, floorInsets, toast, useUi } from "../state/ui";
 import { SETTINGS_TABS, goSettings, setStartsOn, startsOn, type Place, type SettingsTab } from "../lib/place";
+import { useCapabilities } from "../lib/capabilities";
+import { PeopleSection } from "./PeopleSection";
+import { ChatServerSetting } from "./ChatServerSetting";
 import { PlacesTab } from "./PlacesTab";
 import { POSTS, ReleasesTab, ServicesTab } from "./SettingsPage";
 import { RendererTab } from "../rune/RendererTab";
 import { UpdatesSection } from "../update/UpdateCard";
 import { T3Block } from "../shell/AgentsPane";
-import { copyMcpCommand } from "../shell/CommandBar";
+import { useClaude } from "../lib/claudeAgents";
+import { CLAUDE_WAYS, claudeAgentFor } from "../shell/AddAgent";
+import { ClaudeKey, ClaudeModelPicker, Federation, McpConnect, Readiness, wayState } from "../shell/AgentSetup";
+import { useAvailable } from "../lib/agentsAvailable";
 import { FLOORPLAN_URL } from "../shell/SidePane";
 import { initials } from "../shell/Presence";
 import { Still } from "../characters/Avatar";
@@ -90,7 +96,7 @@ export function SettingsSpace({ place, user }: { place: Extract<Place, { kind: "
 
 // ---------------------------------------------------------------- parts
 
-export function Group({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+export function Group({ title, note, children }: { title: React.ReactNode; note?: string; children: React.ReactNode }) {
   return (
     <section className="set-group">
       <div className="set-group-head">
@@ -206,6 +212,10 @@ function GeneralTab({ user }: { user: UserInfo }) {
         <Row name="Side menu" detail={ui.pane ? "Open. It stays the way you leave it; the top bar's first button folds it." : "Folded. It stays the way you leave it; the top bar's first button opens it."} />
       </Group>
 
+      <Group title="ChatForm's server" note="Where this device's ChatForm keeps its conversations. Everything else stays on the Foundation server.">
+        <ChatServerSetting />
+      </Group>
+
       <Group title="Agents on this computer" note="What agents may do beyond writing a grid. Nothing that runs code or spends money starts without a person.">
         <Row
           name="Using a machine's desktop"
@@ -229,7 +239,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
         <Row name="Starting a machine" detail="Always a person's press, from a browser. An agent can only propose one." />
         <Row name="Running a command in a machine" detail="Each command an agent wants to run waits on the machine's card for your Run or Decline." />
         <Row name="Folders agents may read" detail="Only the folders an admin approved.">
-          <button className="f-pill" onClick={() => goSettings("places")}>
+          <button type="button" className="f-pill" onClick={() => goSettings("places")}>
             Places
           </button>
         </Row>
@@ -252,6 +262,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
             {initials(user.name)}
           </span>
           <button
+            type="button"
             className="f-pill"
             onClick={async () => {
               await logout();
@@ -262,6 +273,8 @@ function GeneralTab({ user }: { user: UserInfo }) {
           </button>
         </Row>
       </Group>
+
+      {user.role === "admin" && <PeopleSection user={user} />}
     </div>
   );
 }
@@ -273,37 +286,76 @@ interface Integrations {
 }
 
 function AgentsTab({ user }: { user: UserInfo }) {
+  const claude = useClaude();
+  const available = useAvailable();
   const [s, setS] = useState<Integrations | null>(null);
+  const caps = useCapabilities();
+  const admin = user.role === "admin";
+  // an older server has no Claude routes: what it can say comes from its integrations, as before
   useEffect(() => {
-    api<Integrations>("/api/integrations").then(setS, () => {});
-  }, []);
+    if (claude.older) api<Integrations>("/api/integrations").then(setS, () => {});
+  }, [claude.older]);
+  const st = claude.status;
   return (
     <div className="set-page">
-      <Group title="Your own agent, over MCP" note="An agent you run yourself (Claude Code, Codex) joins a grid with its own cursor and the grid's tools.">
-        <Row name="Claude Code or Codex" detail="Copies the command that adds this server to it. Run it in a terminal, then ask it about the grid.">
-          <button className="f-pill" onClick={() => void copyMcpCommand()}>
-            Copy the command
-          </button>
-        </Row>
-      </Group>
+      <section className="set-group setup-claude" data-settings-claude>
+        <div className="set-group-head">
+          <h2>Claude, run by Foundation</h2>
+          <p>Three ways, and only three. Add one to a council from that council's ＋ (the agents panel → Add); it's set up here.</p>
+        </div>
+        {claude.older ? (
+          <div className="set-rows">
+            <p className="setup-older" data-settings-older>
+              The Foundation server is older than this app: it has one Claude, on whatever this computer has. Restart it for the three ways, the stored key and the model list.
+            </p>
+            <Row name="Claude account on this computer" detail={!s ? "Asking the server…" : s.agent.subscription ? "Claude Code is installed on the server's computer." : (s.agent.subscriptionNote ?? "Claude Code isn't on the server's PATH. Install it and sign in (`claude`).")}>
+              <span className={`f-dot ${s?.agent.subscription ? "is-ok" : "is-warn"}`} />
+            </Row>
+            <Row name="API key" detail={!s ? "Asking the server…" : s.agent.api ? `On credits, ${s.agent.model}.` : "No API key. Set ANTHROPIC_API_KEY on the server."}>
+              <span className={`f-dot ${s?.agent.api ? "is-ok" : "is-warn"}`} />
+            </Row>
+          </div>
+        ) : (
+          <div className="set-rows">
+            {CLAUDE_WAYS.map((w) => (
+              <div key={w.id} className="set-row setup-way" data-settings-way={w.id}>
+                <div className="set-row-text">
+                  <span className="set-row-name">{w.title}</span>
+                  <span className="set-row-detail">{w.what}</span>
+                  <Readiness {...wayState(w.id, claudeAgentFor(w.id, available.agents, false), st)} attr={w.id} />
+                  {w.id === "account" && <span className="set-row-detail">The same sign-in Claude Code uses on this computer; not a connection to any Claude Code window you have open.</span>}
+                  {w.id === "api" && (
+                    <>
+                      <ClaudeKey api={st?.api ?? null} admin={admin} />
+                      <ClaudeModelPicker status={st} admin={admin} />
+                    </>
+                  )}
+                  {w.id === "federated" && <Federation admin={admin} configured={!!st?.federated.configured} />}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
-      <Group title="The server's own agent" note="What ✦ Ask, the voice sheet and a section's Ask call on.">
-        <Row name="On your Claude subscription" detail={!s ? "Asking the server…" : s.agent.subscription ? "Claude Code is installed on the server's computer." : (s.agent.subscriptionNote ?? "Claude Code isn't on the server's PATH. Install it and sign in (`claude`).")}>
-          <span className={`f-dot ${s?.agent.subscription ? "is-ok" : "is-warn"}`} />
-        </Row>
-        <Row name="On API credits" detail={!s ? "Asking the server…" : s.agent.api ? `On credits, ${s.agent.model}.` : "No API key. Set ANTHROPIC_API_KEY on the server."}>
-          <span className={`f-dot ${s?.agent.api ? "is-ok" : "is-warn"}`} />
-        </Row>
-      </Group>
+      <section className="set-group setup-claude" data-settings-mcp>
+        <McpConnect viewer={user.role === "viewer"} />
+      </section>
 
       <section className="set-group">
         <div className="set-group-head">
-          <h2>This computer's agents</h2>
-          <p>Claude, Codex and the rest, each on its own sign-in; Kimi and DeepSeek on a key or a local model. Assign any of them to a section from that section's council.</p>
+          <h2>A T3 session's agents</h2>
+          <p>T3 Code, a program on this computer, runs Claude, Codex, Gemini, Kimi, DeepSeek or a local model in sessions Foundation starts, each on its own sign-in or key kept in T3. Assign any of them to a section from that section's council.</p>
         </div>
-        <div className="set-t3">
-          <T3Block viewer={user.role === "viewer"} admin={user.role === "admin"} section={null} />
-        </div>
+        {!caps.local.t3 ? (
+          <div className="set-rows">
+            <Row name="Hosted server" detail="T3 runs on a local computer and is turned off on a hosted Foundation server. Connect your own Claude Code over MCP above, or use one of the three Claude ways." />
+          </div>
+        ) : (
+          <div className="set-t3">
+            <T3Block viewer={user.role === "viewer"} admin={admin} section={null} />
+          </div>
+        )}
       </section>
     </div>
   );
@@ -374,7 +426,7 @@ function AvatarsTab({ user }: { user: UserInfo }) {
             The characters <span className="set-count">{ready.length}</span>
           </h2>
           <p>Made on the Character studio grid: inspiration, a sheet, then a mesh avatar or a 3D model.</p>
-          <button className="f-pill" onClick={() => void openCharacterStudio()}>
+          <button type="button" className="f-pill" onClick={() => void openCharacterStudio()}>
             Open the Character studio
           </button>
         </div>

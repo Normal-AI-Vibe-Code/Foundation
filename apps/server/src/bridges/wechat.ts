@@ -203,6 +203,14 @@ export const wechat: BridgeAdapter = {
     return { events, ack: "" };
   },
 
+  async check(step) {
+    if (step === "callback") return env("WECOM_TOKEN") && env("WECOM_AES_KEY") ? { ok: true, said: "Both are set. WeCom checks them itself when you save the callback URL in its console (it calls this server and expects the right answer)." } : { ok: false, said: `Still missing: ${["WECOM_TOKEN", "WECOM_AES_KEY"].filter((k) => !env(k)).join(", ")}.` };
+    if (!corpId() || !env("WECOM_SECRET")) return { ok: false, said: `Paste ${!corpId() ? "the CorpID" : "the app's Secret"} first.` };
+    cached = null;
+    await accessToken();
+    return { ok: true, said: `WeCom answered with an access token for ${corpId()}: the CorpID and Secret work together.${agentId() ? "" : " Paste the AgentId too."}` };
+  },
+
   async send(portal, out) {
     const agentid = Number(agentId());
     let last: string | undefined;
