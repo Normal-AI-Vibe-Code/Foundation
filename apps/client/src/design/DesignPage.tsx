@@ -32,6 +32,8 @@ import { InfoGlyph } from "../shell/TopBar";
 import { WindowControls } from "../shell/WindowControls";
 import { GearGlyph, MicGlyph, PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
+import { FitGlyph, LayoutGlyph, OsGlyph } from "../components/SectionView";
+import { ExpandGlyph } from "../components/Fullscreen";
 import { TOOLS } from "../shell/Tools";
 import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } from "../shell/wireGeometry";
 import { tunnelGeometry } from "../shell/wireGeometry";
@@ -702,36 +704,60 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
             <div className="effect-label">Video, hovered: mute and full screen in its top-right corner; the rest of it is the handle</div>
           </div>
           <div className="oncall-cell">
-            <div className="section-card oncall-static oncall-section is-hover" style={{ width: 460, height: 120 }}>
+            <div className="section-card oncall-static oncall-section is-hover" style={{ width: 800, height: 120 }}>
               <div className="section-header" style={{ height: 42 }}>
                 <span className="section-name">Design</span>
                 <span className="section-coords">B1</span>
                 <span className="section-count">3</span>
+                <div className="sec-layout">
+                  <span className="sec-tool sec-layout-more"><LayoutGlyph /></span>
+                  <div className="sec-layout-items">
+                    <span className="sec-tool">◫</span>
+                    <span className="sec-tool">⬓</span>
+                    <span className="sec-tool"><FitGlyph /></span>
+                    <span className="sec-tool">▦</span>
+                  </div>
+                </div>
                 <div className="section-tools">
                   <div className="sec-group">
                     <span className="sec-tool">◳</span>
                     <span className="sec-tool">⊞</span>
                     <span className="sec-tool">◍</span>
-                    <span className="sec-tool">▤</span>
+                    <span className="sec-tool">¶</span>
                     <span className="sec-tool">⇪</span>
+                  </div>
+                  <div className="sec-group">
                     <span className="sec-tool">▣</span>
+                    <span className="sec-tool"><OsGlyph /></span>
+                    <span className="sec-tool">◱</span>
+                    <span className="sec-tool"><ExpandGlyph /></span>
                   </div>
                   <div className="sec-group">
-                    <span className="sec-tool">◫</span>
-                    <span className="sec-tool">⬓</span>
-                    <span className="sec-tool">⤢</span>
-                  </div>
-                  <div className="sec-group">
-                    <span className="sec-tool sec-agent">✦</span>
+                    <span className="sec-tool sec-agent"><CouncilGlyph size={14} /></span>
                     <span className="sec-tool">✕</span>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="f-tip is-on oncall-tip">
-              Ask the agent about this section <span className="f-kbd">{keys("mod+J")}</span>
+            <div className="effect-label">Section, hovered: no bar. Its shape on the left (◫ ⬓ split, fit to the screen, ▦ open as its own grid); on the right, add · machines and how its app shows (as a card, full screen last) · council · remove. Each names itself on roll-over</div>
+          </div>
+          <div className="oncall-cell">
+            <div className="section-card oncall-static oncall-section is-hover" style={{ width: 420, height: 170 }}>
+              <div className="section-header" style={{ height: 42 }}>
+                <span className="section-name">Notes</span>
+                <span className="section-coords">C1</span>
+                <div className="sec-layout is-out">
+                  <span className="sec-tool sec-layout-more"><LayoutGlyph /></span>
+                  <div className="sec-layout-items">
+                    <span className="sec-tool">◫</span>
+                    <span className="sec-tool">⬓</span>
+                    <span className="sec-tool"><FitGlyph /></span>
+                    <span className="sec-tool">▦</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="effect-label">Section, hovered: no bar — tools wait top-right (add · arrange · agent · remove), each names itself on roll-over</div>
+            <div className="effect-label">A narrow section (under 760 wide): its shape folds into one button, pressed here</div>
           </div>
           <div className="oncall-cell">
             <div className="section-card oncall-static oncall-section" style={{ width: 420, height: 220 }}>

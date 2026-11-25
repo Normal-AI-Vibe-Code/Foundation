@@ -3578,7 +3578,8 @@ body.is-connecting .port-in.is-snap {
   left: auto !important;
   align-self: flex-start;
 }
-.oncall-section .section-tools {
+.oncall-section .section-tools,
+.oncall-section .sec-layout {
   opacity: 1;
   translate: 0 0;
 }

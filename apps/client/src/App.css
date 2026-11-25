@@ -156,6 +156,8 @@ body.resizing-v .section-card,
   /* no bar: the name sits on the section's own paper, tools wait top-right */
   z-index: 3;
   cursor: grab;
+  /* the layout tools fold into one button on a narrow section (.sec-layout) */
+  container: sechead / inline-size;
 }
 .section-card.section-dragging .section-header {
   cursor: grabbing;
@@ -359,6 +361,74 @@ body.is-connecting .section-tools,
 .section-card.section-dragging .section-tools {
   opacity: 0;
   pointer-events: none;
+}
+
+/* The section's shape, on the left after its name (2026-11-24, Josh: "most of the
+   section splitting, fitting of the panel should be on the left side of the
+   header, and collapsible into a single button if the section gets too small").
+   The same ghost paper and timing as the tools on the right. */
+.sec-layout {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 2px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--color-raise) 92%, transparent);
+  box-shadow: var(--shadow-sheet);
+  opacity: 0;
+  translate: 0 -3px;
+  pointer-events: none;
+  transition:
+    opacity var(--dur-quick) var(--ease-out-soft) 180ms,
+    translate var(--dur-pane) var(--ease-out-soft) 180ms;
+}
+.section-card:hover .sec-layout,
+.section-card.confirming .sec-layout,
+.sec-layout:focus-within {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+body.is-connecting .sec-layout,
+.section-card.section-dragging .sec-layout {
+  opacity: 0;
+  pointer-events: none;
+}
+.sec-layout-items {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+/* (.sec-tool, below, would show it) */
+.sec-layout .sec-layout-more {
+  display: none;
+}
+.sec-layout.is-out .sec-layout-more {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--color-frost) 8%, transparent);
+}
+@container sechead (max-width: 760px) {
+  .sec-layout .sec-layout-more {
+    display: inline-flex;
+  }
+  .sec-layout-items {
+    display: none;
+  }
+  /* folded: pressed, the tools drop under the one button on the same paper */
+  .sec-layout.is-out .sec-layout-items {
+    display: flex;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: -1px;
+    padding: 2px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--line);
+    background: var(--color-raise);
+    box-shadow: var(--shadow-sheet);
+  }
 }
 
 .sec-group {

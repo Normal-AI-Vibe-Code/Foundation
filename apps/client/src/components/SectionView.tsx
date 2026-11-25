@@ -107,6 +107,8 @@ export const SectionView = memo(function SectionView({
   const [renaming, setRenaming] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [dropping, setDropping] = useState(false);
+  // the layout tools folded into one button on a narrow section: whether that button has them out
+  const [layoutOut, setLayoutOut] = useState(false);
 
   // ----- drag the whole section to another grid cell -----
   const moveDrag = useRef({
@@ -464,22 +466,51 @@ export const SectionView = memo(function SectionView({
                 aria-label={isOpen ? "Back up a level" : childGrid ? "Open the grid" : isGrid ? "Open its grid" : "Open as its own grid"}
                 onClick={() => (isOpen ? levelUp() : isGrid ? openLevel(section.id) : openAsGrid(section.id, host))}
               >
-                {isOpen ? "⤡" : "⤢"}
+                {isOpen ? "⤡" : "▦"}
               </button>
             )}
           </span>
         )}
 
-        {/* tools wait in the top-right corner until the pointer is on the section */}
+        {/* the section's shape, on the left after its name: split it, fit it to the screen, open it as a grid.
+            On a narrow section they fold into one button (a container query, App.css) */}
+        {!mini && (
+          <div className={"sec-layout" + (layoutOut ? " is-out" : "")} role="toolbar" aria-label={`${section.name} layout`}>
+            <button
+              type="button"
+              className="sec-tool sec-layout-more"
+              data-tip="Split, fit and open"
+              aria-label="Split, fit and open"
+              aria-expanded={layoutOut}
+              onClick={() => setLayoutOut((o) => !o)}
+            >
+              <LayoutGlyph />
+            </button>
+            <div className="sec-layout-items" onClick={() => setLayoutOut(false)}>
+              {tool("Split into two columns", "◫", () => splitSection(section.id, "h"))}
+              {tool("Split into two rows", "⬓", () => splitSection(section.id, "v"))}
+              {!isOpen && tool("Fit the section to the screen", <FitGlyph />, () => requestSnap({ kind: "section", id: section.id }))}
+              {childGrid && !isOpen
+                ? tool("Open the grid", "▦", () => openGrid(childGrid))
+                : isOpen
+                  ? tool("Back up a level", "⤡", () => levelUp(), "", "Esc")
+                  : isGrid
+                    ? tool("Open its grid", "▦", () => openLevel(section.id))
+                    : !host && tool("Open as its own grid", "▦", () => openAsGrid(section.id, host))}
+            </div>
+          </div>
+        )}
+
+        {/* the rest wait in the top-right corner until the pointer is on the section */}
         {!mini && (
         <div className="section-tools" role="toolbar" aria-label={`${section.name} tools`}>
+          {/* the hosted app's own: repo, MCP, open */}
           {host && (
             <div className="sec-group">
               <PanelActions panel={host} ask={false} />
-              <FullscreenButton id={host.id} />
-              {tool(`Show ${host.name} as a card`, "◱", () => setSectionHost(section.id, null))}
             </div>
           )}
+          {/* add a primitive */}
           <div className="sec-group">
             {hostable && tool(`Let ${hostable.name} fill the section`, "◳", () => setSectionHost(section.id, hostable.id))}
             {!host &&
@@ -491,21 +522,13 @@ export const SectionView = memo(function SectionView({
             {tool("Add a map", "◍", () => createMap(section.id))}
             {tool("Add a note", "¶", () => addNote(section.id))}
             {tool("Upload an image or video", "⇪", () => fileRef.current?.click(), "", keys("mod+U"))}
-            {tool("Start a machine here: Linux on Kiri or Docker", "▣", () => startMachine(section.id))}
-            {tool("Add a full operating system here: WildOS VM", "▣", () => startVm(section.id))}
           </div>
+          {/* machines, and how the section's app is shown: as a card, or full screen (rightmost) */}
           <div className="sec-group">
-            {tool("Split into two columns", "◫", () => splitSection(section.id, "h"))}
-            {tool("Split into two rows", "⬓", () => splitSection(section.id, "v"))}
-            {childGrid && !isOpen
-              ? tool("Open the grid", "⤢", () => openGrid(childGrid))
-              : host && !isOpen
-                ? tool("Fill the screen with this section", "⤢", () => requestSnap({ kind: "section", id: section.id }))
-                : isOpen
-                  ? tool("Back up a level", "⤡", () => levelUp(), "", "Esc")
-                  : isGrid
-                    ? tool("Open its grid", "⤢", () => openLevel(section.id))
-                    : tool("Open as its own grid", "⤢", () => openAsGrid(section.id, host))}
+            {tool("Start a machine here: Linux on Kiri or Docker", "▣", () => startMachine(section.id))}
+            {tool("Add a full operating system here: WildOS VM", <OsGlyph />, () => startVm(section.id))}
+            {host && tool(`Show ${host.name} as a card`, "◱", () => setSectionHost(section.id, null))}
+            {host && <FullscreenButton id={host.id} />}
           </div>
           <div className="sec-group">
             {tool("Council: this section's agents. Talk to them, add more", <CouncilGlyph size={14} />, () => toggleCouncil({ kind: "section", id: section.id }), "sec-agent sec-council")}
@@ -789,6 +812,38 @@ function AddSectionButton({ sectionId, side, label }: { sectionId: string; side:
     >
       +
     </motion.button>
+  );
+}
+
+const glyph = { width: 13, height: 13, viewBox: "0 0 16 16", fill: "none", stroke: "currentColor", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
+
+/** fit to the screen: four corners framing the section (full screen is the outward arrows, Fullscreen.tsx) */
+export function FitGlyph() {
+  return (
+    <svg {...glyph}>
+      <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
+      <rect x="5.5" y="5.5" width="5" height="5" rx="1" />
+    </svg>
+  );
+}
+
+/** the layout tools folded into one: a section split in two, with a caret */
+export function LayoutGlyph() {
+  return (
+    <svg {...glyph}>
+      <rect x="2" y="3" width="12" height="10" rx="1.5" />
+      <path d="M8 3v10" />
+    </svg>
+  );
+}
+
+/** a whole operating system: a screen on a stand */
+export function OsGlyph() {
+  return (
+    <svg {...glyph}>
+      <rect x="2" y="2.5" width="12" height="8.5" rx="1.5" />
+      <path d="M6 13.5h4M8 11v2.5" />
+    </svg>
   );
 }
 

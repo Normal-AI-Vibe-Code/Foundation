@@ -118,7 +118,7 @@ test("⤢ asks once in place, then the section is a grid inside this one; the ot
   const press = async () => {
     await frameSection(ada.page, designSection);
     await card.locator(".section-header").hover();
-    await card.locator('.section-tools button[aria-label="Open as its own grid"]').click();
+    await card.locator('.sec-layout button[aria-label="Open as its own grid"]').click();
   };
   await press();
   const ask = card.locator(".confirm-pop.grid-ask");
@@ -196,7 +196,7 @@ test("⤢ asks once in place, then the section is a grid inside this one; the ot
   const stood = ada.page.locator(`.section-card[data-section-id="${designSection}"]`);
   await frameSection(ada.page, designSection);
   await stood.locator(".section-header").hover();
-  await stood.locator('.section-tools button[aria-label="Open the grid"]').click();
+  await stood.locator('.sec-layout button[aria-label="Open the grid"]').click();
   await expect.poll(() => boardId(ada.page)).toBe(child);
   await waitLive(ada.page);
 });
