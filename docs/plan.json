@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-25T04:13:51.424Z",
+  "syncedAt": "2026-11-25T04:20:21.382Z",
   "columns": [
     {
       "id": "needs-you",
@@ -100,7 +100,7 @@
       "area": "grid",
       "status": "review",
       "body": "Josh, 2026-11-24: media cards grabbable and movable, full screen at their top right, remove from the right-click menu or Delete, and all of it undoable, with a real undo/redo sequence on the grid. Built: the picture is the handle, the corner buttons, no ✕, Delete/Backspace on the selected card, and a per-window Y.UndoManager over the board (only your own changes; ⌘Z, ⇧⌘Z, Ctrl+Y). Checked in two browsers (e2e/grid-undo.spec.ts). Waiting for a person to try it in the desktop app.",
-      "issue": null
+      "issue": 242
     },
     {
       "id": "hosted-signin-decision",
@@ -249,7 +249,7 @@
       "milestone": "apps",
       "area": "apps",
       "status": "needs-you",
-      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size. PartForm then asks for OnShape's sign-in: since 2026-11-24 the PartForm card is a page of that browser by itself (OnShape refuses frames), and a plain click on its button works.",
+      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size.",
       "issue": 220
     },
     {
@@ -2410,16 +2410,7 @@
       "area": "design",
       "status": "review",
       "body": "Josh, 2026-11-24. Every note is written as formatted text with the toolbar and kept as markdown; the card's bar has Markdown (turns the card to its markdown and back) and Background (takes the paper away); the toolbar has the text size (five steps, the whole note's). The section menu has one Note. Existing notes of both kinds open as this note with nothing rewritten, and a note is not rewritten by a click. add_note takes text_size and background. Checked in two browsers (e2e/section-agents.spec.ts and four more), day and night on #/design; evidence in docs/evidence/2026-11-24_one-note. A person checks: write in a note, set it large, take its background away and turn it to markdown, in the desktop app; and an old markdown note of your own still reads as you wrote it. Not done: Rune still opens a plain note as markdown in its own field (SPEC 7).",
-      "issue": 243
-    },
-    {
-      "id": "page-clicks",
-      "title": "PartForm in the built-in browser; a page card takes a click, not the wheel or the keys",
-      "kind": "plan",
-      "milestone": "apps",
-      "area": "apps",
-      "status": "review",
-      "body": "Josh, 2026-11-24: PartForm on the Form Industries grid was turned away by OnShape's sign-in; pages should take button clicks and leave scroll, zoom and the panel keys to the grid. Found: the card was a frame (pasted address), and OnShape's sign-in refuses every frame (frame-ancestors *.onshape.com). Built (SPEC §0.10): pages on HyperForm are the built-in browser's unless the card says frame; a site that refuses a frame becomes a browser card; at rest a plain click (and hover) is the page's, the wheel, Ctrl-wheel, middle/right buttons and keys are the grid's, and a click in a field gives the page the keys until Esc Esc. Checked in e2e/pages.spec.ts against a stand-in. Not done: frames unchanged; nobody has signed in to OnShape in that browser (hyperform-sign-in)."
+      "issue": 245
     }
   ]
 }
