@@ -2513,6 +2513,16 @@
       "issue": null
     },
     {
+      "id": "chat-together-2026-11-25",
+      "title": "ChatForm on the chat server: files, link cards, pins, mentions and a bell; one sign-in; a channel as a card; characters rest on a still",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "chat",
+      "status": "review",
+      "body": "Josh, 2026-11-25. main, the edges branch and Rune's three commits merged (merge/bring-together-2026-11-25). Built: the Rust chat server gets files (Postgres, 4 MB), link previews from social tags behind an address guard, pins, a mentions list, a Google ID-token exchange and who-is-where; ChatForm gets uploads and GIFs on a chat server, a bell with recent mentions and direct messages, desktop notifications a person turns on; a Foundation Google sign-in signs ChatForm in; a channel is a card in a section (panel chat); character cards rest on a cached still (pan 47 -> 60 fps on the real studio). Checked: all unit suites, cargo test against Postgres, and in a browser on Foundation's own server at night (a mention arriving, the bell, a link card, a channel card added and written in). Not checked: the app against the Rust server in a browser, day theme, a second person, huddle from the card, the real Google, Vercel or Neon. Open: the desktop app signs in through Flowform, which carries no Google proof, so one sign-in doesn't reach it yet; a link card's picture waits for a press; boards still sync only within one Foundation server; no voice through the chat server. Evidence: docs/evidence/2026-11-25_chat-together/, 2026-11-25_character-grid-perf/.",
+      "issue": null
+    },
+    {
       "id": "mac-studio-perf",
       "title": "The Mac: the Character studio at 40–60 fps in WebKit, and its pictures and avatars cached between launches",
       "kind": "plan",
