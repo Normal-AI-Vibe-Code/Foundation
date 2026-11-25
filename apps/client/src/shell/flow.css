@@ -1,0 +1,361 @@
+/* What travels along a wire, a wire's own bar and a fed table's lens (shell/flowPeek.tsx, portHover.tsx,
+   AgentLayer.tsx, components/TableFeed.tsx). On tokens only. */
+
+/* ---------- a port's card: on the page's top layer, beside its pill ---------- */
+.port-label-anchor {
+  display: none;
+}
+.port-card {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 170px;
+  max-width: 340px;
+  padding: 8px 10px;
+  font: 600 var(--text-11) / 1.25 var(--font-sans);
+  color: var(--color-frost);
+  background: var(--color-raise);
+  border: 1px solid color-mix(in srgb, var(--wire-tone) 40%, var(--color-line));
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lift);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.port-card.is-placed {
+  opacity: 1;
+}
+.port-card .port-label-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.port-card .port-label-head i {
+  font-style: normal;
+  color: var(--wire-tone);
+}
+.port-card .port-peek,
+.port-card .port-hint {
+  font-weight: 400;
+  color: var(--color-dim);
+}
+
+/* ---------- a sample of the value ---------- */
+.flow-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  font: 400 var(--text-11) / 1.35 var(--font-code);
+  color: var(--color-mist);
+}
+.flow-sample.is-none {
+  font-family: var(--font-sans);
+  color: var(--color-dim);
+}
+.flow-sample.is-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.flow-sample.is-text.is-compact {
+  -webkit-line-clamp: 2;
+}
+.flow-sample table {
+  border-collapse: collapse;
+  font: inherit;
+}
+.flow-sample th,
+.flow-sample td {
+  max-width: 80px;
+  padding: 1px 6px 1px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.flow-sample th {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-frost);
+  border-bottom: 1px solid var(--color-line);
+}
+.flow-sample td {
+  color: var(--color-mist);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-line) 50%, transparent);
+}
+.flow-sample.is-fields b {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-frost);
+}
+.flow-sample.is-file {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.flow-sample.is-file img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-line);
+  background: var(--color-abyss);
+}
+.flow-sample-more {
+  font-family: var(--font-sans);
+  color: var(--color-dim);
+}
+
+/* ---------- the chip riding a wire: a peek at what's on it, and what the far card is doing ---------- */
+.flow-chips {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 69;
+}
+.flow-chip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.flow-chip > span {
+  position: absolute;
+  left: 0;
+  bottom: 8px;
+  translate: -50% 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 9px 3px 7px;
+  font: 500 var(--text-11) / 1.2 var(--font-sans);
+  color: var(--color-mist);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--color-raise);
+  border: 1px solid color-mix(in srgb, var(--wire-tone) 35%, var(--color-line));
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lift);
+}
+.flow-chip > span::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--wire-tone);
+}
+/* a short hop between two apps keeps its chip for hover */
+.flow-chip.is-short:not(.is-hot) {
+  visibility: hidden;
+}
+/* a value just arrived: the dot rings once */
+.flow-chip.is-fresh > span::before {
+  animation: flow-arrive 900ms var(--ease-out-soft);
+}
+@keyframes flow-arrive {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--wire-tone) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+}
+/* the card it flows into is working on it (reading its source, generating) */
+.flow-chip.is-working > span {
+  color: var(--color-frost);
+  border-color: color-mix(in srgb, var(--color-agent) 55%, var(--color-line));
+}
+.flow-chip.is-working > span::before {
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  background: transparent;
+  border: 2px solid color-mix(in srgb, var(--color-agent) 30%, transparent);
+  border-top-color: var(--color-agent);
+  animation: flow-spin 800ms linear infinite;
+}
+.flow-chip.is-error > span {
+  border-color: color-mix(in srgb, var(--color-bad) 55%, var(--color-line));
+}
+.flow-chip.is-error > span::before {
+  background: var(--color-bad);
+}
+.flow-chip.is-empty > span {
+  color: var(--color-dim);
+}
+.flow-chip.is-empty > span::before {
+  background: transparent;
+  border: 1px dashed var(--wire-tone);
+}
+@keyframes flow-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-chip.is-working > span::before,
+  .flow-chip.is-fresh > span::before {
+    animation: none;
+  }
+}
+
+/* ---------- a pressed wire's bar: what flows, and Disconnect ---------- */
+.wire-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 71;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max-content;
+  max-width: 320px;
+  padding: 8px 10px;
+  transform-origin: 0 0;
+  font-size: var(--text-12);
+  color: var(--color-frost);
+  background: var(--glass-fill-strong);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-glass);
+  pointer-events: auto;
+}
+.wire-bar-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--color-mist);
+}
+.wire-bar-head b {
+  color: var(--color-frost);
+}
+.wire-bar-head i {
+  font-style: normal;
+  color: var(--wire-tone);
+}
+.wire-bar-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.wire-bar-key {
+  margin-left: auto;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+.wire-bar button {
+  font: 600 var(--text-12) / 1 var(--font-sans);
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  cursor: pointer;
+}
+.wire-bar button.is-cut {
+  color: var(--color-bad);
+  border-color: color-mix(in srgb, var(--color-bad) 45%, var(--color-line));
+}
+.wire-bar button:hover {
+  background: color-mix(in srgb, var(--color-frost) 8%, var(--color-raise));
+}
+
+/* a table a wire would land on, while one is dragged */
+.obj-slot.is-wire-target {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 4px;
+  border-radius: var(--radius-card);
+}
+
+/* ---------- a fed table's lens (components/TableFeed.tsx) ---------- */
+.table-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px 10px 8px;
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-pulse) 5%, var(--color-raise));
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+  color: var(--color-mist);
+}
+.table-feed-say {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.table-feed-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-dim);
+}
+.table-feed.is-ok .table-feed-dot {
+  background: var(--color-ok);
+}
+.table-feed.is-bad {
+  color: var(--color-bad);
+}
+.table-feed.is-bad .table-feed-dot {
+  background: var(--color-bad);
+}
+.table-feed.is-working .table-feed-dot {
+  width: 9px;
+  height: 9px;
+  box-sizing: border-box;
+  background: transparent;
+  border: 2px solid color-mix(in srgb, var(--color-pulse) 30%, transparent);
+  border-top-color: var(--color-pulse);
+  animation: flow-spin 800ms linear infinite;
+}
+.table-feed-lens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.table-feed-lens label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+.table-feed-lens label > span {
+  flex: none;
+  color: var(--color-dim);
+}
+.table-feed-lens input {
+  flex: 1;
+  min-width: 0;
+  font: 400 var(--text-11) / 1 var(--font-code);
+  color: var(--color-frost);
+  background: var(--color-abyss);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  padding: 5px 7px;
+}
+.table-feed-lens input:focus {
+  outline: none;
+  border-color: var(--color-pulse);
+}
+@media (prefers-reduced-motion: reduce) {
+  .table-feed.is-working .table-feed-dot {
+    animation: none;
+  }
+}

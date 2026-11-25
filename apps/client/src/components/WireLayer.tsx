@@ -6,6 +6,7 @@ import { polyline, route, routeAvoiding, tunnelGeometry, type P } from "../shell
 import { cardRects, obstaclesFor } from "../shell/ports";
 import { allCrossings, publishRoutes, routesVersion, unpublishRoutes } from "../shell/routeRegistry";
 import { countRender } from "../state/renders";
+import { toast } from "../state/ui";
 
 /**
  * The spreadsheet's data-flow wires, drawn by the same flow-diagram rules as
@@ -99,6 +100,11 @@ export const WireLayer = memo(function WireLayer() {
         if (rb?.hoverMapId && rb.hoverMapId !== rb.oldMapId) {
           bindMap(rb.hoverMapId, rb.tableId); // the connection moves…
           bindMap(rb.oldMapId, null); // …away from the old map
+        } else if (rb && !rb.hoverMapId) {
+          // let go away from any map: the map lets go of the table (2026-11-24: a wire can be taken off; ⌘Z puts it back)
+          const st = getState();
+          bindMap(rb.oldMapId, null);
+          toast(`Disconnected ${st.tables[rb.tableId]?.name ?? "the table"} → ${st.maps[rb.oldMapId]?.name ?? "the map"} · ⌘Z puts it back`);
         }
       };
       window.addEventListener("pointermove", move);
@@ -315,7 +321,7 @@ export const WireLayer = memo(function WireLayer() {
             r={e.kind === "map" ? 6 : 4}
             onPointerDown={(ev) => beginRebind(ev, e)}
           >
-            {e.kind === "map" && <title>Drag to move this connection to another map</title>}
+            {e.kind === "map" && <title>Drag to another map to move this connection, or off any map to disconnect it</title>}
           </circle>
         </g>
       ))}

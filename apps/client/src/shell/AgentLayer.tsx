@@ -12,9 +12,11 @@
  * crossings are recomputed only when the set of routes changes.
  */
 
-import { portHover, sayValue, setPortHover, usePortHover } from "./portHover";
+import { portHover, setPortHover, usePortHover } from "./portHover";
+import { peek, ValueSample } from "./flowPeek";
+import { flowWork, type FlowWork } from "./flowWork";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { CHARACTER_TYPE, SECTION_PORT, type LinkDoc } from "@foundation/protocol";
+import { boardMaps, CHARACTER_TYPE, SECTION_PORT, TABLE_PORT, type LinkDoc } from "@foundation/protocol";
 import { addLink, applyWireClip, getState, gridSize, objectWorldRect, removeLink, sectionAtWorld, subscribe, uid, updatePanel, usePanel, wireBackstage, wireClipRect, type PanelMeta } from "../state/store";
 import { boardTool } from "../lib/collectionDrag";
 import { toast } from "../state/ui";
@@ -28,6 +30,8 @@ import { parsePairs, portWiresSlice, useStoreSlice } from "../state/slices";
 import type { BoardSync } from "../sync/board";
 
 const SNAP_RADIUS = 32;
+/** a table's or note's wires meet it level with its header (52 px) */
+const OBJECT_ATTACH = 26;
 
 // ---------- drag to connect (magnetic) ----------
 
@@ -52,6 +56,33 @@ const notifyDrag = () => dragListeners.forEach((f) => f());
 
 function portType(panelId: string, portId: string) {
   return endPanel(panelId)?.ports.find((p) => p.id === portId)?.type;
+}
+
+/** ring the table a wire would land on */
+function markTable(id: string | null) {
+  document.querySelectorAll<HTMLElement>(".obj-slot.is-wire-target").forEach((el) => el.dataset.objId !== id && el.classList.remove("is-wire-target"));
+  if (id) document.querySelector<HTMLElement>(`.obj-slot[data-obj-id="${CSS.escape(id)}"]`)?.classList.add("is-wire-target");
+}
+
+/**
+ * Take a wire off (2026-11-24, Josh: "there's no ability to make a disconnection, or undo that result"). It's
+ * an ordinary change to the board's links, so the grid's undo puts it back (⌘Z) and redo takes it off again.
+ */
+export function disconnect(id: string) {
+  const l = getState().links[id];
+  if (!l) return;
+  removeLink(id);
+  const st = getState();
+  const from = endPanel(l.from.panel)?.name ?? st.tables[l.from.panel]?.name ?? "its source";
+  const to = endPanel(l.to.panel)?.name ?? st.tables[l.to.panel]?.name ?? st.notes[l.to.panel]?.name ?? "its card";
+  toast(`Disconnected ${from} → ${to} · ⌘Z puts it back`);
+}
+
+/** a table or note at a wire's end: no ports of its own, the wire meets its edge level with its header */
+function objectEnd(id: string) {
+  const st = getState();
+  const o = st.tables[id] ?? st.notes[id];
+  return o ? objectWorldRect(o) : null;
 }
 
 /** ring the section a backwards wire would wire in */
@@ -96,8 +127,13 @@ function startDrag(e: React.PointerEvent, from: { panel: string; port: string },
         }
       }
     }
-    const hit = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-panel-id]");
-    const over = hit?.dataset.panelId && hit.dataset.panelId !== drag.from.panel ? hit.dataset.panelId : null;
+    const under = document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null;
+    const hit = under?.closest<HTMLElement>("[data-panel-id]");
+    // a table takes a wire too (its rows: the server writes what arrives into its cells, flows.ts)
+    const objId = !hit && !drag.reverse ? under?.closest<HTMLElement>("[data-obj-id]")?.dataset.objId : undefined;
+    const tableId = objId && st.tables[objId] ? objId : null;
+    markTable(best ? null : tableId);
+    const over = hit?.dataset.panelId && hit.dataset.panelId !== drag.from.panel ? hit.dataset.panelId : tableId;
     const changed = best?.port !== drag.snap?.port;
     drag = { ...drag, x: p.x, y: p.y, snap: best, overPanel: best ? null : over };
     // drawn backwards: the section it would wire in, when it isn't over a card
@@ -112,9 +148,20 @@ function startDrag(e: React.PointerEvent, from: { panel: string; port: string },
     drag = null;
     markTargets(false);
     markSection(null);
+    markTable(null);
     notifyDrag();
     if (!d) return;
     const st = getState();
+    // let go over a table: the wire lands on its rows
+    if (!d.reverse && !d.snap && d.overPanel && st.tables[d.overPanel]) {
+      const t = st.tables[d.overPanel];
+      const already = Object.values(st.links).some((l) => l.from.panel === d.from.panel && l.from.port === d.from.port && l.to.panel === t.id);
+      if (!already) {
+        addLink({ from: d.from, to: { panel: t.id, port: TABLE_PORT }, label: d.detached?.label ?? st.panels[d.from.panel]?.ports.find((p) => p.id === d.from.port)?.name });
+        toast(`Wired into ${t.name}: what arrives fills its rows`, "ok");
+      }
+      return;
+    }
     if (d.reverse) {
       // out of an input: a card's output it snapped to or was let go over, else the section under the pointer
       const over = d.overPanel ? st.panels[d.overPanel] : undefined;
@@ -256,22 +303,26 @@ function routesFor(links: LinkDoc[]): Map<string, Frame> {
   for (const l of links) {
     const a = endPanel(l.from.panel);
     const b = endPanel(l.to.panel);
-    if (!a || !b) continue;
-    const pa = portPoint(a, l.from.port, l.id, links);
-    const pb = portPoint(b, l.to.port, l.id, links);
+    const oa = a ? null : objectEnd(l.from.panel);
+    const ob = b ? null : objectEnd(l.to.panel);
+    if ((!a && !oa) || (!b && !ob)) continue;
+    const pa = a ? portPoint(a, l.from.port, l.id, links) : { x: oa!.x + oa!.w, y: oa!.y + OBJECT_ATTACH * oa!.s };
+    const pb = b ? portPoint(b, l.to.port, l.id, links) : { x: ob!.x, y: ob!.y + OBJECT_ATTACH * ob!.s };
     if (!pa || !pb) continue;
     // cards leave right and enter left; an app section uses the edge facing the other app
-    const sa = portSide(a, l.from.port, l.id);
-    const sb = portSide(b, l.to.port, l.id);
+    const sa = a ? portSide(a, l.from.port, l.id) : "right";
+    const sb = b ? portSide(b, l.to.port, l.id) : "left";
     const classic = sa === "right" && sb === "left";
     const pts = routeSides(pa, sa, pb, sb, {
-      src: endRect(rects, a.id),
-      dst: endRect(rects, b.id),
+      src: a ? endRect(rects, a.id) : oa!,
+      dst: b ? endRect(rects, b.id) : ob!,
       lane: classic ? (laneOf.get(l.id) ?? 0) : 0,
       srcLane: classic ? (srcLaneOf.get(l.id) ?? 0) : 0,
-      obstacles: obstaclesFor(rects, a.id, b.id),
+      obstacles: obstaclesFor(rects, l.from.panel, l.to.panel),
     });
-    frames.set(l.id, { pts, d: polyline(pts), clip: wireClipRect(a, b) });
+    const ea = a ?? st.tables[l.from.panel] ?? st.notes[l.from.panel];
+    const eb = b ?? st.tables[l.to.panel] ?? st.notes[l.to.panel];
+    frames.set(l.id, { pts, d: polyline(pts), clip: wireClipRect(ea, eb) });
   }
   return frames;
 }
@@ -300,7 +351,11 @@ export const PortWires = memo(function PortWires() {
   const groups = useRef(new Map<string, SVGGElement>());
   const ghost = useRef<SVGPathElement>(null);
   const rings = useRef(new Map<string, SVGRectElement>());
-  const [selected, setSelected] = useState<string | null>(null);
+  // the pressed wire and where it was pressed: its bar opens there (what flows, Disconnect)
+  const [picked, setPicked] = useState<{ id: string; x: number; y: number } | null>(null);
+  const selected = picked && slice.links[picked.id] ? picked.id : null;
+  const setSelected = (id: string | null) => setPicked(id ? { id, x: picked?.x ?? 0, y: picked?.y ?? 0 } : null);
+  const chips = useRef(new Map<string, HTMLDivElement>());
   const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const links: LinkDoc[] = useMemo(() => Object.values(slice.links), [slice.links]);
@@ -320,13 +375,12 @@ export const PortWires = memo(function PortWires() {
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         e.stopPropagation();
-        removeLink(selected);
+        disconnect(selected);
         setSelected(null);
-        toast("Connection removed");
       } else if (e.key === "Escape") setSelected(null);
     };
     const onDown = (e: PointerEvent) => {
-      if (!(e.target as Element).closest?.(".pipe-hit")) setSelected(null);
+      if (!(e.target as Element).closest?.(".pipe-hit, .wire-bar")) setSelected(null);
     };
     window.addEventListener("keydown", onKey, true);
     window.addEventListener("pointerdown", onDown, true);
@@ -376,11 +430,28 @@ export const PortWires = memo(function PortWires() {
         for (let i = 1; i < f.pts.length; i++) length += Math.hypot(f.pts[i].x - f.pts[i - 1].x, f.pts[i].y - f.pts[i - 1].y);
         g.classList.toggle("is-short", length < 160);
         const label = g.querySelector("text");
+        const at = labelAt(f.pts);
         if (label) {
-          const at = labelAt(f.pts);
           label.setAttribute("x", String(at.x));
           label.setAttribute("y", String(at.y - 9));
         }
+        const chip = chips.current.get(l.id);
+        if (chip) {
+          chip.dataset.x = String(at.x);
+          chip.dataset.y = String(at.y);
+          chip.classList.toggle("is-short", length < 160);
+        }
+      }
+      // the chips ride their wires at a constant size on screen
+      const k = 1 / (camera.scale || 1);
+      for (const [id, chip] of chips.current) {
+        const g = groups.current.get(id);
+        const hidden = !g || g.style.display === "none" || chip.dataset.x === undefined;
+        const key = `${chip.dataset.x},${chip.dataset.y},${k.toFixed(3)},${hidden}`;
+        if (chip.dataset.key === key) continue;
+        chip.dataset.key = key;
+        chip.style.display = hidden ? "none" : "";
+        chip.style.transform = `translate3d(${chip.dataset.x}px, ${chip.dataset.y}px, 0) scale(${k})`;
       }
       // over / under across every wire layer: tunnels recomputed only when some route moved
       publishRoutes("ports", new Map([...frames].map(([id, f]) => [id, f.pts])), [...frames.values()].map((f) => f.d).join("|"));
@@ -482,7 +553,7 @@ export const PortWires = memo(function PortWires() {
               <path className="pipe-terminal" />
               <circle r={3.5} className="pipe-end" />
               <circle r={3.5} className="pipe-end" />
-              {l.label && <text className="pipe-label">{l.label}</text>}
+              {l.label && !chipShows(state, l) && <text className="pipe-label">{l.label}</text>}
               <path
                 className="pipe-hit"
                 data-route
@@ -495,7 +566,17 @@ export const PortWires = memo(function PortWires() {
                     return beginDetach(e, port.dataset.panel, port.dataset.portId);
                   }
                   e.stopPropagation();
-                  setSelected(l.id);
+                  const w = toWorld(e.clientX - camera.left, e.clientY - camera.top);
+                  setPicked({ id: l.id, x: w.x, y: w.y });
+                  setHover(null);
+                }}
+                onContextMenu={(e) => {
+                  // a right-click on a wire opens its bar too (Disconnect is the one thing a wire's menu would hold)
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const w = toWorld(e.clientX - camera.left, e.clientY - camera.top);
+                  setPicked({ id: l.id, x: w.x, y: w.y });
+                  setHover(null);
                 }}
                 // a wire's hit area lies over the ports it lands on: where a port is under the pointer, the port
                 // answers (its own label: what's on it, where it goes), not the wire
@@ -522,7 +603,21 @@ export const PortWires = memo(function PortWires() {
         })}
         {d && <path ref={ghost} className={`pipe-ghost${d.snap ? " is-snapped" : ""}`} style={{ ["--wire-tone" as string]: toneOf(d.type) }} />}
       </svg>
-      {hovered && hover && <PipeTip link={hovered} x={hover.x} y={hover.y} />}
+      <div className="flow-chips">
+        {links.map((l) => (
+          <FlowChip
+            key={l.id}
+            link={l}
+            hot={hover?.id === l.id || selected === l.id}
+            ref={(el) => {
+              if (el) chips.current.set(l.id, el);
+              else chips.current.delete(l.id);
+            }}
+          />
+        ))}
+      </div>
+      {hovered && hover && !selected && <PipeTip link={hovered} x={hover.x} y={hover.y} />}
+      {selected && picked && state.links[selected] && <WireBar link={state.links[selected]} x={picked.x} y={picked.y} onDone={() => setPicked(null)} />}
     </>
   );
 });
@@ -544,8 +639,8 @@ function PipeTip({ link, x, y }: { link: LinkDoc; x: number; y: number }) {
         {fromPort ? ` (${fromPort.name})` : ""} → into <b>{to?.name}</b>
         {toPort ? ` (${toPort.name})` : ""}
       </span>
-      <span className="pipe-tip-value">{sayValue(from?.outputs?.[link.from.port])}</span>
-      <span className="pipe-tip-hint">click to select · ⌫ removes</span>
+      <ValueSample value={from?.outputs?.[link.from.port]} />
+      <span className="pipe-tip-hint">press it for its bar: Disconnect, or ⌫</span>
     </div>
   );
 }
@@ -555,4 +650,120 @@ export function usePortLayout(panel: PanelMeta) {
   // only the links: a whole-store subscription re-rendered every app on the board at each press, drag frame and keystroke
   const links = useSyncExternalStore(subscribe, () => getState().links);
   return useMemo(() => portLayout(panel, Object.values(links)), [panel, links]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+// ---------- what a wire carries, on the wire ----------
+
+/** the value at a wire's source end, as the client can see it (an app's or connector's output; a table's rows are the server's to read) */
+function wireValue(l: LinkDoc): unknown {
+  return getState().panels[l.from.panel]?.outputs?.[l.from.port];
+}
+
+/** a wire shows its chip (and not its plain label) when something is on it or it feeds a table the server fills */
+function chipShows(state: ReturnType<typeof getState>, l: LinkDoc): boolean {
+  return state.panels[l.from.panel]?.outputs?.[l.from.port] !== undefined || !!state.tables[l.to.panel];
+}
+
+/**
+ * The chip riding a wire (2026-11-24): a peek at what's on it ("12 rows × 4 columns"), and what the card it
+ * feeds is doing: working (a spinner, while the server reads the source or the card generates), waiting for
+ * data, or why it failed. It rings once when a new value arrives. Placed per frame by PortWires' loop.
+ */
+function FlowChip({ link, hot, ref }: { link: LinkDoc; hot: boolean; ref: (el: HTMLDivElement | null) => void }) {
+  const from = usePanel(link.from.panel);
+  const value = from?.outputs?.[link.from.port];
+  const tick = useFlowTick(link.to.panel);
+  const work: FlowWork = flowWork(link, value, tick);
+  const [fresh, setFresh] = useState(false);
+  const last = useRef(value);
+  useEffect(() => {
+    if (last.current === value) return;
+    last.current = value;
+    setFresh(true);
+    const t = setTimeout(() => setFresh(false), 900);
+    return () => clearTimeout(t);
+  }, [value]);
+  const shows = value !== undefined || work.kind !== "idle";
+  return (
+    <div
+      ref={ref}
+      className={`flow-chip is-${work.kind}${fresh ? " is-fresh" : ""}${hot ? " is-hot" : ""}`}
+      data-link={link.id}
+      data-flow={work.kind}
+      style={{ ["--wire-tone" as string]: toneOf(portType(link.from.panel, link.from.port)), visibility: shows ? undefined : "hidden" }}
+      title={work.title}
+    >
+      <span>{work.text ?? peek(value)}</span>
+    </div>
+  );
+}
+
+/** re-render a chip when the server's state for the card it feeds changes (its `flows` entry, a character's stage) */
+function useFlowTick(cardId: string): string {
+  const board = useActiveBoard();
+  const sub = useCallback(
+    (fn: () => void) => {
+      if (!board) return () => {};
+      const maps = boardMaps(board.doc);
+      const on = (e: { keysChanged: Set<string> }) => e.keysChanged.has(cardId) && fn();
+      maps.flows.observe(on);
+      maps.characters.observe(on);
+      return () => {
+        maps.flows.unobserve(on);
+        maps.characters.unobserve(on);
+      };
+    },
+    [board, cardId],
+  );
+  return useSyncExternalStore(sub, () => {
+    if (!board) return "";
+    const maps = boardMaps(board.doc);
+    const f = maps.flows.get(cardId);
+    const c = maps.characters.get(cardId);
+    const running = c ? Object.entries(c.stages ?? {}).find(([, x]) => x?.state === "running") : undefined;
+    return `${f?.status ?? ""}:${f?.at ?? 0}:${running ? `${running[0]}:${running[1]?.progress ?? 0}` : ""}`;
+  });
+}
+
+/** a pressed wire's bar: what flows along it now, and Disconnect (⌫ does the same; ⌘Z puts it back) */
+function WireBar({ link, x, y, onDone }: { link: LinkDoc; x: number; y: number; onDone: () => void }) {
+  const from = usePanel(link.from.panel) ?? endPanel(link.from.panel);
+  const to = usePanel(link.to.panel) ?? endPanel(link.to.panel);
+  const st = getState();
+  const toName = to?.name ?? st.tables[link.to.panel]?.name ?? st.notes[link.to.panel]?.name ?? "a card that's gone";
+  const fromName = from?.name ?? st.tables[link.from.panel]?.name ?? st.notes[link.from.panel]?.name ?? "?";
+  const fromPort = from?.ports.find((p) => p.id === link.from.port);
+  const value = wireValue(link);
+  return (
+    <div
+      className="wire-bar"
+      data-wire-bar={link.id}
+      style={{ transform: `translate3d(${x}px, ${y}px, 0) scale(${1 / camera.scale}) translate(12px, 12px)`, ["--wire-tone" as string]: toneOf(fromPort?.type) }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <span className="wire-bar-head">
+        <b>{fromName}</b>→<b>{toName}</b>
+        <i>{fromPort?.type ?? "json"}</i>
+      </span>
+      <span className="wire-bar-head">{value === undefined && st.tables[link.from.panel] ? "its rows" : peek(value)}</span>
+      {value !== undefined && <ValueSample value={value} />}
+      <span className="wire-bar-actions">
+        <button
+          type="button"
+          className="is-cut"
+          data-wire-disconnect
+          onClick={() => {
+            disconnect(link.id);
+            onDone();
+          }}
+        >
+          Disconnect
+        </button>
+        <button type="button" onClick={onDone}>
+          Close
+        </button>
+        <span className="wire-bar-key">⌫ · ⌘Z undoes</span>
+      </span>
+    </div>
+  );
 }

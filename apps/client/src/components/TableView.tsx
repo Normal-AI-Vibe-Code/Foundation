@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { TableFeed } from "./TableFeed";
 import { AgentPill } from "../characters/AgentPill";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
@@ -617,6 +618,9 @@ export const TableView = memo(function TableView({ table, framePos, isActive, ge
             </button>
           </div>
         </div>
+
+        {/* what's wired into it and its lens (shown only while it's fed) */}
+        {!table.folded && <TableFeed table={table} />}
 
         {/* spreadsheet grid (kept, not drawn, while minimized) */}
         <div

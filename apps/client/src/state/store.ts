@@ -11,7 +11,7 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { isHostable, type HuddleState, type LinkDoc, type NoteSize, type PanelDoc } from "@foundation/protocol";
+import { isHostable, type HuddleState, type LinkDoc, type NoteSize, type PanelDoc, type TableFeed } from "@foundation/protocol";
 import { workbook } from "../engine/workbook";
 
 let idCounter = 0;
@@ -42,6 +42,8 @@ interface ObjectBase {
 export interface TableMeta extends ObjectBase {
   cols: number;
   rows: number;
+  /** the lens on what's wired into it (protocol TableDoc.feed; the server fills the table through it, flows.ts) */
+  feed?: TableFeed;
 }
 
 export interface MapMeta extends ObjectBase {
@@ -2070,6 +2072,18 @@ export function renameTable(id: string, name: string): boolean {
   if (!workbook.renameTable(id, name.trim())) return false;
   set({ tables: { ...state.tables, [id]: { ...t, name: name.trim() } } });
   return true;
+}
+
+/** a table's lens on what's wired into it: the server refills it (an ordinary change: ⌘Z takes it back) */
+export function setTableFeed(id: string, feed: TableFeed) {
+  const t = state.tables[id];
+  if (!t) return;
+  const next: TableFeed = {};
+  if (feed.filter?.trim()) next.filter = feed.filter.trim();
+  if (feed.columns?.trim()) next.columns = feed.columns.trim();
+  if (feed.limit) next.limit = feed.limit;
+  if (JSON.stringify(next) === JSON.stringify(t.feed ?? {})) return;
+  set({ tables: { ...state.tables, [id]: { ...t, feed: next } } });
 }
 
 export function resizeTable(id: string, cols: number, rows: number) {
