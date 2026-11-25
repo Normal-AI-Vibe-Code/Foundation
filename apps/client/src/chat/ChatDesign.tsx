@@ -26,6 +26,7 @@ import { InboxDemo } from "./tabs/InboxDesign";
 import { SideMenuDemo } from "./SideMenuDesign";
 import { ChatServerNoteView, ChatSignInView } from "./ChatServer";
 import { ChatServerSettingView } from "../settings/ChatServerSetting";
+import { FORM_CHAT_SERVER } from "./serverLogic";
 
 const NOW = Date.now();
 const MIN = 60_000;
@@ -251,13 +252,13 @@ export function ChatServerDemo() {
           Settings · ChatForm on Foundation's server
         </p>
         <div className="chat-server-demo-card is-rows set-rows">
-          <ChatServerSettingView current="" foundation="localhost:4410" onUse={noop} initialDraft="" />
+          <ChatServerSettingView current="" foundation="localhost:4410" remembered={[FORM_CHAT_SERVER, { origin: "http://localhost:4420" }]} onUse={noop} initialDraft="" />
         </div>
         <p className="chat-demo-cap" style={{ marginTop: "var(--space-6)" }}>
           Settings · on a chat server
         </p>
         <div className="chat-server-demo-card is-rows set-rows">
-          <ChatServerSettingView current="https://chatform.vercel.app" foundation="localhost:4410" account={{ name: "Josh Leong", email: "josh@formindustries.co" }} onUse={noop} onSignOut={noop} />
+          <ChatServerSettingView current={FORM_CHAT_SERVER.origin} foundation="localhost:4410" remembered={[FORM_CHAT_SERVER]} account={{ name: "Josh Leong", email: "josh@formindustries.co" }} onUse={noop} onSignOut={noop} />
         </div>
       </div>
     </div>

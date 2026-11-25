@@ -42,8 +42,7 @@ impl Config {
     pub fn from_env() -> Self {
         let on_vercel = env("VERCEL").is_some();
         let port = env("CHATFORM_PORT").and_then(|p| p.parse().ok()).unwrap_or(4420);
-        let database_url = env("DATABASE_URL").or_else(|| env("POSTGRES_URL")).unwrap_or_else(|| "postgres://postgres@localhost:15432/chatform".into());
-        let listen_url = env("DATABASE_URL_UNPOOLED").or_else(|| env("POSTGRES_URL_NON_POOLING")).unwrap_or_else(|| database_url.clone());
+        let (database_url, listen_url) = Self::database_urls(env);
         let public_url = env("CHATFORM_PUBLIC_URL")
             .or_else(|| env("VERCEL_PROJECT_PRODUCTION_URL").map(|h| format!("https://{h}")))
             .unwrap_or_else(|| format!("http://localhost:{port}"));
@@ -71,6 +70,17 @@ impl Config {
             google_token_url,
             google_userinfo_url,
         }
+    }
+
+    /// The query and LISTEN addresses. A database Vercel connects with a prefix (its Storage tab's "Prefix", say
+    /// `NEON_CHAT`) names them `NEON_CHAT_DATABASE_URL` and so on; `CHATFORM_DATABASE_PREFIX` says which prefix to read,
+    /// since the values are secret and can't be copied to the plain names
+    fn database_urls(get: impl Fn(&str) -> Option<String>) -> (String, String) {
+        let p = get("CHATFORM_DATABASE_PREFIX").map(|p| format!("{}_", p.trim_end_matches('_'))).unwrap_or_default();
+        let one = |names: &[&str]| names.iter().find_map(|n| get(&format!("{p}{n}")));
+        let database_url = one(&["DATABASE_URL", "POSTGRES_URL"]).unwrap_or_else(|| "postgres://postgres@localhost:15432/chatform".into());
+        let listen_url = one(&["DATABASE_URL_UNPOOLED", "POSTGRES_URL_NON_POOLING"]).unwrap_or_else(|| database_url.clone());
+        (database_url, listen_url)
     }
 
     /// Google's own addresses (sign-in page, token exchange, userinfo)
@@ -141,6 +151,16 @@ mod tests {
         assert!(!c.allowed("other@gmail.com"));
         assert!(!c.allowed("x@notformindustries.com"));
         assert!(!c.allowed("x@formindustries.co.evil.com"));
+    }
+    #[test]
+    fn a_prefixed_database_is_read_when_the_prefix_is_named() {
+        let vars = |pairs: &'static [(&'static str, &'static str)]| move |k: &str| pairs.iter().find(|(n, _)| *n == k).map(|(_, v)| v.to_string());
+        let plain = vars(&[("DATABASE_URL", "pooled"), ("DATABASE_URL_UNPOOLED", "direct")]);
+        assert_eq!(Config::database_urls(plain), ("pooled".into(), "direct".into()));
+        let prefixed = vars(&[("CHATFORM_DATABASE_PREFIX", "NEON_CHAT_"), ("NEON_CHAT_DATABASE_URL", "pooled"), ("NEON_CHAT_DATABASE_URL_UNPOOLED", "direct"), ("DATABASE_URL", "other")]);
+        assert_eq!(Config::database_urls(prefixed), ("pooled".into(), "direct".into()));
+        let pooled_only = vars(&[("CHATFORM_DATABASE_PREFIX", "NEON_CHAT"), ("NEON_CHAT_POSTGRES_URL", "pooled")]);
+        assert_eq!(Config::database_urls(pooled_only), ("pooled".into(), "pooled".into()));
     }
     #[test]
     fn origins_are_its_own_and_the_listed_ones() {

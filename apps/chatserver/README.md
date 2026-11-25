@@ -33,7 +33,9 @@ I can't sign in to Vercel, Google or Neon for you; these are the steps, about fi
 1. **Vercel project.** <https://vercel.com/new> → import `joshleong/Foundation` → **Root Directory** `apps/chatserver`
    → Framework Preset *Other*. (Or, from a terminal in `apps/chatserver`: `npx vercel login`, then `npx vercel link`.)
 2. **Postgres.** In the project: *Storage* → *Create Database* → **Neon** (free plan is plenty) → connect it to the
-   project. That sets `DATABASE_URL` and `DATABASE_URL_UNPOOLED`.
+   project. That sets `DATABASE_URL` and `DATABASE_URL_UNPOOLED`. If it was connected with a prefix (the store's
+   *Projects* tab shows it, e.g. `NEON_CHAT`, giving `NEON_CHAT_DATABASE_URL`), set `CHATFORM_DATABASE_PREFIX` to that
+   prefix: the values are secret, so they can't be copied to the plain names.
 3. **Google sign-in.** Google Cloud console, in the company's Workspace: *OAuth consent screen* → **Internal**;
    *Credentials* → *OAuth client ID* → **Web application**, authorized redirect URI
    `https://<project>.vercel.app/auth/google/callback`. A second Workspace (formindustries.co and normallab.co are two)

@@ -57,8 +57,11 @@ test("saying it (V) sends it to the crew", async () => {
   await page.keyboard.press("v");
   await expect(page.locator(".talk-heard")).toContainText("lay out all the images");
   await page.screenshot({ path: `${CREW}/08_v-listening.png` });
-  // when the speaker stops, an agent of the crew takes it, by name, without a tab opening (2026-11-07)
-  await expect(page.locator(".crew-row.is-mine").first()).toBeVisible({ timeout: 10_000 });
+  // when the speaker stops, an agent of the crew takes it, by name, without a tab opening (2026-11-07); the grid's council
+  // opens by itself and shows its work over its head, not in the strip over the bar (2026-11-24)
+  await expect(page.locator(".council-place.is-board .council [data-council-doing]").first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".council-place.is-board .council [data-council-name]").first()).not.toHaveText("");
+  await expect(page.locator(".talk-sheet.is-roster .crew-row.is-mine")).toHaveCount(0);
   await expect(page.locator(".session.floor-pane")).toHaveCount(0);
   await expect(page.locator(".tab.is-board.is-current")).toHaveCount(1);
   await page.screenshot({ path: `${CREW}/09_v-sent-to-the-crew.png` });

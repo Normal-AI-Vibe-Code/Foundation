@@ -93,6 +93,10 @@ export interface CrewPresence {
   guide: { to: string; target: { id: string; kind: "object" | "section" }; name: string; note?: string; nonce: number } | null;
   status: "working" | "done" | "stopped" | "error";
   at: number;
+  /** the run's plan, its latest reasoning and when it began (docs/agent-harness.md §2); absent from an older server */
+  plan?: import("@foundation/protocol").CrewPlan | null;
+  thought?: string;
+  started?: number;
 }
 
 /** someone else writing in a note: their selection (from === to for a bare caret) */

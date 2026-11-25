@@ -6,8 +6,8 @@
 
 import { useState } from "react";
 import { SERVER_NAME } from "../lib/api";
-import { BUILT_CHAT_SERVER, CHAT_SERVER, chooseChatServer } from "../chat/server";
-import { chatServerName, chatServerOrigin } from "../chat/serverLogic";
+import { BUILT_CHAT_SERVER, CHAT_SERVER, chooseChatServer, REMEMBERED_CHAT_SERVERS } from "../chat/server";
+import { chatServerName, chatServerOrigin, type KnownChatServer } from "../chat/serverLogic";
 import { signOutOfChat, useChat } from "../chat/model";
 import { Row } from "./SettingsSpace";
 import "../chat/chat.css";
@@ -19,6 +19,8 @@ export interface ChatServerSettingViewProps {
   foundation: string;
   /** who this device is on the chat server */
   account?: { name: string; email: string } | null;
+  /** the servers to offer with a Use each: the team's, and the ones this device has used */
+  remembered?: KnownChatServer[];
   onUse(address: string): void;
   onSignOut?(): void;
   error?: string;
@@ -45,6 +47,16 @@ export function ChatServerSettingView(p: ChatServerSettingViewProps) {
           </button>
         )}
       </Row>
+      {(p.remembered ?? []).map((s) => {
+        const inUse = s.origin === p.current;
+        return (
+          <Row key={s.origin} name={s.name ?? chatServerName(s.origin)} detail={s.name ? `${s.note ? `${s.note} · ` : ""}${chatServerName(s.origin)}` : (s.note ?? "Used on this device before")}>
+            <button type="button" className="f-pill" disabled={inUse} onClick={() => p.onUse(s.origin)} data-chat-server-remembered={s.origin}>
+              {inUse ? "In use" : "Use"}
+            </button>
+          </Row>
+        );
+      })}
       <Row name="A chat server's address" detail={p.error ? <span className="chat-server-error">{p.error}</span> : "Changing it reloads this window. You sign in there once, with Google."}>
         <form
           className="chat-server-form"
@@ -83,6 +95,7 @@ export function ChatServerSetting() {
       current={CHAT_SERVER}
       foundation={SERVER_NAME}
       account={s.account}
+      remembered={REMEMBERED_CHAT_SERVERS}
       error={error}
       initialDraft={CHAT_SERVER ? undefined : BUILT_CHAT_SERVER ? chatServerName(BUILT_CHAT_SERVER) : ""}
       onUse={(a) => {

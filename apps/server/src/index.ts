@@ -24,7 +24,8 @@ import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
-import { followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
+import { claudeAccount, followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
+import { apiState, claudeModels, clearApiKey, federationState, setApiKey, setDefaultModel, setFederation } from "./agentkinds.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { hostTerminals, requestHostTerminal } from "./hostterm.ts";
 import { cardPageOf, hostBrowserRunning, requestHostBrowser } from "./hostbrowser.ts";
@@ -54,7 +55,7 @@ import { beginGrant, downloadsStatus, dropSession, fileThumb } from "./flowformf
 import { isPerson, requirePerson } from "./auth.ts";
 import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
 import { connectLocal, localStatus, resumeLocal, stopLocal } from "./localdev.ts";
-import { availableAgents, postAgent, unpostAgent } from "./posted.ts";
+import { availableAgents, findSeat, postAgent, seatKind, seatModel, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { answerAppToolAsk } from "./apptools.ts";
@@ -980,15 +981,66 @@ r.get("/api/characters/:id/files/:role", (req, res) => {
 
 r.get("/api/agents/available", (req) => {
   requireUser(req);
-  return availableAgents();
+  return { ...availableAgents(), codeMode: true };
+});
+
+// ---------- the server's own Claude, by kind (agentkinds.ts; docs/agent-harness.md §1) ----------
+// a person reads how each stands; an admin, in person, changes the key, the default model or federation.
+// The key is never in a response (last4 at most), a log line, a URL or a child's environment
+const claudeAdmin = (req: Req, what: string) => {
+  const u = requirePerson(req, what);
+  if (u.role !== "admin") throw new HttpError(403, `Only an admin can do that (${what.toLowerCase()}).`);
+  return u;
+};
+r.get("/api/agents/claude", async (req) => {
+  const u = requirePerson(req, "Reading how Claude is set up");
+  // where the identity token is kept on the server is for admins
+  const fed = federationState({ admin: u.role === "admin" });
+  return { account: await claudeAccount(), api: apiState(), federated: { configured: fed.configured, ...(fed.why ? { why: fed.why } : {}) } };
+});
+r.on("PUT", "/api/agents/claude/key", async (req) => {
+  const u = claudeAdmin(req, "Setting Claude's API key");
+  const { key } = await readJson<{ key?: unknown }>(req);
+  return { api: await setApiKey(u, key) };
+});
+r.delete("/api/agents/claude/key", async (req) => {
+  const u = claudeAdmin(req, "Forgetting Claude's API key");
+  const { confirm } = await readJson<{ confirm?: unknown }>(req);
+  if (confirm !== true) throw new HttpError(400, "Forgetting the key needs confirm: true. Seats that run on it stop until another is added.");
+  return { api: clearApiKey(u) };
+});
+r.get("/api/agents/claude/models", async (req) => {
+  requirePerson(req, "Listing Claude's models");
+  return claudeModels();
+});
+r.on("PUT", "/api/agents/claude/model", async (req) => {
+  const u = claudeAdmin(req, "Choosing Claude's model");
+  const { model } = await readJson<{ model?: unknown }>(req);
+  return { api: await setDefaultModel(u, model) };
+});
+r.get("/api/agents/claude/federation", (req) => {
+  claudeAdmin(req, "Reading Claude's federated identity");
+  return { federated: federationState() };
+});
+r.on("PUT", "/api/agents/claude/federation", async (req) => {
+  const u = claudeAdmin(req, "Setting Claude's federated identity");
+  const body = await readJson<Record<string, unknown>>(req);
+  return { federated: setFederation(u, body) };
+});
+r.delete("/api/agents/claude/federation", async (req) => {
+  const u = claudeAdmin(req, "Forgetting Claude's federated identity");
+  const { confirm } = await readJson<{ confirm?: unknown }>(req);
+  if (confirm !== true) throw new HttpError(400, "Forgetting federated identity needs confirm: true.");
+  return { federated: setFederation(u, null) };
 });
 r.post("/api/boards/:id/agents", async (req) => {
   const u = requireUser(req);
   requireBoard(u, req.params.id);
   requireWriter(u, req.params.id);
-  const { place, agent } = await readJson<{ place?: string; agent?: string }>(req);
+  const { place, agent, model } = await readJson<{ place?: string; agent?: string; model?: unknown }>(req);
   if (!place || !agent) throw new HttpError(400, "place (a section id, or * for the grid) and agent required");
-  return postAgent(req.params.id, place, agent, u);
+  // a seat's own model (claude-api, claude-federated only; postAgent refuses it for the others)
+  return postAgent(req.params.id, place, agent, u, await seatModel(model));
 });
 r.post("/api/boards/:id/agents/remove", async (req) => {
   const u = requireUser(req);
@@ -1233,13 +1285,20 @@ r.get("/api/t3host/presets", (req) => {
 // in-process (agent.ts startRun), not through this route. Still in READ_POSTS: a viewer who is a person may ask
 r.post("/api/agent", async (req, res) => {
   const user = requirePerson(req, "Asking the agent");
-  const body = await readJson<{ board?: string; prompt?: string; runtime?: string; session?: string; persona?: string; as?: string }>(req);
+  const body = await readJson<{ board?: string; prompt?: string; session?: string; persona?: string; as?: string; seat?: string }>(req);
   if (!body.prompt?.trim()) throw new HttpError(400, "say something");
   requireBoard(user, body.board || "company");
+  // which seat it's for (its id, or the name it goes by): how it runs is that seat's kind as this server knows it,
+  // never a runtime the request names (a `runtime` in the body is not read). No seat: the server's own default
+  const seat = findSeat(body.board || "company", { seat: body.seat, as: body.as });
+  // a seat named but not on this grid is not the default agent in disguise: it might have been a claude seat
+  if ((body.seat || body.as) && !seat) throw new HttpError(404, "No such seat on this grid: it may have been taken off. Pick an agent on the council again.");
+  const kind = seat ? seatKind(seat) : undefined;
+  if (kind === "t3") throw new HttpError(409, `${seat?.alias ?? seat?.name} is one of T3's agents: ask it through T3 (/api/t3host/threads).`);
   const send = sse(res);
   const session = body.session && /^ses_[a-z0-9]{6,24}$/.test(body.session) ? body.session : undefined;
   // the run lives on the server: closing this stream detaches, it doesn't stop it
-  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, runtime: body.runtime, session, persona: body.persona === "shiba" ? "shiba" : undefined, as: body.as });
+  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, kind, model: seat?.model, session, persona: body.persona === "shiba" ? "shiba" : undefined, as: body.as });
   await new Promise<void>((done) => {
     const detach = followRun(r.id, user.id, send, done);
     res.on("close", () => (detach?.(), done()));
@@ -1349,7 +1408,7 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("access-control-allow-headers", "content-type, authorization, range, mcp-session-id, mcp-protocol-version");
     res.setHeader("access-control-expose-headers", "etag, x-image-level, x-image-natural-width, x-image-natural-height, x-image-width, x-image-height, x-image-alpha");
-    res.setHeader("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+    res.setHeader("access-control-allow-methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.setHeader("access-control-max-age", "600");
     res.setHeader("vary", "origin");
   }

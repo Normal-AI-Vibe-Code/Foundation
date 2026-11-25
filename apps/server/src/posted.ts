@@ -15,15 +15,20 @@
  * those, never taken from the request.
  */
 
-import { GRID_PLACE, boardMaps, logActivity, postedAgentsOf, type PostedAgent, type UserInfo } from "@foundation/protocol";
+import { GRID_PLACE, boardMaps, logActivity, postedAgentsOf, type AgentKind, type PostedAgent, type UserInfo } from "@foundation/protocol";
 import { randomBytes } from "node:crypto";
 import { runtimes } from "./agent.ts";
+import { CLAUDE_KEYS, claudeModels, federationState, kindOfKey, runsSentence } from "./agentkinds.ts";
 import { CREW_NAMES } from "./crew.ts";
 import { editBoard, getBoard } from "./boards.ts";
 import { HttpError } from "./http.ts";
 import { t3Host, type T3Agent } from "./t3host.ts";
 
 export interface AvailableAgent extends Omit<PostedAgent, "by" | "byName" | "at"> {
+  /** what it is (docs/agent-harness.md §1): always set on what's available */
+  kind: AgentKind;
+  /** one sentence: where it runs and who pays */
+  runs: string;
   /** can take work now */
   ready: boolean;
   /** why not, when it can't */
@@ -58,33 +63,67 @@ function t3Service(a: T3Agent): string {
   return a.account ? `${a.account}, signed in on this computer` : "signed in on this computer";
 }
 
-/** every agent that can be assigned: the server's own, then this computer's (when its host runs) */
+/**
+ * every agent that can be assigned: the server's own three kinds of Claude (its Claude Code sign-in, its API
+ * key, its federated identity), then this computer's T3 agents (when its host runs). Each says its kind and,
+ * in a sentence, where it runs and who pays. The scripted stand-in (tests) answers for all three Claudes.
+ */
 export function availableAgents(): { agents: AvailableAgent[]; t3: "off" | "starting" | "running" | "error" } {
-  const rt = runtimes() as { subscription?: boolean; api?: boolean; script?: boolean; model?: string };
-  if (process.env.FOUNDATION_AGENT_SCRIPT === "1") rt.script = true;
-  const own = Boolean(rt.subscription || rt.api || rt.script);
+  const rt = runtimes();
+  const script = process.env.FOUNDATION_AGENT_SCRIPT === "1";
+  const fed = federationState();
   const agents: AvailableAgent[] = [
     {
-      key: "claude",
+      key: CLAUDE_KEYS.account,
+      kind: "claude-account",
       name: "Claude",
       provider: "claude",
       where: "cloud",
-      service: rt.subscription ? "Claude Code on the server, on its Claude subscription" : rt.api ? "the Claude API, on credits" : rt.script ? "a scripted stand-in (tests)" : "not set up on this server",
-      model: rt.api && !rt.subscription ? rt.model : undefined,
+      service: rt.subscription ? "Claude Code on the server, on its Claude subscription" : script ? "a scripted stand-in (tests)" : "Claude Code isn't set up on the server",
+      runs: runsSentence("claude-account"),
       tools: true,
-      ready: own,
-      why: own ? undefined : "Claude Code isn't installed on the server and there's no API key",
+      ready: rt.subscription || script,
+      ...(rt.subscription || script ? {} : { why: `Claude Code can't start on the server: ${rt.subscriptionNote ?? "it isn't installed"}` }),
+    },
+    {
+      key: CLAUDE_KEYS.api,
+      kind: "claude-api",
+      name: "Claude (API key)",
+      provider: "claude",
+      where: "cloud",
+      service: rt.api ? `the Anthropic API, on Foundation's key (${rt.model})` : script ? "a scripted stand-in (tests)" : "the Anthropic API, once an admin adds a key",
+      model: rt.model,
+      runs: runsSentence("claude-api"),
+      tools: true,
+      ready: rt.api || script,
+      ...(rt.api || script ? {} : { why: "No API key yet: an admin adds one in Settings → Agents." }),
+    },
+    {
+      key: CLAUDE_KEYS.federated,
+      kind: "claude-federated",
+      name: "Claude (federated)",
+      provider: "claude",
+      where: "cloud",
+      service: fed.configured ? `the Anthropic API, on your organization's workspace (${rt.model})` : script ? "a scripted stand-in (tests)" : "the Anthropic API, once federated identity is set up",
+      model: rt.model,
+      runs: runsSentence("claude-federated"),
+      tools: true,
+      ready: fed.configured || script,
+      ...(fed.configured || script ? {} : { why: fed.why }),
     },
   ];
   const host = t3Host();
   for (const a of host.agents) {
     if (!a.enabled) continue;
+    const service = t3Service(a);
     agents.push({
       key: `t3:${a.id}`,
+      kind: "t3",
       name: a.name,
       provider: providerOfT3(a),
       where: a.where,
-      service: t3Service(a),
+      service,
+      runs: runsSentence("t3", { service }),
       model: a.model,
       tools: a.boardTools,
       ready: a.state === "ready",
@@ -92,6 +131,24 @@ export function availableAgents(): { agents: AvailableAgent[]; t3: "off" | "star
     });
   }
   return { agents, t3: host.state };
+}
+
+/** a seat's kind as the server knows it: from its key (older seats carry none) */
+export function seatKind(seat: Pick<PostedAgent, "key">): AgentKind {
+  return kindOfKey(seat.key) ?? "claude-account";
+}
+
+/**
+ * The seat an ask is for, on this grid: by its id, else by the name it goes by (the client's `as`). Only to
+ * learn which seat it is: what it runs as is then the seat's, from the server's own record.
+ */
+export function findSeat(boardId: string, ref: { seat?: unknown; as?: unknown }): PostedAgent | undefined {
+  const id = typeof ref.seat === "string" ? ref.seat : "";
+  const alias = typeof ref.as === "string" ? ref.as.trim() : "";
+  if (!id && !alias) return undefined;
+  const all: PostedAgent[] = [];
+  for (const list of boardMaps(getBoard(boardId).doc).agents.values()) if (Array.isArray(list)) all.push(...list);
+  return (id ? all.find((p) => p.id === id) : undefined) ?? (alias ? all.find((p) => (p.alias ?? p.name) === alias) : undefined);
 }
 
 function placeName(boardId: string, place: string): string {
@@ -121,23 +178,45 @@ export function freeAlias(taken: Iterable<string>, seed: string): string {
  * my first agent … let me spawn another claude session"): every seat is its own, with its own id and its own name from
  * the crew's names, so the same agent can sit twice (each its own sessions, its own character); up to MAX_SEATS.
  */
-export function postAgent(boardId: string, place: string, key: string, user: UserInfo): { agents: PostedAgent[]; seat: PostedAgent } {
+export function postAgent(boardId: string, place: string, key: string, user: UserInfo, model?: string): { agents: PostedAgent[]; seat: PostedAgent } {
   const where = placeName(boardId, place);
   const found = availableAgents().agents.find((a) => a.key === key);
   if (!found) throw new HttpError(404, key.startsWith("t3:") ? "That agent isn't on this computer right now. Start this computer's agents in Settings → Agents." : "No such agent");
+  if (model !== undefined && found.kind !== "claude-api" && found.kind !== "claude-federated") throw new HttpError(400, "Only a Claude on the API (an API key or federated identity) takes a model of its own.");
   return editBoard(boardId, "posted", (doc) => {
     const m = boardMaps(doc);
     const now = postedAgentsOf(doc, place);
     if (now.length >= MAX_SEATS) throw new HttpError(409, `A council holds ${MAX_SEATS} agents at most; take one off first.`);
     const taken: string[] = [];
     for (const list of m.agents.values()) for (const p of Array.isArray(list) ? list : []) taken.push(p.alias ?? p.name);
-    const { ready: _ready, why: _why, ...what } = found;
+    // what it is, as the server reads it now; a Claude on the API carries no model of its own, so it follows the default
+    const { ready: _ready, why: _why, runs: _runs, ...what } = found;
+    if (what.kind === "claude-api" || what.kind === "claude-federated") {
+      delete what.model;
+      // …unless the person adding it chose one for this seat (seatModel checked it)
+      if (model) what.model = model;
+    }
     const seat: PostedAgent = { ...what, by: user.id, byName: user.name, at: Date.now(), id: `seat_${randomBytes(6).toString("hex")}`, alias: freeAlias(taken, `${boardId}:${place}:${key}:${now.length}`) };
     const next = [...now, seat];
     m.agents.set(place, next);
     logActivity(doc, { who: user.name, role: "human", text: `put ${seat.alias} (${found.name}) on the council of ${where}`, objectId: place === GRID_PLACE ? undefined : place });
     return { agents: next, seat };
   });
+}
+
+const SEAT_MODEL = /^claude-[a-z0-9.-]{2,80}$/;
+
+/**
+ * A model a person chose for one claude-api or claude-federated seat: a Claude model id, and one on the list when
+ * the list is Anthropic's own (the built-in list may lag behind it, as for the default). Undefined: none chosen.
+ */
+export async function seatModel(raw: unknown): Promise<string | undefined> {
+  if (raw === undefined || raw === null || raw === "") return undefined;
+  const model = typeof raw === "string" ? raw.trim() : "";
+  if (!SEAT_MODEL.test(model)) throw new HttpError(400, "Name a Claude model id (claude-…), as the model list gives it.");
+  const list = await claudeModels();
+  if (list.source === "live" && !list.models.some((m) => m.id === model)) throw new HttpError(400, `${model} isn't one of the models this server's Claude can use.`);
+  return model;
 }
 
 /** take a seat off a council: by its id, or (an older seat, with none) by its agent's key */

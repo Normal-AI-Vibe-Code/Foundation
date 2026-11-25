@@ -156,8 +156,11 @@ test("asked aloud, an agent goes to work in the open: Kai sees its cursor reach 
   await ada.screenshot({ path: `${SHOTS}/02_ada-holding-space.png` });
   await ada.keyboard.up("Space");
 
-  // the crew at work, in Ada's sheet, and Kai's view of it
-  await expect(ada.locator(".crew-row.is-mine").first()).toBeVisible({ timeout: 5000 });
+  // the crew at work: Ada's own ask started on the grid, so the grid's council opens by itself and the lead's work shows
+  // over its head (2026-11-24), not in the strip over the bar; and Kai's view of it
+  await expect(ada.locator(".council-place.is-board .council")).toBeVisible({ timeout: 5000 });
+  await expect(ada.locator(".council-place.is-board .council [data-council-doing]").first()).toBeVisible({ timeout: 5000 });
+  await expect(ada.locator(".talk-sheet.is-roster .crew-row.is-mine")).toHaveCount(0);
   const supply = await expect.poll(() => sectionId(kai, "Supply"), { timeout: 10_000 }).not.toBeNull().then(() => sectionId(kai, "Supply"));
   // Kai frames the new section so he can watch the work land
   await kai.evaluate((id) => (window as unknown as { __foundation: { setState(p: object): void } }).__foundation.setState({ snapRequest: { kind: "section", id, nonce: Math.random() } }), supply);
@@ -263,7 +266,8 @@ test("Stop stops an agent; nothing is left behind", async () => {
   await ada.keyboard.down("Space");
   await expect(ada.locator(".talk-heard")).toContainText("Stopped", { timeout: 4000 });
   await ada.keyboard.up("Space");
-  const stop = ada.locator(".crew-row.is-mine .crew-row-btn.is-stop").first();
+  // Stop is on the bar over the agent's head, on the grid's council (2026-11-24; the open voice sheet keeps one too)
+  const stop = ada.locator(".council-place.is-board .council [data-council-stop]").first();
   await expect(stop).toBeVisible({ timeout: 5000 });
   await stop.click();
   await expect(kai.locator(".crew-cursor.is-stopped")).toHaveCount(1, { timeout: 5000 });

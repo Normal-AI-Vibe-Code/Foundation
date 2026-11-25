@@ -12,20 +12,26 @@
  * different kinds. Press one to add an agent; when every place is taken there is always one more.
  * The grid's council stands the same way on the window's bottom edge.
  *
- * Talking: nothing to type into until you roll over an agent. Then a line with a microphone opens
- * under it (above it, for the grid's), and what you write or say goes to that agent alone. At the
- * section's top right: speak to all of them at once, open the agents panel's Council tab (the long
- * conversation with all of them), close.
+ * Above each head (2026-11-24, Josh: one bar): one opaque bar with its model's mark, its name, whether
+ * it runs in the cloud or on this computer, and how it stands (a pulled plug when it can't be reached;
+ * it also looks the part: grey, head down). While it works, the same bar says what it's doing, alive,
+ * with Follow, and Open and Stop for the one who asked; beside its head, the run card (RunCard.tsx):
+ * its plan and its latest reasoning, the same for everyone on the grid.
  *
- * Above each head: whose model it is, whether it runs in the cloud or on this computer, and a pulled
- * plug when it can't be reached (it also looks the part: grey, head down).
+ * Talking: press an agent and the bar over its head becomes a line with a microphone; what you write
+ * or say goes to that agent alone. At the council's right: speak to all of them at once, open the
+ * agents panel's Council tab (the long conversation with all of them), close.
+ *
+ * A seat is as wide as its figure (a mesh avatar's picture, a 3D figure's frame, a still's own
+ * proportions): never cut at the sides, only at the edge it stands behind. Beside the agents, one
+ * silhouette asleep, and a small one peeking from behind it that adds an agent.
  */
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
-import type { Mood } from "@foundation/protocol";
-import { closeCouncil, councilSelection, logSaid, selectSeat, useCouncilOpen, type CouncilScope } from "../lib/councilOpen";
+import type { CrewPlan, Mood } from "@foundation/protocol";
+import { closeCouncil, councilOpen, councilSelection, logSaid, openCouncil, selectSeat, useCouncilOpen, type CouncilScope } from "../lib/councilOpen";
 import { useCrew, boardWhere } from "../lib/crewWatch";
 import { crewIsIn, sectionOfCrew } from "../lib/sectionCrew";
 import { GRID_PLACE, usePosted, type PostedAgent } from "../lib/posted";
@@ -35,17 +41,17 @@ import { AllGlyph, CloseGlyph, CloudGlyph, ComputerGlyph, MicGlyph, OfflineGlyph
 import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { useActiveBoard } from "../shell/Presence";
-import type { CrewPeer } from "../shell/Crew";
-import { askCrew, crewAsk } from "../state/sessions";
+import { followCrew, useFollowing, type CrewPeer } from "../shell/Crew";
+import { askCrew, crewAsk, stopSession, titleOf, useSession } from "../state/sessions";
 import { getState, requestSnap, subscribe } from "../state/store";
 import { camera, onCamera } from "../state/camera";
-import { floorInsets, getUi, setUi, toast, useUi } from "../state/ui";
+import { floorInsets, getUi, openSession, setUi, toast, useUi } from "../state/ui";
 import { Avatar, StageContext, Still, stillRole } from "./Avatar";
 import { AvatarStage } from "./actor";
 import { useMoods } from "./mood";
 import { ProviderMark, providerOf, type Provider } from "./providers";
 import { characterBytes, readyCharacters, seats as seatCharacters, useRoster, type Roster, type RosterCharacter } from "./roster";
-import { ghostCount } from "./places";
+import { RunCard } from "./RunCard";
 import "./council.css";
 
 export interface CouncilSeat {
@@ -83,6 +89,14 @@ export interface CouncilSeat {
   /** it can't be reached right now (its service is off, signed out, or gone), and why */
   offline?: boolean;
   why?: string;
+  /** its run's plan, latest reasoning and start, from its cursor (docs/agent-harness.md §2; an older server sends none) */
+  plan?: CrewPlan | null;
+  thought?: string;
+  started?: number;
+  /** a person here just sent it something and its agent hasn't joined yet (this window's, optimistic) */
+  pending?: boolean;
+  /** the session its run is in, when this window knows it (Open and Stop are the asker's) */
+  session?: string;
 }
 
 /** how much of a figure shows above the edge it stands behind (px of the grid for a section's, of the screen for the grid's) */
@@ -116,7 +130,7 @@ export function buildSeats(scope: CouncilScope, posted: Record<string, PostedAge
   const taken = new Set<string>();
   const places = [scope.kind === "section" ? scope.id : GRID_PLACE];
   const out: CouncilSeat[] = [];
-  const fromPeer = (p: CrewPeer): Partial<CouncilSeat> => ({ name: p.user.name, hue: p.crew.hue, status: p.crew.status, doing: p.crew.doing, task: p.crew.task, askerName: p.crew.askerName, leadName: p.crew.leadName, mine: p.crew.asker === me, crewId: p.crew.id, mood: moods[p.crew.id] ?? "idle" });
+  const fromPeer = (p: CrewPeer): Partial<CouncilSeat> => ({ name: p.user.name, hue: p.crew.hue, status: p.crew.status, doing: p.crew.doing, task: p.crew.task, askerName: p.crew.askerName, leadName: p.crew.leadName, mine: p.crew.asker === me, crewId: p.crew.id, mood: moods[p.crew.id] ?? "idle", plan: p.crew.plan ?? null, thought: p.crew.thought, started: p.crew.started });
 
   for (const place of places) {
     for (const a of posted[place] ?? []) {
@@ -229,12 +243,76 @@ export function preloadCouncil(characters: Array<RosterCharacter | undefined>) {
   }
   if (mesh) void import("mesh-avatar").catch(() => {});
 }
+// ---------------------------------------------------------------- what this window knows ahead of the grid
+
+/**
+ * A seat a person here just sent something to, before its agent has joined (2026-11-24: the card shows the run is alive
+ * from the first moment). Cleared when the seat's agent appears, when the ask fails or ends without it, or after 90 s.
+ */
+interface Pending {
+  at: number;
+  session?: string;
+}
+export const PENDING_MS = 90_000;
+let pending: ReadonlyMap<string, Pending> = new Map();
+const pendSubs = new Set<() => void>();
+const setPending = (next: Map<string, Pending>) => {
+  pending = next;
+  pendSubs.forEach((f) => f());
+};
+export function markPending(seatId: string) {
+  const next = new Map(pending);
+  next.set(seatId, { at: Date.now() });
+  setPending(next);
+}
+function pendingSession(seatId: string, session: string) {
+  const p = pending.get(seatId);
+  if (!p || p.session === session) return;
+  setPending(new Map(pending).set(seatId, { ...p, session }));
+}
+export function clearPending(seatId: string) {
+  if (!pending.has(seatId)) return;
+  const next = new Map(pending);
+  next.delete(seatId);
+  setPending(next);
+}
+const subPending = (f: () => void) => {
+  pendSubs.add(f);
+  return () => pendSubs.delete(f);
+};
+export const usePending = () => useSyncExternalStore(subPending, () => pending);
+
+/** the crew members the open council shows over their heads: the strip above the bottom bar leaves them out (shell/Talk.tsx) */
+let onCouncil: ReadonlySet<string> = new Set();
+let onCouncilKey = "";
+const onSubs = new Set<() => void>();
+function showOnCouncil(ids: string[]) {
+  const key = [...ids].sort().join("|");
+  if (key === onCouncilKey) return;
+  onCouncilKey = key;
+  onCouncil = new Set(ids);
+  onSubs.forEach((f) => f());
+}
+export function useCrewOnCouncil(): ReadonlySet<string> {
+  return useSyncExternalStore(
+    (f) => {
+      onSubs.add(f);
+      return () => onSubs.delete(f);
+    },
+    () => onCouncil,
+  );
+}
+
+/** a person's own ask that started on the grid opens the grid's council, once per agent (2026-11-24) */
+const seenCrew = new Set<string>();
 
 /** mounted with the shell: keeps the open grid's council warm (when its agents change, a moment after) */
 export function CouncilPreload() {
   const posted = usePosted();
   const roster = useRoster();
   const crew = useCrew();
+  const board = useActiveBoard();
+  const me = board?.user.id;
   useEffect(() => {
     if (!roster.loaded) return;
     const seats = buildSeats({ kind: "board" }, posted, crew, roster, undefined, {});
@@ -242,12 +320,27 @@ export function CouncilPreload() {
     const idle = window.setTimeout(() => preloadCouncil(seats.map((s) => s.character)), 600);
     return () => window.clearTimeout(idle);
   }, [posted, roster, crew]);
+  // 2026-11-24 (Josh): the work shows over the agent's head, not in a strip over the bar. When a person's own ask starts
+  // on the grid (not in a section, nor from a section's council), the grid's council opens by itself; closed again, it
+  // stays closed for that agent
+  useEffect(() => {
+    if (!me) return;
+    for (const p of crew) {
+      if (seenCrew.has(p.crew.id)) continue;
+      seenCrew.add(p.crew.id);
+      if (p.crew.asker !== me || p.crew.status !== "working" || p.crew.lead) continue;
+      if (councilOpen() || getUi().presenting) continue;
+      const from = askedFrom(p.crew.id);
+      if (from ? from !== GRID_PLACE : sectionOfCrew(p.crew, boardWhere)) continue;
+      openCouncil({ kind: "board" });
+    }
+  }, [crew, me]);
   return null;
 }
 
 // ---------------------------------------------------------------- the view
 
-/** one line to say, typed or spoken: the only way to talk on the council (it opens under whoever you roll over) */
+/** one line to say, typed or spoken: the only way to talk on the council (it takes the place of the bar over a head) */
 export function SayBox({ label, placeholder, onSay, focus, onClose }: { label: string; placeholder: string; onSay: (text: string) => void; focus?: boolean; onClose?: () => void }) {
   const [text, setText] = useState("");
   const [hearing, setHearing] = useState<Listening | null>(null);
@@ -276,14 +369,28 @@ export function SayBox({ label, placeholder, onSay, focus, onClose }: { label: s
   };
   return (
     <form
-      className={`council-say${text || hearing ? " is-held" : ""}`}
+      className={`council-say${text || hearing ? " has-words" : ""}`}
       data-council-say
       onSubmit={(e) => {
         e.preventDefault();
         send(text);
       }}
     >
-      <input className="council-say-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={hearing ? "Listening…" : placeholder} aria-label={label} autoFocus={focus} />
+      <input
+        className="council-say-text"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={hearing ? "Listening…" : placeholder}
+        aria-label={label}
+        autoFocus={focus}
+        onKeyDown={(e) => {
+          // Esc clears the line first, then puts it away (a line with a ✕)
+          if (e.key !== "Escape" || !onClose) return;
+          e.preventDefault();
+          if (text) setText("");
+          else onClose();
+        }}
+      />
       <button type="button" className={`council-say-btn${hearing ? " is-live" : ""}`} aria-pressed={Boolean(hearing)} aria-label={hearing ? "Stop listening" : `Talk: ${label}`} data-tip={hearing ? "Stop and send" : "Talk instead"} data-council-mic onClick={mic}>
         <MicGlyph size={14} />
       </button>
@@ -306,6 +413,85 @@ export function SayBox({ label, placeholder, onSay, focus, onClose }: { label: s
   );
 }
 
+/** where a silhouette's closed eyes go, as shares of its picture: each eye's centre, and an eye's width */
+export interface Eyes {
+  left: number;
+  right: number;
+  y: number;
+  w: number;
+}
+/** the plain figure's: its head is the circle at (50, 44) r 25 of 100 × 150, drawn at 88 % × 92 % from (6 %, 8 %) */
+const PLAIN_EYES: Eyes = { left: 0.06 + 0.88 * 0.4, right: 0.06 + 0.88 * 0.6, y: 0.08 + 0.92 * (46 / 150), w: 0.12 };
+/** each picture silhouette's eyes, by character: null when its picture can't be read (it then stands as the plain figure) */
+const ghostEyes = new Map<string, Eyes | null>();
+/** every council showing that silhouette redraws once its eyes are found */
+let eyesV = 0;
+const eyeSubs = new Set<() => void>();
+function setGhostEyes(id: string, eyes: Eyes | null) {
+  ghostEyes.set(id, eyes);
+  eyesV++;
+  eyeSubs.forEach((f) => f());
+}
+const subEyes = (f: () => void) => {
+  eyeSubs.add(f);
+  return () => eyeSubs.delete(f);
+};
+
+/**
+ * Where a picture's head is, from its own alpha (2026-11-24, Josh: the sleeping eyes sit on the head): the opaque bounds
+ * of the top 28 % of the figure are the head; the eyes go at its vertical middle, a third in from each side. A picture
+ * with no clear ground around the figure (or one that can't be read) has no head to find: null.
+ */
+export function eyesOf(img: HTMLImageElement): Eyes | null {
+  try {
+    const k = Math.min(1, 192 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * k));
+    const h = Math.max(1, Math.round(img.naturalHeight * k));
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const g = c.getContext("2d", { willReadFrequently: true });
+    if (!g) return null;
+    g.drawImage(img, 0, 0, w, h);
+    const d = g.getImageData(0, 0, w, h).data;
+    const solid = (x: number, y: number) => d[(y * w + x) * 4 + 3] > 96;
+    // a ground that wasn't cut away: every corner solid
+    if (solid(0, 0) && solid(w - 1, 0) && solid(0, h - 1) && solid(w - 1, h - 1)) return null;
+    let top = -1;
+    let bottom = -1;
+    for (let y = 0; y < h && top < 0; y++) for (let x = 0; x < w; x++) if (solid(x, y)) { top = y; break; }
+    for (let y = h - 1; y >= 0 && bottom < 0; y--) for (let x = 0; x < w; x++) if (solid(x, y)) { bottom = y; break; }
+    if (top < 0 || bottom - top < h * 0.2) return null;
+    const headEnd = top + Math.round((bottom - top) * 0.28);
+    let l = w;
+    let r = -1;
+    for (let y = top; y <= headEnd; y++)
+      for (let x = 0; x < w; x++)
+        if (solid(x, y)) {
+          if (x < l) l = x;
+          if (x > r) r = x;
+        }
+    if (r - l < w * 0.08) return null;
+    const third = (r - l) / 3;
+    return { left: (l + third) / w, right: (r - third) / w, y: (top + headEnd) / 2 / h, w: Math.min(0.14, Math.max(0.05, (r - l) / w / 4.5)) };
+  } catch {
+    return null;
+  }
+}
+
+/** asleep (2026-11-24): two closed eyes over a silhouette, in the paper's own ink, so they read as a gap in the figure */
+function SleepingEyes({ eyes }: { eyes: Eyes }) {
+  return (
+    <>
+      {[eyes.left, eyes.right].map((x, i) => (
+        <svg key={i} className="council-ghost-eye" viewBox="0 0 12 6" style={{ left: `${x * 100}%`, top: `${eyes.y * 100}%`, width: `${eyes.w * 100}%` }} aria-hidden data-council-eye>
+          <path d="M1.5 1.5q4.5 4.5 9 0" />
+        </svg>
+      ))}
+    </>
+  );
+}
+
 /** a figure nobody has filled in: a head and shoulders, when there's no character to trace */
 function PlainGhost() {
   return (
@@ -316,44 +502,114 @@ function PlainGhost() {
   );
 }
 
-/** above a head: its name (2026-11-17), whose model, where it runs, and whether it can be reached */
-export function SeatMarks({ seat, name }: { seat: Pick<CouncilSeat, "provider" | "where" | "offline" | "why" | "status" | "doing">; name?: string }) {
+/** the width a figure takes for its height: a mesh avatar's picture, a 3D figure's frame, a still's own picture */
+const MESH_AR = 896 / 1200;
+const MODEL_AR = 0.72;
+const PLAIN_AR = 100 / 150;
+const NONE_AR = 0.62;
+const STILL_AR = 0.75;
+/** a still's own width over height, by character, once its picture has loaded */
+const stillAr = new Map<string, number>();
+export function figureAr(c: RosterCharacter | undefined, still = false): number {
+  if (!c) return NONE_AR;
+  if (!still && c.form === "mesh" && c.files.mavatar) return MESH_AR;
+  if (!still && c.form === "model" && c.files.clips) return MODEL_AR;
+  return stillAr.get(c.id) ?? STILL_AR;
+}
+/** a figure's full height, at full size (148 of it shows above the edge: council.css) */
+const FIG_H = 190;
+
+type BarSeat = Pick<CouncilSeat, "name" | "provider" | "where" | "offline" | "why" | "status" | "doing" | "crewId" | "mine" | "session" | "pending">;
+
+/**
+ * Over each head, one bar (2026-11-24, Josh: "one unified bar above the agent's head"): its model's mark, its name in full,
+ * where it runs and how it stands. While it works the same bar says what it is doing, alive, with Follow, and Open and
+ * Stop for the one who asked. Opaque paper, never glass.
+ */
+export function SeatBar({ seat, onAbout, say, onLeave }: { seat: BarSeat; onAbout?: () => void; say?: React.ReactNode; onLeave?: () => void }) {
+  const following = useFollowing();
+  const ask = seat.crewId ? crewAsk(seat.crewId) : undefined;
+  const session = seat.session ?? ask?.session;
+  const run = useSession(session ?? null);
+  const working = seat.status === "working" && !seat.offline;
+  // a run this window follows is stoppable while it streams; one it never loaded (the design page) is shown as it would be
+  const live = run.busy || !run.loaded;
+  const state = seat.offline ? `not connected${seat.why ? ` (${seat.why})` : ""}` : seat.pending ? "starting" : SEAT_STATUS[seat.status];
   return (
-    <span className="council-marks">
-      {name && (
-        <b className="council-mark-name" title={name} data-council-name data-tip={seat.status === "working" && seat.doing ? `${name} · ${seat.doing}` : name}>
-          {name}
+    <div
+      className={`council-bar f-paper${working ? " is-working" : ""}${seat.pending ? " is-pending" : ""}${say ? " is-saying" : ""}`}
+      data-council-bar
+      onBlur={(e) => {
+        // the field is put away when focus leaves the bar with nothing in it
+        if (!say || e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        if (!e.currentTarget.querySelector("input")?.value) onLeave?.();
+      }}
+    >
+      <button type="button" className="council-bar-who" onClick={onAbout} aria-label={`${seat.name}: ${state}. Open its details`}>
+        <ProviderMark provider={seat.provider} size={18} />
+        <b className="council-mark-name" data-council-name data-tip={working && seat.doing ? `${seat.name} · ${seat.doing}` : seat.name}>
+          {seat.name}
         </b>
+        {seat.where && (
+          <span className="council-mark" role="img" aria-label={seat.where === "local" ? "Runs on this computer" : "Runs in the cloud"} data-tip={seat.where === "local" ? "Runs on this computer" : "Remote: runs in the cloud"} data-council-where={seat.where}>
+            {seat.where === "local" ? <ComputerGlyph size={12} /> : <CloudGlyph size={12} />}
+          </span>
+        )}
+        {seat.offline ? (
+          <span className="council-mark is-off" role="img" aria-label={`Not connected: ${seat.why ?? ""}`} data-tip={`Not connected${seat.why ? `: ${seat.why}` : ""}`} data-council-offline>
+            <OfflineGlyph size={12} />
+          </span>
+        ) : (
+          <span className={`council-mark is-state is-${seat.pending ? "working" : seat.status}`} role="img" aria-label={state} data-tip={`Connected · ${state}`} />
+        )}
+      </button>
+      {working && (
+        <>
+          <span className="council-bar-doing" data-council-doing>
+            <span className="council-bar-live" aria-hidden>
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="council-bar-doing-text">{seat.doing || "working"}</span>
+          </span>
+          <span className="council-bar-acts">
+            {seat.crewId && (
+              <button type="button" className={`council-bar-btn${following === seat.crewId ? " is-on" : ""}`} onClick={() => followCrew(following === seat.crewId ? null : seat.crewId!)} data-tip={following === seat.crewId ? "Stop following" : `Follow ${seat.name}: your view rides along until you move`} data-council-follow>
+                {following === seat.crewId ? "Following" : "Follow"}
+              </button>
+            )}
+            {seat.mine && session && (
+              <button type="button" className="council-bar-btn" onClick={() => openSession({ id: session, kind: "agent", title: titleOf(ask?.prompt ?? seat.name) })} data-tip="Open its session: what it did, step by step" data-council-open-run>
+                Open
+              </button>
+            )}
+            {seat.mine && session && live && (
+              <button type="button" className="council-bar-btn is-stop" onClick={() => stopSession(session)} data-tip={`Stop ${seat.name}`} data-council-stop>
+                Stop
+              </button>
+            )}
+          </span>
+        </>
       )}
-      <ProviderMark provider={seat.provider} size={20} />
-      {seat.where && (
-        <span className="council-mark" role="img" aria-label={seat.where === "local" ? "Runs on this computer" : "Runs in the cloud"} data-tip={seat.where === "local" ? "Runs on this computer" : "Remote: runs in the cloud"} data-council-where={seat.where}>
-          {seat.where === "local" ? <ComputerGlyph size={12} /> : <CloudGlyph size={12} />}
-        </span>
-      )}
-      {seat.offline ? (
-        <span className="council-mark is-off" role="img" aria-label={`Not connected: ${seat.why ?? ""}`} data-tip={`Not connected${seat.why ? `: ${seat.why}` : ""}`} data-council-offline>
-          <OfflineGlyph size={12} />
-        </span>
-      ) : (
-        <span className={`council-mark is-state is-${seat.status}`} role="img" aria-label={SEAT_STATUS[seat.status]} data-tip={`Connected · ${SEAT_STATUS[seat.status]}`} />
-      )}
-    </span>
+      {/* pressed (2026-11-24, Josh: one bar): the line to it is the bar's last row; its name and marks stay above it */}
+      {say && <div className="council-bar-say">{say}</div>}
+    </div>
   );
 }
 
 interface ViewProps {
   title: string;
-  /** a section's stands on the section's top edge, talk opening under; the grid's on the window's bottom edge, talk opening over */
+  /** a section's stands on the section's top edge; the grid's on the window's bottom edge */
   kind: "section" | "board";
   seats: CouncilSeat[];
-  /** silhouettes after the agents (undefined: a plain figure) */
-  ghosts: Array<RosterCharacter | undefined>;
+  /** the one silhouette beside the agents (undefined: a plain figure) */
+  ghost?: RosterCharacter;
   canAsk: boolean;
   onSay?: (text: string, to: CouncilSeat[], all: boolean) => void;
-  /** press a silhouette: add an agent */
+  /** press the small silhouette: add an agent */
   onAdd?: () => void;
-  /** press an agent: what it is, on the right */
+  /** press an agent, or its card: what it is, on the right */
   onAbout?: (seat: CouncilSeat) => void;
   /** the agents panel, on its Council tab */
   onPanel?: () => void;
@@ -365,12 +621,52 @@ interface ViewProps {
   hot?: string;
 }
 
-export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, onAbout, onPanel, panelOpen, onClose, inline, hot }: ViewProps) {
+/** the run a seat's card shows */
+const runOf = (s: CouncilSeat) => ({ status: s.offline ? ("idle" as const) : s.pending && s.status !== "working" ? ("pending" as const) : s.status, doing: s.doing, plan: s.plan, thought: s.thought, started: s.started, hue: s.hue });
+/** a seat's card takes room beside its figure: a chip or a card, by what there is to show */
+const cardRoom = (s: CouncilSeat) => {
+  const r = runOf(s);
+  if (r.status === "idle") return 0;
+  if (r.status === "working" && (r.plan || r.thought)) return 150;
+  return 78;
+};
+/** what of a seat's width doesn't shrink with the council (its card, a bar wider than its figure) and what does (its figure) */
+function seatParts(s: CouncilSeat): { fig: number; bar: number; card: number } {
+  const card = cardRoom(s);
+  return { fig: FIG_H * figureAr(s.character, s.offline), bar: s.status === "working" ? 176 : 58 + s.name.length * 6.6, card: card ? card - 14 : 0 };
+}
+/** the one scale that fits every seat to the room: figures shrink, cards and bars keep their size (never below 60 %) */
+export function fitScale(seats: CouncilSeat[], room: number, extra: { fig: number; fixed: number }): number {
+  const parts = seats.map(seatParts);
+  let scale = 1;
+  for (let k = 0; k < 3; k++) {
+    let fixed = extra.fixed;
+    let fig = extra.fig;
+    for (const p of parts) {
+      fixed += p.card;
+      // a bar wider than its shrunken figure holds the seat at the bar's width
+      if (p.bar > p.fig * scale) fixed += p.bar;
+      else fig += p.fig;
+    }
+    scale = fig > 0 ? Math.max(0.6, Math.min(1, (room - fixed) / fig)) : 1;
+  }
+  return scale;
+}
+
+export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, onAbout, onPanel, panelOpen, onClose, inline, hot }: ViewProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const root = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<AvatarStage | null>(null);
   const [all, setAll] = useState(false);
-  // a line put away with its ✕ stays away until the pointer leaves that agent
-  const [shut, setShut] = useState<string | null>(null);
+  // 2026-11-24 (Josh): pressing an agent turns the bar over its head into the line to it
+  const [saying, setSaying] = useState<string | null>(hot ?? null);
+  // the head's size before it was pressed: the bar grows up and out from there, and nothing beside it moves
+  const [headBox, setHeadBox] = useState<{ w: number; h: number } | null>(null);
+  // the eyes found on the silhouette's picture (re-render when they are)
+  useSyncExternalStore(subEyes, () => eyesV);
+  // a still's own proportions, once its picture has loaded (the seat is as wide as its figure needs)
+  const [, setMeasured] = useState(0);
+  const [avail, setAvail] = useState(0);
 
   // one renderer for every 3D figure; without WebGL they keep their stills
   useEffect(() => {
@@ -388,68 +684,138 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
     };
   }, []);
 
-  const mid = (seats.length + ghosts.length - 1) / 2;
+  // the pictures' own proportions: read when each loads (and any already loaded)
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const take = (img: HTMLImageElement) => {
+      if (!img.naturalWidth || !img.naturalHeight || img.closest(".avatar-3d, .avatar-mesh")) return;
+      const id = img.closest<HTMLElement>("[data-fig-id]")?.dataset.figId;
+      if (!id) return;
+      if (img.closest(".council-ghost") && !ghostEyes.has(id)) {
+        setGhostEyes(id, eyesOf(img));
+      }
+      const r = img.naturalWidth / img.naturalHeight;
+      if (Math.abs((stillAr.get(id) ?? 0) - r) < 0.004) return;
+      stillAr.set(id, r);
+      setMeasured((n) => n + 1);
+    };
+    const onLoad = (e: Event) => e.target instanceof HTMLImageElement && take(e.target);
+    el.addEventListener("load", onLoad, true);
+    el.querySelectorAll("img").forEach((i) => i.complete && take(i));
+    return () => el.removeEventListener("load", onLoad, true);
+  });
+
+  // how much paper it has: six seats shrink evenly to fit it, never cropped at the sides
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setAvail(el.clientWidth));
+    ro.observe(el);
+    setAvail(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+  const ghostSeen = ghost ? ghostEyes.get(ghost.id) : undefined;
+  const ghostAr = ghost && ghostSeen ? figureAr(ghost, true) : PLAIN_AR;
+  // the grid's leaves the bottom bar its room beside it; the buttons and the council's padding never shrink
+  const room = Math.max(0, avail - (kind === "board" && !inline ? 380 : 0));
+  const scale = avail ? fitScale(seats, room, { fig: canAsk && onAdd ? FIG_H * ghostAr * 1.24 : 0, fixed: 120 + 32 + 8 }) : 1;
+
+  const mid = (seats.length - 1) / 2;
   const where = title === "this grid" ? "on this grid" : `in ${title}`;
 
   return (
-    <div className={`council is-${kind}${inline ? " is-inline" : ""}`} data-council={seats.length} role="group" aria-label={`Council of ${title}`}>
+    <div ref={root} className={`council is-${kind}${inline ? " is-inline" : ""}`} data-council={seats.length} role="group" aria-label={`Council of ${title}`} style={{ ["--council-scale" as string]: scale.toFixed(3) } as CSSProperties}>
       <canvas ref={canvas} className="council-stage" aria-hidden="true" />
       <StageContext.Provider value={stage}>
         <div className="council-row" role="list">
-          {seats.map((s, i) => (
-            <div
-              key={s.id}
-              role="listitem"
-              className={`council-seat is-${s.status}${s.offline ? " is-offline" : ""}${hot === s.id ? " is-hot" : ""}${shut === s.id ? " is-shut" : ""}`}
-              onPointerLeave={() => shut === s.id && setShut(null)}
-              style={{ ["--crew" as string]: `var(--color-crew-${s.hue % 6})`, ["--i" as string]: i } as CSSProperties}
-              data-council-seat={s.name}
-              data-council-agent={s.agentKey}
-              data-mood={s.offline ? "sad" : s.mood}
-            >
-              <SeatMarks seat={s} name={s.name} />
-              <div className="council-crop">
-                <button type="button" className="council-figure" aria-label={`${s.name}${s.character ? `, as ${s.character.name}` : ""}: ${s.offline ? `not connected${s.why ? ` (${s.why})` : ""}` : SEAT_STATUS[s.status]}. Press for what it is`} onClick={() => onAbout?.(s)}>
-                  <Avatar character={s.character} mood={s.offline ? "sad" : s.mood} framing="bust" turn={(mid - i) * 0.1} still={s.offline} />
-                </button>
-              </div>
-              {/* 2026-11-17 (Josh): just a white line over its body, above the section's edge (above the bar, for the
-                  grid's), with the mic and ✕; its name is over its head */}
-              {canAsk && onSay && (
-                <div className="council-under">
-                  <SayBox
-                    label={`Say something to ${s.name}`}
-                    placeholder={s.offline ? `${s.why ?? "Not connected"}` : s.status === "working" && s.doing ? s.doing : `To ${s.name}${s.agentName && s.agentName !== s.name ? ` (${s.agentName})` : ""}…`}
-                    onSay={(t) => onSay(t, [s], false)}
-                    onClose={() => {
-                      setShut(s.id);
-                      (document.activeElement as HTMLElement | null)?.blur();
-                    }}
-                  />
+          {seats.map((s, i) => {
+            const say = saying === s.id && canAsk && !!onSay;
+            const run = runOf(s);
+            return (
+              <div
+                key={s.id}
+                role="listitem"
+                className={`council-seat is-${s.status}${s.offline ? " is-offline" : ""}${s.pending ? " is-pending" : ""}${say ? " is-saying" : ""}`}
+                style={{ ["--crew" as string]: `var(--color-crew-${s.hue % 6})`, ["--i" as string]: i, ["--fig-ar" as string]: figureAr(s.character, s.offline).toFixed(4) } as CSSProperties}
+                data-council-seat={s.name}
+                data-council-agent={s.agentKey}
+                data-mood={s.offline ? "sad" : s.mood}
+              >
+                {run.status !== "idle" && (
+                  <div className="council-card-slot">
+                    <RunCard run={run} variant="seat" onOpen={onAbout ? () => onAbout(s) : undefined} label={`${s.name}'s run: open its details`} />
+                  </div>
+                )}
+                <div className="council-col">
+                  <div className="council-head" style={say && headBox ? { minWidth: headBox.w, minHeight: headBox.h } : undefined}>
+                    <SeatBar
+                      seat={s}
+                      onAbout={onAbout ? () => onAbout(s) : undefined}
+                      onLeave={() => setSaying(null)}
+                      say={
+                        say ? (
+                          <SayBox
+                            focus={hot !== s.id}
+                            label={`Say something to ${s.name}`}
+                            placeholder={s.offline ? `${s.why ?? "Not connected"}` : `To ${s.name}${s.agentName && s.agentName !== s.name ? ` (${s.agentName})` : ""}…`}
+                            onSay={(t) => {
+                              onSay!(t, [s], false);
+                              setSaying(null);
+                            }}
+                            onClose={() => setSaying(null)}
+                          />
+                        ) : undefined
+                      }
+                    />
+                  </div>
+                  <div className="council-crop">
+                    <button
+                      type="button"
+                      className="council-figure"
+                      data-fig-id={s.character?.id}
+                      aria-label={`${s.name}${s.character ? `, as ${s.character.name}` : ""}: ${s.offline ? `not connected${s.why ? ` (${s.why})` : ""}` : SEAT_STATUS[s.status]}. Press to talk to it`}
+                      onClick={(e) => {
+                        onAbout?.(s);
+                        if (!canAsk || !onSay || saying === s.id) return;
+                        const head = e.currentTarget.closest(".council-col")?.querySelector<HTMLElement>(".council-head");
+                        setHeadBox(head ? { w: head.offsetWidth, h: head.offsetHeight } : null);
+                        // one line open at a time: the line to all of them goes when one agent is pressed
+                        setAll(false);
+                        setSaying(s.id);
+                      }}
+                    >
+                      <Avatar character={s.character} mood={s.offline ? "sad" : s.mood} framing="bust" turn={(mid - i) * 0.1} still={s.offline} />
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
-          {canAsk && onAdd && ghosts.length > 0 && (
-            // the silhouettes fade together, so where a group of them overlaps it doesn't darken; the + over the last stays bright
-            <div className={`council-ghosts${ghosts.length > 1 ? " is-group" : ""}`} role="none" data-council-ghosts={ghosts.length}>
+              </div>
+            );
+          })}
+          {canAsk && onAdd && (
+            // 2026-11-24 (Josh): one silhouette, asleep and breathing, and from behind it a small one peeking out with the +:
+            // the small one adds an agent. They fade as one group, so where they overlap it doesn't darken
+            <div className="council-ghosts" role="none" data-council-ghosts={1} style={{ ["--fig-ar" as string]: ghostAr.toFixed(4), ["--i" as string]: seats.length } as CSSProperties}>
               <div className="council-ghost-fade" role="none">
-                {ghosts.map((g, k) => (
-                  <div key={`ghost-${k}`} role="listitem" className={`council-seat council-ghost${k === ghosts.length - 1 ? " is-add" : ""}`} style={{ ["--i" as string]: seats.length + k } as CSSProperties}>
-                    <span className="council-marks" />
-                    <div className="council-crop">
-                      <button type="button" className="council-figure" aria-label="Add an agent to this council" data-tip="Add an agent here" data-council-add onClick={onAdd}>
-                        {g ? <Still character={g} role={stillRole(g, "bust") ?? "thumb"} /> : <PlainGhost />}
-                      </button>
+                <div className="council-ghost-small" role="none" aria-hidden>
+                  <PlainGhost />
+                </div>
+                <div className="council-seat council-ghost" role="listitem" aria-label="A place for another agent">
+                  <div className="council-crop">
+                    <div className={`council-figure${ghost && !ghostSeen ? " is-reading" : ""}`} data-fig-id={ghost?.id} data-ghost={ghostSeen ? "picture" : "plain"}>
+                      {/* a picture whose head can't be found stands as the plain figure, which has eyes */}
+                      {ghost && ghostEyes.get(ghost.id) !== null && <Still character={ghost} role={stillRole(ghost, "bust") ?? "thumb"} />}
+                      {!ghostSeen && <PlainGhost />}
+                      <SleepingEyes eyes={ghostSeen ?? PLAIN_EYES} />
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
-              <span className="council-marks council-ghost-plus" style={{ ["--i" as string]: seats.length + ghosts.length - 1 } as CSSProperties} aria-hidden>
-                <span className="council-mark is-plus">
+              <button type="button" className="council-ghost-add" aria-label="Add an agent to this council" data-tip="Add an agent here" data-council-add onClick={onAdd}>
+                <span className="council-mark is-plus" aria-hidden>
                   <PlusGlyph size={11} />
                 </span>
-              </span>
+              </button>
             </div>
           )}
           {!seats.length && !canAsk && <p className="council-none">No agents are on this council.</p>}
@@ -457,7 +823,10 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
 
         <div className="council-tools" data-council-tools>
           {canAsk && onSay && (
-            <button type="button" className={`council-tool${all ? " is-on" : ""}`} aria-pressed={all} aria-label={seats.length ? `Speak to all ${seats.length} at once` : "Ask an agent"} data-tip={seats.length > 1 ? `Speak to all ${seats.length} at once` : seats.length ? `Speak to ${seats[0].name}` : `Ask an agent ${where}`} data-council-all onClick={() => setAll((a) => !a)}>
+            <button type="button" className={`council-tool${all ? " is-on" : ""}`} aria-pressed={all} aria-label={seats.length ? `Speak to all ${seats.length} at once` : "Ask an agent"} data-tip={seats.length > 1 ? `Speak to all ${seats.length} at once` : seats.length ? `Speak to ${seats[0].name}` : `Ask an agent ${where}`} data-council-all onClick={() => {
+                setAll((a) => !a);
+                setSaying(null);
+              }}>
               <AllGlyph />
             </button>
           )}
@@ -471,18 +840,20 @@ export function CouncilView({ title, kind, seats, ghosts, canAsk, onSay, onAdd, 
               <CloseGlyph />
             </button>
           )}
-          {all && canAsk && onSay && (
-            <div className="council-tools-say">
-              <SayBox focus label={seats.length ? "Say something to all of them" : "Ask an agent"} placeholder={seats.length > 1 ? `To all ${seats.length}…` : seats.length ? `To ${seats[0].name}…` : `What should an agent do ${where}?`} onSay={(t) => onSay(t, seats, true)} />
-            </div>
-          )}
         </div>
+        {all && canAsk && onSay && (
+          // outside the buttons' own box (2026-11-24): opaque paper over the stage, not under it
+          <div className="council-tools-say f-paper">
+            <SayBox focus label={seats.length ? "Say something to all of them" : "Ask an agent"} placeholder={seats.length > 1 ? `To all ${seats.length}…` : seats.length ? `To ${seats[0].name}…` : `What should an agent do ${where}?`} onSay={(t) => {
+                onSay(t, seats, true);
+                setAll(false);
+              }} />
+          </div>
+        )}
       </StageContext.Provider>
     </div>
   );
 }
-
-// ---------------------------------------------------------------- wired to the open grid
 
 // ---------------------------------------------------------------- who was asked from where
 
@@ -495,27 +866,55 @@ function askedFrom(crewId: string): string | undefined {
   return ask ? launched.get(ask.session) : undefined;
 }
 
-/** send one line to a seat's agent, in a section: the server's own agent through a session, one of this computer's through its host */
-export async function tellSeat(seat: Pick<CouncilSeat, "agentKey" | "name" | "alias"> | null, text: string, section: { id: string; name: string } | null, from?: CouncilScope): Promise<void> {
+/** send one line to a seat's agent, in a section: the server's own agent through a session, one of this computer's through its host. The session, when it's the server's */
+export async function tellSeat(seat: Pick<CouncilSeat, "agentKey" | "name" | "alias"> | null, text: string, section: { id: string; name: string } | null, from?: CouncilScope): Promise<string | undefined> {
   const key = seat?.agentKey ?? "claude";
   if (!key.startsWith("t3:")) {
     const session = askCrew(section ? `In the “${section.name}” section: ${text}` : text, seat?.alias);
     if (from) launched.set(session, scopeKey(from));
-    return;
+    return session;
   }
   const board = activeBoard()?.boardId;
   const sec = section ?? Object.values(getState().sections).find((s) => !s.parent) ?? null;
   if (!board || !sec) throw new Error("There's no section for it to work in.");
   await api("/api/t3host/threads", { method: "POST", json: { board, section: sec.id, agent: key.slice(3), text, as: seat?.alias } });
+  return undefined;
 }
 
 /** say one line to some of a council (none: the server's own agent takes it), and keep it for the panel's Council tab */
 export function sayToCouncil(scope: CouncilScope, text: string, to: CouncilSeat[], all: boolean, sec: { id: string; name: string } | null) {
   const list: Array<CouncilSeat | null> = to.length ? to : [null];
-  for (const s of list) void tellSeat(s, text, sec, scope).catch((e: Error) => toast(`${s?.name ?? "Claude"} couldn't take it: ${e.message}`, "bad"));
+  for (const s of list) {
+    // its card shows the run starting at once, before the agent has joined (a seat already at work shows its work)
+    if (s && !s.crewId && !s.offline) markPending(s.id);
+    void tellSeat(s, text, sec, scope).then(
+      (session) => s && session && pendingSession(s.id, session),
+      (e: Error) => {
+        if (s) clearPending(s.id);
+        toast(`${s?.name ?? "Claude"} couldn't take it: ${e.message}`, "bad");
+      },
+    );
+  }
   logSaid(scope, text, to.length ? to.map((s) => s.name) : ["Claude"], all);
   toast(to.length > 1 ? `Sent to ${to.length} agents` : `Sent to ${to[0]?.name ?? "Claude"}`, "agent");
 }
+
+/** a seat waiting for its agent: it stops waiting when the ask ends without one, or after a while */
+function PendingWatch({ id, session, at }: { id: string; session?: string; at: number }) {
+  const run = useSession(session ?? null);
+  const last = run.turns.at(-1);
+  const over = Boolean(session && last && last.status !== "running" && !run.busy);
+  useEffect(() => {
+    if (over) clearPending(id);
+  }, [over, id]);
+  useEffect(() => {
+    const t = window.setTimeout(() => clearPending(id), Math.max(0, at + PENDING_MS - Date.now()));
+    return () => window.clearTimeout(t);
+  }, [id, at]);
+  return null;
+}
+
+// ---------------------------------------------------------------- wired to the open grid
 
 /** the council, wired to the open grid */
 export function Council() {
@@ -525,18 +924,38 @@ export function Council() {
   return <CouncilLive scope={scope} />;
 }
 
+/** the one silhouette a grid shows: chosen at random, once per grid for this window */
+const ghostPick = new Map<string, number>();
+
 function CouncilLive({ scope }: { scope: CouncilScope }) {
   const ui = useUi();
   const roster = useRoster();
-  const { seats, title, sectionId } = useCouncilSeats(scope);
+  const board = useActiveBoard();
+  const { seats: built, title, sectionId } = useCouncilSeats(scope);
+  const waiting = usePending();
+  const seats = useMemo(() => built.map((s) => (waiting.has(s.id) && !s.crewId ? { ...s, pending: true } : s)), [built, waiting]);
   const sections = useSyncExternalStore(subscribe, sectionsOf);
   const section = sectionId ? sections[sectionId] : undefined;
   const canAsk = ui.role !== "viewer";
-  // agents first, then one silhouette to add another; nobody yet: three, close together
-  const ghostN = ghostCount(seats.length, canAsk);
   const ghostKey = seats.map((s) => s.character?.id ?? "").join("|");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const ghosts = useMemo(() => ghostsFor(roster, seats, ghostN), [roster, ghostKey, ghostN]);
+  const boardId = board?.boardId ?? "";
+  const ghost = useMemo(() => {
+    const free = ghostsFor(roster, seats, 64).filter((c): c is RosterCharacter => !!c);
+    if (!free.length) return undefined;
+    if (!ghostPick.has(boardId)) ghostPick.set(boardId, Math.floor(Math.random() * 1e6));
+    return free[ghostPick.get(boardId)! % free.length];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roster, ghostKey, boardId]);
+
+  // a seat's agent has joined: it isn't waiting any more
+  useEffect(() => {
+    for (const s of built) if (s.crewId && waiting.has(s.id)) clearPending(s.id);
+  }, [built, waiting]);
+  // what's over the heads here isn't also in the strip over the bar
+  useEffect(() => {
+    showOnCouncil(seats.flatMap((s) => (s.crewId ? [s.crewId] : [])));
+  }, [seats]);
+  useEffect(() => () => showOnCouncil([]), []);
 
   // a section that's gone takes its council with it
   useEffect(() => {
@@ -551,8 +970,8 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       const t = e.target as HTMLElement | null;
-      // Esc in a line clears the line first, as everywhere
-      if (t?.closest(".council-say") && (t as HTMLInputElement).value) return;
+      // Esc in a line clears the line first, as everywhere; in the line over a head, it then puts the line away
+      if (t?.closest(".council-say") && ((t as HTMLInputElement).value || t.closest(".council-bar"))) return;
       // Esc closes the council and nothing else: the grid's own Esc (step up a level, reframe) waits for the next press
       e.stopPropagation();
       closeCouncil();
@@ -621,11 +1040,14 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
   const f = floorInsets(ui);
   const stand = (
     <div ref={standEl} className={`council-place is-${scope.kind}`} style={scope.kind === "board" ? { left: f.left, right: f.right } : undefined} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
+      {[...waiting].map(([id, p]) => (
+        <PendingWatch key={id} id={id} session={p.session} at={p.at} />
+      ))}
       <CouncilView
         title={title}
         kind={scope.kind}
         seats={seats}
-        ghosts={ghosts}
+        ghost={ghost}
         canAsk={canAsk}
         panelOpen={ui.agents && ui.agentsTab === "council"}
         onClose={closeCouncil}

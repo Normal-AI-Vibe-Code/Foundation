@@ -8,6 +8,7 @@ import {
   LEGACY_LOD_CACHE_NAME,
   peekCachedImage,
   pickShedTier,
+  SCATTERED_CACHE_NAME,
   pruneL2Cache,
   putCachedImage,
   readL2Image,
@@ -352,10 +353,70 @@ test("L2 metadata round-trip, bounded LRU pruning, and clearImageCache() purge L
     await clearImageCache();
 
     assert.equal(peekCachedImage("/files/private", 256), null, "L1 cleared");
-    assert.ok(deletedNames.includes(IMAGE_CACHE_NAME), "v2 Cache Storage deleted");
+    assert.ok(deletedNames.includes(IMAGE_CACHE_NAME), "the image Cache Storage deleted");
     assert.ok(deletedNames.includes(LEGACY_LOD_CACHE_NAME), "legacy v1 Cache Storage deleted");
     assert.equal(stores.size, 0, "no caches remain after logout clear");
   } finally {
+    if (prevCaches === undefined) delete (globalThis as { caches?: CacheStorage }).caches;
+    else (globalThis as { caches?: CacheStorage }).caches = prevCaches;
+  }
+});
+
+test("L2 is opened once per page: racing reads and writes all land in one cache, and WebKit's scattered v2 copies go (2026-11-24)", async () => {
+  // WebKit's worst case: every open makes a new cache of that name; has/delete see the copies one at a time
+  const copies: Array<{ name: string; map: Map<string, Response> }> = [];
+  let opens = 0;
+  const cacheOf = (map: Map<string, Response>) =>
+    ({
+      async match(req: string | Request) {
+        const r = map.get(typeof req === "string" ? req : req.url);
+        return r ? r.clone() : undefined;
+      },
+      async put(req: string | Request, res: Response) {
+        map.set(typeof req === "string" ? req : req.url, res.clone());
+      },
+      async delete(req: string | Request) {
+        return map.delete(typeof req === "string" ? req : req.url);
+      },
+      async keys() {
+        return [...map.keys()].map((u) => new Request(u));
+      },
+    }) as unknown as Cache;
+  const mockCaches = {
+    async open(name: string) {
+      opens++;
+      const copy = { name, map: new Map<string, Response>() };
+      copies.push(copy);
+      return cacheOf(copy.map);
+    },
+    async has(name: string) {
+      return copies.some((c) => c.name === name);
+    },
+    async delete(name: string) {
+      const i = copies.findIndex((c) => c.name === name);
+      if (i < 0) return false;
+      copies.splice(i, 1);
+      return true;
+    },
+  } as unknown as CacheStorage;
+  const prevCaches = (globalThis as { caches?: CacheStorage }).caches;
+  (globalThis as { caches?: CacheStorage }).caches = mockCaches;
+  try {
+    await clearImageCache(); // a fresh page: nothing opened yet
+    for (let i = 0; i < 5; i++) copies.push({ name: SCATTERED_CACHE_NAME, map: new Map() });
+    opens = 0;
+    const blob = new Blob([new Uint8Array(32)], { type: "image/jpeg" });
+    await Promise.all(Array.from({ length: 12 }, (_, i) => writeL2Image(`/files/p${i}`, 256, { blob, width: 256, natural: [900, 600], alpha: false })));
+    const reads = await Promise.all(Array.from({ length: 12 }, (_, i) => readL2Image(`/files/p${i}`, 256)));
+    assert.equal(opens, 1, "one open for every read and write");
+    assert.ok(
+      reads.every((r) => r && r.bytes === 32),
+      "every picture written is read back",
+    );
+    assert.equal(copies.filter((c) => c.name === SCATTERED_CACHE_NAME).length, 0, "the scattered v2 copies are let go");
+    assert.equal(copies.filter((c) => c.name === IMAGE_CACHE_NAME).length, 1, "one cache of the current name");
+  } finally {
+    await clearImageCache();
     if (prevCaches === undefined) delete (globalThis as { caches?: CacheStorage }).caches;
     else (globalThis as { caches?: CacheStorage }).caches = prevCaches;
   }

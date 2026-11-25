@@ -7,7 +7,43 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chatCan, chatServerName, chatServerOrigin, isRemoteChat } from "../src/chat/serverLogic.ts";
+import { builtChatServer, chatCan, chatServerName, chatServerOrigin, FORM_CHAT_SERVER, isRemoteChat, KNOWN_CHAT_SERVERS, readUsedChatServers, rememberChatServer, rememberedChatServers } from "../src/chat/serverLogic.ts";
+
+test("the desktop app defaults to the team's chat server; a named build, dev and e2e don't", () => {
+  assert.equal(builtChatServer(undefined, "desktop"), "https://foundation-chatserver.vercel.app");
+  assert.equal(builtChatServer(undefined, "production"), "");
+  assert.equal(builtChatServer(undefined, "development"), "");
+  // a build that names one gets it, and naming "" is Foundation's own even on the desktop
+  assert.equal(builtChatServer("chat.example.app", "desktop"), "https://chat.example.app");
+  assert.equal(builtChatServer("", "desktop"), "");
+  assert.equal(builtChatServer("not an address", "desktop"), "");
+});
+
+test("the servers a device used are remembered newest first, five at most, each once", () => {
+  let used: string[] = [];
+  used = rememberChatServer(used, "a.example.app");
+  used = rememberChatServer(used, "localhost:4420");
+  used = rememberChatServer(used, "https://a.example.app/");
+  assert.deepEqual(used, ["https://a.example.app", "http://localhost:4420"]);
+  assert.deepEqual(rememberChatServer(used, "not an address"), used);
+  for (const n of [1, 2, 3, 4, 5]) used = rememberChatServer(used, `s${n}.example.app`);
+  assert.equal(used.length, 5);
+  assert.equal(used[0], "https://s5.example.app");
+});
+
+test("a stored list keeps its addresses and drops what isn't one", () => {
+  assert.deepEqual(readUsedChatServers(null), []);
+  assert.deepEqual(readUsedChatServers("{oops"), []);
+  assert.deepEqual(readUsedChatServers('{"a":1}'), []);
+  assert.deepEqual(readUsedChatServers('["https://a.example.app", 3, "javascript://x", "https://a.example.app", "localhost:4420"]'), ["https://a.example.app", "http://localhost:4420"]);
+});
+
+test("Settings offers the team's server first, then the device's own, never Foundation's", () => {
+  const list = rememberedChatServers(KNOWN_CHAT_SERVERS, ["http://localhost:4420", FORM_CHAT_SERVER.origin, "http://localhost:4410"], "http://localhost:4410");
+  assert.deepEqual(list.map((s) => s.origin), ["https://foundation-chatserver.vercel.app", "http://localhost:4420"]);
+  assert.equal(list[0].name, "Form Industries");
+  assert.equal(list[1].name, undefined);
+});
 
 test("an address a person typed becomes an origin: https by default, http on this computer", () => {
   assert.equal(chatServerOrigin("chatform.vercel.app"), "https://chatform.vercel.app");

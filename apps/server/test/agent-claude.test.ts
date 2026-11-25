@@ -110,7 +110,12 @@ test("the argument builder: Foundation's MCP config, strictly; no setting source
     "mcp__foundation__*",
     "--tools=",
     `--disallowedTools=${CLAUDE_BUILT_IN_TOOLS.join(",")}`,
+    // its reasoning, as it comes and readable (docs/agent-harness.md §2)
+    "--include-partial-messages",
+    "--thinking-display",
+    "summarized",
   ]);
+  assert.ok(!subscriptionArgs({ prompt: "p", mcpFile: "/m.json", system: "s", live: false }).includes("--thinking-display"), "an older Claude Code runs without them");
   // the prompt is one argument and never read as a flag: the flags stand on their own after it
   assert.equal(a.filter((x) => x === "--strict-mcp-config").length, 1);
   assert.equal(a.indexOf("--mcp-config") + 1, a.indexOf("/w/runs/r1/mcp.json"));

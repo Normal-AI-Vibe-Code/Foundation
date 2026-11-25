@@ -9,7 +9,7 @@
  *   - Synchronous `peekCachedImage(src, minWidth)` lets cards, chat pictures, lightboxes
  *     and thumbnails render on frame 1 with zero blank flash.
  *
- * L2 (persistent Cache Storage, `foundation-image-cache-v2`):
+ * L2 (persistent Cache Storage, `foundation-image-cache-v3`):
  *   - Stores image blobs with lightweight metadata headers (`x-f-nat-w`, `x-f-nat-h`,
  *     `x-f-alpha`, `x-f-bytes`, `x-f-at`, `x-f-w`) across reloads for BOTH cookie and
  *     bearer (`BEARER === true`) transports.
@@ -24,7 +24,11 @@
  *     `AbortSignal` cancellation so panning off-screen immediately frees slots for visible cards.
  */
 
-export const IMAGE_CACHE_NAME = "foundation-image-cache-v2";
+import { BYTE_CACHE_NAME, resetByteCache } from "./byteCache";
+
+export const IMAGE_CACHE_NAME = "foundation-image-cache-v3";
+/** v2 was opened per read and write: WebKit (the Mac app) made a new cache of the same name for each racing open */
+export const SCATTERED_CACHE_NAME = "foundation-image-cache-v2";
 export const LEGACY_LOD_CACHE_NAME = "foundation-image-lod-v1";
 
 export const PREVIEW_TIER = 64 as const;
@@ -445,12 +449,28 @@ export function l2CacheUrl(src: string, tier: ImageTier, origin = currentImageOr
   return `${L2_ORIGIN}/${encodeURIComponent(origin)}/${encodeURIComponent(src)}/${tier}`;
 }
 
-async function openL2Cache(): Promise<Cache | null> {
-  try {
-    return typeof caches === "undefined" ? null : await caches.open(IMAGE_CACHE_NAME);
-  } catch {
-    return null;
-  }
+/**
+ * The one cache, opened once per page (2026-11-24). Opened per read and per write, the opens raced, and WebKit (the
+ * Mac app's engine) answered each racing open with a new cache of the same name: a studio's load left 79 caches
+ * called v2, its pictures spread over them, and the next launch opened an empty one and fetched everything again.
+ * The scattered v2 is let go the first time (each delete takes one of them).
+ */
+let l2Open: Promise<Cache | null> | null = null;
+function openL2Cache(): Promise<Cache | null> {
+  if (typeof caches === "undefined") return Promise.resolve(null);
+  l2Open ??= (async () => {
+    try {
+      for (let i = 0; i < 200 && (await caches.has(SCATTERED_CACHE_NAME)); i++) await caches.delete(SCATTERED_CACHE_NAME);
+    } catch {
+      /* letting go of old copies is a nicety */
+    }
+    try {
+      return await caches.open(IMAGE_CACHE_NAME);
+    } catch {
+      return null;
+    }
+  })();
+  return l2Open;
 }
 
 let l2Hits = 0;
@@ -560,7 +580,9 @@ export async function pruneL2Cache(maxEntries = DEFAULT_L2_MAX_ENTRIES, maxBytes
 
 export async function clearL2Caches(): Promise<void> {
   if (typeof caches === "undefined") return;
-  await Promise.allSettled([caches.delete(IMAGE_CACHE_NAME), caches.delete(LEGACY_LOD_CACHE_NAME)]);
+  l2Open = null;
+  resetByteCache();
+  await Promise.allSettled([caches.delete(IMAGE_CACHE_NAME), caches.delete(SCATTERED_CACHE_NAME), caches.delete(LEGACY_LOD_CACHE_NAME), caches.delete(BYTE_CACHE_NAME)]);
 }
 
 // ---------- Priority Fetch Scheduler ----------
