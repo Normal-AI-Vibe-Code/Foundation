@@ -1,7 +1,7 @@
 /**
  * End-to-end verification of Progressive Cached Images & Server LODs:
  *   1. Server LOD byte savings (> 75% reduction), numeric `x-image-level` headers,
- *      alpha preservation, and `foundation-image-cache-v2` population on cold grid load.
+ *      alpha preservation, and `foundation-image-cache-v3` population on cold grid load.
  *   2. L1 synchronous instant remount (0 ms / 0 fetches) + persistent L2 Cache Storage
  *      across full `page.reload()` (0 network fetches) + cache wipe on `logout()`.
  *   3. ChatForm image attachment (`w`/`h` metadata on messages, `?w=512` progressive
@@ -375,14 +375,14 @@ test("1. Server LOD byte savings (> 75%) & progressive cold load on a grid", asy
   expect(byteSavingsPct, "LOD byte reduction must exceed 75%").toBeGreaterThan(75);
   expect(coldTransferredBytes, "transferred bytes must be non-zero").toBeGreaterThan(1024);
 
-  // Assert Cache Storage (`foundation-image-cache-v2`) holds the cached tiers
+  // Assert Cache Storage (`foundation-image-cache-v3`) holds the cached tiers
   await expect
     .poll(
       async () =>
         coldViewer!.page.evaluate(async () => {
-          const has = await caches.has("foundation-image-cache-v2");
+          const has = await caches.has("foundation-image-cache-v3");
           if (!has) return 0;
-          const cache = await caches.open("foundation-image-cache-v2");
+          const cache = await caches.open("foundation-image-cache-v3");
           const keys = await cache.keys();
           return keys.length;
         }),
@@ -391,7 +391,7 @@ test("1. Server LOD byte savings (> 75%) & progressive cold load on a grid", asy
     .toBeGreaterThanOrEqual(2);
 
   const l2Keys = await coldViewer.page.evaluate(async () => {
-    const cache = await caches.open("foundation-image-cache-v2");
+    const cache = await caches.open("foundation-image-cache-v3");
     return (await cache.keys()).map((k) => k.url);
   });
   expect(l2Keys.some((u) => u.includes(jpegFile.id))).toBe(true);
@@ -469,7 +469,7 @@ test("2. Persistent L2 cache across reload (0 network downloads), L1 instant rem
   page.off("request", onRemountReq);
   metrics.remountNetworkRequests = remountRequests.length;
 
-  // Part B: Full `page.reload()` hits L2 `foundation-image-cache-v2` with 0 network downloads
+  // Part B: Full `page.reload()` hits L2 `foundation-image-cache-v3` with 0 network downloads
   const reloadRequests: string[] = [];
   const onReloadReq = (req: { url(): string }) => {
     const p = new URL(req.url()).pathname;
@@ -496,8 +496,8 @@ test("2. Persistent L2 cache across reload (0 network downloads), L1 instant rem
   expect(reloadRequests, "second load after reload must serve cached tiers from L2 with 0 network requests").toEqual([]);
   metrics.reloadNetworkRequests = reloadRequests.length;
 
-  // Part C: Calling Sign out (`logout()`) wipes `foundation-image-cache-v2`
-  expect(await page.evaluate(() => caches.has("foundation-image-cache-v2"))).toBe(true);
+  // Part C: Calling Sign out (`logout()`) wipes `foundation-image-cache-v3`
+  expect(await page.evaluate(() => caches.has("foundation-image-cache-v3"))).toBe(true);
   await page.evaluate(() => {
     window.location.hash = "#/settings/general";
   });
@@ -505,8 +505,8 @@ test("2. Persistent L2 cache across reload (0 network downloads), L1 instant rem
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page.locator(".login")).toBeVisible({ timeout: 20_000 });
 
-  const hasCacheAfterLogout = await page.evaluate(() => caches.has("foundation-image-cache-v2"));
-  expect(hasCacheAfterLogout, "logout() must delete foundation-image-cache-v2").toBe(false);
+  const hasCacheAfterLogout = await page.evaluate(() => caches.has("foundation-image-cache-v3"));
+  expect(hasCacheAfterLogout, "logout() must delete foundation-image-cache-v3").toBe(false);
   metrics.cacheClearedOnLogout = !hasCacheAfterLogout;
 
   await coldViewer!.context.close();

@@ -871,6 +871,38 @@
 /* 2026-11-17: over the open menu the fold sits at the menu's right edge */
 .top-left.is-over-pane {
   justify-content: flex-end;
+  /* from the bar's inset to the menu's edge, less the gap its line sits out by (::after), so the line is the menu's
+     edge on every computer, a Mac's lights included (2026-11-24, Josh: "brought back to that panel line") */
+  width: max(0px, calc(var(--pane-w) - var(--bar-inset) - var(--space-2)));
+  container: top-left / inline-size;
+}
+/* a narrow menu (its least, or a Mac's at the usual width, the lights taking the corner) can't hold both words and
+   the fold: ChatForm keeps its mark and its tip, and the fold its edge */
+@container top-left (max-width: 236px) {
+  .top-left .top-chat .top-word {
+    /* out of sight, still the button's name */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .top-left .top-chat {
+    padding-right: var(--space-3);
+  }
+}
+/* narrower still (a Mac's menu at its least): Today keeps its Shiba too, so nothing slides under the lights */
+@container top-left (max-width: 150px) {
+  .top-left .top-today .top-word {
+    /* out of sight, still the button's name */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 /* and a line, the bar's height, between it and the tabs (over the menu, it lands on the menu's own edge) */
 .top-left::after {

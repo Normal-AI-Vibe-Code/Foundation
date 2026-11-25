@@ -46,7 +46,9 @@ export function Still({ character, role, mood }: { character: RosterCharacter; r
   const files = character.files as Record<string, string | undefined>;
   // the role asked for, or the nearest picture there is
   const use = files[role] ? role : (["thumb", "portrait", "front"].find((r) => files[r]) ?? null);
-  const file = useFileSrc(use ? characterFilePath(character.id, use) : null);
+  // a seat is at most a few hundred pixels and its cutout is drawn at 384: the 512 tier, cached, never the original
+  // (an original per character, decoded on the main thread, was most of a studio's first load)
+  const file = useFileSrc(use ? characterFilePath(character.id, use) : null, true, { width: 512 });
   // without its flat ground (characters/cutout.ts): the figure alone, so a silhouette is a figure and not a box
   const src = useCutout(file);
   const [broken, setBroken] = useState(false);

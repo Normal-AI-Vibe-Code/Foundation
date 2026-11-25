@@ -353,6 +353,15 @@
       "issue": 230
     },
     {
+      "id": "webkit-frames",
+      "title": "Hold the Mac's engine to 60 fps in the harness: a WebKit frames spec on a studio board",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "next",
+      "body": "frames.spec.ts measures Edge (WebView2) only; the Mac app is WebKit and was 20× slower than Chromium on the same board until 2026-11-24 (§0.16). Seed a Character studio with characters, inspiration and wired pipeline nodes, and measure pan, zoom and pan at far zoom in Playwright's WebKit (installed 27.2). Then the last 40 → 60 fps at far zoom: the wires drawn into one canvas when far, or cards' DOM culled off screen. The probe scripts are in docs/evidence/2026-11-24_mac-studio-perf/scripts/."
+    },
+    {
       "id": "hyperform-projects",
       "title": "HyperForm's projects in Foundation: list them, show deploy state, read an app without a person's session",
       "kind": "plan",
@@ -2461,6 +2470,24 @@
       "status": "review",
       "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge, fixed the same day. A link in a note: (1) Rune drew no host beside a link where the web note does since the security pass, so the check pressed where no link was; Rune draws it now (view.rs host_mark). (2) Rune's accessibility mirror left each link's <a> taking the pointer above the canvas, so the browser opened the address itself, round openExternal, and Rune heard nothing; rune.css keeps the pointer off the mirror. All 11 checks pass. Still unexplained: 'a section's tools, rename, drag…' failed twice at the drag-swap and then passed eight times on the same code; if it comes back, look for a cancelled pointer (the drop arrives as 'cancel'). A person checks: a link in a note under Rune in the desktop app.",
       "issue": 218
+    },
+    {
+      "id": "mac-studio-perf",
+      "title": "The Mac: the Character studio at 40–60 fps in WebKit, and its pictures and avatars cached between launches",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "perf",
+      "status": "review",
+      "body": "2026-11-24, Josh: 30–60 fps at all times on the Mac, even on the Character studio; progressive loading; cached images and videos. Measured in Playwright's WebKit (the Mac app's engine) on a copy of this Mac's data: zoom 4.7 → 45 fps, pan after a zoom 1.7 → 60, pan at 12 % 2.6 → 40. The cause was the port-wire layer: a live wire's pulse under an SVG tunnel mask, which WebKit re-renders as the camera moves; both now rest while the board is far or moving. useOnScreen keeps one state and batches its reads; character cards fetch pictures once near; stills use the 512 tier; autoplaying videos pause off screen or far. The image cache never hit on a Mac (WebKit made a cache per racing open, 79 called v2): opened once per page now (v3), and mesh avatars and clips are kept in a byte cache; a relaunch fetches 0 bytes of them. SPEC §0.16, docs/evidence/2026-11-24_mac-studio-perf/. A person checks: the studio in the installed Mac app after the next release (pan, zoom far out and back, relaunch and see the pictures arrive at once)."
+    },
+    {
+      "id": "mac-top-left",
+      "title": "The Mac: Today, ChatForm and the fold end on the side menu's edge",
+      "kind": "bug",
+      "milestone": "polish",
+      "area": "shell",
+      "status": "review",
+      "body": "2026-11-24, Josh: 'the tabs are too far out on mac and should be brought back to that panel line'. The group over the open menu was sized paneW − 16, but a Mac's bar starts 84 px in for its lights, so it ran 68 px past the menu. One --bar-inset now (12 px, 84 on a Mac) and the group is the menu's width less it; at a narrow menu ChatForm, then Today, keep their marks (names kept). e2e/today-corner.spec.ts holds it at 220, 272, 340 and 420 px. A person checks: the installed Mac app after the next release."
     }
   ]
 }

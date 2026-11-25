@@ -19,7 +19,7 @@ import { addLink, applyWireClip, getState, gridSize, objectWorldRect, removeLink
 import { boardTool } from "../lib/collectionDrag";
 import { toast } from "../state/ui";
 import { useActiveBoard } from "./Presence";
-import { toWorld, camera } from "../state/camera";
+import { toWorld, camera, FAR_ZOOM } from "../state/camera";
 import { polyline, route, routeSides, tunnelGeometry, typesCompatible, type P } from "./wireGeometry";
 import { allCrossings, publishRoutes, routesVersion, unpublishRoutes } from "./routeRegistry";
 import { cardRects, endPanel, endRect, obstaclesFor, portLayout, portPoint, portSide, sectionEndRect, toneOf } from "./ports";
@@ -394,6 +394,11 @@ export const PortWires = memo(function PortWires() {
           g.querySelector(".tunnel-cut")?.setAttribute("d", t.cut);
           g.querySelector(".pipe-terminal")?.setAttribute("d", t.terminals);
           g.classList.toggle("is-under", t.cut.length > 0);
+          const body = g.querySelector<SVGGElement>(".pipe-body");
+          if (body) {
+            if (t.cut.length > 0) body.setAttribute("mask", body.dataset.mask ?? "");
+            else body.removeAttribute("mask");
+          }
         }
       }
       if (ghost.current && drag) {
@@ -436,7 +441,16 @@ export const PortWires = memo(function PortWires() {
 
   return (
     <>
-      <svg className={`port-layer${d ? " is-dragging" : ""}`} width={size.w} height={size.h} style={{ overflow: "visible" }}>
+      <svg
+        className={`port-layer${d ? " is-dragging" : ""}`}
+        width={size.w}
+        height={size.h}
+        style={{ overflow: "visible" }}
+        // drawn small when it mounts: the pulse and the tunnels rest from the start (the viewport marks it as the camera changes)
+        ref={(el) => {
+          if (el && camera.scale < FAR_ZOOM) el.dataset.far = "1";
+        }}
+      >
         {[...agentFocus.entries()].map(([id, a]) => (
           <g key={`ring-${id}`} className="agent-ring">
             <rect
@@ -474,7 +488,9 @@ export const PortWires = memo(function PortWires() {
                 </mask>
               </defs>
               <path className="pipe-trace" data-route />
-              <g mask={`url(#tun-${l.id})`}>
+              {/* the tunnel mask goes on only where this wire passes under another: a mask is a repaint each frame
+                  the camera moves on WebKit, and most wires never cross */}
+              <g className="pipe-body" data-mask={`url(#tun-${l.id})`}>
                 <path className="pipe-lane" data-route />
                 <path className="pipe-wire" data-route />
                 <path className="pipe-pulse" data-route />

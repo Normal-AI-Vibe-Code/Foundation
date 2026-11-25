@@ -8,6 +8,7 @@
 import { useSyncExternalStore } from "react";
 import { boardMaps, characterChoosable, seatCrew, type CharacterState } from "@foundation/protocol";
 import { api, fetchFile } from "../lib/api";
+import { cachedBytes } from "../lib/byteCache";
 import { activeBoard, onBoardChange } from "../sync/board";
 
 export interface RosterCharacter extends CharacterState {
@@ -100,10 +101,13 @@ export function characterBytes(id: string, role: string, fileId: string): Promis
   const key = `${id}/${role}/${fileId}`;
   let p = bytes.get(key);
   if (!p) {
-    p = fetchFile(characterFilePath(id, role)).then((r) => {
-      if (!r.ok) throw new Error(`the character's ${role} didn't load (${r.status})`);
-      return r.arrayBuffer();
-    });
+    // and kept between launches (lib/byteCache.ts): the key names the file, so a new one is fetched anew
+    p = cachedBytes(`character/${key}`, () =>
+      fetchFile(characterFilePath(id, role)).then((r) => {
+        if (!r.ok) throw new Error(`the character's ${role} didn't load (${r.status})`);
+        return r.arrayBuffer();
+      }),
+    );
     p.catch(() => bytes.delete(key));
     bytes.set(key, p);
   }
