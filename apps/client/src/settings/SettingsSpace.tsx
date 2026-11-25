@@ -13,12 +13,16 @@
  *  - **Services**, **Places**, **Renderer**, **Releases** — as before.
  */
 
+import { setWheelMode, wheelMode } from "../lib/wheel";
 import { useEffect, useState } from "react";
 import type { UserInfo } from "@foundation/protocol";
 import { chooseNight, nightChoice, onNight } from "@foundation/ui";
 import { api, logout } from "../lib/api";
 import { TOP_BAR, floorInsets, toast, useUi } from "../state/ui";
 import { SETTINGS_TABS, goSettings, setStartsOn, startsOn, type Place, type SettingsTab } from "../lib/place";
+import { useCapabilities } from "../lib/capabilities";
+import { PeopleSection } from "./PeopleSection";
+import { ChatServerSetting } from "./ChatServerSetting";
 import { PlacesTab } from "./PlacesTab";
 import { POSTS, ReleasesTab, ServicesTab } from "./SettingsPage";
 import { RendererTab } from "../rune/RendererTab";
@@ -89,7 +93,7 @@ export function SettingsSpace({ place, user }: { place: Extract<Place, { kind: "
 
 // ---------------------------------------------------------------- parts
 
-export function Group({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+export function Group({ title, note, children }: { title: React.ReactNode; note?: string; children: React.ReactNode }) {
   return (
     <section className="set-group">
       <div className="set-group-head">
@@ -136,6 +140,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
   const ui = useUi();
   const [scheme, setScheme] = useState(nightChoice);
   const [start, setStart] = useState(startsOn);
+  const [wheel, setWheel] = useState(wheelMode());
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   // the orb in the top bar changes the scheme too
   useEffect(() => onNight(() => setScheme(nightChoice())), []);
@@ -187,7 +192,25 @@ function GeneralTab({ user }: { user: UserInfo }) {
             }}
           />
         </Row>
+        <Row name="The wheel on a grid" detail={wheel === "zoom" ? "Zooms around the pointer. Drag the paper to move it; Shift+wheel slides it sideways. Two fingers on a trackpad still pan." : "Moves the paper. Ctrl+wheel (⌘ on a Mac) zooms."}>
+          <Seg
+            label="The wheel on a grid"
+            value={wheel}
+            options={[
+              { id: "zoom", label: "Zooms" },
+              { id: "pan", label: "Pans" },
+            ]}
+            onChange={(v) => {
+              setWheelMode(v);
+              setWheel(v);
+            }}
+          />
+        </Row>
         <Row name="Side menu" detail={ui.pane ? "Open. It stays the way you leave it; the top bar's first button folds it." : "Folded. It stays the way you leave it; the top bar's first button opens it."} />
+      </Group>
+
+      <Group title="ChatForm's server" note="Where this device's ChatForm keeps its conversations. Everything else stays on the Foundation server.">
+        <ChatServerSetting />
       </Group>
 
       <Group title="Agents on this computer" note="What agents may do beyond writing a grid. Nothing that runs code or spends money starts without a person.">
@@ -213,7 +236,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
         <Row name="Starting a machine" detail="Always a person's press, from a browser. An agent can only propose one." />
         <Row name="Running a command in a machine" detail="Each command an agent wants to run waits on the machine's card for your Run or Decline." />
         <Row name="Folders agents may read" detail="Only the folders an admin approved.">
-          <button className="f-pill" onClick={() => goSettings("places")}>
+          <button type="button" className="f-pill" onClick={() => goSettings("places")}>
             Places
           </button>
         </Row>
@@ -236,6 +259,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
             {initials(user.name)}
           </span>
           <button
+            type="button"
             className="f-pill"
             onClick={async () => {
               await logout();
@@ -246,6 +270,8 @@ function GeneralTab({ user }: { user: UserInfo }) {
           </button>
         </Row>
       </Group>
+
+      {user.role === "admin" && <PeopleSection user={user} />}
     </div>
   );
 }
@@ -258,6 +284,7 @@ interface Integrations {
 
 function AgentsTab({ user }: { user: UserInfo }) {
   const [s, setS] = useState<Integrations | null>(null);
+  const caps = useCapabilities();
   useEffect(() => {
     api<Integrations>("/api/integrations").then(setS, () => {});
   }, []);
@@ -265,7 +292,7 @@ function AgentsTab({ user }: { user: UserInfo }) {
     <div className="set-page">
       <Group title="Your own agent, over MCP" note="An agent you run yourself (Claude Code, Codex) joins a grid with its own cursor and the grid's tools.">
         <Row name="Claude Code or Codex" detail="Copies the command that adds this server to it. Run it in a terminal, then ask it about the grid.">
-          <button className="f-pill" onClick={() => void copyMcpCommand()}>
+          <button type="button" className="f-pill" onClick={() => void copyMcpCommand()}>
             Copy the command
           </button>
         </Row>
@@ -285,9 +312,15 @@ function AgentsTab({ user }: { user: UserInfo }) {
           <h2>This computer's agents</h2>
           <p>Claude, Codex and the rest, each on its own sign-in; Kimi and DeepSeek on a key or a local model. Assign any of them to a section from that section's council.</p>
         </div>
-        <div className="set-t3">
-          <T3Block viewer={user.role === "viewer"} admin={user.role === "admin"} section={null} />
-        </div>
+        {!caps.local.t3 ? (
+          <div className="set-rows">
+            <Row name="Hosted server" detail="Local T3 agents run on a local computer and are turned off on a hosted Foundation server. Connect your own local agent over MCP above, or set ANTHROPIC_API_KEY for the server's own agent." />
+          </div>
+        ) : (
+          <div className="set-t3">
+            <T3Block viewer={user.role === "viewer"} admin={user.role === "admin"} section={null} />
+          </div>
+        )}
       </section>
     </div>
   );
@@ -358,7 +391,7 @@ function AvatarsTab({ user }: { user: UserInfo }) {
             The characters <span className="set-count">{ready.length}</span>
           </h2>
           <p>Made on the Character studio grid: inspiration, a sheet, then a mesh avatar or a 3D model.</p>
-          <button className="f-pill" onClick={() => void openCharacterStudio()}>
+          <button type="button" className="f-pill" onClick={() => void openCharacterStudio()}>
             Open the Character studio
           </button>
         </div>

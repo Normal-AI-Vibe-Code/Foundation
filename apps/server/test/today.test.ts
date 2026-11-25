@@ -1,7 +1,8 @@
 /**
  * Today: a person's goals are theirs alone; what wants them comes from what
  * Foundation knows (asks, @mentions, stages they own, their job); a viewer
- * keeps their own goals but still can't touch a board.
+ * keeps their own goals but still can't touch a board. The company's goals are
+ * everyone's to read and the company board's writers' to set.
  */
 
 import { after, test } from "node:test";
@@ -17,7 +18,9 @@ const { run, indexDoc } = await import("../src/db.ts");
 const { upsertUser } = await import("../src/auth.ts");
 const { runTool } = await import("../src/tools.ts");
 const { editBoard, closeBoards, ensureBoardRow } = await import("../src/boards.ts");
-const { focusFor, listGoals, mentions, saveGoal, setProfile, todayDigest, todayFor, companyApps } = await import("../src/today.ts");
+const { focusFor, listGoals, mentions, saveGoal, setProfile, todayDigest, todayFor, companyApps, saveCompanyGoal, listCompanyGoals } = await import("../src/today.ts");
+const { boardMaps } = await import("@foundation/protocol");
+const { getBoard } = await import("../src/boards.ts");
 const { appendSection, putNote, uid, logActivity } = await import("@foundation/protocol");
 
 after(() => closeBoards());
@@ -93,7 +96,7 @@ test("the page and the Shiba read the same Today", () => {
   assert.equal(t.profile.title, "Motor lead");
   assert.equal(t.sources.dataroom.connected, false);
   const names = companyApps().map((a) => a.name);
-  for (const n of ["BomForm", "FactoryForm", "HyperForm", "Vision"]) assert.ok(names.includes(n), n);
+  for (const n of ["PartForm", "DeployForm", "FactoryForm", "HyperForm", "Vision"]) assert.ok(names.includes(n), n);
   const d = todayDigest(t);
   assert.match(d, /ask:ask_1/);
   assert.match(d, /Motor lead/);
@@ -109,4 +112,39 @@ test("a viewer keeps their own goals through the tools, and still can't write a 
   await assert.rejects(runTool(ctx, "add_note", { section: "Rim drive", title: "hi", markdown: "hi" }), /View only/);
   // and the agent can't reach someone else's goal
   await assert.rejects(runTool({ ...ctx, userId: kai.id }, "set_goal", { id: goal.id, status: "done" }), /no such goal of yours/);
+});
+
+test("company goals: everyone reads them, the company board's writers set them, and the owner has it in focus", async () => {
+  const g = saveCompanyGoal(kai, { title: "Fly the PTHP demonstrator", detail: "First hover by Q1", owner: "Ada", dueAt: Date.now() + 30 * 864e5 });
+  assert.match(g.id, /^cgoal_/);
+  assert.equal(g.board, "company");
+  // the same for everyone, viewers included; only writers may set them
+  for (const who of [ada, kai, vic]) assert.deepEqual(todayFor(who).company.goals.map((x) => x.id), [g.id]);
+  assert.equal(todayFor(kai).company.canSet, true);
+  assert.equal(todayFor(vic).company.canSet, false);
+  assert.throws(() => saveCompanyGoal(vic, { title: "Not mine to set" }), /View only/);
+  assert.throws(() => saveCompanyGoal(vic, { id: g.id, progress: 1 }), /View only/);
+  // the board it belongs to says so
+  assert.ok(boardMaps(getBoard("company").doc).activity.toArray().some((e) => e.who === "Kai" && e.text.includes("Fly the PTHP demonstrator")));
+  // whoever carries it sees it in focus, right after their asks; others don't
+  const focus = focusFor(ada);
+  const at = focus.findIndex((f) => f.id === `goal:${g.id}`);
+  assert.ok(at >= 0 && focus[at].kind === "goal" && focus[at].why.includes("company goal you carry"));
+  assert.ok(focus.slice(0, at).every((f) => f.kind === "ask"));
+  assert.ok(!focusFor(kai).some((f) => f.kind === "goal"));
+  assert.match(todayDigest(todayFor(vic)), /Company goals \(1; this person can read them, not change them\)/);
+  // the Shiba sets them through the tool for a writer, and is refused for a viewer
+  const ctx = { boardId: "company", actor: "Foundation Agent", userId: kai.id };
+  const { goal } = (await runTool(ctx, "set_company_goal", { id: g.id, progress: 0.4, request_id: "r1" })) as { goal: { progress: number } };
+  assert.equal(goal.progress, 0.4);
+  await assert.rejects(runTool({ ...ctx, userId: vic.id }, "set_company_goal", { title: "Nope" }), /View only/);
+  // and from another board the Shiba is on, it's still the company board that decides
+  run("insert into board_roles (board_id, user_id, role, set_by, set_at) values ('company', ?, 'viewer', ?, ?)", kai.id, ada.id, Date.now());
+  await assert.rejects(runTool({ ...ctx, boardId: "motors" }, "set_company_goal", { title: "Nope" }), /View only/);
+  run("delete from board_roles where board_id = 'company' and user_id = ?", kai.id);
+  // done: it stays in sight a while, out of the owner's focus
+  saveCompanyGoal(kai, { id: g.id, status: "done" });
+  assert.equal(listCompanyGoals()[0].status, "done");
+  assert.equal(listCompanyGoals()[0].progress, 1);
+  assert.ok(!focusFor(ada).some((f) => f.kind === "goal"));
 });

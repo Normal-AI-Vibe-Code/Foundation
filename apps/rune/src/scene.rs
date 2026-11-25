@@ -10,7 +10,7 @@ use rune::Color;
 use serde::Deserialize;
 
 /// Bumped when the shape changes; the client refuses a module that speaks another version.
-pub const SCENE_VERSION: u32 = 4;
+pub const SCENE_VERSION: u32 = 5;
 
 /// sRGB, straight alpha, 0..1: what CSS computes a token to.
 pub type Rgba = [f32; 4];

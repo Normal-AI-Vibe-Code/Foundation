@@ -27,18 +27,22 @@ import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import type { UserInfo } from "@foundation/protocol";
 import type { WebSocketServer } from "ws";
-import { hashToken, isServiceToken, requireUser, tokenFrom, userFromRequest, userFromSessionHash } from "./auth.ts";
+import { hashToken, isPerson, isServiceToken, requireUser, tokenFrom, userFromRequest, userFromSessionHash } from "./auth.ts";
 import { attachHostTerminal, HOST_TERM_PATH, spendHostTerminalKey } from "./hostterm.ts";
+import { attachHostBrowser, HOST_BROWSER_PATH, spendHostBrowser } from "./hostbrowser.ts";
 import { one, run } from "./db.ts";
 import { CLOSE_TOO_OLD, clientTooOld } from "./clientversion.ts";
 import { HttpError, type Req } from "./http.ts";
 import { attachConnection, boardEpoch, syncAccess } from "./boards.ts";
 import { attachHuddle } from "./huddles.ts";
+import { attachChat, CHAT_SOCKET_PATH, chatSocketIsPerson } from "./chatsock.ts";
 import { attachTerminal } from "./machines.ts";
 import { attachDesktop } from "./machinedesktop.ts";
+import { attachVmConsole } from "./localvms.ts";
 import { portTarget, relayUpgrade } from "./machineshare.ts";
 import { canSeeBoard } from "./members.ts";
 import { canWrite } from "./roles.ts";
+import { cookieOriginRefusal } from "./origins.ts";
 
 export const TICKET_TTL_MS = 30_000;
 /** tests move the clock */
@@ -49,10 +53,13 @@ const SYNC = new RegExp(`^/sync/(${ID})$`);
 const HUDDLE = new RegExp(`^/huddle/(${ID})/(${ID})$`);
 const TTY = new RegExp(`^/machines/(${ID})/(${ID})/tty$`);
 const VNC = new RegExp(`^/machines/(${ID})/(${ID})/vnc$`);
+const VM_CONSOLE = new RegExp(`^/vms/(${ID})/(${ID})/vnc$`);
 
 /** the board a socket path belongs to, or null if it isn't one of ours */
 export function socketBoard(path: string): string | null {
-  return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path) ?? VNC.exec(path))?.[1] ?? null;
+  // ChatForm's one socket: the reserved board "chat" (open to everyone signed in); chat.ts decides what each event reaches
+  if (path === CHAT_SOCKET_PATH) return "chat";
+  return (SYNC.exec(path) ?? HUDDLE.exec(path) ?? TTY.exec(path) ?? VNC.exec(path) ?? VM_CONSOLE.exec(path))?.[1] ?? null;
 }
 
 /** `POST /api/ws-ticket { path }`: a one-time ticket for that one socket */
@@ -69,41 +76,60 @@ export function issueTicket(req: Req, path: unknown): { ticket: string; expiresI
   const now = ticketClock.now();
   run("delete from ws_tickets where expires_at <= ?", now);
   const ticket = randomBytes(32).toString("base64url");
+  // the ticket records whether a person asked for it (their browser's cookie, or their app's sign-in bearer) or an
+  // agent did: a machine's terminal and desktop take input from a person only
+  const person = isPerson(req) ? 1 : 0;
   run(
-    "insert into ws_tickets (ticket_hash, session_hash, user_id, path, created_at, expires_at) values (?, ?, ?, ?, ?, ?)",
+    "insert into ws_tickets (ticket_hash, session_hash, user_id, path, created_at, expires_at, person) values (?, ?, ?, ?, ?, ?, ?)",
     hashToken(ticket),
     hashToken(token),
     user.id,
     path,
     now,
     now + TICKET_TTL_MS,
+    person,
   );
   return { ticket, expiresIn: TICKET_TTL_MS / 1000 };
+}
+
+/** who opens a socket, and whether they are a person (not an agent, an MCP client or the service token) */
+export interface SocketWho {
+  user: UserInfo;
+  person: boolean;
 }
 
 /**
  * Spend a ticket on the socket at `path`. It's deleted whatever the outcome,
  * so a ticket tried on the wrong path is gone too. The person is whoever its
- * session is now (a session signed out since gets nothing).
+ * session is now (a session signed out since gets nothing). A ticket made
+ * before tickets recorded who asked is not a person's.
  */
-export function spendTicket(ticket: string, path: string): UserInfo | null {
-  const row = one<{ session_hash: string; user_id: string; path: string; expires_at: number }>(
-    "delete from ws_tickets where ticket_hash = ? returning session_hash, user_id, path, expires_at",
+export function spendTicket(ticket: string, path: string): SocketWho | null {
+  const row = one<{ session_hash: string; user_id: string; path: string; expires_at: number; person: number | null }>(
+    "delete from ws_tickets where ticket_hash = ? returning session_hash, user_id, path, expires_at, person",
     hashToken(ticket),
   );
   if (!row || row.expires_at <= ticketClock.now() || row.path !== path) return null;
   const found = userFromSessionHash(row.session_hash);
   if (!found || found.id !== row.user_id) return null;
-  const { kind: _k, ...user } = found;
-  return user;
+  const { kind, ...user } = found;
+  return { user, person: row.person === 1 && kind !== "agent" };
 }
 
 /** who opens this socket: a ticket in the URL if there is one (and only it), else the cookie or Authorization */
-export function socketUser(req: IncomingMessage, url: URL): UserInfo | null {
+export function socketWho(req: IncomingMessage, url: URL): SocketWho | null {
   const ticket = url.searchParams.get("ticket");
   if (ticket !== null) return spendTicket(ticket, url.pathname);
-  return userFromRequest(req as Req);
+  const user = userFromRequest(req as Req);
+  return user ? { user, person: isPerson(req as Req) } : null;
 }
+
+export function socketUser(req: IncomingMessage, url: URL): UserInfo | null {
+  return socketWho(req, url)?.user ?? null;
+}
+
+/** may this socket type into a machine's terminal or move its desktop's pointer: a person, who can edit the board */
+export const machineInput = (who: SocketWho, boardId: string) => who.person && canWrite(who.user.id, boardId);
 
 /** the server's upgrade handler: every socket goes through socketUser, then its board's rules */
 export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, socket: Duplex, head: Buffer) {
@@ -123,7 +149,45 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
     wss.handleUpgrade(req, socket, head, (ws) => attachHostTerminal(ht[1], ws, who));
     return;
   }
-  const user = socketUser(req, url);
+  // the built-in browser: the same rule, its own key (POST /api/host-browser; hostbrowser.ts)
+  const hb = HOST_BROWSER_PATH.exec(url.pathname);
+  if (hb) {
+    const who = spendHostBrowser(hb[1], req.query.get("key"));
+    if (!who) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachHostBrowser(hb[1], ws, who.user, who.page));
+    return;
+  }
+  // a socket signed in by the cookie is opened by one of our own pages (cross-site WebSocket hijacking: origins.ts)
+  if (cookieOriginRefusal(req, { upgrade: true, ticket: url.searchParams.has("ticket") })) {
+    socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+    socket.destroy();
+    return;
+  }
+  const who = socketWho(req, url);
+  const user = who?.user ?? null;
+  const nativeVm = VM_CONSOLE.exec(url.pathname);
+  if (nativeVm) {
+    // noVNC's viewOnly flag is not a security boundary: first slice admits only people with input rights.
+    if (!who || !canSeeBoard(who.user, nativeVm[1]) || !machineInput(who, nativeVm[1])) {
+      socket.write("HTTP/1.1 403 Forbidden\r\n\r\n"); socket.destroy(); return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachVmConsole(nativeVm[1], nativeVm[2], ws, who.user));
+    return;
+  }
+  // ChatForm (chatsock.ts): a person's socket speaks as that person, anything else as an agent
+  if (url.pathname === CHAT_SOCKET_PATH) {
+    if (!who) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    wss.handleUpgrade(req, socket, head, (ws) => attachChat(ws, who.user, who.person));
+    return;
+  }
   // a machine's web port, relayed (machineshare.ts): its app's own sockets, for anyone who can see the board
   if (url.pathname.startsWith("/m/")) {
     const t = portTarget(url.pathname);
@@ -136,20 +200,26 @@ export function handleUpgrade(wss: WebSocketServer, rawReq: IncomingMessage, soc
     return;
   }
   const hm = HUDDLE.exec(url.pathname);
+  // a channel's huddle seats people only (huddles.ts decides)
+  const huddlePerson = Boolean(who?.person);
   if (hm && user && canSeeBoard(user, hm[1])) {
-    wss.handleUpgrade(req, socket, head, (ws) => attachHuddle(hm[1], hm[2], ws, user, req.query.get("send") === "1"));
+    wss.handleUpgrade(req, socket, head, (ws) => attachHuddle(hm[1], hm[2], ws, user, req.query.get("send") === "1", huddlePerson));
     return;
   }
-  // a machine card's shared terminal: editors type, viewers watch
+  // a machine card's shared terminal: a person who can edit types; viewers, agents and the service token watch
+  // (an agent runs a command with machine_run, which a person presses)
   const tm = TTY.exec(url.pathname);
   if (tm && user && canSeeBoard(user, tm[1])) {
-    wss.handleUpgrade(req, socket, head, (ws) => void attachTerminal(tm[1], tm[2], ws, user, canWrite(user.id, tm[1])));
+    const canType = machineInput(who!, tm[1]);
+    wss.handleUpgrade(req, socket, head, (ws) => void attachTerminal(tm[1], tm[2], ws, user, canType));
     return;
   }
-  // a machine's desktop (VNC, relayed): editors get the pointer and keys, viewers the view-only screen
+  // a machine's desktop (VNC, relayed): a person who can edit gets the pointer and keys; viewers, agents and the
+  // service token the view-only screen (agents act through the desktop tools, where a person let them)
   const vm = VNC.exec(url.pathname);
   if (vm && user && canSeeBoard(user, vm[1])) {
-    wss.handleUpgrade(req, socket, head, (ws) => void attachDesktop(vm[1], vm[2], ws, user, canWrite(user.id, vm[1])));
+    const canType = machineInput(who!, vm[1]);
+    wss.handleUpgrade(req, socket, head, (ws) => void attachDesktop(vm[1], vm[2], ws, user, canType));
     return;
   }
   const m = SYNC.exec(url.pathname);

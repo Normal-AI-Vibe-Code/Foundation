@@ -32,7 +32,8 @@ type Scene = {
   cards: Array<{ id: string; kind: string; x: number; y: number; w: number; h: number; s: number; text: string }>;
 };
 type Camera = { x: number; y: number; scale: number; left: number; top: number };
-type Hook = { camera: Camera; status(): { state: string; reason?: string }; scene(): Scene; addNote(section: string, text: string): { id: string }; createTable(section: string): { id: string } };
+type Motion = { motion: "instant" | "animated"; rule: string };
+type Hook = { motions(): Motion[]; setUi(patch: { pane?: boolean }): void; setNight(on: boolean): void; camera: Camera; status(): { state: string; reason?: string }; scene(): Scene; addNote(section: string, text: string): { id: string }; createTable(section: string): { id: string } };
 type Note = { id: string; x: number; y: number; float: boolean; text: string };
 type Store = { workbook: { setCell(t: string, c: number, r: number, raw: string): void; getCell(t: string, c: number, r: number): { value: unknown } | undefined }; getState(): { activeSectionId: string; activeObjectId: string | null; notes: Record<string, Note> } };
 
@@ -98,6 +99,88 @@ test("Rune draws the board, marked as Rune's, and its pictures sit beside the we
     await settle(page, 1400);
     await page.screenshot({ path: `${OUT}/board-rune-${night ? "night" : "day"}.png` });
   }
+  expect(errors.filter((e) => /rune|wgpu|webgpu|panicked/i.test(e))).toEqual([]);
+});
+
+test("motion has an owner: a pane and another board land, a look eases, a let-go settles", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await open(page, "rune");
+  await page.keyboard.press("0");
+  await settle(page, 1400);
+  const motions = () => page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.motions());
+  /** what the boards handed over since `from` were told */
+  const since = async (from: number) => (await motions()).slice(from);
+  // the first board landed
+  expect((await motions())[0]).toEqual({ motion: "instant", rule: "first" });
+
+  // a pane opens with the pointer moving over the board (what made Rune ease it before): the floor lands
+  let n = (await motions()).length;
+  await page.mouse.move(700, 500);
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setUi({ pane: true }));
+  for (let i = 0; i < 12; i++) await page.mouse.move(700 + i * 6, 500 + i * 3);
+  await settle(page, 300);
+  await page.screenshot({ path: `${OUT}/motion-pane-300ms.png` });
+  await settle(page, 600);
+  let got = await since(n);
+  expect(got.length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule === "floor").length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule === "floor" && m.motion !== "instant")).toEqual([]);
+  // and closing it
+  n = (await motions()).length;
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setUi({ pane: false }));
+  await settle(page, 900);
+  got = await since(n);
+  expect(got.some((m) => m.rule === "floor" && m.motion === "instant")).toBe(true);
+
+  // the selection is a look: it eases
+  n = (await motions()).length;
+  const sc = await scene(page);
+  const other = sc.sections.find((s) => !s.active)!;
+  const c = await camera(page);
+  await page.mouse.click(c.left + c.x + (other.x + other.w - 60) * c.scale, c.top + c.y + (other.y + other.h - 40) * c.scale);
+  await expect.poll(async () => (await state(page)).activeSectionId).toBe(other.id);
+  await settle(page, 300);
+  expect(await since(n)).toContainEqual({ motion: "animated", rule: "look" });
+
+  // day: every token changes and nothing moves, so it eases (the fade is sent three times)
+  n = (await motions()).length;
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setNight(false));
+  await settle(page, 2000);
+  got = await since(n);
+  expect(got.length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule !== "look")).toEqual([]);
+  await page.evaluate(() => (window as unknown as { __foundationRune: Hook }).__foundationRune.setNight(true));
+  await settle(page, 2000);
+
+  // a card let go settles; one that arrives from the store lands
+  const sec = (await scene(page)).sections.find((s) => s.active)!;
+  const made = await page.evaluate((id) => (window as unknown as { __foundationRune: Hook }).__foundationRune.addNote(id, "# Moves").id, sec.id);
+  await settle(page, 500);
+  n = (await motions()).length;
+  const at = await cardPoint(page, made);
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  await page.mouse.move(at.x + 60, at.y + 40, { steps: 8 });
+  await page.mouse.up();
+  await settle(page, 600);
+  expect(await since(n)).toContainEqual({ motion: "animated", rule: "hand" });
+  n = (await motions()).length;
+  await page.evaluate((id) => (window as unknown as { __foundationRune: Hook }).__foundationRune.addNote(id, "# Arrives"), sec.id);
+  await settle(page, 500);
+  got = await since(n);
+  expect(got.length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.motion !== "instant")).toEqual([]);
+
+  // another board (a section opened as its own grid) lands
+  n = (await motions()).length;
+  await page.evaluate((id) => (window as unknown as { __foundation: { expandSection(id: string | null): void } }).__foundation.expandSection(id), sec.id);
+  await settle(page, 900);
+  got = await since(n);
+  expect(got.filter((m) => m.rule === "board").length).toBeGreaterThan(0);
+  expect(got.filter((m) => m.rule === "board" && m.motion !== "instant")).toEqual([]);
+  await page.screenshot({ path: `${OUT}/motion-after.png` });
   expect(errors.filter((e) => /rune|wgpu|webgpu|panicked/i.test(e))).toEqual([]);
 });
 
@@ -489,6 +572,47 @@ async function pixels(page: Page, a: Buffer, b?: Buffer) {
 
 const MARKDOWN = "# Paper and type\n\nThe body, with **strong**, *emphasis*, `code` and a [link](https://foundation.invalid/rune).\n\n## A list\n\n- one\n- two\n- three\n\n> A quoted line.\n\n```\nlet x = 1;\n```\n";
 
+test("a press on a note's link says where it goes", async ({ page }) => {
+  // A press on a link's letters used to go to the <a> Rune's accessibility mirror lays over them (rune.css):
+  // the browser opened the address itself and Rune reported nothing. Only the blank rows of the line answered.
+  page.context().on("page", (p) => void p.close().catch(() => {}));
+  await open(page, "rune");
+  await page.keyboard.press("0");
+  await settle(page, 1400);
+  const section = (await scene(page)).sections.find((s) => s.name === "Design" || s.name === "Studio work")!;
+  const id = await page.evaluate(([sec, text]) => (window as unknown as { __foundationRune: Hook }).__foundationRune.addNote(sec, text).id, [section.id, "Go to [foundation.invalid](https://foundation.invalid/press) now."] as const);
+  await settle(page, 1500);
+  const p = await cardPoint(page, id);
+  await page.mouse.click(p.x, p.y);
+  await page.keyboard.press("f");
+  await settle(page, 1600);
+  const card = (await scene(page)).cards.find((c) => c.id === id)!;
+  const cam = await camera(page);
+  const k = cam.scale * card.s;
+  const at = (x: number, y: number) => ({ x: cam.left + cam.x + card.x * cam.scale + x * k, y: cam.top + cam.y + card.y * cam.scale + y * k });
+  // where Rune itself says the link is: the first line, by the cursor
+  const xs: number[] = [];
+  for (let x = 20; x <= 200; x += 3) {
+    const q = at(x, 24);
+    await page.mouse.move(q.x, q.y);
+    await page.waitForTimeout(30);
+    if ((await page.evaluate(() => document.getElementById("foundation-rune")!.style.cursor)) === "pointer") xs.push(x);
+  }
+  expect(xs.length).toBeGreaterThan(4);
+  // the middle of the link
+  const q = at((xs[0] + xs[xs.length - 1]) / 2, 24);
+  console.log(`link press: the note is drawn at ${k.toFixed(2)}, its link from ${xs[0]} to ${xs[xs.length - 1]}`);
+  await page.mouse.move(q.x, q.y);
+  await settle(page, 500);
+  await page.mouse.down();
+  await page.mouse.up();
+  // nothing of the mirror is under the pointer: the canvas is
+  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.tagName, [q.x, q.y])).toBe("CANVAS");
+  await expect
+    .poll(() => page.evaluate(() => ((window as unknown as { __foundationRune: { events(): Array<{ t: string; url?: string }> } }).__foundationRune.events() ?? []).filter((e) => e.t === "link").map((e) => e.url)), { timeout: 3000 })
+    .toContain("https://foundation.invalid/press");
+});
+
 test("the paper, the face and a note in markdown are the web renderer's own", async ({ page }) => {
   test.setTimeout(120_000);
   mkdirSync(OUT, { recursive: true });
@@ -533,7 +657,7 @@ test("the paper, the face and a note in markdown are the web renderer's own", as
     const clip = { x: Math.round(cam.left + cam.x + card.x * cam.scale) + 2, y: Math.round(cam.top + cam.y + card.y * cam.scale) + 2, width: Math.round(card.w * k) - 4, height: Math.round(card.h * k) - 4 };
     shots[engine] = { paper, note: await page.screenshot({ clip }), clip };
     if (engine === "web") {
-      const a = (await page.locator('.note-rendered a[href*="foundation.invalid"]').boundingBox())!;
+      const a = (await page.locator('.note-rendered a[href*="foundation.invalid/rune"]').boundingBox())!;
       link = { x: a.x + a.width / 2 - clip.x, y: a.y + a.height / 2 - clip.y };
     }
     await page.screenshot({ path: `${OUT}/note-markdown-${engine}.png`, clip });
@@ -559,11 +683,11 @@ test("the paper, the face and a note in markdown are the web renderer's own", as
   // and pixel for pixel they differ by little (4/255 on average here: the faces' edges, the bullets, the code face)
   expect(noteRune.diff).toBeLessThan(8);
 
-  // the link sits where the web note sets it, and a press says where it goes
-  await page.mouse.click(shots.rune.clip.x + link.x, shots.rune.clip.y + link.y);
-  await expect
-    .poll(() => page.evaluate(() => ((window as unknown as { __foundationRune: { events(): Array<{ t: string; url?: string }> } }).__foundationRune.events() ?? []).filter((e) => e.t === "link").map((e) => e.url)))
-    .toContain("https://foundation.invalid/rune");
+  // the link sits where the web note sets it (since 2026-11-18 a link wears its real host, which wraps this one
+  // to the second line in both): Rune shows a link under the pointer there
+  await page.mouse.move(shots.rune.clip.x + link.x, shots.rune.clip.y + link.y);
+  await expect.poll(() => page.evaluate(() => document.getElementById("foundation-rune")!.style.cursor)).toBe("pointer");
+  await page.mouse.move(700, 20);
 
   // the grain steps twice a second though nothing else moves
   await page.keyboard.press("0");

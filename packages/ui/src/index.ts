@@ -11,14 +11,14 @@ export const paper = {
   raise: "#ffffff",
   frost: "#201e19",
   mist: "#5f5b51",
-  dim: "#8a8577",
+  dim: "#6f6a5d",
   pulse: "#325bb4",
   volt: "#27488f",
   moss: "#2e5d43",
-  ok: "#2e7d54",
-  warn: "#a16207",
+  ok: "#287850",
+  warn: "#995c02",
   bad: "#b3261e",
-  agent: "#6b5bd6",
+  agent: "#6858d3",
 } as const;
 
 /** night is greys and white, with yellow (attention) and orange (broken) the only pops; agents stay violet */
@@ -29,7 +29,7 @@ export const night = {
   raise: "#1f1f21",
   frost: "#ededed",
   mist: "#a3a3a3",
-  dim: "#6f6f6f",
+  dim: "#868686",
   pulse: "#f2f2f2",
   volt: "#c4c4c4",
   moss: "#8c8c8c",
@@ -62,18 +62,50 @@ export const easings = {
   settle: [0.22, 1.3, 0.36, 1],
 } as const;
 
-// ---------- night engine ----------
+// ---------- night engine, and themes ----------
+//
+// A theme is the look the interface wears for what is in focus (DESIGN.md §2.1). The place decides:
+// Today wears the room; a grid or an app wears its own (a grid may pin day or night), and everything
+// else wears paper, which follows the orb. Night stays one engine: a theme may pin it, and
+// `isNight()` / `onNight` always say what is actually showing. Surfaces that can't read CSS
+// (a terminal's colours, a canvas) listen to `onLook`, which fires whenever any token may have changed.
 
 const KEY = "foundation-night";
 type Listener = (isNight: boolean) => void;
 const listeners = new Set<Listener>();
+const lookListeners = new Set<() => void>();
 
+export type ThemeId = "paper" | "day" | "night" | "room";
+export const THEMES: Record<ThemeId, { name: string; what: string }> = {
+  paper: { name: "Paper", what: "Paper by day, graphite by night: it follows the orb" },
+  day: { name: "Always day", what: "Paper, whatever the orb says" },
+  night: { name: "Always night", what: "Graphite, whatever the orb says" },
+  room: { name: "The room", what: "Clear panes and white type over a picture: Today" },
+};
+export const isThemeId = (v: unknown): v is ThemeId => typeof v === "string" && Object.prototype.hasOwnProperty.call(THEMES, v);
+
+/** what the person chose with the orb (or the OS did, the first time) */
+let chosen = false;
+let themeId: ThemeId = "paper";
+
+function apply() {
+  const root = document.documentElement;
+  const was = root.classList.contains("is-night");
+  const wasTheme = root.dataset.theme ?? "paper";
+  const on = themeId === "day" ? false : themeId === "night" ? true : chosen;
+  root.classList.toggle("is-night", on);
+  root.dataset.theme = themeId;
+  if (on !== was) for (const fn of listeners) fn(on);
+  if (on !== was || wasTheme !== themeId) for (const fn of lookListeners) fn();
+}
+
+/** night as it shows now (a theme may have pinned it) */
 export function isNight(): boolean {
   return document.documentElement.classList.contains("is-night");
 }
 
 export function setNight(on: boolean, persist = true) {
-  document.documentElement.classList.toggle("is-night", on);
+  chosen = on;
   if (persist) {
     try {
       localStorage.setItem(KEY, on ? "1" : "0");
@@ -81,12 +113,32 @@ export function setNight(on: boolean, persist = true) {
       /* private mode */
     }
   }
-  for (const fn of listeners) fn(on);
+  apply();
 }
 
 export function onNight(fn: Listener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
+}
+
+/** the theme the interface wears now */
+export function theme(): ThemeId {
+  return themeId;
+}
+/** wear a theme (the shell does, for the place in focus) */
+export function setTheme(id: ThemeId) {
+  if (id === themeId) return;
+  themeId = id;
+  apply();
+}
+/** the look changed: the theme, or day and night. For what resolves tokens by hand (xterm, a canvas) */
+export function onLook(fn: () => void): () => void {
+  lookListeners.add(fn);
+  return () => lookListeners.delete(fn);
+}
+/** is night pinned by the theme (the orb's choice waits until the theme lets go) */
+export function nightPinned(): boolean {
+  return themeId === "day" || themeId === "night";
 }
 
 /** what was chosen: day, night, or nothing yet (the app follows the system until the orb or Settings says otherwise) */

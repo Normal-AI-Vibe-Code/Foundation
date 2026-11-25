@@ -1,11 +1,13 @@
 # Foundation's desktop releases build themselves (SPEC §3 "Desktop updates", 2026-11-13).
 #
-# Every push to main that passes the tests and typecheck becomes a signed Windows release,
-# v<major>.<minor>.<patch + run number> (scripts/release.mjs ci). Its latest.json is the feed every
-# installed Foundation reads; each one offers the update within a launch (or six hours) and installs it
-# when a person presses Update and restart.
+# Every push to main that passes the tests and typecheck becomes a signed release for Windows and for
+# macOS on Apple silicon (2026-11-20), v<major>.<minor>.<patch + run number>. Each platform builds on its
+# own runner (scripts/release.mjs ci build), then one job publishes them together with a single latest.json
+# (ci publish). That latest.json is the feed every installed Foundation reads; each one offers the update
+# within a launch (or six hours) and installs it when a person presses Update and restart. If either build
+# fails, nothing is published.
 #
-# Needs two Actions secrets on this repo: TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+# Both builds need two Actions secrets on this repo: TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 # (~/.tauri/foundation-updater.key and .password on Josh's PC). Never replace them with a new key:
 # installed copies only accept updates signed by the key whose public half is in tauri.conf.json.
 
@@ -33,8 +35,18 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    runs-on: windows-latest
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows
+            tests: true # the tests and typecheck run once, here; they gate the release through publish's needs
+          - os: macos-latest # Apple silicon
+            name: macos
+            tests: false
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
@@ -63,14 +75,44 @@ jobs:
       - run: npm ci --no-audit --no-fund
 
       - name: Tests
+        if: matrix.tests
+        timeout-minutes: 15 # two minutes when well; a test that never ends must not hold the release for the whole job
         run: npm test
 
       - name: Typecheck
+        if: matrix.tests
         run: npm run typecheck
 
-      - name: Build, sign and publish
+      - name: Build and sign
         env:
-          GH_TOKEN: ${{ github.token }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: node scripts/release.mjs ci ${{ github.run_number }}
+        run: node scripts/release.mjs ci build ${{ github.run_number }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.name }}
+          path: dist/release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/ci # dist/ci/release-windows/, dist/ci/release-macos/
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Windows first: its notes are the release's
+        run: node scripts/release.mjs ci publish ${{ github.run_number }} dist/ci/release-windows dist/ci/release-macos

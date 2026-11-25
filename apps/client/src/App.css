@@ -1,24 +1,6 @@
 /* ============ Foundation — the grid (tokens: packages/ui/src/tokens.css, contract: DESIGN.md) ============ */
 
-:root {
-  /* Foundation's grid names, mapped onto the one design language (packages/ui) */
-  --paper: var(--color-void);
-  --paper-raised: var(--color-raise);
-  --ink: var(--color-frost);
-  --ink-soft: var(--color-mist);
-  --ink-faint: var(--color-dim);
-  --line: var(--color-line);
-  --line-strong: var(--color-line-strong);
-  --accent: var(--color-frost);
-  --select: var(--color-pulse);
-  --select-soft: var(--color-pulse-dim);
-  --pulse: color-mix(in srgb, var(--color-ok) 35%, transparent);
-  --danger: var(--color-bad);
-  --shadow-card: var(--shadow-sheet);
-  --shadow-card-lift: var(--shadow-lift);
-  --font: var(--font-sans);
-  --mono: var(--font-code);
-}
+/* the grid's own names for the tokens (--ink, --paper, --line…) are declared with the themes, in tokens.css */
 
 * {
   margin: 0;
@@ -37,6 +19,7 @@ body,
 }
 .design-page {
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 body {
@@ -44,14 +27,17 @@ body {
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
-  user-select: none;
+  -moz-osx-font-smoothing: grayscale;
+  text-underline-position: from-font;
 }
 
 body.resizing-h {
   cursor: col-resize !important;
+  user-select: none;
 }
 body.resizing-v {
   cursor: row-resize !important;
+  user-select: none;
 }
 
 .app {
@@ -73,6 +59,7 @@ body.resizing-v {
   background: var(--paper);
   touch-action: none;
   contain: strict;
+  user-select: none;
 }
 
 .grid-viewport.panning {
@@ -174,6 +161,7 @@ body.resizing-v .section-card,
   /* no bar: the name sits on the section's own paper, tools wait top-right */
   z-index: 3;
   cursor: grab;
+  user-select: none;
 }
 .section-card.section-dragging .section-header {
   cursor: grabbing;
@@ -190,10 +178,13 @@ body.resizing-v .section-card,
   cursor: text;
   padding: 3px 6px;
   border-radius: var(--radius-card);
+  -webkit-tap-highlight-color: transparent;
 }
 
-.section-name:hover {
-  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+@media (hover: hover) {
+  .section-name:hover {
+    background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+  }
 }
 
 .section-name-input {
@@ -205,12 +196,15 @@ body.resizing-v .section-card,
   border: 1.5px solid var(--select);
   border-radius: var(--radius-card);
   padding: 2px 6px;
-  outline: none;
+  outline: 2px solid transparent;
   width: 160px;
+}
+.section-name-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-pulse-dim);
 }
 
 .section-coords {
-  font-size: 10px;
+  font-size: var(--text-11);
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--color-moss);
@@ -230,7 +224,7 @@ body.resizing-v .section-card,
   border-radius: var(--radius-pill);
   background: var(--color-panel);
   color: var(--ink-soft);
-  font-size: 10.5px;
+  font-size: var(--text-11);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -329,6 +323,10 @@ body.resizing-v .section-card,
   background: var(--color-agent-dim);
   border-color: color-mix(in srgb, var(--color-agent) 40%, transparent);
 }
+.slack-agents:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 2px;
+}
 /* in a grid section's miniature the mark is only read: the dot and the glyph */
 .section-card.is-mini .slack-marks {
   pointer-events: none;
@@ -365,7 +363,14 @@ body.resizing-v .section-card,
     opacity var(--dur-quick) var(--ease-out-soft) 180ms,
     translate var(--dur-pane) var(--ease-out-soft) 180ms;
 }
-.section-card:hover .section-tools,
+@media (hover: hover) {
+  .section-card:hover .section-tools {
+    opacity: 1;
+    translate: 0 0;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+}
 .section-card.confirming .section-tools,
 .section-tools:focus-within {
   opacity: 1;
@@ -405,20 +410,28 @@ body.is-connecting .section-tools,
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  -webkit-tap-highlight-color: transparent;
   transition: transform var(--dur-press) var(--ease-out-soft);
 }
-.sec-tool:hover,
-.section-tools .icon-btn:hover {
-  background: color-mix(in srgb, var(--color-frost) 8%, transparent);
-  color: var(--ink);
+@media (hover: hover) {
+  .sec-tool:hover,
+  .section-tools .icon-btn:hover {
+    background: color-mix(in srgb, var(--color-frost) 8%, transparent);
+    color: var(--ink);
+  }
 }
-.sec-tool:active,
-.section-tools .icon-btn:active {
+.sec-tool:not(:disabled):active,
+.section-tools .icon-btn:not(:disabled):active {
   transform: scale(0.88);
 }
 .sec-tool.sec-agent,
 .section-tools .icon-btn.is-agent {
   color: var(--color-agent);
+}
+.sec-tool.sec-agent:focus-visible,
+.section-tools .icon-btn.is-agent:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 1px;
 }
 
 /* nested grid inside a section: scrollable content plane with its own dots */
@@ -486,6 +499,7 @@ body.is-connecting .section-tools,
   letter-spacing: -0.02em;
   color: var(--ink);
   margin-bottom: var(--space-3);
+  text-wrap: balance;
 }
 .empty-actions {
   display: grid;
@@ -544,6 +558,7 @@ body.is-connecting .section-tools,
   }
 }
 .empty-action {
+  position: relative;
   display: grid;
   grid-template-columns: 32px 1fr auto;
   align-items: center;
@@ -555,17 +570,50 @@ body.is-connecting .section-tools,
   background: var(--color-raise);
   color: var(--ink);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition:
     transform var(--dur-press) var(--ease-out-soft),
     border-color var(--dur-quick) var(--ease-out-soft),
     box-shadow var(--dur-lift) var(--ease-out-soft);
 }
-.empty-action:hover {
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-lift);
-  transform: translateY(-2px);
+.empty-action-cover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-card);
+  -webkit-tap-highlight-color: transparent;
 }
-.empty-action:active {
+.empty-action-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.empty-action-cover:focus-visible {
+  outline: none;
+}
+.empty-action:has(.empty-action-cover:focus-visible) {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+.empty-action.is-agent:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .empty-action:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-lift);
+    transform: translateY(-2px);
+  }
+}
+.empty-action:not(:disabled):active,
+.empty-action.is-split:has(.empty-action-cover:not(:disabled):active) {
   transform: translateY(0) scale(0.985);
 }
 .empty-action b {
@@ -575,6 +623,8 @@ body.is-connecting .section-tools,
 .empty-action small {
   display: block;
   font-size: var(--text-12);
+  line-height: 1.45;
+  text-wrap: pretty;
   color: var(--ink-soft);
 }
 .empty-glyph {
@@ -612,12 +662,15 @@ body.is-connecting .section-tools,
   color: var(--ink);
   font: 500 var(--text-12) / 1 var(--font-sans);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: border-color var(--dur-quick) var(--ease-out-soft), transform var(--dur-press) var(--ease-out-soft);
 }
-.shelf-app:hover {
-  border-color: var(--color-pulse);
+@media (hover: hover) {
+  .shelf-app:hover {
+    border-color: var(--color-pulse);
+  }
 }
-.shelf-app:active {
+.shelf-app:not(:disabled):active {
   transform: scale(0.97);
 }
 .shelf-mark {
@@ -629,7 +682,7 @@ body.is-connecting .section-tools,
   justify-content: center;
   background: var(--color-frost);
   color: var(--color-void);
-  font: 700 11px / 1 var(--font-display);
+  font: 700 var(--text-11) / 1 var(--font-display);
 }
 
 /* A section never scrolls: it fits its cards to its body (store: sectionFlow).
@@ -653,16 +706,19 @@ body.is-connecting .section-tools,
   font: 500 var(--text-12) / 1 var(--font-sans);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition:
     transform var(--dur-press) var(--ease-out-soft),
     border-color var(--dur-quick) var(--ease-out-soft);
 }
-.section-more:hover,
-.section-back:hover {
-  border-color: var(--color-pulse);
+@media (hover: hover) {
+  .section-more:hover,
+  .section-back:hover {
+    border-color: var(--color-pulse);
+  }
 }
-.section-more:active,
-.section-back:active {
+.section-more:not(:disabled):active,
+.section-back:not(:disabled):active {
   transform: scale(0.97);
 }
 .section-more span,
@@ -927,15 +983,24 @@ body.is-connecting .section-tools,
   transition: opacity 0.25s ease, transform 0.3s var(--ease-spring);
 }
 
-.empty-cell:hover .empty-cell-add {
+@media (hover: hover) {
+  .empty-cell:hover .empty-cell-add {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.empty-cell:focus-within .empty-cell-add,
+.empty-cell-add:focus-visible {
   opacity: 1;
   transform: translateY(0);
 }
 
-.empty-cell-add:hover {
-  background: var(--ink);
-  color: var(--paper-raised);
-  border-color: var(--ink);
+@media (hover: hover) {
+  .empty-cell-add:hover {
+    background: var(--ink);
+    color: var(--paper-raised);
+    border-color: var(--ink);
+  }
 }
 
 .cell-drop-highlight {
@@ -998,6 +1063,7 @@ body.is-connecting .section-tools,
 
 body.rewiring {
   cursor: grabbing !important;
+  user-select: none;
 }
 
 .rebind-highlight {
@@ -1109,14 +1175,16 @@ body.rewiring {
 
 /* a long menu on a short window scrolls inside itself */
 .context-menu {
-  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-2);
 }
 .menu-heading {
   height: 24px;
   padding: 6px 10px 0;
   color: var(--color-dim);
-  font: 600 var(--text-11) / 18px var(--font-sans);
+  font: 600 var(--text-11) / 1.6 var(--font-sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1137,17 +1205,20 @@ body.rewiring {
 /* the keyboard is on it (arrows move through the menu): what the pointer's fill says, said for the keys */
 .menu-item:focus-visible,
 .menu-iconbtn:focus-visible {
-  outline: none;
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
   background: var(--ink);
   color: var(--paper-raised);
 }
 .menu-item.danger:focus-visible,
 .menu-iconbtn.danger:focus-visible {
+  outline-color: var(--color-bad);
   background: var(--danger);
   color: var(--color-on-fill);
 }
 .menu-item.is-agent:focus-visible,
 .menu-item.is-agent:focus-visible .menu-icon {
+  outline-color: var(--color-agent);
   background: var(--color-agent);
   color: var(--color-on-fill);
 }
@@ -1159,7 +1230,7 @@ body.rewiring {
   /* as wide as its two columns want, wherever it was opened (a fixed box would otherwise shrink to the room
      between the click and the window's edge, and stack its columns there) */
   width: max-content;
-  max-width: calc(100vw - 24px);
+  max-width: calc(100% - 24px);
 }
 .menu-cols {
   display: flex;
@@ -1249,7 +1320,13 @@ body.rewiring {
   transition: opacity var(--dur-quick) var(--ease-out-soft) 180ms;
 }
 /* the tools take this corner while the pointer is on the section; they carry the same two */
-.section-card:hover .section-rest,
+@media (hover: hover) {
+  .section-card:hover .section-rest {
+    opacity: 0;
+    pointer-events: none;
+    transition-delay: 0ms;
+  }
+}
 .section-card.confirming .section-rest,
 .section-header:focus-within .section-tools ~ .section-rest {
   opacity: 0;
@@ -1278,6 +1355,10 @@ body.rewiring {
   color: var(--color-agent);
   background: var(--color-agent-dim);
 }
+.sec-agents-chip:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 2px;
+}
 .sec-agents-chip .f-dot {
   width: 6px;
   height: 6px;
@@ -1287,17 +1368,23 @@ body.rewiring {
   padding: 0 6px;
   font-size: var(--text-13);
 }
-.sec-agents-chip:hover,
-.sec-rest-open:hover {
-  color: var(--color-frost);
-  background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+@media (hover: hover) {
+  .sec-agents-chip:hover,
+  .sec-rest-open:hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+  }
 }
 
 /* ---------- a text box: a note written as formatted text ---------- */
 
 .rich-text {
-  outline: none;
+  outline: 2px solid transparent;
   overflow: hidden;
+  user-select: text;
+}
+.rich-text:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-pulse);
 }
 .rich-text.is-writing {
   /* below the card's bar, which sits over the top edge while it has focus (as the note editor does),
@@ -1305,6 +1392,8 @@ body.rewiring {
   padding-top: 42px;
   padding-bottom: 52px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 44px 54px;
 }
 .rich-text:empty::before {
   content: attr(data-placeholder);
@@ -1386,11 +1475,12 @@ body.rewiring {
   background: var(--color-panel);
   color: var(--color-frost);
   font: 500 var(--text-12) / 1 var(--font-sans);
-  outline: none;
+  outline: 2px solid transparent;
 }
 .rich-style:focus-visible,
-.rich-link-field:focus {
-  box-shadow: 0 0 0 1px var(--color-pulse);
+.rich-link-field:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
 }
 .rich-link {
   display: flex;
@@ -1407,14 +1497,25 @@ body.rewiring {
   background: var(--color-panel);
   color: var(--color-frost);
   font: 400 var(--text-12) / 1 var(--font-sans);
-  outline: none;
+  outline: 2px solid transparent;
 }
 .empty-inline {
+  position: relative;
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
   color: var(--select);
   cursor: pointer;
 }
 .empty-inline:hover {
   text-decoration: underline;
+}
+.empty-inline:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 
 /* add-section edge buttons */
@@ -1443,7 +1544,13 @@ body.rewiring {
   margin-left: -13px;
 }
 
-.section-card:hover > .add-btn {
+@media (hover: hover) {
+  .section-card:hover > .add-btn {
+    opacity: 1;
+    transition-delay: 0s;
+  }
+}
+.section-card > .add-btn:focus-visible {
   opacity: 1;
   transition-delay: 0s;
 }
@@ -1507,6 +1614,7 @@ body.rewiring {
   width: min(440px, calc(100% - 20px));
   white-space: normal;
   line-height: 1.45;
+  text-wrap: pretty;
 }
 .grid-ask-words {
   flex: 1 1 100%;
@@ -1586,6 +1694,7 @@ body.is-viewer .sec-rest-open.is-make {
   gap: 8px;
   padding: 0 6px 0 6px;
   cursor: grab;
+  user-select: none;
   border-radius: var(--radius-card);
   /* solid glass, no backdrop-filter: a blur per card inside the zoomed world
      re-rasterised on every selection and flickered (one blur per region) */
@@ -1599,7 +1708,14 @@ body.is-viewer .sec-rest-open.is-make {
     opacity var(--dur-quick) var(--ease-out-soft) 140ms,
     translate var(--dur-pane) var(--ease-out-soft) 140ms;
 }
-.frame-anchor:hover .frame-header,
+@media (hover: hover) {
+  .frame-anchor:hover .frame-header {
+    opacity: 1;
+    translate: 0 0;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+}
 .frame-anchor.is-hover .frame-header,
 .frame-anchor.dragging .frame-header,
 .frame-anchor:focus-within .frame-header {
@@ -1629,7 +1745,15 @@ body.is-connecting .frame-header {
 .frame-card {
   --bar-push: 0px;
 }
-.frame-anchor.chrome-bar:is(:hover, .is-hover, .dragging, .is-confirming, :focus-within) .frame-card {
+@media (hover: hover) {
+  .frame-anchor.chrome-bar:hover .frame-card {
+    --bar-push: 38px;
+  }
+  .frame-anchor.chrome-bar:hover .frame-body > :is(.bar-reflow, .bar-slide) {
+    transition-delay: 0s;
+  }
+}
+.frame-anchor.chrome-bar:is(.is-hover, .dragging, .is-confirming, :focus-within) .frame-card {
   --bar-push: 38px;
 }
 body.is-connecting .frame-card,
@@ -1647,12 +1771,20 @@ body.is-connecting .frame-card,
   translate: 0 var(--bar-push);
   transition: translate var(--dur-pane) var(--ease-out-soft) 140ms;
 }
-.frame-anchor.chrome-bar:is(:hover, .is-hover, .dragging, .is-confirming, :focus-within) .frame-body > :is(.bar-reflow, .bar-slide) {
+.frame-anchor.chrome-bar:is(.is-hover, .dragging, .is-confirming, :focus-within) .frame-body > :is(.bar-reflow, .bar-slide) {
   transition-delay: 0s;
 }
 /* the room the bar is given shows the card's own ground (what its content stands on), not the paper behind it */
 .panel-card .frame-body {
   background: var(--color-abyss);
+}
+.panel-body {
+  user-select: text;
+}
+.frame-engage:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
 }
 .panel-card.kind-connector .frame-body,
 .panel-card.kind-ask .frame-body,
@@ -1669,11 +1801,6 @@ body.is-connecting .frame-card,
 }
 [data-card-chrome] .oncall-cell {
   width: 348px;
-  padding-bottom: 76px;
-}
-[data-card-chrome] .effect-label {
-  right: var(--space-4);
-  border-radius: var(--radius-pane);
 }
 
 /* #/design, "Using a card": what the pointer does (design/PointerDemo.tsx) */
@@ -1682,11 +1809,6 @@ body.is-connecting .frame-card,
 }
 [data-pointer-demo] .oncall-cell {
   width: 348px;
-  padding-bottom: 76px;
-}
-[data-pointer-demo] .effect-label {
-  right: var(--space-4);
-  border-radius: var(--radius-pane);
 }
 .pointer-demo-menus {
   margin-top: var(--space-5);
@@ -1743,6 +1865,7 @@ body.is-connecting .frame-card,
   left: 8px;
   width: 28px;
   height: 28px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1751,6 +1874,7 @@ body.is-connecting .frame-card,
   background: color-mix(in srgb, var(--color-abyss) 95%, transparent);
   box-shadow: var(--shadow-glass);
   cursor: grab;
+  user-select: none;
   touch-action: none;
   opacity: 0;
   margin-left: -6px;
@@ -1764,7 +1888,16 @@ body.is-connecting .frame-card,
   cursor: inherit;
   padding: 0;
 }
-.frame-anchor.chrome-icons:is(:hover, .is-hover, .dragging) .frame-grip {
+@media (hover: hover) {
+  .frame-anchor.chrome-icons:hover .frame-grip {
+    opacity: 1;
+    margin-left: 0;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+}
+.frame-anchor.chrome-icons:is(.is-hover, .dragging, :focus-within) .frame-grip,
+.frame-grip:focus-visible {
   opacity: 1;
   margin-left: 0;
   pointer-events: auto;
@@ -1817,8 +1950,28 @@ body.is-viewer .frame-grip {
   opacity: 0;
   transition: opacity var(--dur-quick) var(--ease-out-soft) 150ms;
 }
-.frame-anchor.chrome-icons:hover .frame-icons::before,
-.frame-anchor.chrome-icons.is-hover .frame-icons::before {
+@media (hover: hover) {
+  .frame-anchor.chrome-icons:hover .frame-icons::before {
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  .frame-anchor.chrome-icons:hover .frame-icons {
+    pointer-events: auto;
+  }
+  .frame-anchor.chrome-icons:hover .frame-icon {
+    translate: 36px 0;
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  .frame-anchor.chrome-icons:hover .frame-icon:nth-child(2) {
+    transition-delay: 40ms;
+  }
+  .frame-anchor.chrome-icons:hover .frame-icon:nth-child(3) {
+    transition-delay: 80ms;
+  }
+}
+.frame-anchor.chrome-icons.is-hover .frame-icons::before,
+.frame-anchor.chrome-icons:focus-within .frame-icons::before {
   opacity: 1;
   transition-delay: 0s;
 }
@@ -1840,38 +1993,36 @@ body.is-viewer .frame-grip {
   cursor: pointer;
   translate: -30px 0;
   opacity: 0;
+  -webkit-tap-highlight-color: transparent;
   /* going away waits a beat (150 ms), so a pointer that slips off doesn't lose them */
   transition:
     translate var(--dur-pane) var(--ease-spring) 150ms,
     opacity var(--dur-quick) var(--ease-out-soft) 150ms;
 }
-.frame-anchor.chrome-icons:hover .frame-icons {
+.frame-anchor.chrome-icons.is-hover .frame-icons,
+.frame-anchor.chrome-icons:focus-within .frame-icons {
   pointer-events: auto;
 }
-.frame-anchor.chrome-icons:hover .frame-icon,
-.frame-anchor.chrome-icons.is-hover .frame-icon {
+.frame-anchor.chrome-icons.is-hover .frame-icon,
+.frame-anchor.chrome-icons:focus-within .frame-icon {
   translate: 36px 0;
   opacity: 1;
   transition-delay: 0s;
-}
-.frame-anchor.chrome-icons:hover .frame-icon:nth-child(2) {
-  transition-delay: 40ms;
-}
-.frame-anchor.chrome-icons:hover .frame-icon:nth-child(3) {
-  transition-delay: 80ms;
 }
 .frame-anchor.chrome-icons.dragging .frame-icon {
   translate: -30px 0;
   opacity: 0;
 }
-.frame-icon:hover {
-  color: var(--color-frost);
+@media (hover: hover) {
+  .frame-icon:hover {
+    color: var(--color-frost);
+  }
+  .frame-icon.is-remove:hover {
+    color: var(--color-bad);
+  }
 }
 .frame-icon.is-on {
   color: var(--color-pulse);
-}
-.frame-icon.is-remove:hover {
-  color: var(--color-bad);
 }
 
 .frame-anchor.dragging .frame-header {
@@ -1925,6 +2076,8 @@ body.is-viewer .frame-grip {
   height: 100%;
   padding: 14px 18px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-4);
   font-size: 13.5px;
   line-height: 1.55;
   color: var(--ink);
@@ -1932,13 +2085,13 @@ body.is-viewer .frame-grip {
   user-select: text;
 }
 
-.note-rendered h1 { font-size: 20px; margin: 8px 0 6px; letter-spacing: -0.02em; }
-.note-rendered h2 { font-size: 16.5px; margin: 8px 0 5px; letter-spacing: -0.01em; }
-.note-rendered h3 { font-size: 14px; margin: 6px 0 4px; }
-.note-rendered h4 { font-size: 13px; margin: 6px 0 4px; color: var(--ink-soft); }
-.note-rendered p { margin: 4px 0; }
-.note-rendered ul, .note-rendered ol { margin: 4px 0 4px 20px; }
-.note-rendered li { margin: 2px 0; }
+.note-rendered h1 { font-size: 20px; margin: 8px 0 6px; letter-spacing: -0.02em; text-wrap: balance; }
+.note-rendered h2 { font-size: 16.5px; margin: 8px 0 5px; letter-spacing: -0.01em; text-wrap: balance; }
+.note-rendered h3 { font-size: 14px; margin: 6px 0 4px; text-wrap: balance; }
+.note-rendered h4 { font-size: 13px; margin: 6px 0 4px; color: var(--ink-soft); text-wrap: balance; }
+.note-rendered p { margin: 4px 0; max-width: 68ch; text-wrap: pretty; }
+.note-rendered ul, .note-rendered ol { margin: 4px 0 4px 20px; max-width: 68ch; }
+.note-rendered li { margin: 2px 0; text-wrap: pretty; }
 .note-rendered code {
   font-family: var(--mono);
   font-size: 12px;
@@ -1953,6 +2106,7 @@ body.is-viewer .frame-grip {
   padding: 10px 12px;
   margin: 6px 0;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
 }
 .note-rendered pre code { background: none; padding: 0; }
 .note-rendered blockquote {
@@ -1960,6 +2114,12 @@ body.is-viewer .frame-grip {
   padding-left: 12px;
   margin: 6px 0;
   color: var(--ink-soft);
+  max-width: 66ch;
+  text-wrap: pretty;
+}
+.note-rendered .md-img {
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
 }
 .note-rendered hr {
   border: none;
@@ -1972,8 +2132,48 @@ body.is-viewer .frame-grip {
   border-bottom: 1px solid color-mix(in srgb, var(--color-pulse) 30%, transparent);
 }
 .note-rendered a:hover { border-bottom-color: var(--select); }
+/* rendered text (utils/markdown.ts): a link's real host beside it, and a picture from elsewhere waiting for a press */
+.md-link-host {
+  margin-left: var(--space-1);
+  font-family: var(--font-code);
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  white-space: nowrap;
+  user-select: none;
+}
+.md-link-host::before { content: "↗ "; }
+.md-img-remote {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin: var(--space-1) 0;
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-raise);
+  font-size: var(--text-12);
+  color: var(--color-dim);
+  user-select: none;
+  vertical-align: middle;
+}
+.md-img-remote-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-img-remote-label b { font-weight: 600; color: var(--color-frost); }
+.md-img-load {
+  flex: none;
+  height: var(--h-pill);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: inherit;
+  cursor: pointer;
+}
+.md-img-load:hover { border-color: var(--color-pulse); }
+.md-img-load:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 1px; }
 /* | tables | in a note: hairlines, a soft header, scroll sideways in a narrow note */
-.note-rendered .md-table { overflow-x: auto; margin: 6px 0; }
+.note-rendered .md-table { overflow-x: auto; overscroll-behavior-x: contain; margin: 6px 0; }
 .note-rendered table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
 .note-rendered th, .note-rendered td {
   border: 1px solid var(--line);
@@ -1993,13 +2193,19 @@ body.is-viewer .frame-grip {
 .note-cm {
   height: 100%;
   background: var(--color-abyss);
+  user-select: text;
 }
 .note-cm .cm-editor {
   height: 100%;
   background: var(--color-abyss);
   color: var(--ink);
 }
-.note-cm .cm-editor.cm-focused { outline: none; }
+.note-cm .cm-editor.cm-focused {
+  outline: 2px solid transparent;
+}
+.note-cm:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-pulse);
+}
 .note-cm .cm-editor .cm-scroller,
 .note-cm-waiting {
   font-family: var(--mono);
@@ -2007,6 +2213,8 @@ body.is-viewer .frame-grip {
   line-height: 1.6;
   font-variant-ligatures: none; /* markdown source: |---| stays dashes, -> stays two characters */
   scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-4);
 }
 /* while writing, the card's bar is showing and has moved the editor down (.bar-reflow): no room of its own */
 .note-cm .cm-editor .cm-content {
@@ -2057,6 +2265,10 @@ body.is-viewer .frame-grip {
   display: block;
   object-fit: cover;
 }
+.frame-card.media-card:not(.is-clear) .media-body img.is-loaded {
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
+}
 /* the well shows only while an image loads (never through a clear one) */
 .media-body img:not(.is-loaded),
 .media-body video {
@@ -2080,9 +2292,15 @@ body.is-viewer .frame-grip {
   pointer-events: none;
   transition: opacity var(--dur-quick) var(--ease-out-soft) 120ms;
 }
-.frame-anchor:hover .frame-card.media-card::after,
+@media (hover: hover) {
+  .frame-anchor:hover .frame-card.media-card::after {
+    opacity: 1;
+    transition-delay: 0s;
+  }
+}
 .frame-anchor.is-hover .frame-card.media-card::after,
-.frame-anchor.dragging .frame-card.media-card::after {
+.frame-anchor.dragging .frame-card.media-card::after,
+.frame-anchor:focus-within .frame-card.media-card::after {
   opacity: 1;
   transition-delay: 0s;
 }
@@ -2132,6 +2350,7 @@ body.is-viewer .frame-grip {
   padding: 0 14px 0 10px;
   border-bottom: 1px solid var(--line);
   cursor: grab;
+  user-select: none;
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   background: linear-gradient(180deg, var(--color-abyss), var(--color-void));
 }
@@ -2182,8 +2401,11 @@ body.is-viewer .frame-grip {
   border: 1.5px solid var(--select);
   border-radius: var(--radius-card);
   padding: 3px 6px;
-  outline: none;
+  outline: 2px solid transparent;
   width: 200px;
+}
+.table-name-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-pulse-dim);
 }
 
 .header-actions {
@@ -2205,17 +2427,20 @@ body.is-viewer .frame-grip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.icon-btn:hover {
-  background: color-mix(in srgb, var(--color-frost) 8%, transparent);
-  color: var(--ink);
+@media (hover: hover) {
+  .icon-btn:hover {
+    background: color-mix(in srgb, var(--color-frost) 8%, transparent);
+    color: var(--ink);
+  }
+  .icon-btn.is-remove:hover {
+    background: color-mix(in srgb, var(--color-bad) 12%, transparent);
+    color: var(--danger);
+  }
 }
-.icon-btn.is-remove:hover {
-  background: color-mix(in srgb, var(--color-bad) 12%, transparent);
-  color: var(--danger);
-}
-.icon-btn:active {
+.icon-btn:not(:disabled):active {
   transform: scale(0.88);
 }
 
@@ -2223,15 +2448,20 @@ body.is-viewer .frame-grip {
 
 .sheet {
   display: grid;
-  outline: none;
+  outline: 2px solid transparent;
   border-radius: 0 0 var(--radius-card) var(--radius-card);
   overflow: hidden;
+}
+.sheet:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
 }
 
 .corner {
   background: var(--color-panel);
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line-strong);
+  user-select: none;
 }
 
 .colhead,
@@ -2239,11 +2469,12 @@ body.is-viewer .frame-grip {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10.5px;
+  font-size: var(--text-11);
   font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--ink-faint);
   background: var(--color-panel);
+  user-select: none;
 }
 
 .colhead {
@@ -2336,6 +2567,7 @@ body.is-viewer .frame-grip {
   overflow: hidden;
   text-overflow: ellipsis;
   width: 100%;
+  user-select: text;
 }
 
 .cell-editor {
@@ -2347,7 +2579,9 @@ body.is-viewer .frame-grip {
   font-family: var(--mono);
   font-size: 12.5px;
   background: var(--color-raise);
-  outline: none;
+  color: var(--ink);
+  outline: 2px solid transparent;
+  user-select: text;
   z-index: 3;
   box-shadow: 0 4px 16px color-mix(in srgb, var(--color-pulse) 18%, transparent);
 }
@@ -2365,6 +2599,7 @@ body.is-viewer .frame-grip {
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
+  user-select: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2374,14 +2609,18 @@ body.is-viewer .frame-grip {
   z-index: 4;
 }
 
-.table-card:hover .add-btn {
-  opacity: 1;
+@media (hover: hover) {
+  .table-card:hover .add-btn {
+    opacity: 1;
+  }
+  .add-btn:hover {
+    background: var(--ink);
+    color: var(--paper-raised);
+    border-color: var(--ink);
+  }
 }
-
-.add-btn:hover {
-  background: var(--ink);
-  color: var(--paper-raised);
-  border-color: var(--ink);
+.table-card .add-btn:focus-visible {
+  opacity: 1;
 }
 
 /* pressed once: the add waits out the double-click window (SectionView AddSectionButton) */
@@ -2421,6 +2660,8 @@ body.is-viewer .frame-grip {
   max-width: 100%;
   object-fit: cover;
   border-radius: var(--radius-paper);
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
   box-shadow: 0 1px 4px color-mix(in srgb, var(--color-frost) 25%, transparent);
   cursor: zoom-in;
 }
@@ -2482,9 +2723,11 @@ body.is-viewer .frame-grip {
 }
 
 .lightbox img {
-  max-width: 78vw;
-  max-height: 78vh;
+  max-width: 78%;
+  max-height: 78dvh;
   border-radius: var(--radius-pane);
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
   box-shadow: var(--shadow-pane);
 }
 
@@ -2538,22 +2781,26 @@ body.is-viewer .frame-grip {
   height: 28px;
   padding: 0 8px;
   cursor: pointer;
-  outline: none;
   max-width: 180px;
 }
 
 .map-bind:hover {
   border-color: var(--ink-faint);
 }
+.map-bind:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
 
 .map-count {
-  font-size: 11px;
+  font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
   color: var(--ink-faint);
   white-space: nowrap;
 }
 
 .map-3d {
-  font-size: 10.5px;
+  font-size: var(--text-11);
   font-weight: 700;
   letter-spacing: 0.04em;
   width: 32px;
@@ -2581,7 +2828,11 @@ body.is-viewer .frame-grip {
 }
 
 .map-body .maplibregl-canvas {
-  outline: none;
+  outline: 2px solid transparent;
+}
+.map-body .maplibregl-canvas:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
 }
 
 /* shield: map is a passive card until the canvas zooms to 1:1 */
@@ -2589,16 +2840,31 @@ body.is-viewer .frame-grip {
   position: absolute;
   inset: 0;
   z-index: 5;
+  border: 0;
+  padding: 0 0 14px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding-bottom: 14px;
   cursor: pointer;
   background: transparent;
 }
 
-.map-shield:hover {
-  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+@media (hover: hover) {
+  .map-shield:hover {
+    background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+  }
+  .map-shield:hover .map-shield-hint {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.map-shield:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
+.map-shield:focus-visible .map-shield-hint {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .map-shield-hint {
@@ -2617,11 +2883,6 @@ body.is-viewer .frame-grip {
     transform 0.35s var(--ease-spring);
 }
 
-.map-shield:hover .map-shield-hint {
-  opacity: 1;
-  transform: translateY(0);
-}
-
 /* The resize corner (2026-11-16, Josh: "really just a gleam on the card corner, and don't show it until
    hovering over"). Nothing at rest. While the pointer is on the card, a 1 px arc lies on the card's own
    bottom-right corner, 10 px each way and fading out at both ends; under the pointer it turns blue. The grab
@@ -2633,6 +2894,7 @@ body.is-viewer .frame-grip {
   width: 22px;
   height: 22px;
   cursor: nwse-resize;
+  user-select: none;
   z-index: 6;
   opacity: 0;
   /* fades on opacity (never a transitioned colour), and waits a beat on the way out like the rest of a card's chrome */
@@ -2654,14 +2916,21 @@ body.is-viewer .frame-grip {
   /* a mask reads only alpha: clear at the two ends, solid round the corner */
   mask-image: linear-gradient(to bottom right, transparent 50%, black 78%);
 }
-.frame-anchor:hover .map-resize,
+@media (hover: hover) {
+  .frame-anchor:hover .map-resize,
+  .map-anchor:hover .map-resize {
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  .map-resize:hover::after {
+    border-color: var(--color-pulse);
+  }
+}
 .frame-anchor.is-hover .map-resize,
-.map-anchor:hover .map-resize,
 .map-resize:active {
   opacity: 1;
   transition-delay: 0s;
 }
-.map-resize:hover::after,
 .map-resize:active::after {
   border-color: var(--color-pulse);
 }
@@ -2728,7 +2997,7 @@ body.is-viewer .frame-grip {
   border: 1px solid var(--color-line-strong);
   background: var(--color-abyss);
   color: var(--color-mist);
-  font: 600 8px / 1 var(--font-sans);
+  font: 600 10px / 1 var(--font-sans);
   cursor: pointer;
   opacity: 0;
   transition: opacity var(--dur-quick) var(--ease-out-soft);
@@ -2909,4 +3178,183 @@ body.is-viewer .frame-grip {
   content: "";
   position: absolute;
   inset: min(0px, calc((100% - 26px / var(--view-scale, 1)) / 2));
+}
+
+/* ============ 2026-11-18: a card pinned to its section, a card minimized, a card's inputs and outputs ============ */
+
+/* Pinned (protocol ObjectBaseDoc.pinned): the card leaves the flow and spans its section, drawn on the section's
+   own paper from under the header down. SectionView scales it so its width is exactly the section's. The flow's
+   cards lie over it. */
+.pinned-slot {
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  z-index: 0;
+}
+.section-content {
+  z-index: 1;
+}
+/* a table on the paper: no card under it (no fill, edge, corner or shadow); the section's dots show through
+   its cells, and only its rules are drawn */
+.table-anchor.is-pinned .table-card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  transition: none;
+  will-change: auto;
+}
+.table-anchor.is-pinned .table-header {
+  padding: 0 14px 0 18px;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+}
+.table-anchor.is-pinned .table-name {
+  font-size: var(--text-13);
+  color: var(--ink-soft);
+}
+.table-pinned-tag {
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.table-anchor.is-pinned .sheet {
+  border-radius: 0;
+}
+.table-anchor.is-pinned :is(.corner, .colhead, .rownum) {
+  background: color-mix(in srgb, var(--color-panel) 55%, transparent);
+}
+.table-anchor.is-pinned .cell {
+  background: transparent;
+}
+.table-anchor.is-pinned .cell:hover {
+  background: color-mix(in srgb, var(--color-panel) 70%, transparent);
+}
+/* the selection ring and the active-card ring keep to the sheet: the section already has an edge */
+.table-anchor.is-pinned .table-card.ctx-active {
+  box-shadow: none;
+}
+.pin-btn.is-on {
+  color: var(--color-pulse);
+}
+/* its header's buttons wait for the pointer, like a section's tools */
+.table-anchor.is-pinned .header-actions {
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.table-anchor.is-pinned .table-header:is(:hover, :focus-within) .header-actions {
+  opacity: 1;
+}
+/* in a section drawn in miniature the pinned sheet is only its rules */
+.section-card.is-mini .table-anchor.is-pinned .header-actions {
+  display: none;
+}
+
+/* Minimized (protocol ObjectBaseDoc.folded): the card is its title bar alone, always showing. Its content stays
+   mounted and is not drawn. */
+.frame-anchor.is-folded .frame-card {
+  height: 40px;
+  --bar-push: 0px;
+}
+.frame-anchor.is-folded .frame-header {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  box-shadow: none;
+}
+.frame-anchor.is-folded .frame-body[hidden] {
+  display: none;
+}
+.table-anchor.is-folded .table-header {
+  border-bottom: 0;
+  border-radius: var(--radius-card);
+}
+.table-anchor.is-folded .sheet[hidden] {
+  display: none;
+}
+
+/* A card's inputs and outputs, in the right pane (components/CardWiring.tsx) */
+.wiring {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.wiring-ports {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.wiring-port {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+.wiring-port:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.wiring-port-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.wiring-port-head code {
+  font: 500 var(--text-11) / 1 var(--font-code);
+}
+.wiring-bead {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.wiring-value {
+  margin: 0;
+  max-height: 260px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.wiring-none {
+  margin: var(--space-2) 0 0;
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-wrap: pretty;
+}
+.wiring-link {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.wiring-link:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+}
+.wiring-link:disabled {
+  cursor: default;
+}
+.wiring-link b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.wiring-arrow {
+  color: var(--wire-tone, var(--color-pulse));
+  font-weight: 700;
 }

@@ -68,9 +68,9 @@ const ago = (t: number) => {
 const at = (t: number) => new Date(t).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" });
 
 function Still({ id, name, src }: { id: string; name: string; src?: string }) {
-  const fetched = useFileSrc(src ? null : `/api/characters/${id}/files/thumb`);
+  const fetched = useFileSrc(src ? null : `/api/characters/${id}/files/thumb`, true, { width: 256 });
   const url = src ?? fetched;
-  return url ? <img src={url} alt={name} draggable={false} loading="lazy" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <i aria-hidden>☺</i>;
+  return url ? <img src={url} alt={name} draggable={false} loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <i aria-hidden>☺</i>;
 }
 
 function Tile({ e, inMain, viewer, still, onApprove }: { e: UploaderEntry; inMain: Set<string>; viewer: boolean; still?: string; onApprove?(e: UploaderEntry): void }) {

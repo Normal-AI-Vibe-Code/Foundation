@@ -28,10 +28,20 @@ test("Foundation for Chrome: a new tab is Today, and the popup reads it with the
   mkdirSync(evidence, { recursive: true });
 
   // a day worth showing: Kai asks Ada for things; Ada has goals and says what she works on
-  const kai = await request.newContext();
+  // the setup's own calls sign in by cookie and say they come from Foundation's page, as Kai's browser would there:
+  // the server refuses a cookie's change from any other page (origins.ts)
+  const fromFoundation = { origin: CLIENT };
+  const kai = await request.newContext({ extraHTTPHeaders: fromFoundation });
   expect((await kai.post(`${CLIENT}/auth/dev`, { data: { name: "Kai Moana", email: "kai@normal.dev" } })).ok()).toBeTruthy();
   for (const prompt of ["Upload the latest stator STEP for the PTHP build", "Sign off the bearing loads before Friday's review"]) {
     expect((await kai.post(`${CLIENT}/api/asks`, { data: { board: "company", assignee: "ada@normal.dev", prompt, kind: "cad_upload" } })).ok()).toBeTruthy();
+  }
+  // and the company's goals, which every new tab opens on (Kai can change the company board, so he sets them)
+  for (const [i, g] of [
+    { title: "Fly the PTHP demonstrator", detail: "First tethered hover", owner: "Ada", progress: 0.45, dueAt: Date.now() + 40 * 864e5 },
+    { title: "Every station on FactoryForm work orders", progress: 0.7 },
+  ].entries()) {
+    expect((await kai.post(`${CLIENT}/api/today/company-goals`, { data: { ...g, request_id: `ext-cg-${i}` } })).ok()).toBeTruthy();
   }
 
   const profile = mkdtempSync(join(tmpdir(), "foundation-chrome-"));
@@ -42,13 +52,14 @@ test("Foundation for Chrome: a new tab is Today, and the popup reads it with the
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`],
   });
   try {
-    expect((await context.request.post(`${CLIENT}/auth/dev`, { data: { name: "Ada Park", email: "ada@normal.dev" } })).ok()).toBeTruthy();
+    // (per call, not for the whole context: the extension's own pages make their requests as Chrome does)
+    expect((await context.request.post(`${CLIENT}/auth/dev`, { data: { name: "Ada Park", email: "ada@normal.dev" }, headers: fromFoundation })).ok()).toBeTruthy();
     for (const g of [
       { title: "Freeze the rim-drive CAD for the PTHP build", detail: "Stator and bearings signed off", progress: 0.6, dueAt: Date.now() + 8 * 864e5 },
       { title: "Get Today in front of the team", progress: 0.35, dueAt: Date.now() + 2 * 864e5 },
       { title: "Onboard Kai to FactoryForm work orders", progress: 0.8 },
     ]) {
-      expect((await context.request.post(`${CLIENT}/api/today/goals`, { data: g })).ok()).toBeTruthy();
+      expect((await context.request.post(`${CLIENT}/api/today/goals`, { data: g, headers: fromFoundation })).ok()).toBeTruthy();
     }
     await context.addInitScript(() => localStorage.setItem("foundation-floor", JSON.stringify({ pane: false, tabs: [], tab: null, search: false })));
 
@@ -63,6 +74,9 @@ test("Foundation for Chrome: a new tab is Today, and the popup reads it with the
     await expect(page.locator(".today")).toBeVisible();
     await expect(page.locator(".today-line")).toContainText("Ada");
     await expect(page.locator(".today-row", { hasText: "Upload the latest stator STEP" })).toBeVisible();
+    // the company's goals open the page, and the one Ada carries is in her focus
+    await expect(page.getByRole("region", { name: "Company goals" }).locator(".today-goal", { hasText: "Fly the PTHP demonstrator" })).toBeVisible();
+    await expect(page.locator(".today-row[data-kind=goal]", { hasText: "Fly the PTHP demonstrator" })).toBeVisible();
     const id = seen.map((u) => /^chrome-extension:\/\/([a-p]{32})\/newtab\.html/.exec(u)?.[1]).find(Boolean);
     expect(id, `the new tab went through the extension (saw ${seen.join(" → ")})`).toBeTruthy();
     await page.waitForTimeout(1500); // the Shiba's room fades in
@@ -72,7 +86,9 @@ test("Foundation for Chrome: a new tab is Today, and the popup reads it with the
     const popup = await context.newPage();
     await popup.setViewportSize({ width: 360, height: 640 });
     await popup.goto(`chrome-extension://${id}/popup.html`);
-    await expect(popup.locator("#hello")).toHaveText("Ada, 2 things want you.");
+    await expect(popup.locator("#hello")).toHaveText("Ada, 3 things want you.");
+    await expect(popup.locator("#company-list")).toContainText("Fly the PTHP demonstrator");
+    await expect(popup.locator("#company-list")).toContainText("Every station on FactoryForm work orders");
     await expect(popup.locator("#focus-list")).toContainText("Sign off the bearing loads");
     await expect(popup.locator("#goal-list")).toContainText("Freeze the rim-drive CAD");
     await expect(popup.locator("#state")).toHaveText("");

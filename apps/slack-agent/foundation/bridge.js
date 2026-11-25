@@ -26,7 +26,7 @@ import { readFileSync } from 'node:fs';
 
 const CHECK_IN_MS = 10_000;
 
-/** what Foundation follows: messages, and the channel list changing */
+/** what Foundation follows: messages, reactions (ChatForm's Slack bridge mirrors them), and the channel list changing */
 export const FORWARDED = new Set([
   'message',
   'channel_created',
@@ -41,6 +41,8 @@ export const FORWARDED = new Set([
   'group_left',
   'member_joined_channel',
   'member_left_channel',
+  'reaction_added',
+  'reaction_removed',
 ]);
 
 /**
@@ -49,7 +51,7 @@ export const FORWARDED = new Set([
  * @returns {{ type: string, subtype?: string, channel?: string }}
  */
 export function slim(event) {
-  const channel = typeof event.channel === 'string' ? event.channel : event.channel?.id;
+  const channel = typeof event.channel === 'string' ? event.channel : (event.channel?.id ?? event.item?.channel);
   return { type: event.type, ...(event.subtype ? { subtype: event.subtype } : {}), ...(channel ? { channel } : {}) };
 }
 

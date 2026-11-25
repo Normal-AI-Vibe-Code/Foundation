@@ -17,6 +17,7 @@ import type { UserInfo } from "@foundation/protocol";
 import { all, one, run } from "./db.ts";
 import { HttpError } from "./http.ts";
 import { dropConnections } from "./boards.ts";
+import { audit } from "./audit.ts";
 
 export type BoardRole = "admin" | "member" | "viewer";
 
@@ -35,6 +36,7 @@ export const READ_TOOLS = new Set([
   "flowform", // the person's own Flowform, through a read-only token; writes nothing here
   "pipeline_status",
   "huddle_transcript",
+  "replay_timeline", // a recorded session's timeline; reads only
   "slack_read",
   "set_plan", // shows the session's plan; writes nothing to the board
   "find_images",
@@ -45,6 +47,12 @@ export const READ_TOOLS = new Set([
   "set_goal",
   "set_profile",
   "point_today",
+  // ChatForm: no board; chattools.ts enforces chat's own rule (the person's channels; posting where they're a member)
+  "chat_channels",
+  "chat_read",
+  "chat_search",
+  "chat_post",
+  "chat_react",
 ]);
 
 function accountRole(userId: string): BoardRole {
@@ -67,9 +75,14 @@ export function requireWriter(user: UserInfo, boardId?: string | null) {
   if (role === "viewer") throw new HttpError(403, boardId ? `View only: you can read “${boardId}” but not change it. An admin can make you a member.` : "View only: your account can read but not change boards.");
 }
 
-/** set (or with null, clear) someone's role on one board — admins only */
+/** set (or with null, clear) someone's role on one board — admins only, in person (the route asks requirePerson) */
 export function setBoardRole(by: UserInfo, boardId: string, userId: string, role: "member" | "viewer" | null) {
-  if (by.role !== "admin") throw new HttpError(403, "Only an admin can change who may edit a board");
+  const rec = (decision: "allowed" | "refused", reason?: string) =>
+    audit({ actor_kind: by.id === "agent" ? "service" : "person", actor_id: by.id, actor_name: by.name, board_id: boardId, door: "route", action: "board_role.set", target: `${userId}:${role ?? "default"}`, decision, reason: reason ?? null, approved_by: decision === "allowed" ? by.id : null, result: decision === "allowed" ? "ok" : null });
+  if (by.role !== "admin" || by.id === "agent") {
+    rec("refused", "not an admin");
+    throw new HttpError(403, "Only an admin can change who may edit a board");
+  }
   if (!one("select id from users where id = ?", userId)) throw new HttpError(404, "no such person");
   if (role === null) run("delete from board_roles where board_id = ? and user_id = ?", boardId, userId);
   else
@@ -77,6 +90,7 @@ export function setBoardRole(by: UserInfo, boardId: string, userId: string, role
       "insert into board_roles (board_id, user_id, role, set_by, set_at) values (?, ?, ?, ?, ?) on conflict(board_id, user_id) do update set role = excluded.role, set_by = excluded.set_by, set_at = excluded.set_at",
       boardId, userId, role, by.id, Date.now(),
     );
+  rec("allowed");
   dropConnections(boardId, userId); // they reconnect under the new role
 }
 

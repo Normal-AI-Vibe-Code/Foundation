@@ -398,7 +398,10 @@ test("Slack: read a channel, post as a person, share a board place, invite to a 
   assert.match(invite, /Noa invited this channel to a huddle on Foundation — Noa, Kai are there now/);
   assert.match(invite, /focus=pnl_h\|Join Shroud review>/);
 
-  // agents can put a channel on the board and read it, by name
+  // agents can put a channel on the board and read it, by name, once a person has allowed Slack reads from this board (egress.ts)
+  const { setAllowance } = await import("../src/egress.ts");
+  const { upsertUser } = await import("../src/auth.ts");
+  setAllowance(BOARD, upsertUser("noa@example.test", "Noa"), "Slack", "read", true);
   const { id, channel } = (await runTool(ctx, "add_slack_channel", { channel: "#design" })) as { id: string; channel: string };
   assert.equal(channel, "C0DESIGN1");
   const card = boardMaps(getBoard(BOARD).doc).objects.get(id) as { panel: string; name: string; channel: string };

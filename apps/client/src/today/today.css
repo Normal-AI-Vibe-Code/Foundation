@@ -12,6 +12,7 @@
   color: var(--color-frost);
   font-family: var(--font-sans);
   overflow: hidden;
+  user-select: text;
 }
 
 /* the Shiba fills the room, edge to edge, under everything */
@@ -140,7 +141,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-height: 26vh;
+  max-height: 26dvh;
   overflow: hidden;
   mask-image: linear-gradient(to bottom, transparent, black 40%);
 }
@@ -183,8 +184,9 @@
   letter-spacing: -0.02em;
   white-space: pre-line;
   text-wrap: balance;
-  max-height: 46vh;
+  max-height: 46dvh;
   overflow: auto;
+  overscroll-behavior: contain;
   animation: today-rise var(--dur-rise) var(--ease-out-soft);
 }
 @keyframes today-rise {
@@ -195,9 +197,10 @@
 }
 .today-sub {
   margin: 0;
-  max-width: 560px;
-  font: 400 var(--text-14) / 1.5 var(--font-sans);
+  max-width: 60ch;
+  font: 400 var(--text-14) / 1.55 var(--font-sans);
   color: var(--color-mist);
+  text-wrap: pretty;
 }
 
 .today-composer {
@@ -221,10 +224,12 @@
   flex: 1;
   min-width: 0;
   border: 0;
-  outline: 0;
   background: transparent;
   color: var(--color-frost);
   font: 400 var(--text-14) / 1 var(--font-sans);
+}
+.today-composer input:focus-visible {
+  outline: none;
 }
 .today-composer input::placeholder {
   color: var(--color-dim);
@@ -261,6 +266,7 @@
   padding: var(--space-6) var(--space-6) var(--space-7) var(--space-5);
   overflow: auto;
   overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-5);
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
@@ -282,10 +288,31 @@
   margin: 0;
   font: 300 var(--text-32) / 1.1 var(--font-display);
   letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 .today-app {
   grid-template-columns: 28px minmax(0, 1fr) 8px;
   align-items: center;
+}
+/* a linked app: the row opens it in your browser, the press beside it opens it in Foundation */
+.today-app-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+.today-app-open {
+  opacity: 0.55;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+@media (hover: hover) {
+  .today-app-pair:hover .today-app-open {
+    opacity: 1;
+  }
+}
+.today-app-pair:focus-within .today-app-open,
+.today-app-open:focus-visible {
+  opacity: 1;
 }
 .today-app[data-unlinked] {
   opacity: 0.62;
@@ -312,8 +339,10 @@
 .today-empty,
 .today-source {
   margin: 0;
-  font: 400 var(--text-12) / 1.5 var(--font-sans);
+  max-width: 60ch;
+  font: 400 var(--text-12) / 1.55 var(--font-sans);
   color: var(--color-dim);
+  text-wrap: pretty;
 }
 .today-source {
   margin-top: var(--space-3);
@@ -360,7 +389,14 @@
   color: inherit;
   text-decoration: none;
 }
-.today-row:hover {
+@media (hover: hover) {
+  .today-row:hover {
+    background: var(--color-raise);
+  }
+}
+.today-row:focus-visible {
+  outline: 2px solid var(--color-over-room);
+  outline-offset: 2px;
   background: var(--color-raise);
 }
 .today-glyph {
@@ -399,17 +435,19 @@
   overflow: hidden;
 }
 .today-row-why {
-  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
   color: var(--color-mist);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-wrap: pretty;
 }
 .today-row[data-tone="bad"] .today-row-why {
   color: var(--color-bad);
 }
 .today-row-board {
-  font: 500 var(--text-11) / 18px var(--font-sans);
+  font: 500 var(--text-11) / 1.64 var(--font-sans);
   padding: 0 var(--space-3);
   border-radius: var(--radius-pill);
   background: var(--color-panel);
@@ -435,9 +473,13 @@
   border-radius: var(--radius-pill);
   border: 1.5px solid var(--color-line-strong);
   background: transparent;
-  color: var(--color-raise);
+  color: var(--color-on-fill);
   font: 700 var(--text-11) / 1 var(--font-sans);
   cursor: pointer;
+}
+.today-check:focus-visible {
+  outline: 2px solid var(--color-over-room);
+  outline-offset: 2px;
 }
 .today-check:hover:not(:disabled) {
   border-color: var(--color-ok);
@@ -445,6 +487,7 @@
 .today-goal[data-done] .today-check {
   background: var(--color-ok);
   border-color: var(--color-ok);
+  color: var(--color-on-fill);
 }
 .today-goal-text {
   display: flex;
@@ -485,7 +528,7 @@
   background: var(--color-ok);
 }
 .today-goal-pct {
-  font: 500 var(--text-12) / 20px var(--font-sans);
+  font: 500 var(--text-12) / 1.67 var(--font-sans);
   font-variant-numeric: tabular-nums;
   color: var(--color-dim);
 }
@@ -498,9 +541,10 @@
   background: transparent;
   color: var(--color-frost);
   font: 400 var(--text-13) / 1 var(--font-sans);
-  outline: 0;
 }
-.today-add input:focus {
+.today-add input:focus-visible {
+  outline: 2px solid var(--color-over-room);
+  outline-offset: 2px;
   border-style: solid;
   border-color: var(--color-pulse);
   background: var(--color-raise);
@@ -512,6 +556,7 @@
   gap: var(--space-2);
   min-width: 0;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   margin-left: var(--space-4);
   padding: var(--space-2) 0;
@@ -537,10 +582,16 @@
     transform var(--dur-press) var(--ease-out-soft),
     border-color var(--dur-quick) var(--ease-out-soft);
 }
-a.today-chip:hover {
-  border-color: var(--color-line-strong);
+@media (hover: hover) {
+  a.today-chip:hover {
+    border-color: var(--color-line-strong);
+  }
 }
-a.today-chip:active {
+a.today-chip:focus-visible {
+  outline: 2px solid var(--color-over-room);
+  outline-offset: 2px;
+}
+a.today-chip:not(:disabled):active {
   transform: scale(0.97);
 }
 .today-chip[data-unlinked] {
@@ -589,6 +640,7 @@ a.today-chip:active {
   height: 100%;
   overflow: auto;
   overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-5);
 }
 .today.is-narrow .today-words {
   /* the first screen is the Shiba's; the panel's title shows under it, so there's more */
@@ -672,7 +724,7 @@ a.today-chip:active {
 .today .today-veil,
 .today.is-narrow .today-veil {
   background:
-    linear-gradient(to left, color-mix(in srgb, var(--color-room-shade) 46%, transparent), transparent min(640px, 56%)),
+    linear-gradient(to left, color-mix(in srgb, var(--color-room-shade) 54%, transparent), transparent min(640px, 56%)),
     linear-gradient(to top, color-mix(in srgb, var(--color-room-shade) 52%, transparent), transparent 60%),
     linear-gradient(color-mix(in srgb, var(--color-room-shade) 36%, transparent), color-mix(in srgb, var(--color-room-shade) 36%, transparent)),
     color-mix(in srgb, var(--color-void) calc(var(--night) * 40%), transparent);
@@ -681,9 +733,10 @@ a.today-chip:active {
 .today .today-state,
 .today.is-narrow .today-state {
   --color-frost: var(--color-over-room);
-  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
-  --color-dim: color-mix(in srgb, var(--color-over-room) 64%, transparent);
+  --color-mist: color-mix(in srgb, var(--color-over-room) 86%, transparent);
+  --color-dim: color-mix(in srgb, var(--color-over-room) 74%, transparent);
   --color-moss: color-mix(in srgb, var(--color-over-room) 76%, transparent);
+  text-shadow: 0 1px 10px color-mix(in srgb, var(--color-room-shade) 42%, transparent);
   --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
   --color-raise: color-mix(in srgb, var(--color-over-room) 12%, transparent);
   --color-line: color-mix(in srgb, var(--color-over-room) 24%, transparent);
@@ -767,7 +820,7 @@ a.today-chip:active {
 }
 .today-state .today-row-board {
   font-size: var(--text-12);
-  line-height: 22px;
+  line-height: 1.83;
 }
 .today-state .today-empty,
 .today-state .today-source {
@@ -783,7 +836,9 @@ a.today-chip:active {
 .today .today-add input::placeholder {
   color: color-mix(in srgb, var(--color-over-room) 78%, transparent);
 }
-.today .today-add input:focus {
+.today .today-add input:focus-visible {
+  outline: 2px solid var(--color-over-room);
+  outline-offset: 2px;
   border-style: solid;
   border-color: var(--color-over-room);
   background: color-mix(in srgb, var(--color-over-room) 14%, transparent);
@@ -795,7 +850,7 @@ a.today-chip:active {
   font: inherit;
   letter-spacing: 0;
   white-space: normal;
-  max-height: 52vh;
+  max-height: 52dvh;
 }
 .shiba-talk {
   display: flex;
@@ -840,6 +895,8 @@ a.today-chip:active {
   margin: var(--space-3) 0;
   border-radius: var(--radius-card);
   object-fit: contain;
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
 }
 /* a block of code, a command, the steps: one line, opened on the right */
 .shiba-fold {
@@ -856,8 +913,15 @@ a.today-chip:active {
   font: 500 var(--text-12) / 1 var(--font-sans);
   cursor: pointer;
 }
-.shiba-fold:hover {
-  background: color-mix(in srgb, var(--color-over-room) 20%, transparent);
+@media (hover: hover) {
+  .shiba-fold:hover {
+    background: color-mix(in srgb, var(--color-over-room) 20%, transparent);
+  }
+}
+.shiba-fold:focus-visible,
+.shiba-plan:focus-visible {
+  outline: 2px solid var(--color-over-room);
+  outline-offset: 2px;
 }
 .shiba-fold-mark {
   font-family: var(--font-code);
@@ -926,7 +990,7 @@ a.today-chip:active {
   place-items: center;
   border: 1px solid currentColor;
   border-radius: var(--radius-paper);
-  font-size: 10px;
+  font-size: var(--text-11);
 }
 .shiba-plan-step[data-status="active"] .shiba-plan-box {
   animation: f-breathe 1.6s var(--ease-out-soft) infinite;
@@ -984,49 +1048,9 @@ a.today-chip:active {
   position: absolute;
   inset: 0;
 }
-/* the floor's panes over it: no fill of their own, white type, white hairlines */
-.shell.is-place-today :is(.top-bar, .floor-pane) {
-  --color-frost: var(--color-over-room);
-  --color-mist: color-mix(in srgb, var(--color-over-room) 84%, transparent);
-  --color-dim: color-mix(in srgb, var(--color-over-room) 62%, transparent);
-  --color-moss: color-mix(in srgb, var(--color-over-room) 74%, transparent);
-  --color-panel: color-mix(in srgb, var(--color-over-room) 14%, transparent);
-  --color-raise: color-mix(in srgb, var(--color-over-room) 16%, transparent);
-  --color-abyss: color-mix(in srgb, var(--color-over-room) 8%, transparent);
-  --color-void: transparent;
-  --color-line: color-mix(in srgb, var(--color-over-room) 24%, transparent);
-  --color-line-strong: color-mix(in srgb, var(--color-over-room) 44%, transparent);
-  --color-pulse: var(--color-over-room);
-  --color-pulse-dim: color-mix(in srgb, var(--color-over-room) 16%, transparent);
-  --color-agent: var(--color-over-room);
-  --color-agent-dim: color-mix(in srgb, var(--color-over-room) 18%, transparent);
-  --color-on-fill: var(--color-room-shade);
-  --shadow-sheet: none;
-  background: transparent;
-  color: var(--color-over-room);
-}
+/* the floor's panes over it wear the room theme (tokens.css, html[data-theme="room"]): clear, white type, white hairlines */
 .shell.is-place-today .side-pane .me-avatar {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-over-room) 60%, transparent);
 }
-.shell.is-place-today .server-switch-lift {
-  --color-frost: initial;
-}
 
-/* the window's own buttons (minimize, maximize, close) over Today: white like the bar, with a shadow under each so
-   they read over any part of the room (2026-11-17, Josh: "should contrast with the rest of the ui in the today mode").
-   They are drawn outside the shell (App.tsx), so they are reached through the page */
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn {
-  color: var(--color-over-room);
-  filter: drop-shadow(0 1px 1.5px color-mix(in srgb, var(--color-room-shade) 70%, transparent));
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn:hover {
-  background: color-mix(in srgb, var(--color-over-room) 20%, transparent);
-  color: var(--color-over-room);
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo) .win-btn.is-close:hover {
-  background: var(--color-bad);
-  filter: none;
-}
-html:has(.shell.is-place-today) .window-controls:not(.is-demo)::before {
-  background: color-mix(in srgb, var(--color-over-room) 34%, transparent);
-}
+/* the window's own buttons (minimize, maximize, close) wear the room theme too: tokens.css and shell.css */

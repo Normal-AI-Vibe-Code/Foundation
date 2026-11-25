@@ -65,7 +65,7 @@
 }
 .update-card-glyph svg {
   width: 18px;
-  height: 17px;
+  height: 18px;
   fill: currentColor;
 }
 .update-card-glyph[data-phase="failed"] {

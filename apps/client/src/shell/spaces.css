@@ -79,6 +79,7 @@
   box-shadow:
     var(--shadow-lift),
     0 0 0 1px var(--color-line);
+  transform-origin: top left;
 }
 .tab-new-item {
   display: grid;
@@ -184,6 +185,7 @@
   opacity: 0;
 }
 .space-row:hover .space-move,
+.space-row:focus-within .space-move,
 .space-move:focus-visible,
 .space-move.is-on {
   opacity: 1;
@@ -242,6 +244,17 @@
   outline: 0;
   border-color: var(--color-pulse);
   background: var(--color-raise);
+}
+.info-name:not([readonly]):focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+  border-color: var(--color-pulse);
+  background: var(--color-raise);
+}
+.space-info .pane-group + .pane-group {
+  margin-top: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
 }
 .info-facts {
   display: grid;
@@ -343,6 +356,8 @@
   right: var(--space-4);
   max-height: 60%;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-3);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -352,6 +367,7 @@
   box-shadow:
     var(--shadow-lift),
     0 0 0 1px var(--color-line);
+  transform-origin: top right;
 }
 
 /* ---------- scroll bars: a 2 px light line by the pane's edge, there only while the pane is in use ----------
@@ -581,6 +597,7 @@
   margin: 0;
   padding: var(--space-4);
   overflow: auto;
+  overscroll-behavior: contain;
   border-radius: var(--radius-card);
   background: var(--color-panel);
   box-shadow: inset 0 0 0 1px var(--color-line);
@@ -616,7 +633,8 @@
 }
 .detail-goal {
   margin: 0 0 var(--space-4);
-  font: 600 var(--text-14) / 1.4 var(--font-sans);
+  font: 600 var(--text-14) / 1.45 var(--font-sans);
+  text-wrap: balance;
 }
 .detail-plan li {
   display: flex;
@@ -657,6 +675,45 @@
   border-top: 1px solid var(--color-line);
   border-bottom: 1px solid var(--color-line);
 }
+/* Settings and the server pill in one band: Settings takes the room, the pill sits at the right */
+.side-pane .pane-low-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.side-pane .pane-low-row .pane-row {
+  flex: 1 0 auto;
+  width: auto;
+}
+/* the row is still the band's whole width under the pointer and when it's the place you're in: its wash (and the
+   2 px bar) is drawn across the band, behind the pill, and pressing beside the pill is pressing Settings (2026-11-19) */
+.side-pane .pane-low-row .pane-row::before {
+  content: "";
+  position: absolute;
+  inset: var(--space-2) 0;
+}
+.side-pane .pane-low-row .pane-row:hover,
+.side-pane .pane-low-row .pane-place.is-current,
+.side-pane .pane-low-row .pane-place.is-current:hover {
+  background: transparent;
+  box-shadow: none;
+}
+.side-pane .pane-low-row .pane-row:hover::before {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.side-pane .pane-low-row .pane-place.is-current::before {
+  background: var(--color-pulse-dim);
+  box-shadow: inset 2px 0 0 var(--color-pulse);
+}
+.side-pane .pane-low-row .pane-place.is-current:hover::before {
+  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+}
+/* the pill stays over the wash (a flex item takes a z-index without becoming what its panel is placed against) */
+.side-pane .pane-low-row .server-switch-place {
+  z-index: 1;
+  /* its padding is Settings' to press; the pill inside takes the pointer itself (server.css) */
+  pointer-events: none;
+}
 .side-pane .pane-pick {
   flex: none;
   display: flex;
@@ -670,6 +727,14 @@
   /* 2026-11-17: outlined, so the pill reads as a control and its left edge is the line the rows start on */
   box-shadow: inset 0 0 0 1px var(--color-line-strong);
 }
+/* three segments since 2026-11-20 (Recent · All Grids · Chats): each as wide as its word, the rest shared, so the
+   words stay whole at the menu's narrowest (220) */
+.side-pane .pane-pick .pane-seg-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 2px;
+  white-space: nowrap;
+}
 .pane-new {
   flex: none;
   width: 28px;
@@ -682,9 +747,11 @@
   color: var(--color-mist);
   cursor: pointer;
 }
-.pane-new:hover {
-  background: var(--color-pulse-dim);
-  color: var(--color-frost);
+@media (hover: hover) {
+  .pane-new:hover {
+    background: var(--color-pulse-dim);
+    color: var(--color-frost);
+  }
 }
 .side-pane .pane-scroll {
   padding: 0 0 var(--space-4);
@@ -723,9 +790,11 @@
   display: none;
 }
 /* hover: a quiet ink wash, the full row */
-.side-pane .pane-row:hover,
-.side-pane .space-row:hover .space-open {
-  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+@media (hover: hover) {
+  .side-pane .pane-row:hover,
+  .side-pane .space-row:hover .space-open {
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
 }
 /* selected: the accent's tint and a 2 px bar at the pane's edge. Never the same as hover */
 .side-pane .space-row.is-current .space-open,
@@ -734,13 +803,28 @@
   box-shadow: inset 2px 0 0 var(--color-pulse);
   color: var(--color-frost);
 }
-.side-pane .space-row.is-current .space-open:hover,
-.side-pane .pane-place.is-current:hover {
-  background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+@media (hover: hover) {
+  .side-pane .space-row.is-current .space-open:hover,
+  .side-pane .pane-place.is-current:hover {
+    background: color-mix(in srgb, var(--color-pulse) 18%, transparent);
+  }
 }
 .side-pane .space-row .space-move {
   position: absolute;
   right: var(--space-3);
+}
+/* "New grid inside" shows over the row's right end, where its status dot or its count sits: while it shows
+   (the pointer on the row, or the keyboard in it) they step left to give it room, and step back after */
+.side-pane .space-row .space-open {
+  transition: padding-right var(--dur-quick) var(--ease-out-soft);
+}
+.side-pane .space-row:has(.space-move):is(:hover, :focus-within) .space-open {
+  padding-right: calc(var(--space-3) + 24px + var(--space-2));
+}
+@media (prefers-reduced-motion: reduce) {
+  .side-pane .space-row .space-open {
+    transition: none;
+  }
 }
 /* Today: no longer a pill; a row in its own lined-off section */
 .side-pane .pane-today {
@@ -757,7 +841,7 @@
 }
 .side-pane .pane-foot {
   border-top: 0;
-  /* the orb, then you, from the Settings icon's left edge (2026-11-17) */
+  /* you, from the Settings icon's left edge, and the orb at the other end (2026-11-18) */
   padding-left: var(--space-4);
 }
 .pane-empty.is-create {
@@ -812,9 +896,11 @@
   font: 500 var(--text-13) / 1 var(--font-sans);
   cursor: pointer;
 }
-.top-today:hover {
-  color: var(--color-frost);
-  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+@media (hover: hover) {
+  .top-today:hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
 }
 .top-today.is-on {
   color: var(--color-frost);
@@ -902,8 +988,10 @@
   height: 2px;
   background: var(--color-void);
 }
-.top-bar .tab.is-space:not(.is-current):hover {
-  background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+@media (hover: hover) {
+  .top-bar .tab.is-space:not(.is-current):hover {
+    background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+  }
 }
 .top-bar .tab-new-wrap {
   margin-left: var(--space-2);
@@ -923,9 +1011,14 @@
   box-shadow: none;
   border-bottom: 1px solid var(--color-line);
 }
-/* the line under the search line is the grid's own hairline, focused or not (2026-11-17, Josh) */
+/* the line under the search line is the grid's own hairline on pointer click; keyboard focus shows a clear pulse ring */
 .search-pane .search-head:focus-within {
   box-shadow: none;
+}
+.search-pane .search-field:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
 }
 .search-pane .search-glyph {
   display: inline-grid;
@@ -944,4 +1037,54 @@
 /* the bottom bar's search pill: its key chip keeps clear of the pill's rounded end */
 .hud-search {
   padding-right: var(--space-4);
+}
+/* the server switch's panel, when open (server.css): in flow between the grids and the Settings band */
+.side-pane .pane-server-slot {
+  flex: none;
+  min-height: 0;
+}
+
+/* ---------- who is on a grid, on its row (HereStack.tsx, 2026-11-21) ---------- */
+
+/* the others with it open, then its agents: 16 px faces, overlapping, on the row's right before its count */
+.here-stack {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding-left: var(--space-2);
+}
+.here-face {
+  width: 16px;
+  height: 16px;
+  margin-left: -4px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 1.5px var(--color-void);
+  color: var(--color-on-fill);
+  font: 700 7px / 1 var(--font-sans);
+  letter-spacing: 0.02em;
+}
+.here-face:first-child {
+  margin-left: 0;
+}
+/* an agent: the ✦ on its crew colour, a rounded tile rather than a face (agents are never a disc in ChatForm either) */
+.here-face.is-agent {
+  border-radius: 4px;
+  font-size: 9px;
+}
+.here-face.is-agent.is-working {
+  animation: f-breathe 2.4s var(--ease-out-soft) infinite;
+}
+.here-more {
+  margin-left: 3px;
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .here-face.is-agent.is-working {
+    animation: none;
+  }
 }

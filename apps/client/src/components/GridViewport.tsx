@@ -1,8 +1,8 @@
 import { fullscreenCard, inUse, releaseCard } from "../lib/cardUse";
-import { wheelKind, wheelMemory } from "../lib/wheelKind";
 import { cardWheel } from "../lib/cardScroll";
 import { installScrollHint, noteAltScroll } from "../lib/scrollHint";
 import { keys } from "../lib/keys";
+import { GESTURE_GAP_MS, startsOnTrackpad, wheelAction, wheelMode } from "../lib/wheel";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import { ShaderBackground } from "../gl/background";
@@ -41,6 +41,8 @@ import { TalkButton } from "../shell/Talk";
 import { SearchPop } from "../shell/SearchPane";
 import { PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
+import { useOnLocalGrid } from "../panels/LocalView";
+import { ComputerGlyph } from "../shell/glyphs";
 import { toggleCouncil, useCouncilOpen } from "../lib/councilOpen";
 import { COMMANDS_GLYPH } from "../lib/keys";
 import { PeerCursors } from "../shell/Presence";
@@ -51,7 +53,7 @@ import { openContextMenu } from "./ContextMenu";
 import { openSectionAgents } from "./SectionAgents";
 import { countRender } from "../state/renders";
 import { gridViewSlice, useStoreSlice } from "../state/slices";
-import { colName, gutterRuns } from "../lib/gridLines";
+import { colName, gutterRuns, gutterSegments } from "../lib/gridLines";
 import { useRuneDrawing } from "../rune/engine";
 import { runeHost } from "../rune/host";
 import { hitWorld } from "../rune/scene";
@@ -59,6 +61,8 @@ import { RuneMark, RuneSurface } from "../rune/RuneSurface";
 import { RuneIslands } from "../rune/RuneIslands";
 import { toWorld } from "../state/camera";
 
+/** a boundary's grab area runs the length of the section edge beside it: the sections sit this far in from their tracks */
+const GUTTER_INSET = SECTION_INSET;
 const MIN_SCALE = 0.12;
 const MAX_SCALE = 1.6;
 const FIT_MARGIN = 0.92;
@@ -124,6 +128,8 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
   const ui = useUi();
   // the grid's council stands at the bottom right: the bar steps aside to the bottom left
   const councilBoard = useCouncilOpen()?.kind === "board";
+  // the This computer grid: its council wears the computer's mark
+  const onLocal = useOnLocalGrid();
   const insets = floorInsets(ui);
   // Settings → Renderer: Rune draws the sections and cards on its own canvas (rune/); the camera, its
   // gestures and keys, and the layers above stay here for both engines. The handlers read it through a ref
@@ -571,16 +577,18 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     publishPointer(null, null);
   }, []);
 
-  // the wheel gesture under way: a trackpad's stays a pan until the wheel rests (lib/wheelKind.ts)
-  const wheelMem = useRef(wheelMemory());
+  /** the wheel gesture in progress: a trackpad's two fingers pan, a mouse wheel zooms (lib/wheel.ts) */
+  const wheelGesture = useRef({ at: 0, trackpad: false });
   const onWheel = useCallback(
     (e: WheelEvent) => {
       const container = containerRef.current;
       if (!container) return;
-      // 2026-11-17, Josh: "Scroll wheel should be zoom in Foundation" (a mouse wheel zooms; a trackpad's
-      // two-finger scroll still pans, and a pinch zooms: lib/wheelKind.ts)
-      const kind = wheelKind(e, wheelMem.current);
-      const zooming = kind !== "pan";
+      // 2026-11-18: the wheel zooms. What a gesture is (a wheel, or fingers on a trackpad) is decided where it starts
+      const g = wheelGesture.current;
+      const now = performance.now();
+      if (now - g.at > GESTURE_GAP_MS) g.trackpad = !(e.ctrlKey || e.metaKey) && startsOnTrackpad(e);
+      g.at = now;
+      const zooming = wheelAction(e, wheelMode(), g.trackpad) === "zoom";
       // panning the grid ends a card's use, so it can't catch the wheel as it slides under the pointer;
       // a zoom keeps the card under the pointer, so a terminal or a desktop in use keeps the keys
       if (!zooming) releaseCard();
@@ -589,9 +597,10 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
         const cx = e.clientX - r.left;
         const cy = e.clientY - r.top;
         // trackpad pinch arrives as small ctrl-wheel deltas: follow the fingers 1:1;
-        // a mouse wheel takes bigger steps on the spring (lines are about 40 px each)
-        const pinch = kind === "zoom-pinch";
-        const dy = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+        // a mouse wheel (with or without ⌘/ctrl) takes bigger steps on the spring
+        const pinch = (e.ctrlKey || e.metaKey) && e.deltaMode === 0 && Math.abs(e.deltaY) < 40;
+        // a wheel that counts in lines or pages: a notch is a notch
+        const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? Math.sign(e.deltaY) * 100 : e.deltaY;
         const oldS = pinch ? zoom.value : zoom.goal;
         const factor = Math.exp(-dy * (pinch ? 0.011 : 0.0022));
         const newS = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldS * factor));
@@ -604,8 +613,10 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
           camera.to(cx - (cx - camera.x.goal) * ratio, cy - (cy - camera.y.goal) * ratio);
         }
       } else {
-        // two-finger / wheel pans the grid wherever a section didn't consume it
-        camera.set(camera.x.value - e.deltaX, camera.y.value - e.deltaY);
+        // two fingers on a trackpad, Shift+wheel, or a wheel set to pan (Settings → General): the paper moves.
+        // Shift turns a plain wheel sideways where the system hasn't already
+        const side = e.shiftKey && e.deltaX === 0;
+        camera.set(camera.x.value - (side ? e.deltaY : e.deltaX), camera.y.value - (side ? 0 : e.deltaY));
       }
     },
     [camera, zoom],
@@ -635,8 +646,8 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    // No card takes the wheel (lib/cardUse.ts): over an app, a map, a terminal or a list it pans the grid,
-    // and ⌘/Ctrl-wheel zooms it. Only the card in use (⌘/Ctrl-click, or full screen) has its own wheel.
+    // No card takes the wheel (lib/cardUse.ts): over an app, a map, a terminal or a list it is the grid's
+    // (it zooms; two fingers on a trackpad pan: lib/wheel.ts), and ⌘/Ctrl-wheel always zooms it. Only the card in use (⌘/Ctrl-click, or full screen) has its own wheel.
     // Caught on the way down, so a card's own scroller (xterm, maplibre, a list) never sees it.
     // Alt-wheel over a card with more in it than fits scrolls through that card (lib/cardScroll.ts);
     // ⌘/Ctrl-wheel always zooms (2026-11-17: the zoom key does one thing).
@@ -979,7 +990,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
         {/* track resize gutters, one per run of boundary: a boundary between two
             sections shows its line; one running inside a merged section is
             invisible until the pointer finds it — both reveal a grab knob */}
-        {gutterRuns(state.grid, sections).map((g) => {
+        {gutterSegments(state.grid, sections).map((g) => {
           const key = `${g.axis}${g.index}:${g.from}`;
           const col = g.axis === "col";
           return (
@@ -988,8 +999,8 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
               className={`gutter gutter-${g.axis}${g.interior ? " is-interior" : ""}`}
               style={
                 col
-                  ? { left: xo[g.index + 1] - 7, top: yo[g.from], height: yo[g.to + 1] - yo[g.from] }
-                  : { top: yo[g.index + 1] - 7, left: xo[g.from], width: xo[g.to + 1] - xo[g.from] }
+                  ? { left: xo[g.index + 1] - 7, top: yo[g.from] + GUTTER_INSET, height: yo[g.to + 1] - yo[g.from] - GUTTER_INSET * 2 }
+                  : { top: yo[g.index + 1] - 7, left: xo[g.from] + GUTTER_INSET, width: xo[g.to + 1] - xo[g.from] - GUTTER_INSET * 2 }
               }
               onPointerMove={(e) => onGutterHover(e, key, g.axis)}
             >
@@ -1060,7 +1071,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
         <RuneMark />
         <button
           className="hud-zoom f-glass"
-          title="Zoom — click for 100% (1) · 0 fits all · F frames the focus · double-click zooms in"
+          data-tip="Zoom: the wheel zooms, drag the paper to move · click for 100% (1) · 0 fits all · F frames the focus"
           onClick={() => zoomAroundCenter(1 / zoom.goal)}
         >
           <span ref={zoomLabel}>50%</span>
@@ -1073,8 +1084,13 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
             <span className="hud-icon-text">{COMMANDS_GLYPH}</span>
           </button>
         </div>
-        <button className={`hud-icon hud-council f-glass${councilBoard ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-pressed={councilBoard} aria-label="Council" data-tip="Council: this grid's agents, as characters. Talk to them, add more" data-council-open>
+        <button className={`hud-icon hud-council f-glass${councilBoard ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-pressed={councilBoard} aria-label="Council" data-tip={onLocal ? "Council: this grid's agents. The grid is read from this computer, where its sessions run" : "Council: this grid's agents, as characters. Talk to them, add more"} data-council-open>
           <CouncilGlyph />
+          {onLocal && (
+            <span className="council-local-badge" aria-hidden>
+              <ComputerGlyph size={10} />
+            </span>
+          )}
         </button>
         <div className={`hud-ask-pill f-glass${ui.session ? " is-on" : ""}`}>
           <button className={`hud-ask${ui.session ? " is-on" : ""}`} onClick={toggleSession} aria-pressed={!!ui.session} data-tip={ui.session ? "Put the conversation away" : "Ask the agent: a conversation beside the canvas"} data-kbd={keys("mod+J")}>

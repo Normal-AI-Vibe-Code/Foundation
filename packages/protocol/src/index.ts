@@ -12,9 +12,13 @@ import * as Y from "yjs";
 import type { CharacterState } from "./characters.ts";
 import type { CollectionState } from "./collections.ts";
 import type { UploaderState } from "./avatars.ts";
+import type { LocalProject, LocalWatch } from "./localdev.ts";
 export * from "./characters.ts";
 export * from "./collections.ts";
+export * from "./chat.ts";
+export * from "./replay.ts";
 export * from "./avatars.ts";
+export * from "./localdev.ts";
 
 // ---------- board document layout ----------
 
@@ -29,12 +33,15 @@ export const BOARD = {
   activity: "activity", // Y.Array<ActivityEntry>
   noteText: "noteText", // noteId → Y.Text (schema 3: typing merges character by character)
   huddles: "huddles", // huddle panel id → HuddleState (schema 6: kept by the server alone, off the card)
-  machineAsks: "machineAsks", // machine panel id → MachineAsk[] (commands agents asked to run; kept by the server alone, off the card)
+  machineAsks: "machineAsks", // machine or app panel id → MachineAsk[] (commands agents asked to run, app tools they asked to use; kept by the server alone, off the card)
   slack: "slack", // section id → SlackSectionState (a section kept for a Slack channel; kept by the server alone)
   characters: "characters", // character panel id → CharacterState (the art pipeline's state for that card; kept by the server alone)
   agents: "agents", // place (a section id, or "*": the grid) → PostedAgent[] (who is on that place's council; kept by the server alone)
   collections: "collections", // collection panel id → CollectionState (what it has gathered, and the section it lays out into; kept by the server alone)
   uploaders: "uploaders", // uploader panel id → UploaderState (Foundation's avatars wired into it, its timer and its last upload; kept by the server alone)
+  local: "local", // project key → LocalProject (this computer's projects, on the LOCAL_GRID_ID grid; kept by the server alone)
+  localWatch: "localWatch", // "state" → LocalWatch (whether this computer is being watched, and when it last looked; kept by the server alone)
+  desktopLeave: "desktopLeave", // machine panel id → DesktopLeave (a person's leave for agents to use its desktop, and an agent's ask for it; kept by the server alone, off the card)
 } as const;
 
 /** the place that means "the whole grid" in the board's `agents` map */
@@ -132,6 +139,14 @@ interface ObjectBaseDoc {
    * the actor of the tool call that made them.
    */
   createdBy?: string;
+  /**
+   * Pinned to its section (2026-11-18): it leaves the flow and spans the section, drawn on the section's own
+   * paper from under the header down, at the section's full width; other cards lie over it. One to a section.
+   * Unpinned, it is a card again. Tables first (a new section a person adds starts with one).
+   */
+  pinned?: boolean;
+  /** Minimized: drawn as its title bar alone, wherever it sits; its content is kept and comes back when restored */
+  folded?: boolean;
 }
 
 export interface TableDoc extends ObjectBaseDoc {
@@ -199,7 +214,9 @@ export type PanelKind =
   | "uploader" // Foundation's avatars: the characters wired into it are avatars on every Foundation; it uploads them to main's starter set, pressed or on a timer (avatars.ts)
   | "collection" // a collector: gathers what the cards wired into it make (pictures, characters) and can lay it out in a section; tiles drag out as copies
   | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
-  | "character"; // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
+  | "character" // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
+  | "local" // one of this computer's projects (localdev.ts; `source`: the project key, `node`: preview, progress or changes), kept by the server
+  | "replay"; // a recorded huddle session's clock (ChatForm R1): scrub it and the section it sits in is drawn as it was then (`sessionId`: the huddle session)
 
 export interface Port {
   id: string;
@@ -240,7 +257,9 @@ export interface PanelDoc extends ObjectBaseDoc {
    * huddleStateOf. Readers ignore this field.
    */
   huddle?: HuddleState;
-  /** agent session id for panel === "agent" */
+  /** a huddle card that is a view of a ChatForm channel's huddle (its id is the huddle's; it signals on /huddle/chat/:id, and `channel` is the chat channel's id) */
+  home?: "chat";
+  /** agent session id for panel === "agent"; the huddle session (hs_…) for panel === "replay" */
   sessionId?: string;
   /** for asks: who, and whether it's done */
   assignee?: string;
@@ -257,6 +276,8 @@ export interface PanelDoc extends ObjectBaseDoc {
   // ---- machines on a container engine (panel === "machine" without a url) ----
   /** a Linux machine or container this card runs on Kiri or Docker, kept by the server (machines.ts) */
   machine?: MachineState;
+  /** A full OS on the server's native QEMU backend; distinct from a container. */
+  vm?: LocalVmState;
   /**
    * A page opened from a machine card's port pill: which card and which
    * container port (and the machine's name then, for when the card is gone).
@@ -264,6 +285,14 @@ export interface PanelDoc extends ObjectBaseDoc {
    * state otherwise, reloaded when it runs again. Optional, so no migration.
    */
   fromMachine?: { panel: string; port: number; name: string };
+  /**
+   * How a page card ("app" or "link" with a `url`) is shown. Absent: a frame. "browser": a tab of the built-in
+   * browser on the server's computer (hostbrowser.ts), for a site that refuses framing or sits behind a sign-in
+   * (everything on HyperForm). Far away the card shows the picture last saved of it (`seenAt`); near, the live page.
+   */
+  via?: "browser";
+  /** when the picture of a `via: "browser"` page was last saved (GET /api/boards/:id/pages/:panel/picture) */
+  seenAt?: number;
 }
 
 // ---------- machines: Linux machines and containers on a local engine ----------
@@ -273,7 +302,24 @@ export interface PanelDoc extends ObjectBaseDoc {
  * reads it back (by the container's labels) and writes what it finds here,
  * so everyone sees the same state. Starting needs a person; agents propose.
  */
+/** Native full-system VM. The card is a projection; host configuration and paths stay server-owned. */
+export interface LocalVmState {
+  name: string;
+  os: string;
+  state: "ready" | "starting" | "running" | "stopping" | "stopped" | "error" | "archived";
+  isoName: string;
+  memoryMB: number;
+  cpus: number;
+  diskGB: number;
+  acceleration: "native" | "software";
+  bootIso: boolean;
+  detail?: string;
+  guestAgent?: boolean;
+}
+
 export interface MachineState {
+  /** Setup intent only. Native VM configuration is held by the server, never trusted from this flag. */
+  wantVm?: boolean;
   /** machine name; the container is `machine-<name>` (Kiri's convention, so `kiri machine shell <name>` finds it) */
   name: string;
   /** image it runs ("ubuntu:24.04"): picked by a person on the card, or proposed by an agent */
@@ -301,15 +347,8 @@ export interface MachineState {
    * machine's disk, so Remove clears it.
    */
   desktop?: MachineDesktop;
-  /**
-   * A person let agents use this machine's desktop (look at it, move the
-   * pointer, type): who and when. Unset is the default: agents can't.
-   * Only a signed-in person who can edit the board sets it, from their
-   * browser; anyone who can edit takes it away; Remove clears it.
-   */
-  agentsMay?: { by: string; at: number };
-  /** an agent tried to use the desktop without that leave: the card offers the person the button */
-  agentAsked?: { by: string; for?: string; at: number };
+  // whether agents may use the desktop is not on the card (a writer's socket could set it there): the board's
+  // `desktopLeave` map, which only the server writes (desktopLeaveOf)
   /** what agents last did on the desktop, newest last (a few kept): the card shows who is driving */
   agentActs?: MachineAgentAct[];
   /** the machine's pipes: when /foundation/in was last written and /foundation/out last read, and what was in them */
@@ -455,6 +494,7 @@ export function machineName(s: string): string {
  */
 export interface MachineAsk {
   id: string;
+  /** the command to run; for an app's tool, the tool's name */
   command: string;
   /** the agent's few words on why */
   why?: string;
@@ -462,7 +502,15 @@ export interface MachineAsk {
   by: string;
   /** the person it works for */
   for?: string;
-  state: "waiting" | "running" | "done" | "declined" | "timed out" | "withdrawn" | "failed";
+  /**
+   * Set when this asks to use a tool of a saved app (on an app's card, ADR-001
+   * G3) rather than to run a command in a machine. Nothing is called on Allow:
+   * Allow lets agents call that tool of that app from then on (until its
+   * definition changes), and the agent calls again. Such an ask doesn't wait
+   * in the server or time out; it stays until a person answers it.
+   */
+  tool?: AppToolAsk;
+  state: "waiting" | "running" | "done" | "declined" | "timed out" | "withdrawn" | "failed" | "allowed";
   at: number;
   /** the person who pressed Run or Decline */
   decidedBy?: string;
@@ -475,9 +523,44 @@ export interface MachineAsk {
   expiresAt?: number;
 }
 
-/** the commands agents asked to run in a machine, newest last */
+/** what an ask to use an app's tool shows a person: which app, where, which tool, and what this call would send */
+export interface AppToolAsk {
+  /** the saved app (the registry's `apps` row) the card resolved to */
+  appId: string;
+  app: string;
+  /** the saved MCP address Foundation would connect to (the registry's, not the card's) */
+  address: string;
+  description: string;
+  /** the arguments this call wants to send, as JSON (shortened) */
+  args: string;
+  /** "first": never allowed; "changed": allowed before, but its definition changed since */
+  change: "first" | "changed";
+  /** sha256 of the tool's name, description and input schema as listed: what Allow allows */
+  defHash: string;
+}
+
+/** the commands agents asked to run in a machine (and, on an app's card, the tools they asked to use), newest last */
 export function machineAsksOf(doc: Y.Doc, panelId: string): MachineAsk[] {
   return boardMaps(doc).machineAsks.get(panelId) ?? [];
+}
+
+/**
+ * Agents' leave to use a machine's desktop, kept by the server alone in the board's `desktopLeave` map (a
+ * writer's sync socket can't set it: only a person's press, through the server, does).
+ */
+export interface DesktopLeave {
+  /**
+   * A person let agents use this machine's desktop (look at it, move the pointer, type): who and when.
+   * Unset is the default: agents can't. Only a signed-in person who can edit the board sets it, from their
+   * browser; anyone who can edit takes it away; Remove clears it.
+   */
+  agentsMay?: { by: string; at: number };
+  /** an agent tried to use the desktop without that leave: the card offers the person the button */
+  agentAsked?: { by: string; for?: string; at: number };
+}
+
+export function desktopLeaveOf(doc: Y.Doc, panelId: string): DesktopLeave {
+  return boardMaps(doc).desktopLeave.get(panelId) ?? {};
 }
 
 // ---------- Slack sections: a section kept for a channel ----------
@@ -536,6 +619,8 @@ export interface HuddleState {
   /** someone pressed Record: every participant's own camera and mic are being archived */
   recording?: { by: string; since: number } | null;
   lastEndedAt?: number;
+  /** a channel's huddle shown on a grid whose channel isn't open: the card says whose it is, never who's in it (people stays empty, recording.by "") */
+  locked?: boolean;
 }
 
 /** one line of a huddle's transcript — spoken (each person's browser transcribes their own mic) or typed */
@@ -544,19 +629,32 @@ export interface HuddleLine {
   at: number;
   speaker: string;
   text: string;
-  source: "speech" | "typed" | "system";
+  source: "speech" | "typed" | "system" | "agent";
 }
 
 /** messages on the huddle socket (/huddle/:board/:huddle) — signalling only; media is peer to peer */
 export type HuddleWire =
-  | { t: "welcome"; you: string; peers: Array<{ id: string; name: string; color: string; sending: boolean }>; ice: unknown[] }
+  | { t: "welcome"; you: string; peers: Array<{ id: string; name: string; color: string; sending: boolean; noRec?: boolean }>; ice: unknown[] }
   | { t: "peer-joined"; id: string; name: string; color: string; sending: boolean }
   | { t: "peer-left"; id: string }
-  | { t: "peer-state"; id: string; sending: boolean; muted?: boolean; camOff?: boolean }
+  | { t: "peer-state"; id: string; sending: boolean; muted?: boolean; camOff?: boolean; /** "don't record me": their recorder never starts */ noRec?: boolean }
   | { t: "signal"; from: string; to: string; data: unknown }
   | { t: "line"; line: HuddleLine }
   | { t: "caption"; from: string; name: string; text: string }
-  | { t: "recording"; on: boolean; by: string };
+  | { t: "recording"; on: boolean; by: string }
+  // ---- ChatForm (H1): screen share, agents in the room, a channel huddle's end ----
+  /** client → server: share my screen (a second video track on the stream `stream`) or stop; one share per room */
+  | { t: "share"; on: boolean; stream?: string }
+  /** server → all: who shares now (null: nobody); `stream` is the shared MediaStream's id on that peer's connection */
+  | { t: "sharing"; id: string | null; by: string | null; stream?: string }
+  /** server → all: the agents seated in the room and what each is doing */
+  | { t: "agents"; agents: Array<{ name: string; by: string; state: "listening" | "thinking" | "talking" }> }
+  /** server → all: an agent's answer, for every client to speak aloud (speechSynthesis, locally) */
+  | { t: "agent-says"; name: string; text: string; id: string }
+  /** server → all: a person pressed Stop: stop speaking now */
+  | { t: "agent-hush" }
+  /** server → all: a channel's huddle ended (the last person left); the socket closes after */
+  | { t: "ended"; session: string | null };
 
 // ---------- design pipelines: design → CAD → simulation → release ----------
 
@@ -690,6 +788,9 @@ export function boardMaps(doc: Y.Doc) {
     agents: doc.getMap<PostedAgent[]>(BOARD.agents),
     collections: doc.getMap<CollectionState>(BOARD.collections),
     uploaders: doc.getMap<UploaderState>(BOARD.uploaders),
+    desktopLeave: doc.getMap<DesktopLeave>(BOARD.desktopLeave),
+    local: doc.getMap<LocalProject>(BOARD.local),
+    localWatch: doc.getMap<LocalWatch>(BOARD.localWatch),
   };
 }
 
@@ -926,7 +1027,7 @@ export type AgentEvent =
 export type AgentRuntime = "subscription" | "api" | "script";
 
 export interface SearchHit {
-  source: "board" | "file" | "slack" | "github" | "app" | "activity" | "huddle" | "flowform";
+  source: "board" | "file" | "slack" | "github" | "app" | "activity" | "huddle" | "flowform" | "chat";
   id: string;
   title: string;
   snippet: string;

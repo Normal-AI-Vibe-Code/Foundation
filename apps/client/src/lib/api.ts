@@ -154,9 +154,12 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
 }
 
 export const me = () => api<{ user: UserInfo | null }>("/api/me");
-export const authConfig = () => api<{ google: boolean; devLogin: boolean; flowform?: { url: string }; version?: string; minClient?: string | null }>("/auth/config");
-/** desktop: Google through flowform in the system browser; the window polls with a secret only it holds */
-export const flowformBegin = () => api<{ url: string; poll: string; expiresIn: number }>("/auth/flowform/begin", { method: "POST" });
+export const authConfig = () => api<{ google: boolean; devLogin: boolean; flowform?: { url: string }; invite?: boolean; version?: string; minClient?: string | null }>("/auth/config");
+/**
+ * desktop: Google through flowform in the system browser; the window polls with a secret only it holds, and
+ * shows `code`, which the browser shows back before the person presses "This is me"
+ */
+export const flowformBegin = () => api<{ url: string; poll: string; code: string; expiresIn: number }>("/auth/flowform/begin", { method: "POST" });
 export async function flowformPoll(poll: string) {
   // the poll secret is this request's Authorization (it replaces any bearer); with a bearer transport, ask for the session in the body
   const r = await api<{ status: "pending" | "ok" | "error"; user?: UserInfo; error?: string; session?: string }>(`/auth/flowform/poll${BEARER ? "?bearer=1" : ""}`, {
@@ -171,6 +174,15 @@ export async function devLogin(email: string, name: string) {
   if (r.session) keepBearer(r.session);
   return { user: r.user };
 }
+/**
+ * an invitation an admin made at the server's computer, to sign in from another computer on its network
+ * (apps/server/src/network.ts): the link's code, or the email and the short code. Exchanged by POST, never kept
+ */
+export async function inviteSignIn(body: { code: string } | { email: string; short: string }) {
+  const r = await api<{ user: UserInfo; session?: string }>("/auth/invite", { method: "POST", json: BEARER ? { ...body, bearer: true } : body });
+  if (r.session) keepBearer(r.session);
+  return { user: r.user };
+}
 /** sign out: this device also forgets who you are and the board copies it kept for offline */
 export async function logout() {
   try {
@@ -180,6 +192,8 @@ export async function logout() {
   } catch { /* private window */ }
   const { forgetDevice } = await import("../sync/board");
   await forgetDevice();
+  const { clearImageCache } = await import("./imageCache");
+  await clearImageCache();
   // the server forgets the session first (it needs the bearer to know which), then this device does
   try {
     return await api("/auth/logout", { method: "POST" });

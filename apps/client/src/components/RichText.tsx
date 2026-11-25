@@ -39,6 +39,11 @@ function inlineOf(n: Node): string {
   if (!(n instanceof HTMLElement)) return "";
   const tag = n.tagName;
   if (tag === "BR") return "\n";
+  // what renderMarkdown adds around the words (utils/markdown.ts) goes back as the markdown it came from:
+  // a link's host is shown beside it, not written; a picture (loaded, or waiting for a press) is its ![alt](address)
+  if (n.dataset.md === "host") return "";
+  if (n.dataset.md === "remote-img") return `![${n.dataset.alt ?? ""}](${n.dataset.src ?? ""})`;
+  if (tag === "IMG" && n.classList.contains("md-img")) return `![${n.getAttribute("alt") ?? ""}](${n.getAttribute("src") ?? ""})`;
   const inner = [...n.childNodes].map(inlineOf).join("");
   const st = n.style;
   if (tag === "STRONG" || tag === "B" || Number(st.fontWeight) >= 600 || st.fontWeight === "bold") return mark(inner, "**");

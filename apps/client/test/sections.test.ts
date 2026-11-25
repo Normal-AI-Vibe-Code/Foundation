@@ -35,3 +35,39 @@ test("nothing lines up: the hole stays", () => {
   const s = board(sec("A", 0, 0, 1, 0), sec("B", 3, 2)); // A only half covers the top; B is below-right, touching nothing
   assert.equal(fillHole(s, { c0: 1, c1: 2, r0: 1, r1: 1 }), false);
 });
+
+// ---------- the grab areas along the track boundaries (lib/gridLines.ts) ----------
+import { gutterRuns, gutterSegments } from "../src/lib/gridLines";
+
+test("a boundary's grab area is one stretch per pair of neighbours: a section's edge, top to bottom, and no further", () => {
+  // three rows, two columns: A over B on the left, one tall C on the right; row 2 is one section D across both
+  const grid = { cols: [500, 500], rows: [400, 400, 400] };
+  const sections = [
+    { c0: 0, c1: 0, r0: 0, r1: 0 }, // A
+    { c0: 0, c1: 0, r0: 1, r1: 1 }, // B
+    { c0: 1, c1: 1, r0: 0, r1: 1 }, // C
+    { c0: 0, c1: 1, r0: 2, r1: 2 }, // D
+  ];
+  // the line itself runs as far as it divides sections: rows 0–1, then inside D
+  assert.deepEqual(
+    gutterRuns(grid, sections).filter((g) => g.axis === "col").map((g) => [g.from, g.to, g.interior]),
+    [[0, 1, false], [2, 2, true]],
+  );
+  // what lights under the pointer: A|C, then B|C, then the stretch inside D
+  assert.deepEqual(
+    gutterSegments(grid, sections).filter((g) => g.axis === "col").map((g) => [g.from, g.to, g.interior]),
+    [[0, 0, false], [1, 1, false], [2, 2, true]],
+  );
+  // a section spanning two tracks keeps one stretch along its whole edge
+  const rows = gutterSegments(grid, sections).filter((g) => g.axis === "row" && g.index === 1);
+  assert.deepEqual(rows.map((g) => [g.from, g.to]), [[0, 0], [1, 1]]);
+  const tall = [{ c0: 0, c1: 0, r0: 0, r1: 2 }, { c0: 1, c1: 1, r0: 0, r1: 2 }];
+  assert.deepEqual(gutterSegments(grid, tall).filter((g) => g.axis === "col").map((g) => [g.from, g.to]), [[0, 2]]);
+});
+
+test("a boundary inside merged sections is cut where the section changes", () => {
+  const grid = { cols: [500, 500], rows: [400, 400] };
+  const sections = [{ c0: 0, c1: 1, r0: 0, r1: 0 }, { c0: 0, c1: 1, r0: 1, r1: 1 }];
+  assert.deepEqual(gutterRuns(grid, sections).filter((g) => g.axis === "col").map((g) => [g.from, g.to, g.interior]), [[0, 1, true]]);
+  assert.deepEqual(gutterSegments(grid, sections).filter((g) => g.axis === "col").map((g) => [g.from, g.to, g.interior]), [[0, 0, true], [1, 1, true]]);
+});

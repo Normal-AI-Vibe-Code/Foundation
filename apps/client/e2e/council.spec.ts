@@ -205,8 +205,8 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   await expect(seat).toBeVisible();
   await expect(seat).toHaveClass(/is-idle/);
   await expect(council).toHaveAttribute("data-council", "1");
-  // three places: one taken, two silhouettes (once all three are taken, one more silhouette to add another)
-  await expect(council.locator(".council-ghost")).toHaveCount(2);
+  // from the first agent on, one silhouette to add another (2026-11-21); before it, three close together
+  await expect(council.locator(".council-ghost")).toHaveCount(1);
   // above its head: whose model, that it runs in the cloud, and that it's connected
   await expect(seat.locator('[data-council-where="cloud"]')).toBeVisible();
   await expect(seat.locator("[data-council-offline]")).toHaveCount(0);

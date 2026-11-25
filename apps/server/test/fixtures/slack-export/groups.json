@@ -1,0 +1,20 @@
+[
+    {
+        "id": "G01SECRET",
+        "name": "secret-project",
+        "created": 1771578000,
+        "creator": "U01ADA",
+        "is_archived": false,
+        "members": [
+            "U01ADA",
+            "U02NOA"
+        ],
+        "pins": [],
+        "topic": {
+            "value": "Don't tell anyone"
+        },
+        "purpose": {
+            "value": ""
+        }
+    }
+]

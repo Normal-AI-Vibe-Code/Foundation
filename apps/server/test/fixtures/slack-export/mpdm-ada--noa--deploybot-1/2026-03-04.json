@@ -1,0 +1,38 @@
+[
+    {
+        "client_msg_id": "cm-1772615100.000105",
+        "type": "message",
+        "text": "group chat about the deploy",
+        "user": "U01ADA",
+        "ts": "1772615100.000105",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        }
+    },
+    {
+        "type": "message",
+        "subtype": "bot_message",
+        "ts": "1772615160.000106",
+        "bot_id": "B03DEPLOY",
+        "username": "deploybot",
+        "text": "deploy *done*",
+        "bot_profile": {
+            "id": "B03DEPLOY",
+            "name": "deploybot",
+            "icons": {
+                "image_72": "https://avatars.slack-edge.com/2026-01-01/bot_72.png"
+            }
+        }
+    }
+]

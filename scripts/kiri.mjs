@@ -17,11 +17,14 @@
  * macOS and Linux: the release is downloaded and checked, and the one command
  * that installs it is printed (a .dmg to open, a .deb or .rpm that needs sudo).
  *
- * To move to a new Kiri: change VERSION and the hashes below from the release's SHA256SUMS.
+ * To move to a new Kiri: change VERSION and the hashes below, from the release's SHA256SUMS or, when a
+ * release has none (0.2.1), from GitHub's own digest of each asset:
+ *   gh api repos/libracoder/kiri/releases/tags/v<VERSION> -q '.assets[] | "\(.name) \(.digest)"'
+ * An upgrade on Windows stops Kiri and its distro first, so the new app copies its own engine into WSL.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs";
+import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { homedir, tmpdir } from "node:os";
 import { join, posix } from "node:path";
@@ -29,18 +32,19 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export const VERSION = "0.1.18";
+export const VERSION = "0.2.1";
 const RELEASE = `https://github.com/libracoder/kiri/releases/download/v${VERSION}`;
-/** From the release's SHA256SUMS. A download that doesn't match is deleted, never run. */
+/** GitHub's sha256 digest of each asset (0.2.1 ships no SHA256SUMS). A download that doesn't match is deleted, never run.
+ *  0.2.1 has no full .deb, only kiri-lite's: null here, and the Linux path says so. */
 const FILES = {
-  "win32-x64": { file: `Kiri-${VERSION}-x86_64.msi`, sha256: "6ea27a576198065d19b4656eaf7f4993231c2aaa840181fe67b15ca8ec32f8f9" },
-  "win32-arm64": { file: `Kiri-${VERSION}-arm64.msi`, sha256: "9d8ff28e2e009810364de57e01c78c33254b0a4614f2920a842048856675bc33" },
-  "darwin-arm64": { file: `Kiri-${VERSION}-arm64.dmg`, sha256: "d142612e5765e6a13299d0afcfc4eb11a65ca2468d627497ce5450c8fc333121" },
-  "darwin-x64": { file: `Kiri-${VERSION}-x86_64.dmg`, sha256: "8df5dfa2173864e2e2e4b5e1a25161a5ef620951bb0a1623ab722cf8b2d33091" },
-  "linux-x64-deb": { file: `kiri_${VERSION}_amd64.deb`, sha256: "423be3e596df78e47f03256eb08492b9f1ddc27ab60f4623993fee5a3f74b5cf" },
-  "linux-arm64-deb": { file: `kiri_${VERSION}_arm64.deb`, sha256: "ada276d6a6517a043bcff843dd2826777d06f8343188c2c93c2620bb563b8340" },
-  "linux-x64-rpm": { file: `kiri-${VERSION}-1.x86_64.rpm`, sha256: "433841998448ddf779e69a1bbb5e0bea069cbf50fecea68b70ba4997eba3fee1" },
-  "linux-arm64-rpm": { file: `kiri-${VERSION}-1.aarch64.rpm`, sha256: "30313f301c923c1cb7ef61a9f886e81384a5c970aeedf987ef602ad2d11a2d46" },
+  "win32-x64": { file: `Kiri-${VERSION}-x86_64.msi`, sha256: "784314423a5f4723415d7ca08799d3700399a8e3f9d8d026b18a5b15cdfeccf5" },
+  "win32-arm64": { file: `Kiri-${VERSION}-arm64.msi`, sha256: "b5c52546eaf2e667e1a3dacb2ad400c051eb1e7832345c33d831c3c315cdb36e" },
+  "darwin-arm64": { file: `Kiri-${VERSION}-arm64.dmg`, sha256: "c42c518eb6a4efcb995b52b987b83e848028a020eef5872e0ac16a1c7827fffa" },
+  "darwin-x64": { file: `Kiri-${VERSION}-x86_64.dmg`, sha256: "66e5e9f6255ba109e1740078994d8346fbce3c1d7f77075699f3f7f6b9314cff" },
+  "linux-x64-deb": null,
+  "linux-arm64-deb": null,
+  "linux-x64-rpm": { file: `kiri-${VERSION}-1.x86_64.rpm`, sha256: "dcd3c6df3b2b198f3a85d8e757864c2c33ae16e29646cec102e471eb7d3a4821" },
+  "linux-arm64-rpm": { file: `kiri-${VERSION}-1.aarch64.rpm`, sha256: "55f52eb2d7d935063b0f6f7ac53b66d3a423c9e250820941a0074ac4c42dc788" },
 };
 
 const win = process.platform === "win32";
@@ -89,6 +93,48 @@ function version() {
     req.on("error", () => done(null));
     req.end();
   });
+}
+
+/** Kiri's own version from /version: the "Kiri" component from 0.2.0 (Version is then Docker's), else Version. */
+function engineVersion(v) {
+  return v?.Components?.find((c) => c.Name === "Kiri")?.Version ?? v?.Version ?? null;
+}
+
+/**
+ * What Kiri's setup window records when it finishes (%LOCALAPPDATA%\Kiri\setup.json). Kiri's app reads the
+ * distro from it, and from 0.2.0 copies its own engine into that distro on start; without it the app says
+ * "Kiri's Linux is not set up" and keeps running whatever engine the distro already has.
+ */
+function recordSetup() {
+  const file = join(kiriDir(), "setup.json");
+  let saved = {};
+  try {
+    saved = JSON.parse(readFileSync(file, "utf8"));
+  } catch {}
+  if (saved.done && saved.linux === "kiri" && saved.distro === DISTRO) return;
+  writeFileSync(file, JSON.stringify({ ...saved, done: true, linux: "kiri", distro: DISTRO }, null, 2));
+  console.log(`kiri: recorded Kiri Linux ('${DISTRO}') in ${file}, as Kiri's setup window does`);
+}
+
+/** Stop Kiri's app and its distro, so the next start copies this version's engine into WSL. */
+function stopKiri() {
+  spawnSync("taskkill.exe", ["/IM", "kiri-win.exe", "/F"], { windowsHide: true });
+  spawnSync("wsl.exe", ["--terminate", DISTRO], { windowsHide: true });
+}
+
+/**
+ * Copy this version's engine (kiri, kiri-init from Kiri's folder) into the distro's /usr/local/bin, as Kiri's
+ * app means to on start. Kiri 0.2.1's own copy hands its script to `wsl.exe --`, whose login shell expands
+ * `$f` and `$s` before sh sees them, so it never copies (fixed on Kiri's main: `wsl.exe -e`, its wslsync.rs).
+ * Run with Kiri stopped. Returns the files copied.
+ */
+function copyEngine() {
+  const to = (f) => join(kiriDir(), f).replace(/\\/g, "/").replace(/^([A-Za-z]):/, (_, d) => `/mnt/${d.toLowerCase()}`);
+  const script =
+    'c=""; for f in kiri kiri-init; do s="$1/$f"; cmp -s "$s" /usr/local/bin/$f && continue; ' +
+    'cp -f "$s" /usr/local/bin/$f.new && chmod 755 /usr/local/bin/$f.new && mv -f /usr/local/bin/$f.new /usr/local/bin/$f && c="$c $f" || exit 1; done; echo "copied:$c"';
+  const r = run("wsl.exe", ["-d", DISTRO, "-u", "root", "-e", "sh", "-c", script, "sh", to("").replace(/\/$/, "")], "copying the engine into WSL");
+  return wslText(r.stdout).match(/copied:(.*)/)?.[1].trim().split(/\s+/).filter(Boolean) ?? [];
 }
 
 /** WSL prints UTF-16 to a pipe. */
@@ -197,7 +243,9 @@ export async function installKiri() {
       const msi = await fetchRelease(FILES[`win32-${arch}`]);
       const log = join(tmpdir(), "foundation-kiri", VERSION, "install.log");
       console.log(`kiri: installing ${VERSION} for this user into ${kiriDir()}${have.version ? ` (was ${have.version})` : ""}`);
-      // a running Kiri holds its files; the MSI closes it, and we start it again below
+      // An upgrade: Kiri's app copies its engine into WSL only when the engine isn't answering, so stop
+      // the app and the distro; the new app starts the new engine below.
+      if (have.app) stopKiri();
       const r = spawnSync("msiexec.exe", ["/i", msi, "/qn", "/norestart", "/L*V", log], { windowsHide: true });
       if (r.status !== 0 && r.status !== 3010) throw new Error(`msiexec exited ${r.status} (its log: ${log})`);
     }
@@ -208,18 +256,31 @@ export async function installKiri() {
       mkdirSync(join(kiriDir(), "wsl"), { recursive: true });
       run("wsl.exe", ["--import", DISTRO, join(kiriDir(), "wsl", DISTRO), tar, "--version", "2"], "wsl --import");
     }
+    recordSetup();
   } else if (process.platform === "darwin") {
     const dmg = await fetchRelease(FILES[`darwin-${arch}`]);
     console.log(`kiri: open ${dmg}, drag Kiri to Applications and open it once; then npm run kiri`);
     return;
   } else {
     const rpm = existsSync("/usr/bin/rpm") && !existsSync("/usr/bin/dpkg");
-    const pkg = await fetchRelease(FILES[`linux-${arch}-${rpm ? "rpm" : "deb"}`]);
+    const want = FILES[`linux-${arch}-${rpm ? "rpm" : "deb"}`];
+    if (!want) throw new Error(`Kiri ${VERSION} has no full .deb (only kiri-lite); install it from https://runkiri.com/releases/`);
+    const pkg = await fetchRelease(want);
     console.log(`kiri: install it with  sudo ${rpm ? "dnf install" : "apt install"} ${pkg}  then npm run kiri`);
     return;
   }
-  const s = await startKiri();
+  let s = await startKiri();
   if (s.startsWith("failed")) throw new Error(s);
+  const running = engineVersion(await version());
+  if (win && running && running !== VERSION) {
+    // an engine left from an earlier Kiri (or a setup.json written only now): restart so the app copies its own
+    console.log(`kiri: the engine in WSL is ${running}; copying ${VERSION}'s in and restarting Kiri`);
+    stopKiri();
+    const copied = copyEngine();
+    console.log(`kiri: ${copied.length ? `copied ${copied.join(", ")}` : "nothing to copy"} into '${DISTRO}'`);
+    s = await startKiri();
+    if (s.startsWith("failed")) throw new Error(s);
+  }
   await status();
 }
 
@@ -227,7 +288,7 @@ export async function status() {
   const here = kiriInstalled();
   const v = (await ping()) ? await version() : null;
   console.log(`kiri: pinned ${VERSION}; installed ${here.app ? here.version ?? "yes" : "no"}${win ? `; WSL distro '${DISTRO}' ${here.distro ? "present" : "absent"}` : ""}`);
-  console.log(v ? `kiri: engine up on ${kiriSocket()}: ${v.Platform?.Name ?? "?"} ${v.Version} (API ${v.ApiVersion}, ${v.Os}/${v.Arch})` : `kiri: no engine on ${kiriSocket()}`);
+  console.log(v ? `kiri: engine up on ${kiriSocket()}: ${v.Platform?.Name ?? "?"} ${engineVersion(v)} (API ${v.ApiVersion}, ${v.Os}/${v.Arch})` : `kiri: no engine on ${kiriSocket()}`);
   return !!v;
 }
 

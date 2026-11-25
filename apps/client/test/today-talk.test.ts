@@ -28,9 +28,12 @@ test("the badge counts what waits, by who it's from; related work doesn't wait",
   assert.deepEqual(countNotices([]), { people: 0, agents: 0, changes: 0 });
 });
 
-test("a picture in markdown is one of Foundation's files or the web's, nothing else", () => {
-  assert.ok(renderMarkdown("![Rim drive](/files/f_abc)").includes('<img class="md-img" src="/files/f_abc" alt="Rim drive"'));
-  assert.ok(renderMarkdown("![x](https://example.com/a.png)").includes('<img class="md-img" src="https://example.com/a.png"'));
+test("a picture in markdown loads on sight only from Foundation's files or the text itself; the web's waits for a press", () => {
+  assert.ok(renderMarkdown("![Rim drive](/files/f_0123456789abcdef)").includes('<img class="md-img" src="/files/f_0123456789abcdef" alt="Rim drive"'));
+  // the web's: a placeholder with its host and Load image (utils/markdown.ts), not an <img>
+  const web = renderMarkdown("![x](https://example.com/a.png)");
+  assert.ok(!web.includes("<img") && web.includes('data-src="https://example.com/a.png"') && web.includes("Load image"));
   assert.ok(!renderMarkdown("![x](javascript:alert(1))").includes("<img"));
-  assert.ok(!renderMarkdown("![x](data:image/png;base64,AAAA)").includes("<img"));
+  // a picture written into the text (data:image) is already here: nothing is fetched to show it
+  assert.ok(renderMarkdown("![x](data:image/png;base64,AAAA)").includes('<img class="md-img" src="data:image/png;base64,AAAA"'));
 });

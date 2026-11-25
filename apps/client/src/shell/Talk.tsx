@@ -268,9 +268,19 @@ export function TalkButton() {
   const board = useBoardTick();
   useSpaceToTalk();
   const open = m !== "idle";
+  const prevFocus = useRef<HTMLElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && (e.preventDefault(), e.stopPropagation(), cancelTalk());
+    prevFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancelTalk();
+      const target = prevFocus.current?.isConnected ? prevFocus.current : btnRef.current;
+      requestAnimationFrame(() => target?.focus());
+    };
     window.addEventListener("keydown", esc, true);
     return () => window.removeEventListener("keydown", esc, true);
   }, [open]);
@@ -284,7 +294,16 @@ export function TalkButton() {
 
   return (
     <>
-      <button className={`hud-talk f-glass${m === "listening" ? " is-on" : ""}`} onClick={() => (m === "typing" ? cancelTalk() : toggleTalk())} data-tip={m === "listening" ? "Send · Esc drops it" : "Talk to the crew"} data-kbd={m === "listening" ? "V" : "hold Space"} aria-pressed={m === "listening"}>
+      <button
+        ref={btnRef}
+        type="button"
+        className={`hud-talk f-glass${m === "listening" ? " is-on" : ""}`}
+        onClick={() => (m === "typing" ? cancelTalk() : toggleTalk())}
+        aria-label={m === "listening" ? "Send voice prompt" : m === "typing" ? "Close crew prompt" : "Talk to the crew"}
+        data-tip={m === "listening" ? "Send · Esc drops it" : "Talk to the crew"}
+        data-kbd={m === "listening" ? "V" : "hold Space"}
+        aria-pressed={m === "listening"}
+      >
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
           <rect x="5.5" y="1.5" width="5" height="9" rx="2.5" />
           <path d="M3 7.5a5 5 0 0 0 10 0M8 12.5v2" strokeLinecap="round" />
@@ -296,10 +315,13 @@ export function TalkButton() {
         {showRoster && (
           <motion.div
             className={`talk-sheet f-glass${open ? " is-open" : " is-roster"}`}
-            initial={{ opacity: 0, y: 28, scale: 0.98 }}
+            role={open ? "dialog" : "region"}
+            aria-modal={open ? "true" : undefined}
+            aria-label={open ? (m === "listening" ? "Voice prompt for the crew" : "Ask the crew") : "Agents at work"}
+            initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.98 }}
-            transition={{ type: "spring", stiffness: 260, damping: 24 }}
+            exit={{ opacity: 0, y: 12, scale: 0.99, transition: { duration: 0.14 } }}
+            transition={{ type: "spring", stiffness: 280, damping: 26 }}
             data-mode={m}
           >
             {open && <TalkInput mode={m} words={words} />}
@@ -309,7 +331,7 @@ export function TalkButton() {
                   <li className="crew-row crew-row-all">
                     <span className="crew-row-doing">{mineWorking} of yours at work</span>
                     <span className="crew-row-actions">
-                      <button className="crew-row-btn is-stop" onClick={() => void stopAllOnBoard()} data-tip="Stop every agent of yours on this board, helpers too">
+                      <button type="button" className="crew-row-btn is-stop" onClick={() => void stopAllOnBoard()} data-tip="Stop every agent of yours on this grid, helpers too">
                         Stop all
                       </button>
                     </span>
@@ -331,7 +353,7 @@ export function TalkButton() {
                       <span className="crew-row-for"> · {titleOf(a.prompt)}</span>
                     </span>
                     <span className="crew-row-actions">
-                      <button className="crew-row-btn" onClick={() => openSession({ id: a.session, kind: "agent", title: titleOf(a.prompt) })} data-tip="Open its session: what it did, step by step">
+                      <button type="button" className="crew-row-btn" onClick={() => openSession({ id: a.session, kind: "agent", title: titleOf(a.prompt) })} data-tip="Open its session: what it did, step by step">
                         Open
                       </button>
                     </span>
@@ -356,7 +378,7 @@ export function TalkButton() {
                       <span className="f-kbd">↵</span> sends
                     </span>
                     <span>
-                      Hold <span className="f-kbd">Space</span> on the board to talk
+                      Hold <span className="f-kbd">Space</span> on the grid to talk
                     </span>
                     <span>
                       <span className="f-kbd">Esc</span> closes
@@ -392,12 +414,15 @@ function TalkInput({ mode: m, words }: { mode: Mode; words: string }) {
         ))}
       </span>
       {m === "listening" ? (
-        <p className={`talk-heard${words ? "" : " is-empty"}`}>{words || (onSession ? "Listening… for this session" : "Listening… say what the crew should do")}</p>
+        <p className={`talk-heard${words ? "" : " is-empty"}`} role="status" aria-live="polite">
+          {words || (onSession ? "Listening… for this session" : "Listening… say what the crew should do")}
+        </p>
       ) : (
         <textarea
           ref={field}
           className="talk-field"
           rows={1}
+          aria-label={onSession ? "Message for this session" : "Ask the crew"}
           placeholder={onSession ? "Tell this session…" : "Ask the crew: make a section for…, hook up FactoryForm…"}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {

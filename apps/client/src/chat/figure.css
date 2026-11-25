@@ -1,0 +1,79 @@
+/* An agent standing behind a line (chat/AgentFigure.tsx; 2026-11-20). Tokens only.
+   The window is the figure's box: no radius, no ring; it cuts the figure at its foot, and the foot is a
+   1 px baseline in the agent's violet mixed toward the line colour. */
+
+.chat-figure {
+  position: relative;
+  flex: none;
+  display: inline-block;
+  vertical-align: bottom;
+  user-select: none;
+  --figure-line: color-mix(in srgb, var(--color-agent) 62%, var(--color-line-strong));
+}
+.chat-figure-window {
+  position: absolute;
+  inset: 0 0 1px;
+  overflow: hidden;
+  /* the figure may rise to the window's top; it never shows below the line */
+  border-radius: 0;
+}
+.chat-figure-window img {
+  position: absolute;
+  max-width: none;
+  display: block;
+  object-fit: contain;
+  object-position: 50% 0;
+  user-select: none;
+  pointer-events: none;
+}
+.chat-figure-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--figure-line);
+}
+/* no character: the spark stands on the line, where the figure would */
+.chat-figure-spark {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  display: grid;
+  place-items: end center;
+  height: 100%;
+  padding-bottom: 8%;
+  color: var(--color-agent);
+  line-height: 1;
+}
+/* a picture whose ground couldn't be cut: a rounded paper tile, still not a disc */
+.chat-figure.is-tile .chat-figure-window {
+  border-radius: var(--radius-paper) var(--radius-paper) 0 0;
+  background: var(--color-panel);
+}
+/* under 20 px: the ✦ on the agent's tint, a small paper tile */
+.chat-figure.is-spark {
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-paper);
+  background: var(--color-agent-dim);
+  color: var(--color-agent);
+  line-height: 1;
+}
+
+/* the huddle card: after the people's overlapping portraits, each agent stands on its own line, not overlapped */
+.hcard-agent {
+  display: inline-flex;
+  margin-left: var(--space-2);
+}
+
+/* in the timeline: a 36 px window over the 32 px gutter, so the text column stays where people's is.
+   Its baseline sits on the line a person's disc ends on */
+.chat-msg-gutter > .chat-figure {
+  margin: -4px -2px 0;
+}
+/* a thread's summary: an agent among the repliers, a 20 px figure on its line between the faces */
+.chat-thread-figure {
+  margin: 0 2px 0 0;
+}

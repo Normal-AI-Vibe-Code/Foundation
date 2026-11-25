@@ -64,8 +64,8 @@ export function RuneMark() {
       : "Starting the Rune renderer…";
   return (
     // a button, like everything in the bottom bar: the grid takes a press on anything else there for a pan
-    <button className={`rune-mark f-glass is-${status.state}`} onClick={() => (window.location.hash = "#/settings/renderer")} data-tip={tip} aria-label={tip}>
-      <span className="rune-mark-dot" />
+    <button type="button" className={`rune-mark f-glass is-${status.state}`} onClick={() => (window.location.hash = "#/settings/renderer")} data-tip={tip} aria-label={tip}>
+      <span className="rune-mark-dot" aria-hidden />
       <span className="rune-mark-word">{failed ? "Rune off" : "Rune"}</span>
     </button>
   );

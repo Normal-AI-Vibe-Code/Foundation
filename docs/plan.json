@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-17T08:08:12.388Z",
+  "syncedAt": "2026-11-23T06:07:39.341Z",
   "columns": [
     {
       "id": "needs-you",
@@ -79,9 +79,299 @@
       "id": "today",
       "name": "Today",
       "about": "Home before the boards: the Shiba, focus, goals, Foundation for Chrome"
+    },
+    {
+      "id": "chatform",
+      "name": "ChatForm",
+      "about": "The company's conversations in Foundation: channels, DMs, agents, huddles and replay, Slack's history, and bridges to mail, WhatsApp, Instagram and WeChat"
+    },
+    {
+      "id": "hosted",
+      "name": "Hosted Foundation",
+      "about": "One server everyone's apps and browsers reach, so the company's chat, boards and agents are shared"
     }
   ],
   "cards": [
+    {
+      "id": "usability-pass-2026-11-22",
+      "title": "Whole-app usability, legibility, spacing, accessibility & motion pass (jakubkrehel/skills)",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-22 (SPEC §0.15): comprehensive whole-app pass using jakubkrehel/skills (better-interface across accessibility, layout, writing, typography, colors, UI polish, motion) preserving Foundation's warm-paper / graphite / federal-blue / violet-agent look and features. Built: OKLCH lightness-tuned WCAG 2.2 AA (>= 4.5:1) tokens in packages/ui/src/tokens.css + packages/ui/src/index.ts; global :focus-visible + forced-colors ring, .f-skip-link + <main> landmark, <MotionConfig reducedMotion=\"user\"> + synchronous prefers-reduced-motion settlement in physics/spring.ts; body user-select restored (scoped to .grid-viewport and drag handles); overscroll-behavior: contain (11 -> 92), scroll-padding-block (0 -> 61), text-wrap (2 -> 136), @media (hover: hover) (0 -> 63), :focus-visible (31 -> 217), :not(:disabled):active, aria-modal dialogs, pure-neutral --color-media-outline, and #/design -> Usability & contrast live specimen. Verified: test/usability.test.ts (11/11), test/design.test.ts (4/4), e2e/usability.spec.ts (5/5, Day/Night/Room/CommandBar/ChatForm/Settings/reduced-motion), typecheck, build, check:security. Evidence: docs/evidence/2026-11-22_usability-pass/. Still unverified on physical touch hardware, OS forced-colors, screen readers, and packaged desktop app.",
+      "issue": 241
+    },
+    {
+      "id": "hosted-signin-decision",
+      "title": "Decide how Google sign-in reaches a hosted address: Flowform widened, or Foundation's own Google client",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "auth",
+      "status": "needs-you",
+      "body": "The blocker for a hosted Foundation (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Sign-in goes through Flowform, whose callback rule takes only a loopback address (http, 127.0.0.1 or localhost, a port), so a server at an https address can't finish a sign-in: `loopbackOrigin()` in apps/server/src/flowform.ts refuses one. Two ways, a person's choice: (a) Flowform widens `native_loopback_callback` to accept the hosted address (a change on Flowform's side; Foundation keeps one sign-in for the company), or (b) Foundation gets its own Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`, an internal consent screen on the Form Industries Google Workspace). SPEC §6 #2. *hosted-signin* builds whichever is chosen. 2026-11-20: (b) is built and checked with a stand-in Google, because it needs nothing from Flowform. What is left is a person's: create the OAuth client (docs/hosting.md) and put its ID and secret on the hosted machine. Say so if (a) is wanted instead.",
+      "issue": 223
+    },
+    {
+      "id": "hosted-where",
+      "title": "Choose where the hosted Foundation runs and its address",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "ship",
+      "status": "needs-you",
+      "body": "A person's choice and accounts (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Where: a small cloud VM (simplest, always on) or an always-on computer in the office. Its name: for example foundation.formindustries.com, with DNS pointed at it. Who pays, and who holds the machine's keys. Whether it's open to the internet (Google sign-in is the fence) or only reachable on the company's private network (Tailscale in front). *hosted-deploy* makes it runnable; this card says where. 2026-11-20: either choice now runs from deploy/compose.yml (docs/hosting.md): a VM with ports 80/443 uses Caddy; a computer with no open ports uses the tunnel profile. Also set FOUNDATION_ALLOWLIST to the domains people really sign in with (the default says formindustries.com; HyperForm's accounts are formindustries.co and normallab.co). 2026-11-20, Josh: a cloud VM. deploy/setup-vm.sh readies an Ubuntu 24.04 VM (Docker, firewall, the repo, deploy/.env); not yet run on a real one. Still a person's: which provider and account, the VM itself, the name and its DNS record.",
+      "issue": 224
+    },
+    {
+      "id": "tailnet-stopgap",
+      "title": "Until hosting: two computers share one Foundation through an SSH tunnel over Tailscale",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "desktop",
+      "status": "needs-you",
+      "body": "A stopgap for Josh's home and work computers, not the company's way in (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) The home computer runs the app's built-in server (it stays up while the app is open); the work computer forwards its own localhost:4410 to it, so the work app finds a server on :4410, uses it, and the Flowform sign-in returns through the tunnel. Nothing in Foundation changes and nothing is on the open internet. Home (admin PowerShell): `winget install --id Tailscale.Tailscale`, `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0`, `Start-Service sshd; Set-Service sshd -StartupType Automatic`; keep Foundation open and the PC awake. Work: Tailscale on the same account, quit Foundation, then `ssh -N -L 4410:127.0.0.1:4410 <you>@<home-pc>` and open Foundation. Not run yet. Work IT may not allow Tailscale; huddles connect directly and may fail on a strict network.",
+      "issue": 225
+    },
+    {
+      "id": "wildos-wsl-host",
+      "title": "Full local WildOS VMs inside Foundation sections",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "machines",
+      "status": "review",
+      "body": "Implemented native QEMU full OS VMs in sections: section tools/menu and command; streaming archived ISO import; own persistent sparse disk; embedded authenticated desktop; guest-agent command runner with idempotent request claims and independent command IDs; memory/CPU and emulation settings, installer/disk boot, shutdown, confirmed poweroff and archive/restore. Person and board gates, server-owned configuration, filtered child environment and audit. 18 server VM/child-door checks and 11 client token/machine-page checks pass; typecheck, build and security scan pass. Host browser checks are blocked (loopback EACCES and browser connection timeouts); QEMU/verified ISO unavailable, so no real WildOS boot or day/night screenshot claimed. Host acceptance spec: apps/client/e2e/local-vms.spec.ts (VM_E2E_ISO opts into real boot). Remaining: real host acceptance, orphan-process reattachment, viewer console, audio/nested Windows. docs/wildos.md; docs/evidence/2026-11-20_native-vms/.",
+      "issue": 226
+    },
+    {
+      "id": "chatform-slack-export",
+      "title": "Export the Slack workspace and bring it in",
+      "kind": "hookup",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "needs-you",
+      "body": "Slack → Settings → Import/Export → Export (private channels and DMs need Business+ and an owner's request). Bring the zip in from ChatForm → Inbox → History soon after: file links in an export expire. Architecture and contract: docs/chatform.md.",
+      "issue": 196
+    },
+    {
+      "id": "chatform-bridge-keys",
+      "title": "Connect the real services: a Google Cloud project for Gmail, a Meta app for WhatsApp and Instagram, WeCom for WeChat",
+      "kind": "hookup",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "needs-you",
+      "body": "The bridges run against a stand-in until these exist. Each is an account, an app review or an admin consent only a person can do; Inbox says which keys are missing and the steps. Architecture and contract: docs/chatform.md.",
+      "issue": 197
+    },
+    {
+      "id": "chatform-replay",
+      "title": "Replay and the clock: a recorded huddle replays with the grid as it was; CAD and Vision files in a channel",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "review",
+      "body": "R1. A grid's changes are kept with a recorded session (takes). A clock card on a section scrubs the session: recordings seek together, lines light as said, portraits and avatars speak, the section is drawn as it was. The scenario end to end: a STEP file in a channel, a huddle on it, taken to a grid, recorded, replayed. Architecture and contract: docs/chatform.md.",
+      "issue": 198
+    },
+    {
+      "id": "chatform-huddles",
+      "title": "Huddles in a channel: a card everyone can join, screen share, agents that speak, and taking it to a grid",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "review",
+      "body": "H1. A huddle belongs to a channel and posts a card; when it ends the card holds the people, transcript, recordings and Replay. Take it to a grid moves the same call onto a section. Agent participants answer aloud through their avatars. Architecture and contract: docs/chatform.md.",
+      "issue": 199
+    },
+    {
+      "id": "chatform-agents",
+      "title": "Agents in ChatForm: mention one and it answers in the thread as itself; T3 threads and sessions as conversations",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "review",
+      "body": "A1. Agents post as agents (violet, avatar, whom they worked for); @mention starts a turn that answers in the thread; chat tools on the tool surface and MCP; each T3 thread and Foundation session is a conversation in the Agents tab. Architecture and contract: docs/chatform.md.",
+      "issue": 200
+    },
+    {
+      "id": "chatform-bridges",
+      "title": "Bridges: mail, WhatsApp, Instagram and WeChat as portals, with a person's press to send",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "review",
+      "body": "B1. One adapter per service on the official routes (Gmail API, WhatsApp Business Cloud API, Instagram Messaging API, WeCom / WeChat Official Account), each honest about its state and the keys it lacks; inbound webhooks make portals and ghosts; agents draft, people send; a stand-in adapter in tests. Architecture and contract: docs/chatform.md.",
+      "issue": 201
+    },
+    {
+      "id": "chatform-history",
+      "title": "Bring Slack's history in (export zip and API) and take ChatForm's out",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "review",
+      "body": "I1. Slack's export zip (channels, groups, dms, mpims, users, day files) and, with a token, Slack's API: authors, times, threads, reactions, pins, mentions and files; brought in twice without doubling; a report of what was skipped. Every channel downloads as JSON and Markdown. Architecture and contract: docs/chatform.md.",
+      "issue": 202
+    },
+    {
+      "id": "chatform-place",
+      "title": "ChatForm, the place: a button beside Today, four tabs, the sidebar, the timeline, the composer and threads",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "review",
+      "body": "C1. #/chat with Chat, Agents, Inbox and Huddles tabs; unread badge; quick switcher; uploads of images, video, GIFs and files with inline previews; link previews; mentions, emoji, drafts; shown on #/design day and night; two-browser e2e. Architecture and contract: docs/chatform.md.",
+      "issue": 203
+    },
+    {
+      "id": "chatform-second-round",
+      "title": "ChatForm, second round: chats in the side menu, agents on a line, an Inbox that connects, Slack in step, the server on your network",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "review",
+      "body": "Built 2026-11-20 (SPEC §0.14, docs/server.md) and left uncommitted in its worktree; merged onto main 2026-11-21 beside the hosted server (§0.13): both modes stay, On your network for the office switch on this computer, hosted for a server behind HTTPS. Checked on merge: typecheck, the server, client and slack-agent suites (one T3 timing test flaked under load and passes alone). Nothing has met the real Slack, Google or a second computer yet.",
+      "issue": 236
+    },
+    {
+      "id": "council-silhouettes-one-add",
+      "title": "The council's silhouettes: three close together until an agent joins, then one to add another",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"the silhouettes should be closer to each other until an agent is added, and then there should only be one silhouette to add new agents\". Built and seen on a copy of the real data and #/design, day and night (docs/evidence/2026-11-21_council-silhouettes/). A person checks the spacing with their own characters.",
+      "issue": 237
+    },
+    {
+      "id": "who-is-where",
+      "title": "Who is where: people and agents on each grid, on the side menu's rows and ChatForm's people",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"show when people are in the boards and collaborating, as well as the agents\". Built: whereabouts.ts (server), shell/HereStack.tsx, a DM row's \"in <grid>\". Checked with a second person from a script on a copy of the real data (docs/evidence/2026-11-21_who-is-where/). A person checks it with a real teammate and a real agent at work.",
+      "issue": 238
+    },
+    {
+      "id": "chatform-rust-vercel",
+      "title": "ChatForm's server in Rust on Vercel: accounts, channels, messages and the live socket on Postgres",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "review",
+      "body": "Josh, 2026-11-21: \"Host it on vercel for now. build a rust based server there.\" Built: apps/chatserver (axum on Vercel's Rust runtime, Postgres, LISTEN/NOTIFY across instances, Google accounts with an allowlist), the Node server's chat routes and JSON. 2026-11-22: an app signs in on it like a device (/auth/app/begin, the code, the press on the server's own page, /auth/app/poll: app_signin.rs), and ChatForm in the app points at it: Settings → General → ChatForm's server (per device; VITE_CHATFORM_SERVER for a build), its own bearer and socket ticket (chat/server.ts), the Chat tab's sign-in, and what the server lacks left out. Checked: cargo test (6 unit, 7 end to end, the app sign-in against a stand-in Google), apps/client/test/chat-server.test.ts, and in a browser on this computer, day and night (docs/evidence/2026-11-22_chat-server/). Not checked: the desktop app's window, a deployed server, real Google: those wait on chatform-vercel-setup. Next on it: files in messages, pins and typing in threads.",
+      "issue": 239
+    },
+    {
+      "id": "chatform-vercel-setup",
+      "title": "Set up ChatForm's server on Vercel: the project, Neon Postgres and the Google OAuth client",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chat",
+      "status": "needs-you",
+      "body": "Steps in apps/chatserver/README.md: import the repo with Root Directory apps/chatserver, add Neon from Storage, create the Google OAuth client (redirect https://<project>.vercel.app/auth/google/callback), set GOOGLE_CLIENT_ID/SECRET, CHATFORM_ALLOWLIST (@formindustries.co,@normallab.co), CHATFORM_ADMIN_EMAILS, CHATFORM_CORS_ORIGINS. Then /api/health says database and listening true.",
+      "issue": 240
+    },
+    {
+      "id": "chatform-core",
+      "title": "ChatForm core: channels, DMs, threads, reactions, files, search and unread on the server",
+      "kind": "plan",
+      "milestone": "chatform",
+      "area": "chatform",
+      "status": "review",
+      "body": "S1. One conversation model in SQLite (chat.ts): open and private channels, DMs, groups, agent conversations and portals; messages with a per-channel seq, threads by root, reactions, pins, edits, removals that need confirm, request_id idempotency; who spoke is the server's to say; a /chat socket; FTS; unread and mentions into Today. Architecture and contract: docs/chatform.md.",
+      "issue": 204
+    },
+    {
+      "id": "hyperform-apps",
+      "title": "HyperForm's apps on Today, opened in Foundation as live pages with kept pictures",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "review",
+      "body": "Josh, 2026-11-19: start integrating HyperForm (where the vibe-coded apps are hosted); link HyperForm, PartForm, DeployForm and FactoryForm on Today; open them as web pages that take over a section, usable by agents, with a saved preview from far away and the live page up close. Built (SPEC §0.10): the app list with hosted addresses; ⤢ on a Today row opens the app in a new section it fills; such a page is a tab of the built-in browser (a frame can't show a site behind HyperForm's sign-in), live when near, its kept picture when far, an admin's to run, with Agents on the card for the `browser_` tools. Checked against a stand-in page in a real browser (`e2e/pages.spec.ts`, `test/pagecard.test.ts`); not yet against the real apps: that waits on a sign-in (card: hyperform-sign-in).",
+      "issue": 219
+    },
+    {
+      "id": "hyperform-sign-in",
+      "title": "Sign in to HyperForm once in Foundation's browser, and say what you see",
+      "kind": "hookup",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "needs-you",
+      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size.",
+      "issue": 220
+    },
+    {
+      "id": "hosted-signin",
+      "title": "Sign in to a hosted Foundation: the browser, the desktop app, and who may join",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "auth",
+      "status": "review",
+      "body": "Foundation's side of *hosted-signin-decision* (Josh, 2026-11-20: company-wide chat comes from hosting Foundation's own server, not Mattermost, and not Tailscale as the way in: ChatForm is already the chat server, and keeping chat beside the boards is what lets agents read and answer in it.) Built 2026-11-20 as option (b), Foundation's own Google client: browser and desktop device-code sign-in finish on the hosted address, Secure cookies on https, allowlist + admin emails, desktop window CORS admitted. Updated 2026-11-21: added Admin People & Role management (`GET /api/admin/users`, `POST /api/admin/users/:id/role`, last-admin guard, audit log, `PeopleSection` in Settings → General & `#/design` day/night). Tests: `apps/server/test/hosted-signin.test.ts`, `apps/server/test/hosted-features.test.ts`, `apps/client/e2e/hosted-chat.spec.ts`. Evidence: `docs/evidence/2026-11-20_hosted/`, `docs/evidence/2026-11-21_images-hosted-chat/`. Not built: Flowform's widened callback (option a).",
+      "issue": 227
+    },
+    {
+      "id": "hosted-deploy",
+      "title": "A hosted Foundation you can deploy: one command, HTTPS, its data kept and backed up",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "ship",
+      "status": "review",
+      "body": "Built 2026-11-20: Dockerfile (desktop server bundle on pinned Node serving built web client via FOUNDATION_CLIENT_DIR), deploy/compose.yml (server, Caddy, nightly backup, Cloudflare Tunnel profile), deploy/foundation.env.example, scripts/hosted-backup.mjs, docs/hosting.md. Hardened 2026-11-21: Caddy HSTS/nosniff/referrer headers, Compose json-file log rotation, verified restore CLI (`scripts/hosted-restore.mjs` with `--confirm`, `pragma integrity_check`, archive preservation), preflight checker (`npm run hosted:check` / `scripts/hosted-preflight.mjs`), and image disk cache excluded from backups. Checked in `apps/server/test/hosted-features.test.ts` (backup → mutate → restore end-to-end). Not done: a real certificate on a real domain.",
+      "issue": 228
+    },
+    {
+      "id": "hosted-local-features",
+      "title": "What machines, the built-in browser, Kiri and Vision hand-offs do on a hosted server",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "machines",
+      "status": "review",
+      "body": "Built and checked 2026-11-21 (`apps/server/src/hosted.ts`, `GET /api/capabilities`, `apps/client/src/lib/capabilities.ts`). On a hosted server (`hostedServer() === true`, unless `FOUNDATION_ALLOW_HOST_TOOLS=1`), local-computer features (built-in terminal, built-in browser, container machines, local QEMU VMs, T3 host, Vision threads, Places, local projects watch) are refused at the server with 403 and honest plain explanations, and client surfaces (`Tools.tsx`, `BrowserTool.tsx`, `MachineView.tsx`, `LocalVm.tsx`, `PlacesTab.tsx`) show quiet hosted notices with zero auto-POST race conditions while ChatForm, boards, files, search and API agents run cleanly. Follow-up policy choice filed as `hosted-hardware-policy` (needs-you). Tests: `apps/server/test/hosted-features.test.ts`, `apps/client/e2e/hosted-chat.spec.ts`. Evidence: `docs/evidence/2026-11-21_images-hosted-chat/`.",
+      "issue": 229
+    },
+    {
+      "id": "hosted-hardware-policy",
+      "title": "Decide who may start containers, VMs or a server browser on hosted hardware later",
+      "kind": "hookup",
+      "milestone": "hosted",
+      "area": "machines",
+      "status": "needs-you",
+      "body": "Follow-up from *hosted-local-features* (2026-11-21): local-computer tools (terminal, built-in browser, Kiri/Docker machines, local QEMU VMs, T3, Places) are turned off by default on a hosted Foundation server. Decide later whether any hosted machine should ever run sandboxed containers/browsers on shared cloud hardware, or whether those always pair back to each person's own computer (like *vision-pairing*).",
+      "issue": 235
+    },
+    {
+      "id": "hosted-chat-check",
+      "title": "Two people on two computers chat through a hosted Foundation",
+      "kind": "plan",
+      "milestone": "hosted",
+      "area": "chatform",
+      "status": "review",
+      "body": "Automated Playwright E2E built and verified 2026-11-21 (`apps/client/e2e/hosted-chat.spec.ts`, 4/4 pass): against a real hosted Foundation server (`http://foundation.localhost:<port>`, stand-in Google, `FOUNDATION_DEV_LOGIN=0`), Ada (browser cookie, admin) and Kai (desktop app bearer with device code + 'This is me', member) share `#general`, a private DM, a thread reply, a reaction, an uploaded 1600×1200 cached image (512w inline, 0 network fetches on reload in desktop bearer mode), live unread counts and badges, offline drop + catch-up reconnect, hosted local-tool 403 boundaries, and Admin People role management. Evidence: `docs/evidence/2026-11-21_images-hosted-chat/`. Still waiting on the live VM: real two-computer check across networks (Josh home + work + third person) and TURN for huddles.",
+      "issue": 230
+    },
+    {
+      "id": "hyperform-projects",
+      "title": "HyperForm's projects in Foundation: list them, show deploy state, read an app without a person's session",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "connectors",
+      "status": "next",
+      "body": "HyperForm has an MCP server, a CLI and machine certificates (its llms.txt). Next: a HyperForm connector that lists the projects it hosts (so Today's apps come from HyperForm instead of a hand-kept list, and a new app appears by itself), shows each one's last deployment, and uses a machine certificate so the server can read an app (and refresh a page card's picture) without a person's browser session. Needs a person to approve the connector's access on HyperForm (read only).",
+      "issue": 221
+    },
+    {
+      "id": "themes-browser-sheets",
+      "title": "Themes by what's in focus, a real built-in browser, a release page, sheets and a card's menu",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "shell",
+      "status": "review",
+      "body": "Josh, 2026-11-18: the browser doesn't work (build Claude's, readable by agents); the terminal prints too many blank lines; Changes as a release page, white on Today through a theming system keyed to the grid or app in focus (the terminal stayed white back on a grid); T3's pane themed and its expand a tab of its own, listed in All Grids; the wheel zooms; the orb right of the profile; the section adjuster only as long as its section; right-click menus on cards; a new section starts with a full-width table drawn on the grid, unpinnable. Built: `setTheme`/`onLook` and the `room`, `paper`, `day`, `night` themes (a grid's Look in its pane); Chrome or Edge on the server's computer over the DevTools pipe, screencast to the pane, five agent tools behind a person's leave; `termtidy`; the release page; spaces of kind `app` (T3, any app card); wheel zoom with trackpad pan and a setting; grab areas per section edge; the card menu with minimize, pin, inputs and outputs, open as a tab, remove; pinned tables and a sheet in every section a person adds. Checked: `e2e/look` (9), `test/hostbrowser` (6, one on the real Chrome), `termtidy` (6), `release-outline` (4), `sections` (8); github.com/login seen in the pane. Not checked: the desktop window, Josh's older grids (the adjuster fault there was not reproduced), T3 running, Rune. 2026-11-19, Josh: every new section keeps starting with a table. Needs Josh: how the wheel reads his mouse (SPEC, Waiting on a person).",
+      "issue": 205
+    },
     {
       "id": "council-seats-and-machine-io",
       "title": "Councils of their own, seats with names (the same agent twice), the white line, a machine's Ins & outs",
@@ -349,7 +639,7 @@
       "milestone": "vision",
       "area": "vision",
       "status": "backlog",
-      "body": "Hand-offs use T3's CLI on the same machine. A hosted server needs a T3 pairing link and a stored client credential: a decision for Josh on where that credential lives (SPEC §7).",
+      "body": "Hand-offs use T3's CLI on the same machine. A hosted server needs a T3 pairing link and a stored client credential: a decision for Josh on where that credential lives (SPEC §7). Part of a hosted Foundation: *hosted-local-features*.",
       "issue": 28
     },
     {
@@ -846,10 +1136,10 @@
       "id": "hosted-server",
       "title": "A hosted server: S3 media, Postgres or libsql",
       "kind": "plan",
-      "milestone": "ship",
+      "milestone": "hosted",
       "area": "ship",
       "status": "backlog",
-      "body": "And what a hosted server means for machines (they'd run on the host) and Vision hand-offs (a pairing link).",
+      "body": "And what a hosted server means for machines (they'd run on the host) and Vision hand-offs (a pairing link). Comes after the first hosted Foundation (*hosted-deploy*), which starts on SQLite and a files folder; this is the step up when one server and its disk aren't enough.",
       "issue": 76
     },
     {
@@ -983,6 +1273,16 @@
       "issue": 108
     },
     {
+      "id": "company-goals",
+      "title": "The company's goals open Today and every Chrome new tab",
+      "kind": "plan",
+      "milestone": "today",
+      "area": "today",
+      "status": "review",
+      "body": "Company goals: the few things everyone is working towards, first on Today (above Focus today) and in Foundation for Chrome's popup, the same for everyone. Whoever can change the company board sets them (on the page, or by asking the Shiba: `set_company_goal`); a viewer reads them and the server refuses their write (HTTP and tools). A goal handed to someone (`owner`) is in their focus, right after their asks. Changes are logged on the company board. Evidence: `docs/evidence/2026-11-14_company-goals/` (SPEC §3 Today).",
+      "issue": 195
+    },
+    {
       "id": "chrome-real-check",
       "title": "Load Foundation for Chrome in a real Chrome",
       "kind": "plan",
@@ -1004,12 +1304,12 @@
     },
     {
       "id": "app-addresses",
-      "title": "Set BomForm's, HyperForm's and FleetForm's addresses",
+      "title": "Set FleetForm's address (and say if PartForm is BomForm)",
       "kind": "hookup",
       "milestone": "today",
       "area": "apps",
       "status": "needs-you",
-      "body": "Today shows them as not linked until `BOMFORM_URL`, `HYPERFORM_URL`, `FLEETFORM_URL` are set (SPEC §6 #18). What is HyperForm's app? Only the Data Room's diligence video mentions it.",
+      "body": "2026-11-19: HyperForm, PartForm, DeployForm and FactoryForm are linked on Today where HyperForm hosts them, with nothing to set (SPEC §0.10, §6 #18). Left for a person: `FLEETFORM_URL` (Today shows FleetForm as not linked), and whether PartForm is the app that was called BomForm (the list shows one row for both).",
       "issue": 111
     },
     {
@@ -1058,8 +1358,8 @@
       "kind": "plan",
       "milestone": "polish",
       "area": "perf",
-      "status": "backlog",
-      "body": "Levels are made in the browser from the original, once per device (`lib/imageLod.ts`), so the first visit to a heavy board still downloads every original (110 MB on the Flowform room). The server has no image decoder; one (sharp, or a WASM decoder) would let it serve `/files/<id>?w=512` and share levels across devices.",
+      "status": "review",
+      "body": "Built and verified 2026-11-21 (`apps/server/src/imagelod.ts`, `apps/client/src/lib/imageCache.ts`, `ProgressiveImage.tsx`): pure-JS server pyramid (`jpeg-js` + `fast-png`, bundles into single-file desktop server) serving quantized `?w=64|256|512|1024|2048` tiers with decompression-bomb guard (64 MP / 16,384 px), single-flight dedup, single-decode `512→64` upload pre-warm, O(1) disk LRU cache outside `data/files/`, `ETag`/`304`, and `width`/`height` on `files` & `ChatFile`. Client unifies L1 ref-counted RAM LRU + L2 persistent Cache Storage (`foundation-image-cache-v2`, cookie & bearer, wiped on logout), viewport priority queue with pan-away abort, 64 px progressive preview -> off-main-thread `img.decode()` opacity swap, and 2.5 s off-screen VRAM shedding across grid, ChatForm, Lightbox, search, clipboard, collections and characters. Measured 98.4% cold-load byte reduction (2,652.4 KB -> 43.1 KB) and 0 network fetches on reload. Evidence: `docs/evidence/2026-11-21_images-hosted-chat/`.",
       "issue": 107
     },
     {
@@ -1719,7 +2019,7 @@
       "milestone": "crew",
       "area": "agent",
       "status": "backlog",
-      "body": "The Connect step's links (console.anthropic.com/settings/keys, Kimi's and DeepSeek's key pages) open in the system browser. Show them in Foundation's own browser (a web page space or card) so the steps and the page are side by side. Sign-in pages often refuse to be framed; find out which do first. **2026-11-17:** a browser is built (top bar → Browser: address, back, forward, reload, open outside, put on the grid). The Connect step's key links still open the system browser: not routed into it, and whether those pages refuse to be framed is unchecked.",
+      "body": "The Connect step's links (console.anthropic.com/settings/keys, Kimi's and DeepSeek's key pages) open in the system browser. Show them in Foundation's own browser (a web page space or card) so the steps and the page are side by side. Sign-in pages often refuse to be framed; find out which do first. **2026-11-17:** a browser is built (top bar → Browser: address, back, forward, reload, open outside, put on the grid). The Connect step's key links still open the system browser: not routed into it, and whether those pages refuse to be framed is unchecked. 2026-11-18: the Browser tool is now a real browser on the server's computer (card *themes-browser-sheets*); what is left here is sending the Connect step's key pages and sign-ins to it instead of the system browser.",
       "issue": 165
     },
     {
@@ -1899,7 +2199,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "review",
-      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-card/NOTES.md`). Josh: \"we can do a lot better with this Kiri interface …\". The head in two rows with Start/Stop, Restart, Remove at the top and the address bar with Share (a Foundation link relayed at /m/…, a public cloudflared link); Docker Hub in Start; Access as a panel of its own; functions in /foundation/functions as wired ports, with Process in a machine on a collection (ImageMagick trim-resize, sprite-sheet, describe); k3s clusters across machine cards with pods as cards; a mouse wheel zooms, a trackpad pans; Today's window buttons white. Checked: `e2e/machines-kiri.spec.ts` on Kiri (4), unit tests (19). Not done: the Tauri window not driven; a real cloudflared tunnel not opened; a function runs only on a press."
+      "body": "Built 2026-11-17 (`docs/evidence/2026-11-17_machine-card/NOTES.md`). Josh: \"we can do a lot better with this Kiri interface …\". The head in two rows with Start/Stop, Restart, Remove at the top and the address bar with Share (a Foundation link relayed at /m/…, a public cloudflared link); Docker Hub in Start; Access as a panel of its own; functions in /foundation/functions as wired ports, with Process in a machine on a collection (ImageMagick trim-resize, sprite-sheet, describe); k3s clusters across machine cards with pods as cards; a mouse wheel zooms, a trackpad pans; Today's window buttons white. Checked: `e2e/machines-kiri.spec.ts` on Kiri (4), unit tests (19). Not done: the Tauri window not driven; a real cloudflared tunnel not opened; a function runs only on a press.",
+      "issue": 231
     },
     {
       "id": "cloudflared-install",
@@ -1908,7 +2209,8 @@
       "milestone": "apps",
       "area": "machines",
       "status": "needs-you",
-      "body": "Public links to a machine's port go through Cloudflare's free quick tunnels, which need cloudflared on this computer: `winget install --id Cloudflare.cloudflared`. Foundation doesn't install it. Without it Share says so and the Foundation link still works."
+      "body": "Public links to a machine's port go through Cloudflare's free quick tunnels, which need cloudflared on this computer: `winget install --id Cloudflare.cloudflared`. Foundation doesn't install it. Without it Share says so and the Foundation link still works.",
+      "issue": 232
     },
     {
       "id": "functions-auto-and-agents",
@@ -1916,8 +2218,9 @@
       "kind": "plan",
       "milestone": "apps",
       "area": "machines",
-      "status": "later",
-      "body": "A machine's function runs only on a person's press (2026-11-17). Next: an Auto switch per function (runs when what's wired in gains items), and a tool for agents to call one, behind a person's leave like the desktop's."
+      "status": "backlog",
+      "body": "A machine's function runs only on a person's press (2026-11-17). Next: an Auto switch per function (runs when what's wired in gains items), and a tool for agents to call one, behind a person's leave like the desktop's.",
+      "issue": 233
     },
     {
       "id": "pipes-older-server",
@@ -2018,6 +2321,146 @@
       "status": "backlog",
       "body": "The GPU renderer (apps/rune) draws a collection card blank and has no tile drag-out. Bring it to the web renderer's card (panels/CollectionView.tsx).",
       "issue": 193
+    },
+    {
+      "id": "wt-person-gate",
+      "title": "Working together 1: the person gate",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "review",
+      "body": "Things only a person may start are refused to an agent's token everywhere, with a test for each; programs Foundation starts get no keys, a pinned REA and a folder outside data/. Slice 1 of ADR-001 (docs/decisions/ADR-001-working-together.md). Merged to main 2026-11-18. In Review until a person runs one real agent turn from the page, which checks that Claude Code still finds its login.",
+      "issue": 206
+    },
+    {
+      "id": "wt-tool-doors",
+      "title": "Working together 2: app tools go through the registry",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "review",
+      "body": "An agent calls an app's tools by its registry entry, with a press on first use; agents get a working folder of their own. Slice 2 of ADR-001 (docs/decisions/ADR-001-working-together.md). Built and merged to main locally 2026-11-18; waits in Review for a person to try it on a live board.",
+      "issue": 207
+    },
+    {
+      "id": "wt-origin-mark",
+      "title": "Working together 3: where it ran, in the data",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Every agent event and every board object carries its origin and whether it includes outside content; the origin badge and chain row on #/design, day and night. Needs /api/agui. Slice 3 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 208
+    },
+    {
+      "id": "wt-deny-ledger",
+      "title": "Working together 4: marked runs and the ledger",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "backlog",
+      "body": "A run that has read outside content is refused the tools that send data out or spend; one ledger line per tool call. Slice 4 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 209
+    },
+    {
+      "id": "wt-registry",
+      "title": "Working together 5: enrolment and the map",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "The apps table grows into participants a person enrols by code; manifest v2 served and read; the map drawn from the registry. Builds on app-registry (#48) and foundation-json (#49). Slice 5 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 210
+    },
+    {
+      "id": "wt-mandates",
+      "title": "Working together 6: mandates",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "security",
+      "status": "backlog",
+      "body": "Short-lived, chain-bound tokens for calls between enrolled apps, with generated-chain tests for the weakest-link rule. Slice 6 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 211
+    },
+    {
+      "id": "wt-first-chain",
+      "title": "Working together 8: the first chain",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "vision",
+      "status": "backlog",
+      "body": "Foundation's agent asks Vision for a part from SolidCraft through Vision's engine door; the Chain view draws it; evidence end to end. Needs Vision's side (slice 7). Slice 8 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 212
+    },
+    {
+      "id": "wt-watch",
+      "title": "Working together 9: watching and Waiting for you",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "backlog",
+      "body": "Chains started elsewhere can be seen and stopped; every pending ask in one list, each saying where it is answered. Slice 9 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 213
+    },
+    {
+      "id": "wt-shared-package",
+      "title": "Working together 10: one reducer",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "Take the shared AG-UI conventions and reducer from @pacific/agui by hash-locked copy; retire the duplicate. Slice 10 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 214
+    },
+    {
+      "id": "wt-handoff",
+      "title": "Working together 12: hand-off between agents",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "agent",
+      "status": "backlog",
+      "body": "A run in another app shown as a subagent in ours; its asks display-only. Needs Vision's tool door. Slice 12 of ADR-001 (docs/decisions/ADR-001-working-together.md).",
+      "issue": 215
+    },
+    {
+      "id": "security-pass-desktop-check",
+      "title": "Check the desktop app before the security pass is pushed",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "security",
+      "status": "done",
+      "body": "A push to main publishes a signed desktop release. Before pushing the 2026-11-18 security pass, a person checks the packaged desktop app: it signs in (the new code-and-confirm step), the agent answers one turn, and T3 starts. See docs/SECURITY.md. Josh checked the desktop app and the pass was pushed on 2026-11-19 (71bed0d).",
+      "issue": 216
+    },
+    {
+      "id": "this-computer-grid",
+      "title": "This computer: a grid of the projects being built here",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "grid",
+      "status": "review",
+      "body": "Connect this computer (Settings → Places, an admin in person) and Foundation keeps a members-only grid of the projects being built on it: a section per git repository with Preview (newest screenshot, dev server), Progress (Claude Code and T3 sessions, their plans and wrap-ups) and Changes (git) cards, read from Claude Code's transcripts, T3 and git and never written. Cards, the grid's tab and side-menu row, section headers and the grid's council wear the computer mark. Built 2026-11-20 (apps/server/src/localdev.ts, apps/client/src/panels/LocalView.tsx; tests in apps/server/test/localdev.test.ts). Waits in Review for a person to try it in the packaged desktop app.",
+      "issue": 234
+    },
+    {
+      "id": "rune-motion-rules-icon",
+      "title": "Rune: motion by rule (panes and other boards land); the new mark and app icon",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-19: Rune animated between pane transitions, which it doesn't need to; and the icon was too small. Built: every board Rune is handed says lands or eases, by five rules (apps/client/src/rune/transitions.ts; DESIGN §6). The mark is Josh's two leaves, and the app icon is that mark on a full-bleed night-navy tile like the other apps'. Checked: test/rune-transitions.test.ts, e2e/rune.spec.ts 'motion has an owner' in Edge, #/design day and night (docs/evidence/2026-11-19_rune-motion-icon/). A person checks: the feel of a pane opening under Rune, the icon in the taskbar after a desktop build, and whether navy is the tile's colour.",
+      "issue": 217
+    },
+    {
+      "id": "rune-e2e-drag-link",
+      "title": "Rune: a link in a note opens (two causes fixed); the section drag-swap check failed twice and then stopped",
+      "kind": "bug",
+      "milestone": "ship",
+      "area": "design",
+      "status": "review",
+      "body": "Found 2026-11-19 running e2e/rune.spec.ts headed in Edge, fixed the same day. A link in a note: (1) Rune drew no host beside a link where the web note does since the security pass, so the check pressed where no link was; Rune draws it now (view.rs host_mark). (2) Rune's accessibility mirror left each link's <a> taking the pointer above the canvas, so the browser opened the address itself, round openExternal, and Rune heard nothing; rune.css keeps the pointer off the mirror. All 11 checks pass. Still unexplained: 'a section's tools, rename, drag…' failed twice at the drag-swap and then passed eight times on the same code; if it comes back, look for a cancelled pointer (the drop arrives as 'cancel'). A person checks: a link in a note under Rune in the desktop app.",
+      "issue": 218
     }
   ]
 }

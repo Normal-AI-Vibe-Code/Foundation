@@ -16,12 +16,14 @@
  * own terminal for those.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { childOptions, spawnChild, type ChildProcess, type SpawnOptions } from "./child.ts";
 import { randomBytes } from "node:crypto";
 import type { WebSocket } from "ws";
 import type { UserInfo } from "@foundation/protocol";
 import { requirePerson } from "./auth.ts";
+import { requireLocalFeature } from "./hosted.ts";
 import { HttpError, type Req } from "./http.ts";
+import { TermTidy } from "./termtidy.ts";
 
 const KEY_TTL_MS = 30_000;
 /** the mark the shell prints after each line: \x01FP<folder>\x02 */
@@ -42,6 +44,7 @@ export const HOST_TERM_PATH = /^\/host\/terminal\/([A-Za-z0-9_-]{8,64})$/;
 export function requestHostTerminal(req: Req) {
   const u = requirePerson(req, "Opening a terminal");
   if (u.role !== "admin") throw new HttpError(403, "Only an admin can open a terminal on the server's computer.");
+  requireLocalFeature("terminal", "The built-in terminal");
   return openHostTerminal(u);
 }
 
@@ -65,30 +68,39 @@ export function spendHostTerminalKey(id: string, key: string | null): UserInfo |
 
 const shellName = () => (process.platform === "win32" ? "PowerShell" : process.env.SHELL?.split("/").pop() || "sh");
 
+/**
+ * The shell is a person's own, but not the server's keys: it gets the allowlist (child.ts), no extras, and
+ * TERM=dumb (no colours or cursor codes; there's no pseudo-terminal), so `env` or `Get-ChildItem env:` in it
+ * prints none of `.env`. An admin who needs a key reads `.env` themselves.
+ */
 function startShell(cwd: string): ChildProcess {
   if (process.platform === "win32") {
-    const p = spawn("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"], { cwd, windowsHide: true, env: { ...process.env, TERM: "dumb" } });
+    const p = spawnChild("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"], childOptions<SpawnOptions>({ extras: [], set: { TERM: "dumb" } }, { cwd, windowsHide: true }));
     p.stdin?.write("[Console]::OutputEncoding=[Text.Encoding]::UTF8; $ProgressPreference='SilentlyContinue'\n");
     return p;
   }
   const sh = process.env.SHELL && /(^|\/)(bash|zsh|sh)$/.test(process.env.SHELL) ? process.env.SHELL : "/bin/sh";
-  return spawn(sh, ["-s"], { cwd, env: { ...process.env, TERM: "dumb", PS1: "" } });
+  return spawnChild(sh, ["-s"], childOptions<SpawnOptions>({ extras: [], set: { TERM: "dumb", PS1: "" } }, { cwd }));
 }
 
 /** the line that prints the mark after each command */
 const markLine = () => (process.platform === "win32" ? 'Write-Output ("$([char]1)FP" + (Get-Location).Path + "$([char]2)")\n' : "printf '\\001FP%s\\002\\n' \"$PWD\"\n");
 
-/** text for a terminal: every line ending as \r\n */
-const crlf = (s: string) => s.replace(/\r?\n/g, "\r\n");
-
 /**
  * A socket that spent its key: the shell starts now, and stops when the socket closes.
- * Client → server: {t:"line", text} · {t:"restart"}. Server → client: {t:"out", data} · {t:"prompt", cwd} · {t:"exit", code}.
+ * Client → server: {t:"line", text} · {t:"restart"}. Server → client: {t:"out", data, err?} · {t:"prompt", cwd, printed} · {t:"exit", code}.
+ * What a command prints is tidied on the way (termtidy.ts): no blank lines before, after, or in runs inside it.
  */
 export function attachHostTerminal(id: string, ws: WebSocket, user: UserInfo) {
   let proc: ChildProcess | null = null;
   let buf = "";
+  const tidy = new TermTidy();
   const send = (m: unknown) => ws.readyState === ws.OPEN && ws.send(JSON.stringify(m));
+  /** what the shell printed, tidied; `err` marks its error stream */
+  const out = (chunk: string, err = false) => {
+    const data = tidy.push(chunk);
+    if (data) send(err ? { t: "out", data, err: true } : { t: "out", data });
+  };
   const flush = (chunk: string) => {
     buf += chunk;
     // hold back a partial mark until the rest of it arrives
@@ -98,11 +110,14 @@ export function attachHostTerminal(id: string, ws: WebSocket, user: UserInfo) {
     buf = keep;
     let last = 0;
     for (const m of text.matchAll(MARK)) {
-      if (m.index! > last) send({ t: "out", data: crlf(text.slice(last, m.index)) });
-      send({ t: "prompt", cwd: m[1] });
+      if (m.index! > last) out(text.slice(last, m.index));
+      // the command is over: close a line it left open, and say whether it printed anything
+      const end = tidy.end();
+      if (end.text) send({ t: "out", data: end.text });
+      send({ t: "prompt", cwd: m[1], printed: end.printed });
       last = m.index! + m[0].length;
     }
-    if (last < text.length) send({ t: "out", data: crlf(text.slice(last)) });
+    if (last < text.length) out(text.slice(last));
   };
   const start = () => {
     proc = startShell(process.cwd());
@@ -111,13 +126,13 @@ export function attachHostTerminal(id: string, ws: WebSocket, user: UserInfo) {
     p.stdout?.setEncoding("utf8");
     p.stderr?.setEncoding("utf8");
     p.stdout?.on("data", (d: string) => flush(d));
-    p.stderr?.on("data", (d: string) => send({ t: "out", data: crlf(d), err: true }));
+    p.stderr?.on("data", (d: string) => out(d, true));
     p.on("exit", (code) => {
       if (proc !== p) return;
       live.delete(id);
       send({ t: "exit", code });
     });
-    p.on("error", (e) => send({ t: "out", data: `\r\nThe shell didn't start: ${e.message}\r\n`, err: true }));
+    p.on("error", (e) => send({ t: "out", data: `The shell didn't start: ${e.message}\r\n`, err: true }));
     p.stdin?.write(markLine());
   };
   const stop = () => {
@@ -142,6 +157,7 @@ export function attachHostTerminal(id: string, ws: WebSocket, user: UserInfo) {
     } else if (m.t === "restart") {
       stop();
       buf = "";
+      tidy.end();
       start();
     }
   });

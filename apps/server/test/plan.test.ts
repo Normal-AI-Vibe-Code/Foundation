@@ -8,9 +8,17 @@ import assert from "node:assert/strict";
 import { copyFileSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 const dir = mkdtempSync(join(tmpdir(), "foundation-plan-"));
+/**
+ * The stand-in gh (fixtures/fake-gh.mjs), told its state file by a launcher of its own: the sync gets gh's
+ * credential and FOUNDATION_GH but no other variable of the server's (child.ts), so FAKE_GH_STATE can't ride along.
+ */
+const fakeGh = (state: string) => {
+  const launcher = join(dir, "fake-gh-run.mjs");
+  writeFileSync(launcher, `process.env.FAKE_GH_STATE = ${JSON.stringify(state)};\nawait import(${JSON.stringify(new URL("./fixtures/fake-gh.mjs", import.meta.url).href)});\n`);
+  return launcher;
+};
 process.env.FOUNDATION_DATA_DIR = dir;
 process.env.FOUNDATION_ADMIN_EMAILS = "boss@formindustries.com";
 process.env.FOUNDATION_PLAN_FILE = join(dir, "plan.json");
@@ -92,7 +100,7 @@ test("sync reads GitHub first, then sends only moved columns and new cards", asy
   const stateFile = join(dir, "gh.json");
   writeFileSync(stateFile, JSON.stringify({ issues, labels: [], milestones: [] }));
   process.env.FAKE_GH_STATE = stateFile;
-  process.env.FOUNDATION_GH = fileURLToPath(new URL("./fixtures/fake-gh.mjs", import.meta.url));
+  process.env.FOUNDATION_GH = fakeGh(stateFile);
 
   movePlanCard(boss, moving.id, "doing");
   const fresh = readPlan()!.cards.filter((c) => !c.issue);
@@ -124,7 +132,7 @@ test("sync says plainly when gh isn't there", async () => {
 });
 
 test("a card made here whose issue already exists is linked, not made twice", async () => {
-  process.env.FOUNDATION_GH = fileURLToPath(new URL("./fixtures/fake-gh.mjs", import.meta.url));
+  process.env.FOUNDATION_GH = fakeGh(process.env.FAKE_GH_STATE!);
   const card = createPlanCard(boss, { title: "Landings shimmer after a split", kind: "bug" });
   const stateFile = process.env.FAKE_GH_STATE!;
   const gh = JSON.parse(readFileSync(stateFile, "utf8"));

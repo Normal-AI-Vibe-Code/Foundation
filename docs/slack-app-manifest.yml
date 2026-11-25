@@ -5,6 +5,13 @@
 #
 # Private channels: /invite @Foundation in the channel first. Public channels are
 # joined automatically the first time someone posts from a card (channels:join).
+#
+# ChatForm's Slack bridge (Inbox → Slack, the Slack guide) uses the same app: the
+# guide shows this file with a copy button. Messages come in through Socket Mode
+# (the app's own process, apps/slack-agent, forwards the event's kind and channel,
+# never its text) or, when that isn't running, by reading linked channels every few
+# seconds. reactions:read mirrors reactions; files:write lets a file posted in
+# ChatForm be uploaded to Slack (without it, the file is named in a line).
 display_information:
   name: Foundation
   description: Form Industries' shared board — Slack channels, links and huddles on the grid
@@ -26,10 +33,24 @@ oauth_config:
       - users:read # names instead of user ids
       - users:read.email # Hermes finds the person to nudge by email
       - im:write # …and DMs them
-      - files:read # the agent lays out images shared in Slack (copied into Foundation's archive)
+      - files:read # the agent lays out images shared in Slack (copied into Foundation's archive); the bridge brings files in
+      - reactions:read # ChatForm's bridge mirrors reactions
+      - files:write # ChatForm's bridge uploads a file posted in a linked channel (optional: else a line names it)
     user:
       - search:read # ⌘K searches Slack as the person who connected it; find_images searches its files
 settings:
   org_deploy_enabled: false
-  socket_mode_enabled: false
+  # Socket Mode: events reach the app's process (apps/slack-agent) with no public address
+  socket_mode_enabled: true
+  event_subscriptions:
+    bot_events:
+      - message.channels # a linked public channel changed: ChatForm reads it now
+      - message.groups # …a linked private channel the app was invited to
+      - reaction_added
+      - reaction_removed
+      - channel_created # the Slack board's sections follow the channel list
+      - channel_rename
+      - channel_archive
+      - channel_unarchive
+      - member_joined_channel
   token_rotation_enabled: false

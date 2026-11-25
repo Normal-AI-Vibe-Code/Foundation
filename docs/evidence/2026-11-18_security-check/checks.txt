@@ -1,0 +1,50 @@
+scripts/check-security.mjs on the worktree cut from origin/main (cbb3277), 2026-11-18, Node 24.16.0.
+Counts only: no secret values, and no line numbers for open findings.
+
+npm run check:security            exit 1, 9 problems, 4 waived by scripts/check-security.allow.json
+npm run check:security -- --diff origin/main
+                                  exit 1, the same 9 problems (origin/main..HEAD has no commits; the
+                                  working-tree diff and the untracked files added nothing)
+
+Per rule
+  secret          0  (5 raw hits before tuning, all false positives; 1 left waived, see below)
+  secret-file     0  (2 waived: apps/client/.env.desktop, apps/slack-agent/.env.sample)
+  unpinned        1  (1 waived: a demo string on #/design)
+  child-process   8  (all whole-environment hand-offs; no import outside allowChildProcess)
+  gap             0  on this tree (no docs/decisions here; SPEC.md and README.md cite no code lines)
+
+Per file
+  child-process  apps/server/src/agent.ts     1
+  child-process  apps/server/src/hostterm.ts  2
+  child-process  apps/server/src/jobs.ts      1
+  child-process  apps/server/src/plan.ts      1
+  child-process  apps/server/src/rea.ts       1
+  child-process  apps/server/src/t3host.ts    1
+  child-process  apps/server/src/t3paths.ts   1  (an object describing the host, not a spawn: likely an allowlist entry)
+  unpinned       apps/server/src/rea.ts       1  (the REA npm package at the latest tag)
+
+Gap rule on local main (6dc248d, ahead of origin/main, read with git show; not edited)
+  docs/decisions/ADR-001-working-together.md   34
+  docs/decisions/ADR-001/critique.md           17
+  docs/decisions/ADR-001/for-creation.md       10
+  docs/decisions/ADR-001/for-homeform.md        8
+  docs/decisions/ADR-001/for-vision.md          2
+  docs/decisions/ADR-001/inventory.md          99
+  SPEC.md                                       0
+  total                                       170
+
+Rule-1 hits on the first run, each assessed (value shown as 6 characters at most)
+  apps/client/src-tauri/tauri.conf.json  "pubkey" dW50cn…   false positive: the Tauri updater's PUBLIC key
+                                                              (generic rule now ignores names like pubkey/public_key)
+  apps/server/src/t3host.ts              urn:t3…            false positive: an OAuth token-type URN (urn: values now ignored)
+  apps/server/test/flowform.test.ts      012345…            false positive: a test token, one run repeated (now ignored)
+  apps/server/test/places.test.ts        -----B…            false positive: a bare PEM header with no key, in a test (waived)
+  apps/slack-agent/tests/foundation/bridge.test.js (3 lines)  xoxb-t…  false positive: the literal word "test-token"
+                                                              (Slack pattern now needs the digits real tokens carry)
+  apps/client/.env.desktop (tracked)     false positive: holds only the default server URL (waived)
+  apps/slack-agent/.env.sample (tracked) false positive: a template with every value empty (waived)
+
+Unit tests: node --test --import tsx apps/client/test/security.test.ts
+  12 tests: 11 pass, 0 fail, 1 todo ("the repository passes every rule", red until the 9 problems are fixed)
+  whole client suite (npm test -w @foundation/client): 184 tests, 183 pass, 0 fail, 1 todo
+  tsc --noEmit (client): clean

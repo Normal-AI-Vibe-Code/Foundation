@@ -17,7 +17,9 @@
  * same server and Google client. In the browser the page goes to flowform and
  * comes back with ?arrive, and this page dissolves on arrival. In the desktop
  * app Google refuses the embedded webview, so the system browser signs in and
- * this window polls, then dissolves when you come back to it. Dev sign-in
+ * this window polls, showing a code; the browser shows the same code and asks
+ * "This is me?" before this window gets its session (SignInCode.tsx), and the
+ * window dissolves when you come back to it. Dev sign-in
  * (name + allowlisted email) is for this machine.
  */
 
@@ -26,8 +28,14 @@ import { motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { initAsciiWind2 } from "./asciiWind2";
+import { SignInCode } from "./SignInCode";
 import { activeBoard } from "../sync/board";
-import { authConfig, BEARER, chooseServer, devLogin, flowformBegin, flowformPoll, SERVER, serverUrl } from "../lib/api";
+import { authConfig, BEARER, chooseServer, devLogin, flowformBegin, flowformPoll, inviteSignIn, SERVER, serverUrl } from "../lib/api";
+import { takeJoinCode } from "../server/join";
+
+/** an invitation link this page was opened with (#/join/<code>; server/join.ts has already taken it out of the address) */
+const JOIN_CODE = takeJoinCode();
+let joinTried = false;
 
 const inDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
@@ -105,13 +113,19 @@ export function Login({
   const form = useRef<HTMLDivElement>(null);
   const [g, setGrid] = useState<Grid | null>(null);
   const [contentH, setContentH] = useState(0);
-  const [cfg, setCfg] = useState<{ google: boolean; devLogin: boolean; flowform?: { url: string } } | null>(null);
+  const [cfg, setCfg] = useState<{ google: boolean; devLogin: boolean; flowform?: { url: string }; invite?: boolean } | null>(null);
+  /** an invitation from the server's computer (another computer on its network): the code typed with the email */
+  const [byInvite, setByInvite] = useState(false);
+  const [short, setShort] = useState("");
+  const [joining, setJoining] = useState(Boolean(JOIN_CODE));
   const [email, setEmail] = useState(() => localStorage.getItem("foundation-last-email") ?? "");
   const [name, setName] = useState(() => localStorage.getItem("foundation-last-name") ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   /** desktop: waiting on the system browser */
   const [waiting, setWaiting] = useState(false);
+  /** desktop: the code this window shows, to match the one the browser shows before "This is me" */
+  const [code, setCode] = useState<string | null>(null);
   /** the email sign-in, folded away until asked for */
   const [byEmail, setByEmail] = useState(false);
   /** the app (or a page on another site) can be pointed at another server: the Server line, folded until asked for */
@@ -231,7 +245,7 @@ export function Login({
       cancelAnimationFrame(soon);
       events.forEach((type) => el.removeEventListener(type, later));
     };
-  }, [frame, open, byEmail, error, waiting, cfg]);
+  }, [frame, open, byEmail, error, waiting, code, cfg]);
 
   /** centre of an element, in the root's box */
   const centreOf = (el: Element | null) => {
@@ -311,7 +325,8 @@ export function Login({
     // a page on another site's server (not the app) finishes the same way: Google in its own tab, this page polls
     const tab = inDesktop ? null : window.open("", "_blank");
     try {
-      const { url, poll, expiresIn } = await flowformBegin();
+      const { url, poll, code, expiresIn } = await flowformBegin();
+      setCode(code);
       if (tab) tab.location.href = url;
       else await openUrl(url);
       setWaiting(true);
@@ -336,6 +351,36 @@ export function Login({
       fail((err as Error).message);
     } finally {
       setWaiting(false);
+      setCode(null);
+    }
+  };
+
+  // opened from an invitation link: exchange it once (POST), as the page comes up
+  useEffect(() => {
+    if (!JOIN_CODE || joinTried || !g) return;
+    joinTried = true;
+    void inviteSignIn({ code: JOIN_CODE })
+      .then(({ user }) => signedIn(user))
+      .catch((err) => fail((err as Error).message))
+      .finally(() => setJoining(false));
+    // once, when the page can dissolve
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [g]);
+
+  const joinSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (busy) return;
+    ripple(e.currentTarget.querySelector(".login-go"));
+    setBusy(true);
+    setError(null);
+    try {
+      const { user } = await inviteSignIn({ email: email.trim(), short });
+      localStorage.setItem("foundation-last-email", email.trim());
+      signedIn(user);
+    } catch (err) {
+      fail((err as Error).message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -420,13 +465,16 @@ export function Login({
             </h1>
 
             {waiting ? (
-              <div className="login-waiting" role="status">
-                <span className="f-dot is-live" />
-                <span data-shape="text">Finish signing in with Google in your browser.</span>
-                <motion.button type="button" className="f-pill login-cancel" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press} onClick={() => cancelWait.current()}>
-                  Cancel
-                </motion.button>
-              </div>
+              <>
+                <div className="login-waiting" role="status">
+                  <span className="f-dot is-live" />
+                  <span data-shape="text">Finish signing in with Google in your browser.</span>
+                  <motion.button type="button" className="f-pill login-cancel" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press} onClick={() => cancelWait.current()}>
+                    Cancel
+                  </motion.button>
+                </div>
+                {code && <SignInCode code={code} />}
+              </>
             ) : (
               google && (
                 <>
@@ -459,7 +507,9 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="name"
                   placeholder="Your name"
+                  aria-label="Your name"
                   value={name}
                   autoComplete="name"
                   onChange={(e) => {
@@ -471,7 +521,11 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="email"
                   placeholder="Work email"
+                  aria-label="Work email"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "login-error" : undefined}
                   type="email"
                   value={email}
                   autoComplete="email"
@@ -483,13 +537,76 @@ export function Login({
                   }}
                   onFocus={(e) => focused(e.currentTarget)}
                 />
-                <motion.button className="f-pill login-btn login-go" data-shape="control" disabled={busy || !email} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
+                <motion.button type="submit" className="f-pill login-btn login-go" data-shape="control" disabled={busy || !email} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
                   {busy ? "Signing in…" : "Enter Foundation"}
                 </motion.button>
               </motion.form>
             )}
+            {joining && (
+              <div className="login-waiting" role="status">
+                <span className="f-dot is-live" />
+                <span data-shape="text">Signing you in with your invitation…</span>
+              </div>
+            )}
+            {cfg?.invite && !waiting && !joining && (google || cfg.devLogin) && !byInvite && (
+              <button type="button" className="login-or" data-shape="text" onClick={() => setByInvite(true)} data-login-invite>
+                I have an invitation
+              </button>
+            )}
+            {cfg?.invite && !waiting && !joining && (byInvite || (!google && !cfg.devLogin)) && (
+              <motion.form
+                className="login-fields"
+                onSubmit={joinSubmit}
+                initial={google || cfg.devLogin ? { opacity: 0, height: 0 } : false}
+                animate={{ opacity: 1, height: "auto" }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                data-login-invite-form
+              >
+                <input
+                  className="f-input"
+                  data-shape="control"
+                  name="email"
+                  placeholder="Work email"
+                  aria-label="Work email"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "login-error" : undefined}
+                  type="email"
+                  value={email}
+                  autoComplete="email"
+                  required
+                  onChange={(e) => setEmail(e.target.value)}
+                  onFocus={(e) => focused(e.currentTarget)}
+                />
+                <input
+                  className="f-input"
+                  data-shape="control"
+                  name="code"
+                  placeholder="Invitation code (ABCDE-FGHJK)"
+                  value={short}
+                  autoComplete="one-time-code"
+                  spellCheck={false}
+                  required
+                  aria-label="Invitation code"
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? "login-error" : undefined}
+                  onChange={(e) => setShort(e.target.value)}
+                  onFocus={(e) => focused(e.currentTarget)}
+                />
+                <motion.button type="submit" className="f-pill login-btn login-go" data-shape="control" disabled={busy || !email || !short} whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
+                  {busy ? "Signing in…" : "Join"}
+                </motion.button>
+                <div className="signin-code-note" data-shape="text">
+                  An admin at the server’s computer makes the invitation. It works once, for 15 minutes.
+                </div>
+              </motion.form>
+            )}
+            {cfg && !cfg.devLogin && !google && !cfg.invite && !waiting && (
+              <div className="login-error" role="status" data-shape="text">
+                No sign-in is turned on for this server. To sign in by email on your own computer, add FOUNDATION_DEV_LOGIN=1 to .env and restart the server.
+              </div>
+            )}
             {error && (
-              <motion.div className="login-error" role="alert" data-shape="text" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={press}>
+              <motion.div className="login-error" id="login-error" role="alert" data-shape="text" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={press}>
                 {error}
               </motion.div>
             )}
@@ -512,6 +629,7 @@ export function Login({
                 <input
                   className="f-input"
                   data-shape="control"
+                  name="server"
                   placeholder="https://foundation.example.com"
                   type="url"
                   value={serverDraft}
@@ -519,7 +637,7 @@ export function Login({
                   aria-label="Server"
                   onChange={(e) => setServerDraft(e.target.value)}
                 />
-                <motion.button className="f-pill login-btn" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
+                <motion.button type="submit" className="f-pill login-btn" data-shape="control" whileHover={{ y: -1 }} whileTap={{ scale: 0.97 }} transition={press}>
                   Use this server
                 </motion.button>
               </motion.form>

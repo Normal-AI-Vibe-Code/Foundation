@@ -11,8 +11,15 @@
  *    reloads, to sign in on that server.
  * Shown where the app can point elsewhere (the desktop app, or a page on another site's server),
  * over everything, the sign-in page included. `ServerSwitchView` is presentational for `#/design`.
+ *
+ * 2026-11-20 (Josh: "It's unclear to what server ChatForm is being connected to"): the panel first says which
+ * server this is (ServerAbout.tsx: this computer, another on your network, or a hosted Foundation; its
+ * address, version, what it serves, since when it's up, who's here, its data folder to an admin), then
+ * **On your network** (the switch, the addresses, Invite someone, who's signed in from where), and folds
+ * the two ways to change server under **Use another server** while the one in use answers.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { springs } from "@foundation/ui";
 import { BEARER, SERVER, chooseServer } from "../lib/api";
@@ -35,6 +42,8 @@ import {
   type LocalPhase,
   type Reach,
 } from "./model";
+import { NetworkSectionView, ServerAboutView, takeServerPanelWish, type NetworkSectionProps } from "./ServerAbout";
+import { OPEN_SERVER_PANEL, buildPage, copyText, listSessions, makeInvite, setNetwork, signOutSession, useServerInfo, type Invite, type NetworkSession, type ServerInfo } from "./info";
 import "./server.css";
 
 const FOLDER_KEY = "foundation-server-folder";
@@ -74,6 +83,11 @@ export interface ServerSwitchViewProps {
   still?: boolean;
   /** in the top bar: the panel drops down from the pill instead of rising from the corner */
   drop?: boolean;
+  /** in the side menu (2026-11-18): the panel is drawn into this element, in the menu's own flow above the
+   * Settings band, on the menu's paper instead of glass */
+  host?: HTMLElement | null;
+  /** #/design: the side menu's open panel alone, drawn where it stands (its pill is drawn in the band) */
+  panelOnly?: boolean;
   onToggle?: () => void;
   onStart?: () => void;
   onStop?: () => void;
@@ -83,6 +97,14 @@ export interface ServerSwitchViewProps {
   onFolder?: (v: string) => void;
   onRemote?: (v: string) => void;
   onConnect?: () => void;
+  /** what the server says it is (GET /api/server); none: it isn't answering, or not asked yet */
+  info?: ServerInfo | null;
+  /** On your network, when the server says (signed in) */
+  network?: Omit<NetworkSectionProps, "info"> | null;
+  /** the two ways to change server are shown (else folded under "Use another server") */
+  optionsOpen?: boolean;
+  onOptions?: () => void;
+  now?: number;
 }
 
 export function ServerSwitchView(p: ServerSwitchViewProps) {
@@ -90,7 +112,13 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
   const pill = pillState(p.reach, p.local, currentIsLocal);
   const starting = p.local === "starting";
   const panel = (
-    <section className="server-switch-panel f-glass" aria-label="Server" id="server-switch-panel">
+    <section
+      className={`server-switch-panel${p.host !== undefined ? " is-inline" : " f-glass"}`}
+      role={p.host === undefined && !p.still ? "dialog" : "region"}
+      aria-modal={p.host === undefined && !p.still ? "true" : undefined}
+      aria-label="Server settings"
+      id="server-switch-panel"
+    >
       <header className="server-switch-head">
         <span className="f-eyebrow">Server</span>
         <span className="server-switch-now">
@@ -100,6 +128,16 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
         </span>
       </header>
 
+      {p.info && <ServerAboutView info={p.info} current={p.current} now={p.now} />}
+      {p.info?.network && p.network && <NetworkSectionView info={p.info} {...p.network} now={p.now} />}
+      {p.info && !p.optionsOpen && (
+        <button type="button" className="server-switch-more" aria-expanded={false} onClick={p.onOptions}>
+          Use another server <span aria-hidden>›</span>
+        </button>
+      )}
+
+      {(!p.info || p.optionsOpen) && (
+      <>
       <div className="server-switch-option" data-current={currentIsLocal || undefined}>
         <div className="server-switch-option-head">
           <strong>This computer</strong>
@@ -151,7 +189,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
             onChange={(e) => p.onFolder?.(e.target.value)}
           />
         )}
-        {p.local === "failed" && p.message && <p className="server-switch-error">{p.message}</p>}
+        {p.local === "failed" && p.message && <p className="server-switch-error" role="alert">{p.message}</p>}
         <div className="server-switch-actions">
           {p.localListening ? (
             <>
@@ -212,21 +250,48 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
             Connect
           </button>
         </div>
-        {p.remoteError ? <p className="server-switch-error">{p.remoteError}</p> : <p className="server-switch-hint">Foundation reloads and signs in on that server.</p>}
+        {p.remoteError ? <p className="server-switch-error" role="alert">{p.remoteError}</p> : <p className="server-switch-hint">Foundation reloads and signs in on that server.</p>}
       </form>
+      </>
+      )}
     </section>
   );
 
+  // in the side menu: the panel grows in place above the Settings band, pushing the grids up
+  const inline = p.host !== undefined;
+  if (p.panelOnly) return <div className="server-switch-inline">{panel}</div>;
+  const inlinePanel =
+    inline &&
+    (p.still ? (
+      p.open && panel
+    ) : (
+      <AnimatePresence initial={false}>
+        {p.open && (
+          <motion.div
+            key="panel"
+            className="server-switch-inline"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0, transition: { duration: 0.16 } }}
+            transition={{ type: "spring", ...springs.camera }}
+          >
+            {panel}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    ));
   return (
-    <div className="server-switch" data-open={p.open || undefined} data-still={p.still || undefined} data-drop={p.drop || undefined}>
-      {p.still ? (
+    <div className="server-switch" data-open={p.open || undefined} data-still={p.still || undefined} data-drop={p.drop || undefined} data-inline={inline || undefined}>
+      {inline ? (
+        p.host ? createPortal(inlinePanel, p.host) : null
+      ) : p.still ? (
         p.open && panel
       ) : (
         <AnimatePresence>
           {p.open && (
             <motion.div
               key="panel"
-              className="server-switch-lift"
+              className="server-switch-lift f-paper"
               initial={{ opacity: 0, y: p.drop ? -8 : 10, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 6, scale: 0.98, transition: { duration: 0.14 } }}
@@ -274,12 +339,12 @@ const keep = (k: string, v: string) => {
 let launchChecked = false;
 
 /**
- * The switch itself. Signed in, it sits in the side menu's foot above Settings (`where="pane"`, 2026-11-17;
+ * The switch itself. Signed in, it is a small pill right of Settings in the side menu's foot (`where="pane"`, 2026-11-17;
  * from 2026-11-15 it was in the top bar, `where="bar"`: always there, so the server this app talks to is
  * never a mystery); before that there is no bar, and it keeps the bottom-right
  * corner wherever the app can point at another server. `day` pins day tokens over the sign-in page.
  */
-export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean; where?: "corner" | "bar" | "pane" }) {
+export function ServerSwitch({ day = false, where = "corner", host }: { day?: boolean; where?: "corner" | "bar" | "pane"; host?: HTMLElement | null }) {
   const current = (SERVER || window.location.origin).replace(/\/$/, "");
   // signed in: in the side menu's foot, above Settings (2026-11-17), or in the top bar
   const bar = where !== "corner";
@@ -301,6 +366,77 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
   const [remoteError, setRemoteError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const startingRef = useRef(false);
+  // what the server says it is, and On your network (ServerAbout.tsx)
+  const { info, setInfo, refresh: refreshInfo } = useServerInfo(shown && open && reach !== "down", 5000);
+  const [optionsOpen, setOptionsOpen] = useState(!bar);
+  const [invite, setInvite] = useState<Invite | null>(null);
+  const [sessions, setSessions] = useState<NetworkSession[]>([]);
+  const [netBusy, setNetBusy] = useState<string | null>(null);
+  const [netError, setNetError] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ name: "", email: "" });
+  const [copied, setCopied] = useState<string | null>(null);
+  const managing = Boolean(info?.canManage && info.network?.on);
+  useEffect(() => {
+    if (!open || !managing) return;
+    const load = () => void listSessions().then((r) => setSessions(r.sessions)).catch(() => null);
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, [open, managing]);
+  // asked from elsewhere (ChatForm's strip): open, now or as the switch mounts in the side menu's foot
+  useEffect(() => {
+    if (!shown) return;
+    if (takeServerPanelWish()) setOpen(true);
+    const go = () => {
+      takeServerPanelWish();
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_SERVER_PANEL, go);
+    return () => window.removeEventListener(OPEN_SERVER_PANEL, go);
+  }, [shown]);
+  const netDo = async (what: string, fn: () => Promise<unknown>) => {
+    setNetBusy(what);
+    setNetError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setNetError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setNetBusy(null);
+    }
+  };
+  const network: Omit<NetworkSectionProps, "info"> = {
+    invite,
+    sessions,
+    busy: netBusy,
+    error: netError,
+    draft,
+    copied,
+    onToggle: (on) => void netDo("switch", async () => setInfo(await setNetwork(on))),
+    onDraft: setDraft,
+    onInvite: () =>
+      void netDo("invite", async () => {
+        setInvite(await makeInvite(draft.email.trim(), draft.name.trim()));
+        setDraft({ name: "", email: "" });
+      }),
+    onDoneInvite: () => setInvite(null),
+    onSignOut: (id) =>
+      void netDo(id, async () => {
+        await signOutSession(id);
+        setSessions((list) => list.filter((s) => s.id !== id));
+      }),
+    onBuild: () =>
+      void netDo("build", async () => {
+        await buildPage();
+        await refreshInfo();
+      }),
+    onCopy: (text) =>
+      void copyText(text).then((ok) => {
+        if (!ok) return;
+        setCopied(text);
+        setTimeout(() => setCopied((c) => (c === text ? null : c)), 1600);
+      }),
+  };
 
   // the corner is shared: the call chip and the upload tray move up while the switch is there (server.css)
   useEffect(() => {
@@ -352,20 +488,27 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
     return () => clearInterval(t);
   }, [shown, open, refreshLocal]);
 
-  // Esc and a press outside put it away
+  // Esc and a press outside put it away (Escape restores focus to the pill)
   useEffect(() => {
     if (!open) return;
-    const key = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    const down = (e: PointerEvent) => {
-      if (root.current && !root.current.contains(e.target as Node)) setOpen(false);
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      setOpen(false);
+      root.current?.querySelector<HTMLButtonElement>(".server-switch-pill")?.focus();
     };
-    window.addEventListener("keydown", key);
+    const down = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (root.current && !root.current.contains(t) && !host?.contains(t)) setOpen(false);
+    };
+    window.addEventListener("keydown", key, true);
     window.addEventListener("pointerdown", down, true);
     return () => {
-      window.removeEventListener("keydown", key);
+      window.removeEventListener("keydown", key, true);
       window.removeEventListener("pointerdown", down, true);
     };
-  }, [open]);
+  }, [open, host]);
 
   const goLocal = () => (isLocalServer(current) ? window.location.reload() : chooseServer(LOCAL_SERVER));
 
@@ -473,6 +616,7 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
     <div ref={root} className={`server-switch-place${bar ? " is-bar" : ""}${where === "pane" ? " is-pane" : ""}${day ? " f-day" : ""}`} style={bar ? undefined : { right }} data-server-where={where}>
       <ServerSwitchView
         drop={where === "bar"}
+        host={where === "pane" ? (host ?? null) : undefined}
         open={open}
         current={current}
         reach={reach}
@@ -508,6 +652,10 @@ export function ServerSwitch({ day = false, where = "corner" }: { day?: boolean;
           setRemoteError(null);
         }}
         onConnect={connect}
+        info={reach === "down" ? null : info}
+        network={network}
+        optionsOpen={optionsOpen || reach === "down"}
+        onOptions={() => setOptionsOpen(true)}
       />
     </div>
   );

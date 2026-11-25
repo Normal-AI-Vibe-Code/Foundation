@@ -53,23 +53,23 @@ export function useCharacter(panelId: string): CharacterState | undefined {
 /** a picture the character has, by role; `still` is a picture given instead of the archive's (the design page) */
 function Picture({ character, role, label, still, large = false }: { character: CharacterState; role: string; label: string; still?: string; large?: boolean }) {
   const id = (character.files as Record<string, string | undefined>)[role];
-  const fetched = useFileSrc(id && !still ? characterFilePath(character.id, role) : null);
+  const fetched = useFileSrc(id && !still ? characterFilePath(character.id, role) : null, true, { width: large ? 512 : 256 });
   const src = still ?? fetched;
   const [broken, setBroken] = useState(false);
   if ((!id && !still) || broken) return null;
   return (
     <figure className={`char-thumb${large ? " is-large" : ""}`} data-char-file={role}>
-      {src ? <img src={src} alt={`${character.name}, ${label}`} draggable={false} onError={() => setBroken(true)} /> : <span />}
+      {src ? <img src={src} alt={`${character.name}, ${label}`} loading="lazy" decoding="async" draggable={false} onError={() => setBroken(true)} /> : <span />}
       <figcaption>{label}</figcaption>
     </figure>
   );
 }
 
 function Pick({ item, on, disabled, onToggle }: { item: Inspiration; on: boolean; disabled: boolean; onToggle: () => void }) {
-  const src = useFileSrc(item.src);
+  const src = useFileSrc(item.src, true, { width: 256 });
   return (
     <button type="button" className={`char-pick${on ? " is-on" : ""}`} aria-pressed={on} disabled={disabled && !on} data-tip={on ? "Drawn from this · press to leave it out" : disabled ? "Five at most reach the image model" : "Draw from this"} onClick={onToggle}>
-      {src && <img src={src} alt={item.name} draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />}
+      {src && <img src={src} alt={item.name} loading="lazy" decoding="async" draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />}
     </button>
   );
 }

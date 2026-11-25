@@ -1,0 +1,366 @@
+/* ChatForm's Agents tab (tabs/Agents.tsx). Tokens only; violet is the agent. */
+
+.cfa-tab {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+@container chat (max-width: 720px) {
+  .cfa-tab {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .cfa-row-marks .provider-mark {
+    display: none;
+  }
+}
+
+/* ---- the list ---- */
+
+.cfa-list {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-line);
+}
+.cfa-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-3);
+  padding: var(--space-3) 0 var(--space-6);
+}
+.cfa-part + .cfa-part {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.cfa-part-head {
+  margin: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.cfa-part-count {
+  color: var(--color-dim);
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.cfa-row {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-frost);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  font: 500 var(--text-13) / 1.2 var(--font-sans);
+}
+.cfa-row.is-quiet {
+  min-height: 36px;
+}
+@media (hover: hover) {
+  .cfa-row:hover {
+    background: color-mix(in srgb, var(--color-frost) 5%, transparent);
+  }
+}
+.cfa-row:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: -2px;
+}
+.cfa-row.is-current {
+  background: var(--color-agent-dim);
+}
+.cfa-row.is-current::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--color-agent);
+}
+.cfa-row.is-off {
+  opacity: 0.62;
+}
+.cfa-row.is-unread .cfa-row-name {
+  font-weight: 700;
+}
+.cfa-row-words {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cfa-row-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.cfa-row.is-agent .cfa-row-name {
+  color: var(--color-agent);
+}
+.cfa-row-sub {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+}
+.cfa-row-marks {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cfa-state {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-dim);
+}
+.cfa-state.is-ready,
+.cfa-state.is-idle {
+  background: var(--color-ok);
+}
+.cfa-state.is-needs-sign-in,
+.cfa-state.is-waiting {
+  background: var(--color-warn);
+}
+.cfa-state.is-off,
+.cfa-state.is-problem {
+  background: var(--color-bad);
+}
+.cfa-state.is-working {
+  background: var(--color-agent);
+  animation: cfa-breathe 1.6s var(--ease-out-soft) infinite;
+}
+@keyframes cfa-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfa-state.is-working {
+    animation: none;
+  }
+}
+.cfa-badge {
+  flex: none;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-agent);
+  color: var(--color-on-fill);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.cfa-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-1);
+  color: var(--color-mist);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+}
+.cfa-empty,
+.cfa-why {
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.cfa-why {
+  color: var(--color-bad);
+}
+
+/* ---- the open one ---- */
+
+.cfa-open {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cfa-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 72px;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--color-line);
+}
+/* 2026-11-20 (Josh: "not in a circle … render on the bottom line"): the agent stands behind the head's own
+   bottom hairline, chest up, the figure taller than its window and cut by it; no disc, no ring. The words
+   sit in the middle of the head beside it; the figure rises above them */
+.cfa-head:has(> .cfa-face) {
+  align-items: flex-end;
+  min-height: 96px;
+  padding-top: var(--space-2);
+  padding-bottom: 0;
+}
+.cfa-head:has(> .cfa-face) > :not(.cfa-face) {
+  align-self: center;
+}
+.cfa-face {
+  --figure-line: color-mix(in srgb, var(--color-agent) 62%, var(--color-line-strong));
+  position: relative;
+  flex: none;
+  width: 80px;
+  height: 88px;
+  overflow: hidden;
+  /* under the figure the hairline is the agent's */
+  box-shadow: 0 1px 0 var(--figure-line);
+}
+/* the figure: a 3:4 picture (a portrait's, a mesh face's) framed from just over the head to the chest */
+.cfa-face-body {
+  position: absolute;
+  left: -22.5%;
+  width: 145%;
+  top: -16%;
+  height: 175%;
+}
+.cfa-face-body .avatar {
+  width: 100%;
+  height: 100%;
+}
+.cfa-face-body img.avatar {
+  object-fit: contain;
+  object-position: 50% 0;
+  border-radius: 0;
+}
+.cfa-face.is-none .cfa-face-body {
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding-bottom: var(--space-3);
+}
+/* working: the line under it breathes in violet (the figure plays its own mood) */
+.cfa-face.is-thinking,
+.cfa-face.is-talking {
+  animation: cfa-line 1.4s var(--ease-out-soft) infinite;
+}
+@keyframes cfa-line {
+  50% {
+    box-shadow: 0 1px 0 var(--color-agent), 0 3px 6px -3px var(--color-agent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cfa-face.is-thinking,
+  .cfa-face.is-talking {
+    animation: none;
+  }
+}
+.cfa-face-none {
+  color: var(--color-agent);
+  font-size: var(--text-24);
+}
+.cfa-head-words {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.cfa-head-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-agent);
+  font: 600 var(--text-16) / 1.2 var(--font-sans);
+}
+.cfa-head-line {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+}
+.cfa-head[data-mood="thinking"] .cfa-head-line,
+.cfa-head[data-mood="talking"] .cfa-head-line {
+  color: var(--color-agent);
+}
+.cfa-stop,
+.cfa-ghost {
+  flex: none;
+  height: var(--h-pill);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line-strong);
+  background: transparent;
+  color: var(--color-frost);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.cfa-stop {
+  border-color: color-mix(in srgb, var(--color-bad) 55%, transparent);
+  color: var(--color-bad);
+}
+.cfa-stop:hover {
+  background: color-mix(in srgb, var(--color-bad) 10%, transparent);
+}
+.cfa-ghost:hover {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.cfa-stop:focus-visible,
+.cfa-ghost:focus-visible,
+.cfa-link:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+.cfa-conversation {
+  flex: 1;
+}
+.cfa-intro {
+  max-width: 68ch;
+  padding: var(--space-6) var(--space-6) var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
+}
+.cfa-intro b {
+  color: var(--color-agent);
+}
+.cfa-foot-note {
+  padding: var(--space-3) var(--space-6);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  border-top: 1px solid var(--color-line);
+}
+.chat-main-foot .cfa-foot-note {
+  padding-left: 0;
+  padding-right: 0;
+  border-top: 0;
+}
+.cfa-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-pulse);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

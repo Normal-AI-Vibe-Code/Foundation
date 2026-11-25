@@ -40,6 +40,7 @@ import { createBoardRow, editBoard, getBoard, listBoards } from "./boards.ts";
 import { storeFile } from "./files.ts";
 import { imageSize } from "./construct.ts";
 import { canWrite } from "./roles.ts";
+import { allowanceFor, setAllowance } from "./egress.ts";
 import { SlackError, channelItems, downloadFile, forgetChannels, joinChannel, lendToken, listChannels, slackConfigured, slackStatus, type ChannelItem, type SlackChannel, type SlackFileRef } from "./slack.ts";
 
 db.exec(`
@@ -153,6 +154,21 @@ export function slackBoards(): BoardRow[] {
 const boardRow = (boardId: string) => one<BoardRow>("select * from slack_boards where board_id = ?", boardId);
 const sectionRows = (boardId: string) => all<SectionRow>("select * from slack_sections where board_id = ? order by name", boardId);
 const sectionRow = (boardId: string, channel: string) => one<SectionRow>("select * from slack_sections where board_id = ? and channel = ?", boardId, channel);
+
+/**
+ * Is this Slack channel one the board follows: a Slack card on it whose channel was picked (a person picks it
+ * on the card; an agent's add_slack_channel is a write on the board, in view of everyone on it), or a section the
+ * Slack board keeps for it (made by a person's press) that is still there. Reading a channel by id, through a
+ * tool or a route, is tied to this: the bot can see more channels than any one board has taken in.
+ */
+export function boardHasChannel(boardId: string, channel: string): boolean {
+  if (!channel) return false;
+  const doc = getBoard(boardId).doc;
+  const m = boardMaps(doc);
+  for (const o of m.objects.values()) if (o.kind === "panel" && o.panel === "slack" && o.channel === channel) return true;
+  const row = sectionRow(boardId, channel);
+  return Boolean(row && m.sections.has(row.section_id) && slackSectionOf(doc, row.section_id)?.channel === channel);
+}
 
 /** the first free cell of the board's grid, row by row; a new row when it's full */
 function freeCell(doc: Y.Doc): { c: number; r: number } {
@@ -469,6 +485,13 @@ export interface BridgeMessage {
   event?: { type?: string; channel?: string | { id?: string }; subtype?: string };
 }
 
+const eventListeners = new Set<(ev: NonNullable<BridgeMessage["event"]>) => void>();
+/** another listener for what the Slack app forwards (ChatForm's Slack bridge, bridges/slack.ts): the event's type and channel only */
+export function onSlackEvent(fn: (ev: NonNullable<BridgeMessage["event"]>) => void): () => void {
+  eventListeners.add(fn);
+  return () => eventListeners.delete(fn);
+}
+
 /** A word from the Slack app's process: it's there, and maybe something happened. */
 export function fromBridge(msg: BridgeMessage, opts: { loopback: boolean }): { ok: true; boards: number } {
   const wasLive = bridgeLive();
@@ -484,6 +507,13 @@ export function fromBridge(msg: BridgeMessage, opts: { loopback: boolean }): { o
     if (boards.length) soon("refresh", 200, () => void refreshChannels().then(() => boards.forEach((b) => void fill(b.board_id, sectionRows(b.board_id).filter((r) => slackSectionOf(getBoard(b.board_id).doc, r.section_id)?.state !== "waiting").map((r) => r.channel)))));
   }
   const ev = msg.type === "event" ? msg.event : undefined;
+  if (ev) for (const fn of eventListeners) {
+    try {
+      fn(ev);
+    } catch (e) {
+      console.error("slack: an event listener failed", e);
+    }
+  }
   if (ev?.type === "message") {
     const channel = typeof ev.channel === "string" ? ev.channel : ev.channel?.id;
     if (channel) for (const b of boards) if (sectionRow(b.board_id, channel)) soon(`sync:${b.board_id}:${channel}`, num("FOUNDATION_SLACK_EVENT_MS", 600), () => void syncChannel(b.board_id, channel).catch(() => {}));
@@ -550,6 +580,9 @@ export async function joinFor(boardId: string, channel: string, user: UserInfo) 
 export function setAgents(boardId: string, user: UserInfo, on: boolean) {
   const row = boardRow(boardId);
   if (!row) throw new SlackError("not_a_slack_board", "That isn't the Slack board");
+  // the agents here read each section's channel: turning them on is this person allowing Slack reads from this board
+  // (egress.ts; recorded as theirs). Turning them off leaves the allowance, which the board's pane takes back
+  if (on && !allowanceFor(boardId, "Slack", "read")) setAllowance(boardId, user, "Slack", "read", true);
   run("update slack_boards set agents_by = ?, agents_at = ? where board_id = ?", on ? user.id : null, on ? Date.now() : null, boardId);
   const agents = on ? { by: user.name, at: Date.now() } : undefined;
   editBoard(boardId, "slack", (doc) => {

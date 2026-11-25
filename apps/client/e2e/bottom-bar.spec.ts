@@ -8,7 +8,7 @@
  */
 
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { person, settle } from "./helpers";
+import { CLIENT, FRAME, person, settle } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-17_bottom-bar";
 let admin: Page;
@@ -39,6 +39,8 @@ test.beforeAll(async ({ browser }) => {
   ctx = a.context;
 });
 test.afterAll(async () => {
+  // T3 off even if a check stopped half way: dev sign-in is refused while it runs, and the next files sign in
+  await ctx?.request.post(`${CLIENT}/api/t3host/stop`, { failOnStatusCode: false }).catch(() => {});
   await ctx?.close();
 });
 
@@ -173,7 +175,7 @@ test("a section's council: three places at the section's right, by its Council b
   await admin.keyboard.press("Escape");
 });
 
-test("the side menu's foot: the server the menu's width above Settings, day and night left of you, all in line with the Settings icon", async () => {
+test("the side menu's foot: the server a small pill right of Settings in its band, day and night left of you, in line with the Settings icon", async () => {
   await admin.locator(".pane-fold").click();
   const pane = admin.locator(".side-pane");
   await expect(pane.locator('[data-server-where="pane"]')).toBeVisible();
@@ -183,15 +185,32 @@ test("the side menu's foot: the server the menu's width above Settings, day and 
   const orb = await box(admin, ".side-pane .pane-foot .night-orb");
   const me = await box(admin, ".side-pane .pane-foot .me-avatar");
   const paneBox = (await pane.boundingBox())!;
-  // above Settings, and nearly the menu's width with the same space either side
-  expect(pill.y + pill.height).toBeLessThanOrEqual(settings.y);
-  expect(Math.abs(pill.x - paneBox.x - (paneBox.x + paneBox.width - (pill.x + pill.width)))).toBeLessThan(3);
-  // the left edges in a line: the server pill, the Settings icon, the orb
-  expect(Math.abs(pill.x - settings.x)).toBeLessThan(2);
+  // in Settings' band: right of it, centred on the same line, small, and inside the menu's right edge
+  expect(pill.x).toBeGreaterThan(settings.x + settings.width);
+  expect(Math.abs(pill.y + pill.height / 2 - (settings.y + settings.height / 2))).toBeLessThan(3);
+  expect(pill.height).toBeLessThanOrEqual(24);
+  expect(pill.x + pill.width).toBeLessThanOrEqual(paneBox.x + paneBox.width);
+  // the orb's left edge in line with the Settings icon
   expect(Math.abs(orb.x - settings.x)).toBeLessThan(3);
   // the orb is left of you
   expect(orb.x + orb.width).toBeLessThanOrEqual(me.x);
   await admin.screenshot({ path: `${SHOTS}/06_side-menu-foot.png` });
+  // pressed, its panel opens in the menu's own flow (2026-11-18): inside the menu, right above the band, on no glass
+  await admin.locator('.side-pane [data-server-where="pane"] .server-switch-pill').click();
+  const panel = admin.locator(".side-pane .pane-server-slot .server-switch-panel");
+  await expect(panel).toBeVisible();
+  await settle(admin, 700);
+  const p = await box(admin, ".side-pane .pane-server-slot .server-switch-panel");
+  const band = await box(admin, ".side-pane .pane-low-row");
+  expect(p.x).toBeGreaterThanOrEqual(paneBox.x - 1);
+  expect(p.x + p.width).toBeLessThanOrEqual(paneBox.x + paneBox.width + 1);
+  expect(Math.abs(p.y + p.height - band.y)).toBeLessThan(3);
+  expect(await panel.evaluate((el) => el.classList.contains("f-glass"))).toBe(false);
+  // its type is the menu's: the same colour as Settings
+  expect(await css(admin, ".side-pane .pane-server-slot .server-switch-option-head strong", "color")).toBe(await css(admin, '.side-pane [data-place="settings"] .pane-label', "color"));
+  await admin.screenshot({ path: `${SHOTS}/06b_side-menu-server-open.png` });
+  await admin.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
 });
 
 test("day and night reach the grid's paper, even when the browser has taken the paper's WebGL context", async () => {
@@ -223,12 +242,12 @@ test("day and night reach the grid's paper, even when the browser has taken the 
 });
 
 test("the tools: a terminal that runs a line for an admin, the change log, the files, a browser, and T3", async ({ browser }) => {
-  // terminal: nothing runs until Start; then a line in, its answer and the folder back
+  // the member signs in first: dev sign-in is refused while the built-in terminal (a shell here) is open
+  const m = await person(browser, "Ada Test", "ada@normal.dev");
+  // terminal: pressing its button starts the shell (no second press); then a line in, its answer and the folder back
   await admin.locator('[data-tool-open="terminal"]').click();
   const pane = admin.locator(".tool-pane");
   await expect(pane).toBeVisible();
-  await expect(pane.locator("[data-term-start]")).toBeVisible();
-  await pane.locator("[data-term-start]").click();
   const screen = pane.locator("[data-term-screen]");
   await expect(screen).toContainText("❯", { timeout: 15_000 });
   await screen.click();
@@ -243,8 +262,14 @@ test("the tools: a terminal that runs a line for an admin, the change log, the f
   await admin.keyboard.press("Backspace");
   await admin.screenshot({ path: `${SHOTS}/09_terminal.png` });
 
+  // and while it is, nobody signs in by email alone (the shell could sign itself in as a person)
+  const late = await browser.newContext();
+  const lateSignIn = await late.request.post(`${CLIENT}/auth/dev`, { data: { name: "Late Test", email: "late@normal.dev" }, failOnStatusCode: false });
+  expect(lateSignIn.status()).toBe(403);
+  expect(await lateSignIn.text()).toContain("the built-in terminal is running");
+  await late.close();
+
   // a member gets no terminal: the server refuses, and the tool says why
-  const m = await person(browser, "Ada Test", "ada@normal.dev");
   const refused = await m.page.request.post("/api/host-terminal", { data: {} });
   expect(refused.status()).toBe(403);
   await m.page.locator('[data-tool-open="terminal"]').click();
@@ -265,7 +290,7 @@ test("the tools: a terminal that runs a line for an admin, the change log, the f
   await admin.locator('[data-tool-tab="files"]').click();
   await expect(pane.locator(".tool-files")).toBeVisible();
   await admin.locator('[data-tool-tab="browser"]').click();
-  await pane.locator("[data-browser-addr]").fill("localhost:" + new URL(admin.url()).port + "/e2e/frame.html");
+  await pane.locator("[data-browser-addr]").fill(FRAME.replace(/^http:\/\//, ""));
   await pane.locator("[data-browser-addr]").press("Enter");
   await expect(pane.locator("[data-browser-frame]")).toBeVisible();
   await admin.screenshot({ path: `${SHOTS}/11_browser.png` });

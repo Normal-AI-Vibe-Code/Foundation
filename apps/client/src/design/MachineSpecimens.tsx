@@ -26,7 +26,7 @@ const running: MachineState = {
     { port: 3000, host: 49154 },
   ],
   shares: [{ port: 8080, url: "https://dense-river-cat-bloom.trycloudflare.com", by: "Ada", at: now - 4 * 60_000 }],
-  agentsMay: { by: "Ada", at: now - 3 * 60_000 },
+
   desktop: { state: "ready" } as MachineState["desktop"],
 };
 const card = { id: "pnl_demo", sectionId: "sec_demo", name: "build-box" };
@@ -65,7 +65,7 @@ export function MachineHeadSpecimens() {
               <ViewSwitch view="access" panelId="pnl_demo" />
               <AddressBar panel={card} m={running} viewer={false} />
             </div>
-            <AccessView panel={card} m={running} viewer={false} waiting={1} now={now} />
+            <AccessView panel={card} m={running} leave={{ agentsMay: { by: "Ada", at: now - 3 * 60_000 } }} viewer={false} waiting={1} now={now} />
           </div>
         </div>
       </div>

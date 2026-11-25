@@ -35,8 +35,11 @@ import { UploadTray } from "./UploadTray";
 import { SidePane, isSystemGrid } from "./SidePane";
 import { Today } from "../today/Today";
 import { SettingsSpace, SETTINGS_GRIDS } from "../settings/SettingsSpace";
+import { ChatForm } from "../chat/ChatForm";
 import { goGrid, placeOf } from "../lib/place";
-import { loadGrids, useGrids, type SpaceKind } from "../lib/grids";
+import { isPageKind, loadGrids, useGrids, type SpaceKind } from "../lib/grids";
+import { setTheme } from "@foundation/ui";
+import { AppCanvas } from "./AppCanvas";
 export { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "../lib/grids";
 import { SpaceInfo } from "./SpaceInfo";
 import { PageCanvas } from "./PageCanvas";
@@ -56,7 +59,7 @@ function typing(e: KeyboardEvent) {
 /** the grid this device had open last (never one of Foundation's own, which Settings opens) */
 const lastGrid = () => new URLSearchParams(window.location.search).get("board") || localStorage.getItem("foundation-board") || "company";
 
-export function Shell({ user, route }: { user: UserInfo; route: string }) {
+export function Shell({ user, route, titleActive = true }: { user: UserInfo; route: string; titleActive?: boolean }) {
   const ui = useUi();
   const place = useMemo(() => placeOf(route), [route]);
   /** Settings' Plan and Design language are grids of Foundation's own: on those tabs the grid is what shows */
@@ -179,7 +182,7 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
   };
 
   /** rename a space or move it between folders; the list reloads from the server */
-  const updateSpace = async (id: string, patch: { name?: string; parent?: string | null }) => {
+  const updateSpace = async (id: string, patch: { name?: string; parent?: string | null; theme?: "day" | "night" | null }) => {
     try {
       await api(`/api/boards/${encodeURIComponent(id)}`, { method: "POST", json: patch });
     } catch (e) {
@@ -203,7 +206,10 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
       if (holdsKeys(e.target)) return;
       const mod = e.metaKey || e.ctrlKey;
       // in a text box, ⌘I and ⌘U are italic and underline, as in any word processor
-      const writing = !!(e.target as HTMLElement | null)?.closest?.(".rich-text");
+      const writing = !!(e.target as HTMLElement | null)?.closest?.(".rich-text, .chat-compose");
+      // in ChatForm, ⌘K is its quick switcher (chat/ChatForm.tsx); ⌘K there again opens the commands
+      const inChat = placeOf(window.location.hash).kind === "chat";
+      if (mod && e.key.toLowerCase() === "k" && inChat && !getUi().command) return;
       if (mod && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setUi({ command: !getUi().command });
@@ -238,7 +244,7 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
       } else if (e.key === "Escape" && getUi().engaged) {
         e.stopPropagation();
         setUi({ engaged: null });
-      } else if (!mod && !typing(e) && !talkTyping() && !getUi().command && !getUi().presenting) {
+      } else if (!mod && !inChat && !typing(e) && !talkTyping() && !getUi().command && !getUi().presenting) {
         if (e.key === "v" || e.key === "V") toggleTalk();
         else if (e.key === "p" || e.key === "P") setUi({ presenting: true });
       }
@@ -265,12 +271,46 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
   const onGrid = place.kind === "grid";
   const away = !onGrid && !systemGrid;
 
+  // the interface wears the theme of what is in focus (DESIGN.md §2.1): Today is the room; a grid may pin day or
+  // night for itself; everything else (Settings, an app's tab, a page) is paper, which follows the orb
+  const wears = place.kind === "today" ? "room" : onGrid && !isPageKind(space?.kind) && space?.theme ? space.theme : "paper";
+  useEffect(() => setTheme(wears), [wears]);
+  useEffect(() => () => setTheme("paper"), []);
+
+  // keep document.title in sync with the active place for screen readers and browser tabs
+  useEffect(() => {
+    if (!titleActive) return;
+    if (place.kind === "today") document.title = "Foundation — Today";
+    else if (place.kind === "chat") document.title = "Foundation — ChatForm";
+    else if (place.kind === "settings") document.title = "Foundation — Settings";
+    else document.title = space?.name ? `Foundation — ${space.name}` : "Foundation";
+  }, [titleActive, place.kind, space?.name]);
+
+  // Today renders its own <main className="today-words"> landmark; avoid nested <main>
+  const MainWrap = place.kind === "today" ? "div" : "main";
+
   return (
-    <div className={`app shell is-place-${place.kind}${away ? " is-away" : ""}${space?.kind === "page" ? " is-page-space" : ""}${ui.presenting ? " presenting" : ""}`} onContextMenu={(e) => e.preventDefault()}>
-      <GridViewport boardName={space?.name ?? (systemGrid === "plan" ? "The plan" : systemGrid === "design" ? "Design language" : undefined)} />
-      {onGrid && space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
-      {place.kind === "today" && !ui.presenting && <Today user={user} />}
-      {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}
+    <div className={`app shell is-place-${place.kind}${away ? " is-away" : ""}${isPageKind(space?.kind) ? " is-page-space" : ""}${ui.presenting ? " presenting" : ""}`} onContextMenu={(e) => e.preventDefault()}>
+      {!ui.presenting && (
+        <a
+          href="#main-content"
+          className="f-skip-link"
+          onClick={(e) => {
+            e.preventDefault();
+            document.getElementById("main-content")?.focus();
+          }}
+        >
+          Skip to content
+        </a>
+      )}
+      <MainWrap id="main-content" className="shell-main" tabIndex={-1}>
+        <GridViewport boardName={space?.name ?? (systemGrid === "plan" ? "The plan" : systemGrid === "design" ? "Design language" : undefined)} />
+        {onGrid && space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
+        {onGrid && space?.kind === "app" && !ui.presenting && <AppCanvas space={space} />}
+        {place.kind === "today" && !ui.presenting && <Today user={user} />}
+        {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}
+        {place.kind === "chat" && !ui.presenting && <ChatForm place={place} user={user} />}
+      </MainWrap>
       {!ui.presenting && <TopBar boards={boards} current={onGrid ? current : ""} place={place} onSwitch={switchBoard} onNew={newSpace} onClose={closeSpace} onRename={(id, name) => void updateSpace(id, { name })} />}
       {!ui.presenting && (ui.paneView === "spaces" || !onGrid) && <SidePane user={user} boards={boards} current={current} place={place} onSwitch={switchBoard} onNew={newSpace} />}
       {!ui.presenting && ui.paneView === "info" && onGrid && <SpaceInfo user={user} space={space} boards={boards} onUpdate={updateSpace} />}
@@ -308,20 +348,30 @@ export function Shell({ user, route }: { user: UserInfo; route: string }) {
 
 function Toast() {
   const ui = useUi();
+  const isError = ui.toast?.tone === "bad";
   return (
-    <AnimatePresence>
-      {ui.toast && (
-        <motion.div
-          key={ui.toast.at}
-          className={`toast f-glass tone-${ui.toast.tone ?? "plain"}`}
-          initial={{ opacity: 0, y: 16, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8 }}
-          transition={{ type: "spring", stiffness: 300, damping: 24 }}
-        >
-          {ui.toast.text}
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <>
+      <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {ui.toast && !isError ? ui.toast.text : ""}
+      </div>
+      <div className="sr-only" role="alert" aria-live="assertive" aria-atomic="true">
+        {ui.toast && isError ? ui.toast.text : ""}
+      </div>
+      <AnimatePresence>
+        {ui.toast && (
+          <motion.div
+            key={ui.toast.at}
+            className={`toast f-glass tone-${ui.toast.tone ?? "plain"}`}
+            aria-hidden="true"
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, transition: { duration: 0.14 } }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+          >
+            {ui.toast.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

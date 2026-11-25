@@ -4,7 +4,7 @@
  * full-text index, apps, asks and agent runs.
  */
 
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "./config.ts";
@@ -93,6 +93,22 @@ create table if not exists apps (
   ports_json text not null default '[]',
   created_by text,
   created_at integer not null
+);
+
+-- A person's leave for agents to call one tool of one saved app, on one board
+-- (apptools.ts, ADR-001 G3). Keyed by the board it was given on and by the
+-- tool's definition as it was listed when they pressed Allow (sha256 of name,
+-- description and input schema): another board, or a tool whose definition
+-- changes, needs a new press.
+create table if not exists app_tool_allowances (
+  board_id text not null,
+  app_id text not null,
+  tool text not null,
+  def_hash text not null,
+  allowed_by text not null,
+  allowed_by_name text not null,
+  allowed_at integer not null,
+  primary key (board_id, app_id, tool, def_hash)
 );
 
 create table if not exists asks (
@@ -252,6 +268,31 @@ const FTS_SQL = `create virtual table search_fts using fts5(
   }
 }
 
+// app-tool leave was once keyed by app, tool and definition alone: rebuilt keyed by board too, each row
+// keeping the board it was given on (a row with no board recorded applies to no board, so it isn't kept)
+export function rekeyAppToolLeave(d: DatabaseSync) {
+  if ((d.prepare("pragma table_info(app_tool_allowances)").all() as Array<{ name: string; pk: number }>).some((c) => c.name === "board_id" && c.pk > 0)) return;
+  d.exec(`
+    begin;
+    alter table app_tool_allowances rename to app_tool_allowances_unboarded;
+    create table app_tool_allowances (
+      board_id text not null,
+      app_id text not null,
+      tool text not null,
+      def_hash text not null,
+      allowed_by text not null,
+      allowed_by_name text not null,
+      allowed_at integer not null,
+      primary key (board_id, app_id, tool, def_hash)
+    );
+    insert or ignore into app_tool_allowances (board_id, app_id, tool, def_hash, allowed_by, allowed_by_name, allowed_at)
+      select board_id, app_id, tool, def_hash, allowed_by, allowed_by_name, allowed_at from app_tool_allowances_unboarded where board_id is not null;
+    drop table app_tool_allowances_unboarded;
+    commit;
+  `);
+}
+rekeyAppToolLeave(db);
+
 // additive migrations — each is idempotent
 for (const sql of [
   "alter table asks add column stage_panel_id text",
@@ -262,6 +303,10 @@ for (const sql of [
   "alter table boards add column url text",
   // grids of grids (2026-11-15): a grid may sit inside another; null parent = at the top of All Grids
   "alter table boards add column parent text",
+  // themes and apps (2026-11-18): a grid may pin its own look ('day' | 'night'; null = paper, following the orb),
+  // and a space may be an app opened as a tab (kind 'app'): `app` names it ('t3', or null for one at a url)
+  "alter table boards add column theme text",
+  "alter table boards add column app text",
   "alter table users add column flowform_user_id text",
   // agent sessions: each tab is its own conversation, resumable after a restart
   "alter table agent_runs add column session_id text",
@@ -272,6 +317,18 @@ for (const sql of [
   // files: what an import said about where it came from (kept so a re-index keeps it), and the text
   // read out of documents, by content (filetext.ts)
   "alter table files add column about text",
+  // a socket ticket says whether a person asked for it (1) or an agent did (0; null: before this): a machine's
+  // terminal and desktop take input from a person only (sockets.ts)
+  "alter table ws_tickets add column person integer",
+  // a desktop sign-in is like a device sign-in (flowform.ts): the code the window shows, the finishing
+  // browser's press cookie (hashed), and when the person pressed "This is me"
+  "alter table flowform_attempts add column code text",
+  "alter table flowform_attempts add column confirm_hash text",
+  "alter table flowform_attempts add column confirmed_at integer",
+  // what a job's card showed when it was queued (jobs.ts shownHash): Run must name it, and the row must still match
+  "alter table jobs add column shown_hash text",
+  "alter table files add column width integer",
+  "alter table files add column height integer",
   "create index if not exists files_sha on files(sha256)",
   `create table if not exists file_text (
      sha256 text primary key, v integer not null, status text not null,
@@ -287,16 +344,37 @@ for (const sql of [
 
 export type Row = Record<string, unknown>;
 
+/**
+ * Statements are compiled once and kept by their SQL text: compiling one on every call was 7.6 % of the
+ * server's busy time (profiled 2026-11-20). Each call below runs a statement to its end before returning,
+ * so one statement is never in use twice, and SQLite recompiles a kept statement itself when the schema
+ * changes. The oldest is dropped past STATEMENTS_KEPT, for SQL built with a varying number of placeholders.
+ */
+const STATEMENTS_KEPT = 500;
+const statements = new Map<string, StatementSync>();
+
+function statement(sql: string): StatementSync {
+  let st = statements.get(sql);
+  if (st) return st;
+  st = db.prepare(sql);
+  if (statements.size >= STATEMENTS_KEPT) statements.delete(statements.keys().next().value as string);
+  statements.set(sql, st);
+  return st;
+}
+
+/** how many statements are kept (for tests) */
+export const keptStatements = () => statements.size;
+
 export function one<T = Row>(sql: string, ...params: unknown[]): T | undefined {
-  return db.prepare(sql).get(...(params as never[])) as T | undefined;
+  return statement(sql).get(...(params as never[])) as T | undefined;
 }
 
 export function all<T = Row>(sql: string, ...params: unknown[]): T[] {
-  return db.prepare(sql).all(...(params as never[])) as T[];
+  return statement(sql).all(...(params as never[])) as T[];
 }
 
 export function run(sql: string, ...params: unknown[]) {
-  return db.prepare(sql).run(...(params as never[]));
+  return statement(sql).run(...(params as never[]));
 }
 
 /** Replace a document in the full-text index. */

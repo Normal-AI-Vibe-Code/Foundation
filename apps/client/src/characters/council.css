@@ -153,6 +153,7 @@
   margin: 0 0 var(--space-5);
   font: 400 var(--text-12) / 1.5 var(--font-sans);
   color: var(--color-mist);
+  text-wrap: pretty;
 }
 .council-seat {
   position: relative;
@@ -196,7 +197,12 @@
   translate: 0 -6px;
 }
 .council-figure:focus-visible {
-  outline: 0;
+  outline: 2px solid var(--color-agent);
+  outline-offset: -3px;
+  border-radius: var(--radius-card);
+}
+.council-seat:focus-within .council-mark-name {
+  box-shadow: 0 0 0 2px var(--color-agent);
 }
 .council-figure .avatar {
   position: absolute;
@@ -268,17 +274,42 @@
   color: var(--color-agent);
 }
 
-/* a place nobody has taken: a character's outline */
+/* a place nobody has taken: a character's outline. The silhouettes fade as one group (2026-11-21), so where a council
+   nobody has joined stands them close together, one in front of another, the overlap doesn't darken */
+.council-ghosts {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+}
+.council-ghost-fade {
+  display: flex;
+  align-items: flex-end;
+  opacity: 0.13;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.is-night .council-ghost-fade {
+  opacity: 0.2;
+}
+/* nobody yet: three, shoulder to shoulder, a little in front of one another (each place is 104 wide) */
+.council-ghosts.is-group .council-ghost + .council-ghost {
+  margin-left: -32px;
+}
 .council-ghost .council-figure .avatar-still,
 .council-ghost-plain {
   filter: brightness(0);
-  opacity: 0.13;
-  transition: opacity var(--dur-quick) var(--ease-out-soft);
 }
 .is-night .council-ghost .council-figure .avatar-still,
 .is-night .council-ghost-plain {
   filter: brightness(0) invert(1);
-  opacity: 0.2;
+}
+/* the + over the last silhouette, outside the fade: centred on that figure, in the marks' row */
+.council-ghost-plus {
+  position: absolute;
+  top: 0;
+  right: 52px;
+  translate: 50% 0;
+  pointer-events: none;
 }
 .council-ghost-plain {
   position: absolute;
@@ -308,9 +339,8 @@
     transform: translateY(-1px) rotate(0.8deg) scale(1.004);
   }
 }
-.council-ghost:hover .council-figure .avatar-still,
-.council-ghost:hover .council-ghost-plain,
-.council-ghost .council-figure:focus-visible .avatar-still {
+.council-ghosts:hover .council-ghost-fade,
+.council-ghosts:focus-within .council-ghost-fade {
   opacity: 0.34;
 }
 
@@ -357,7 +387,8 @@
 .council-under .council-say:focus-within {
   box-shadow:
     var(--shadow-lift),
-    0 0 0 1.5px var(--color-agent);
+    0 0 0 2px var(--color-agent),
+    0 0 0 5px var(--color-agent-dim);
 }
 .council-under .council-say-text {
   color: var(--color-room-shade);
@@ -414,6 +445,7 @@
   white-space: nowrap;
 }
 .council-name > b {
+  min-width: 0;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -457,7 +489,9 @@
   box-shadow: inset 0 0 0 1px var(--color-line-strong);
 }
 .council-say:focus-within {
-  box-shadow: inset 0 0 0 1px var(--color-agent);
+  box-shadow:
+    inset 0 0 0 2px var(--color-agent),
+    0 0 0 3px var(--color-agent-dim);
 }
 .council-say-text {
   flex: 1;
@@ -480,9 +514,20 @@
   color: var(--color-mist);
   cursor: pointer;
 }
-.council-say-btn:hover:not(:disabled) {
-  background: var(--color-agent-dim);
-  color: var(--color-agent);
+.council-say-btn:focus-visible,
+.council-tool:focus-visible,
+.council-talk-seat:focus-visible,
+.council-talk-open:focus-visible,
+.agent-info-other:focus-visible,
+.agent-info-pick:focus-visible {
+  outline: 2px solid var(--color-agent);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .council-say-btn:hover:not(:disabled) {
+    background: var(--color-agent-dim);
+    color: var(--color-agent);
+  }
 }
 .council-say-btn.is-live {
   background: var(--color-agent);
@@ -545,10 +590,12 @@
   box-shadow:
     var(--shadow-lift),
     0 0 0 1px var(--color-line);
+  transform-origin: top right;
 }
 .council.is-board .council-tools-say {
   top: auto;
   bottom: calc(100% + var(--space-3));
+  transform-origin: bottom right;
 }
 
 /* ---------- the agents panel's Council tab: the long conversation with all of them ---------- */
@@ -610,6 +657,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-4);
   padding: var(--space-4) var(--space-5);
   display: flex;
   flex-direction: column;
@@ -619,6 +668,7 @@
   margin: auto 0;
   color: var(--color-mist);
   font: 400 var(--text-12) / 1.55 var(--font-sans);
+  text-wrap: pretty;
 }
 .council-talk-said {
   align-self: flex-end;
@@ -629,12 +679,14 @@
   color: var(--color-frost);
   font: 400 var(--text-13) / 1.45 var(--font-sans);
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 .council-talk-said small {
   display: block;
   margin-bottom: 2px;
   color: var(--color-dim);
   font: 500 var(--text-11) / 1.3 var(--font-sans);
+  font-variant-numeric: tabular-nums;
 }
 .council-talk-now {
   display: grid;
@@ -757,6 +809,7 @@
   margin: 0;
   color: var(--color-frost);
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 .agent-info-code {
   font-family: var(--font-mono, ui-monospace, monospace);
@@ -795,7 +848,7 @@
   padding: var(--space-2) 0;
   border-top: 1px solid var(--color-line);
   color: var(--color-mist);
-  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
 }
 .agent-info-did time {
   flex: none;
@@ -814,6 +867,9 @@
 }
 .agent-info-say:focus-within {
   border-color: var(--color-agent);
+  box-shadow: 0 0 0 3px var(--color-agent-dim);
+  outline: 2px solid var(--color-agent);
+  outline-offset: -1px;
 }
 .agent-info-say textarea {
   resize: none;

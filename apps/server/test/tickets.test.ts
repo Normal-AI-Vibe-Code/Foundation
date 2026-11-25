@@ -32,7 +32,7 @@ process.env.FOUNDATION_SERVICE_TOKEN = "s".repeat(40);
 
 const { one, run } = await import("../src/db.ts");
 const auth = await import("../src/auth.ts");
-const { handleUpgrade, issueTicket, ticketClock, TICKET_TTL_MS } = await import("../src/sockets.ts");
+const { handleUpgrade, issueTicket, machineInput, socketWho, spendTicket, ticketClock, TICKET_TTL_MS } = await import("../src/sockets.ts");
 const { boardEpoch, closeBoards, getBoard } = await import("../src/boards.ts");
 const { setBoardRole } = await import("../src/roles.ts");
 const { setMember } = await import("../src/members.ts");
@@ -263,6 +263,40 @@ test("the app's bearer is a person (it may start a machine); an agent's bearer, 
   assert.throws(() => auth.requirePerson(reqWith({ authorization: `Bearer ${browser}`, cookie: `foundation_session=${browser}` })), /needs a person/);
   assert.equal(auth.requirePerson(reqWith({ cookie: `foundation_session=${browser}` })).id, ada.id);
   assert.equal(one<{ kind: string }>("select kind from sessions where token = ?", auth.hashToken(app))?.kind, "app");
+});
+
+test("a machine's terminal and desktop take input only from a person: an agent's ticket, its bearer and the service token get the view-only stream", () => {
+  const tty = "/machines/tk/m1/tty";
+  const vnc = "/machines/tk/m1/vnc";
+  const url = (p: string) => new URL(p, "http://local");
+  const agent = auth.createSession(ada.id, 3600_000, "agent");
+  const app = appSession(ada.id);
+  const browser = auth.createSession(ada.id);
+  for (const path of [tty, vnc]) {
+    // tickets: the ticket records who asked for it
+    const byAgent = spendTicket(issueTicket(bearer(agent), path).ticket, path);
+    assert.ok(byAgent, "an agent may watch");
+    assert.equal(byAgent.person, false);
+    assert.equal(machineInput(byAgent, "tk"), false, `an agent's ticket can't type into ${path}`);
+    const beside = spendTicket(issueTicket(reqWith({ authorization: `Bearer ${agent}`, cookie: `foundation_session=${browser}` }), path).ticket, path);
+    assert.equal(beside && machineInput(beside, "tk"), false, "an agent's bearer beside a person's cookie is still the agent");
+    const byApp = spendTicket(issueTicket(bearer(app), path).ticket, path);
+    assert.equal(byApp && machineInput(byApp, "tk"), true, "the person's app types");
+    const byCookie = spendTicket(issueTicket(reqWith({ cookie: `foundation_session=${browser}` }), path).ticket, path);
+    assert.equal(byCookie && machineInput(byCookie, "tk"), true, "the person's browser types");
+    const byViewer = spendTicket(issueTicket(bearer(appSession(vic.id)), path).ticket, path);
+    assert.equal(byViewer && machineInput(byViewer, "tk"), false, "a viewer watches");
+    // a ticket from before tickets said who asked is not a person's
+    const old = issueTicket(bearer(app), path).ticket;
+    run("update ws_tickets set person = null where ticket_hash = ?", auth.hashToken(old));
+    assert.equal(spendTicket(old, path)?.person, false);
+    // the header on the socket itself
+    const hdr = (headers: Record<string, string>) => socketWho(reqWith(headers, path), url(path));
+    assert.equal(machineInput(hdr({ authorization: `Bearer ${agent}` })!, "tk"), false, "an agent's bearer on the socket");
+    assert.equal(machineInput(hdr({ authorization: `Bearer ${process.env.FOUNDATION_SERVICE_TOKEN}` })!, "tk"), false, "the service token on the socket");
+    assert.equal(machineInput(hdr({ cookie: `foundation_session=${browser}` })!, "tk"), true, "a person's cookie on the socket");
+    assert.equal(machineInput(hdr({ authorization: `Bearer ${app}` })!, "tk"), true, "a person's app bearer on the socket");
+  }
 });
 
 test("client code puts the bearer only in an Authorization header, never in a URL", () => {

@@ -26,13 +26,15 @@
  * read defensively: an unknown shape is skipped, never a crash.
  */
 
-import { spawn, execFile, type ChildProcess } from "node:child_process";
+import { childOptions, execFileChild, spawnChild, type ChildProcess, type ExecFileOptions, type SpawnOptions } from "./child.ts";
+import { CLAUDE_CODE_ENV } from "./rea.ts";
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import WebSocket from "ws";
 import { config } from "./config.ts";
+import { hostedFeatureReason, localFeatureAllowed, requireLocalFeature } from "./hosted.ts";
 import { findT3Cli, ON_PATH, t3Command } from "./t3paths.ts";
 
 /** an agent T3 can run: one configured instance of a provider */
@@ -88,6 +90,8 @@ export interface T3HostStatus {
 }
 
 const HOME = () => join(config.dataDir, "t3");
+/** what Foundation's T3 gets beyond the allowlist: where the agents it runs keep their sign-ins (why: at the start, below) */
+export const T3_ENV = [...CLAUDE_CODE_ENV, "CODEX_HOME"] as const;
 const FIRST_PORT = () => {
   const v = Number(process.env.FOUNDATION_T3_PORT ?? "15783");
   return Number.isInteger(v) && v > 0 ? v : 15783;
@@ -143,7 +147,21 @@ const tellWork = (id: string, w: T3Work | null) => workSubs.forEach((f) => {
   } catch { /* a listener's own trouble */ }
 });
 
+/** T3's program is up or coming up here (its agents can have a shell on this computer): starting, running, or a child still alive */
+export function t3HostRunning(): boolean {
+  return status.state === "running" || status.state === "starting" || child !== null;
+}
+
 export function t3Host(): T3HostStatus {
+  if (!localFeatureAllowed("t3")) {
+    return {
+      state: "off",
+      detail: hostedFeatureReason("t3", "Local T3 agents"),
+      since: status.since,
+      agents: [],
+      work: [],
+    };
+  }
   return { ...status, agents: status.agents, work: [...threads.values()].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1)) };
 }
 
@@ -369,14 +387,15 @@ async function connect(base: string, gen: number) {
 }
 
 function killTree(c: ChildProcess) {
-  if (c.pid && process.platform === "win32") execFile("taskkill", ["/pid", String(c.pid), "/T", "/F"], { windowsHide: true }, () => {});
+  if (c.pid && process.platform === "win32") execFileChild("taskkill", ["/pid", String(c.pid), "/T", "/F"], childOptions<ExecFileOptions>({ extras: [] }, { windowsHide: true }));
   else c.kill();
 }
 
 /** a person pressed Start. Resolves once T3 is running (or says why it isn't); a second press while it starts joins the first */
 let starting: Promise<T3HostStatus> | null = null;
-export function startT3(by: string): Promise<T3HostStatus> {
-  if (status.state === "running") return Promise.resolve(t3Host());
+export async function startT3(by: string): Promise<T3HostStatus> {
+  requireLocalFeature("t3", "Local T3 agents");
+  if (status.state === "running") return t3Host();
   starting ??= run(by).finally(() => (starting = null));
   return starting;
 }
@@ -397,10 +416,15 @@ async function run(by: string): Promise<T3HostStatus> {
     seedHome(home);
     const port = await pickPort();
     const token = randomBytes(24).toString("hex");
-    const env: NodeJS.ProcessEnv = { ...process.env, T3CODE_HOME: home };
-    for (const k of ["T3CODE_PORT", "T3CODE_MODE", "T3CODE_HOST", "T3CODE_DEV_AUTH_TOKEN"]) delete env[k];
     set({ detail: `Starting T3 on port ${port}`, port });
-    const c = spawn(cmd, [...pre, "--bootstrap-fd", "0"], { cwd: home, env, stdio: ["pipe", "ignore", "pipe"], windowsHide: true });
+    // T3 and every agent it runs get the allowlist (child.ts), never the server's keys: a vendor key reaches
+    // an agent only through T3's own settings, per agent (addT3Agent: a provider instance's `environment`,
+    // marked sensitive, kept by T3). Beyond that: its home (T3CODE_HOME, Foundation's; the port, mode, host
+    // and a dev token come only on the bootstrap line, so none of the server's T3CODE_* ride along), and what
+    // the agents it starts need to find their own sign-ins when a person moved them: Claude Code's
+    // (CLAUDE_CODE_ENV, and Git Bash on Windows) and Codex's (CODEX_HOME). Its home, and its working folder,
+    // are still under data/ (`<data>/t3`: T3's database, the added agents' homes and foundation-agents.json).
+    const c = spawnChild(cmd, [...pre, "--bootstrap-fd", "0"], childOptions<SpawnOptions>({ extras: T3_ENV, set: { T3CODE_HOME: home } }, { cwd: home, stdio: ["pipe", "ignore", "pipe"], windowsHide: true }));
     child = c;
     let err = "";
     c.stderr?.on("data", (b: Buffer) => (err = (err + b).slice(-600)));
@@ -444,6 +468,7 @@ async function run(by: string): Promise<T3HostStatus> {
 
 /** a person pressed Stop: T3 and the agents it runs end; its threads are kept in its home */
 export function stopT3(): T3HostStatus {
+  requireLocalFeature("t3", "Local T3 agents");
   generation++;
   ws?.close();
   ws = null;
@@ -539,6 +564,32 @@ export async function startT3Thread(opts: { agent: string; model?: string; title
   return { threadId, agent, model };
 }
 
+/**
+ * The next turn on a thread T3 already has: the same `thread.turn.start` its own client sends for a
+ * follow-up message, without the bootstrap that makes a thread. Same agent and model as the thread,
+ * supervised. Like starting one, it runs a model on someone's plan or key: a person's press only.
+ */
+export async function continueT3Thread(threadId: string, text: string): Promise<{ threadId: string; agent: T3Agent; model: string }> {
+  const w = threads.get(threadId);
+  if (!w) throw new Error("This T3 doesn't have that thread (it may be archived, or another T3's): open it in T3 to continue.");
+  const agent = status.agents.find((a) => a.id === w.agent);
+  if (!agent) throw new Error(`T3 has no agent "${w.agent}" for this thread any more.`);
+  if (agent.state !== "ready") throw new Error(`${agent.name} can't take work: ${t3AgentWhy(agent)}.`);
+  const model = w.model || agent.model || agent.modelList[0]?.slug;
+  if (!model) throw new Error(`${agent.name} has no model to run.`);
+  await dispatch({
+    type: "thread.turn.start",
+    commandId: randomUUID(),
+    threadId,
+    message: { messageId: randomUUID(), role: "user", text, attachments: [] },
+    modelSelection: { instanceId: agent.id, model },
+    runtimeMode: "approval-required",
+    interactionMode: "default",
+    createdAt: new Date().toISOString(),
+  });
+  return { threadId, agent, model };
+}
+
 /** stop a thread's turn (its agent stops; the thread is kept) */
 export async function interruptT3Thread(threadId: string) {
   await dispatch({ type: "thread.turn.interrupt", commandId: randomUUID(), threadId, createdAt: new Date().toISOString() });
@@ -601,6 +652,7 @@ export interface AddAgentInput {
 }
 
 export async function addT3Agent(input: AddAgentInput): Promise<T3Agent[]> {
+  requireLocalFeature("t3", "Local T3 agents");
   const preset = T3_PRESETS[input.preset];
   if (!preset) throw new Error(`No such agent to add: ${input.preset}. Known: ${Object.keys(T3_PRESETS).join(", ")}.`);
   if (input.where !== "cloud" && input.where !== "local") throw new Error("Say where it runs: cloud or local.");
@@ -653,6 +705,7 @@ export async function addT3Agent(input: AddAgentInput): Promise<T3Agent[]> {
  * computer, and signed in; T3 says so after the refresh.
  */
 export async function enableT3Agent(id: string): Promise<T3Agent[]> {
+  requireLocalFeature("t3", "Local T3 agents");
   const a = status.agents.find((x) => x.id === id);
   if (!a) throw new Error(`T3 has no agent called ${id}.`);
   const settings = obj(await rpc("server.getSettings", {}));
@@ -670,6 +723,7 @@ export async function enableT3Agent(id: string): Promise<T3Agent[]> {
 }
 
 export async function removeT3Agent(id: string): Promise<T3Agent[]> {
+  requireLocalFeature("t3", "Local T3 agents");
   if (!added.has(id)) throw new Error("Only agents added from Foundation can be removed here.");
   const settings = obj(await rpc("server.getSettings", {}));
   const instances = { ...(obj(settings?.providerInstances) ?? {}) };
@@ -681,11 +735,33 @@ export async function removeT3Agent(id: string): Promise<T3Agent[]> {
   return status.agents;
 }
 
+/**
+ * An address that is exactly a loopback origin: http(s), localhost / 127.0.0.1 / [::1], an explicit port,
+ * and nothing else (no user, path, query or fragment). The origin, or null.
+ */
+export function loopbackOrigin(base: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(base.trim());
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(u.hostname)) return null;
+  if (!u.port || u.username || u.password || u.search || u.hash || (u.pathname !== "/" && u.pathname !== "")) return null;
+  // what was written is the origin itself (a trailing slash at most): nothing the parser tidied away
+  const raw = base.trim().replace(/\/$/, "");
+  return raw.toLowerCase() === u.origin.toLowerCase() ? u.origin : null;
+}
+
 /** model servers on this computer that a local agent could use (Ollama's address; asked when the form opens) */
 export async function localModels(base = T3_PRESETS.kimi.local.baseUrl): Promise<{ baseUrl: string; up: boolean; models: string[] }> {
-  if (!isLoopback(base)) throw new Error("Only an address on this computer can be asked.");
+  requireLocalFeature("t3", "Local T3 agents");
+  const origin = loopbackOrigin(base);
+  if (!origin) throw new Error("Only a model server on this computer can be asked: an address like http://127.0.0.1:11434 (http or https, localhost, 127.0.0.1 or [::1], a port, and nothing after it).");
   try {
-    const r = await fetch(`${base.replace(/\/+$/, "")}/api/tags`, { signal: AbortSignal.timeout(1500) });
+    // the list is asked of that origin's /api/tags and nowhere else (a redirect isn't followed)
+    const r = await fetch(`${origin}/api/tags`, { signal: AbortSignal.timeout(1500), redirect: "manual" });
     const j = (await r.json()) as { models?: Array<{ name?: string }> };
     return { baseUrl: base, up: r.ok, models: (j.models ?? []).map((m) => m.name ?? "").filter(Boolean) };
   } catch {
@@ -743,7 +819,7 @@ async function ensureBoardTools() {
 process.once("exit", () => {
   if (child?.pid) {
     try {
-      if (process.platform === "win32") spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, detached: true, stdio: "ignore" }).unref();
+      if (process.platform === "win32") spawnChild("taskkill", ["/pid", String(child.pid), "/T", "/F"], childOptions<SpawnOptions>({ extras: [] }, { windowsHide: true, detached: true, stdio: "ignore" })).unref();
       else child.kill();
     } catch { /* already gone */ }
   }

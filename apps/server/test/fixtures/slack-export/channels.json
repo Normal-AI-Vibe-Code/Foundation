@@ -1,0 +1,75 @@
+[
+    {
+        "id": "C01GENERAL",
+        "name": "general",
+        "created": 1769850000,
+        "creator": "U01ADA",
+        "is_archived": false,
+        "is_general": true,
+        "members": [
+            "U01ADA",
+            "U02NOA",
+            "U03BOT"
+        ],
+        "pins": [
+            {
+                "id": "1772442120.000102",
+                "type": "C",
+                "created": 1772442600,
+                "user": "U01ADA",
+                "owner": "U01ADA"
+            }
+        ],
+        "topic": {
+            "value": "Company-wide",
+            "creator": "U01ADA",
+            "last_set": 1772355600
+        },
+        "purpose": {
+            "value": "This channel is for team-wide communication.",
+            "creator": "U01ADA",
+            "last_set": 1769850000
+        }
+    },
+    {
+        "id": "C02DESIGN",
+        "name": "design",
+        "created": 1770714000,
+        "creator": "U02NOA",
+        "is_archived": false,
+        "is_general": false,
+        "members": [
+            "U01ADA",
+            "U02NOA"
+        ],
+        "pins": [],
+        "topic": {
+            "value": "",
+            "creator": "",
+            "last_set": 0
+        },
+        "purpose": {
+            "value": "Shroud, housings, renders",
+            "creator": "U02NOA",
+            "last_set": 1770714000
+        }
+    },
+    {
+        "id": "C03OLD",
+        "name": "old-launch",
+        "created": 1755162000,
+        "creator": "U01ADA",
+        "is_archived": true,
+        "is_general": false,
+        "members": [
+            "U01ADA"
+        ],
+        "pins": [],
+        "topic": {
+            "value": ""
+        },
+        "purpose": {
+            "value": "The 2025 launch"
+        }
+    }
+]

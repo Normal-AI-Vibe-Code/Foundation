@@ -30,13 +30,14 @@
 
 import RFB from "@novnc/novnc/core/rfb.js";
 import keysyms from "@novnc/novnc/core/input/keysymdef.js";
-import { openSocket } from "../lib/api";
+import { api, openSocket } from "../lib/api";
 import { escEscToLeave } from "../lib/keysHeld";
 
 const q = new URLSearchParams(window.location.hash.slice(1));
 const board = q.get("board") ?? "";
 const panel = q.get("panel") ?? "";
 const viewOnly = q.get("view") === "1";
+const nativeVm = q.get("vm") === "1";
 const screen = document.getElementById("screen")!;
 
 const say = (event: string, more: Record<string, unknown> = {}) => window.parent.postMessage({ type: "foundation:desktop", panel, event, ...more }, window.location.origin);
@@ -48,8 +49,10 @@ let retry: ReturnType<typeof setTimeout> | undefined;
 
 async function connect() {
   let ws: WebSocket;
+  let password: string | undefined;
   try {
-    ws = await openSocket(`/machines/${encodeURIComponent(board)}/${encodeURIComponent(panel)}/vnc`);
+    if (nativeVm) ({ password } = await api<{ password: string }>(`/api/boards/${encodeURIComponent(board)}/vms/${encodeURIComponent(panel)}/console`, { method: "POST", json: {} }));
+    ws = await openSocket(`/${nativeVm ? "vms" : "machines"}/${encodeURIComponent(board)}/${encodeURIComponent(panel)}/vnc`);
   } catch {
     return again("Foundation's server isn't answering.");
   }
@@ -59,7 +62,7 @@ async function connect() {
     reason = e.reason;
     code = e.code;
   });
-  const r = new RFB(screen, ws, { shared: true });
+  const r = new RFB(screen, ws, { shared: true, ...(password ? { credentials: { password } } : {}) });
   rfb = r;
   r.viewOnly = viewOnly;
   r.scaleViewport = true;

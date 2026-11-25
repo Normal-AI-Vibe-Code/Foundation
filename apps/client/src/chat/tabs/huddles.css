@@ -1,0 +1,234 @@
+/* ChatForm's Huddles tab (Huddles.tsx). Tokens only; DESIGN.md §5 "ChatForm · Huddles tab". */
+
+.htab {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: var(--space-5);
+  padding: var(--space-6) var(--space-6) var(--space-7);
+}
+.htab-overview,
+.htab-detail {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.htab-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.htab-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.htab-h {
+  margin: 0;
+  font: 600 var(--text-16) / 1.25 var(--font-sans);
+  color: var(--color-frost);
+  text-wrap: balance;
+}
+.htab-sub {
+  margin: 0 0 var(--space-3);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.htab-note {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
+}
+.htab-dim {
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.htab-search {
+  flex: 1;
+  max-width: 360px;
+  height: var(--h-pill);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1 var(--font-sans);
+}
+.htab-search:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-color: var(--color-pulse);
+}
+
+/* live now */
+.htab-live {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.htab-live-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-pane);
+  border: 1px solid color-mix(in srgb, var(--color-ok) 40%, var(--color-line));
+  background: var(--color-raise);
+}
+.htab-where {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-frost);
+  font: 600 var(--text-13) / 1.2 var(--font-sans);
+  cursor: pointer;
+}
+.htab-where:hover {
+  text-decoration: underline;
+}
+.htab-where:focus-visible,
+.htab-back:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
+}
+
+/* sessions */
+.htab-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-line);
+}
+.htab-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+}
+.htab-row-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 170px minmax(120px, 1fr) 64px minmax(120px, 1.4fr) auto;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-frost);
+  text-align: left;
+  font: 400 var(--text-13) / 1.3 var(--font-sans);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .htab-row-main:hover {
+    background: var(--color-pulse-dim);
+  }
+}
+.htab-row-main:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+  border-radius: var(--radius-paper);
+}
+.htab-row-when {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.htab-row-where,
+.htab-row-people {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.htab-row-people {
+  color: var(--color-mist);
+}
+.htab-row-snippet {
+  grid-column: 2 / -1;
+  color: var(--color-mist);
+  font-size: var(--text-12);
+}
+@media (max-width: 760px) {
+  .htab-row-main {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+  .htab-row-snippet {
+    grid-column: auto;
+  }
+}
+
+/* one session */
+.htab-back {
+  align-self: flex-start;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.htab-back:hover {
+  color: var(--color-frost);
+}
+.htab-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.htab-detail-head .htab-dim {
+  white-space: normal;
+}
+.htab-detail-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .htab-detail-body {
+    grid-template-columns: 1fr;
+  }
+}
+.htab-recordings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.htab-recording {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.htab-recording video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
+  outline-offset: -1px;
+}
+.htab-recording figcaption {
+  color: var(--color-mist);
+  font: 500 var(--text-12) / 1.2 var(--font-sans);
+}
+.htab-transcript .huddle-lines {
+  max-height: 70dvh;
+  overscroll-behavior: contain;
+}
+.huddle-line.is-agent b {
+  color: var(--color-agent);
+}

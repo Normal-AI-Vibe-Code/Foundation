@@ -13,7 +13,7 @@
  */
 import { AnimatePresence, motion } from "motion/react";
 import { springs } from "@foundation/ui";
-import { MARK_VIEWBOX, MarkPanels } from "../brand/Mark";
+import { MARK_VIEWBOX, MarkShape } from "../brand/Mark";
 import { noteLines, progressLabel, shortDate } from "./policy";
 import { checkForUpdate, closeCard, inDesktop, installUpdate, later, skipVersion, useUpdate, type UpdatePhase } from "./updater";
 import { floorInsets, useUi } from "../state/ui";
@@ -44,11 +44,11 @@ export interface UpdateCardProps {
   onClose?: () => void;
 }
 
-/** the app's own mark, small: the four panels, in the tile's phase colour */
+/** the app's own mark, small: the two leaves, in the tile's phase colour */
 function Mark() {
   return (
     <svg viewBox={MARK_VIEWBOX} aria-hidden>
-      <MarkPanels />
+      <MarkShape />
     </svg>
   );
 }

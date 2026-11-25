@@ -36,7 +36,7 @@ export function LevelBar({ boardName }: { boardName?: string }) {
   const here = path[path.length - 1];
   const [sure, setSure] = useState<string | null>(null);
   useEffect(() => setSure(null), [key, boardId]);
-  const name = boardName ?? me?.name ?? boardId ?? "Board";
+  const name = boardName ?? me?.name ?? boardId ?? "Grid";
   const up = above[above.length - 1];
   return (
     <AnimatePresence>
@@ -47,21 +47,28 @@ export function LevelBar({ boardName }: { boardName?: string }) {
           aria-label="Where you are"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
+          exit={{ opacity: 0, y: -8, transition: { duration: 0.14 } }}
           transition={{ type: "spring", stiffness: 420, damping: 34 }}
         >
           {path.length > 0 ? (
-            <button className="level-back" onClick={levelUp} data-tip={path.length > 1 ? `Back to ${path[path.length - 2].name}` : "Back to the grid"} data-kbd="Esc">
+            <button
+              type="button"
+              className="level-back"
+              onClick={levelUp}
+              aria-label={path.length > 1 ? `Go back to ${path[path.length - 2].name}` : "Go back to grid"}
+              data-tip={path.length > 1 ? `Back to ${path[path.length - 2].name}` : "Back to the grid"}
+              data-kbd="Esc"
+            >
               <span aria-hidden>⤡</span>
             </button>
           ) : (
-            <button className="level-back" onClick={() => openParentGrid(up.id, boardId!)} data-tip={`Up to ${up.name}, the grid this one is inside`} aria-label={`Up to ${up.name}`}>
+            <button type="button" className="level-back" onClick={() => openParentGrid(up.id, boardId!)} data-tip={`Up to ${up.name}, the grid this one is inside`} aria-label={`Go up to ${up.name}`}>
               <span aria-hidden>⤡</span>
             </button>
           )}
           {above.map((g, i) => (
             <span key={g.id} className="level-crumb">
-              <button className="level-step" data-level-grid={g.id} onClick={() => openParentGrid(g.id, above[i + 1]?.id ?? boardId!)}>
+              <button type="button" className="level-step" data-level-grid={g.id} title={g.name} onClick={() => openParentGrid(g.id, above[i + 1]?.id ?? boardId!)}>
                 {g.name}
               </button>
               <span className="level-sep" aria-hidden>
@@ -70,11 +77,11 @@ export function LevelBar({ boardName }: { boardName?: string }) {
             </span>
           ))}
           {path.length > 0 ? (
-            <button className="level-step" onClick={() => openLevel(null)}>
+            <button type="button" className="level-step" title={name} onClick={() => openLevel(null)}>
               {name}
             </button>
           ) : (
-            <span className="level-here" aria-current="page">
+            <span className="level-here" aria-current="page" title={name}>
               <span className="level-glyph" aria-hidden>
                 ▦
               </span>
@@ -87,14 +94,14 @@ export function LevelBar({ boardName }: { boardName?: string }) {
                 ›
               </span>
               {i === path.length - 1 ? (
-                <span className="level-here" aria-current="page">
+                <span className="level-here" aria-current="page" title={s.name}>
                   <span className="level-glyph" aria-hidden>
                     ▦
                   </span>
                   {s.name}
                 </span>
               ) : (
-                <button className="level-step" onClick={() => openLevel(s.id)}>
+                <button type="button" className="level-step" title={s.name} onClick={() => openLevel(s.id)}>
                   {s.name}
                 </button>
               )}

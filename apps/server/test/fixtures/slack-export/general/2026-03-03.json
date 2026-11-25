@@ -1,0 +1,157 @@
+[
+    {
+        "client_msg_id": "cm-1772528400.000100",
+        "type": "message",
+        "text": "",
+        "user": "U01ADA",
+        "ts": "1772528400.000100",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "blocks": [
+            {
+                "type": "rich_text",
+                "block_id": "b1",
+                "elements": [
+                    {
+                        "type": "rich_text_section",
+                        "elements": [
+                            {
+                                "type": "text",
+                                "text": "Agenda",
+                                "style": {
+                                    "bold": true
+                                }
+                            },
+                            {
+                                "type": "text",
+                                "text": " for "
+                            },
+                            {
+                                "type": "user",
+                                "user_id": "U02NOA"
+                            },
+                            {
+                                "type": "text",
+                                "text": " "
+                            },
+                            {
+                                "type": "emoji",
+                                "name": "tada",
+                                "unicode": "1f389"
+                            },
+                            {
+                                "type": "text",
+                                "text": "\n"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "rich_text_list",
+                        "style": "bullet",
+                        "indent": 0,
+                        "elements": [
+                            {
+                                "type": "rich_text_section",
+                                "elements": [
+                                    {
+                                        "type": "text",
+                                        "text": "shroud"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "rich_text_section",
+                                "elements": [
+                                    {
+                                        "type": "link",
+                                        "url": "https://formindustries.com/q2",
+                                        "text": "Q2 plan"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "rich_text_preformatted",
+                        "elements": [
+                            {
+                                "type": "text",
+                                "text": "npm run ship"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "client_msg_id": "cm-1772528460.000101",
+        "type": "message",
+        "text": "waves at everyone",
+        "user": "U02NOA",
+        "ts": "1772528460.000101",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/noa_72.png",
+            "first_name": "Noa",
+            "real_name": "Noa Kim",
+            "display_name": "noa",
+            "team": "T0FORM",
+            "name": "noa",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "subtype": "me_message"
+    },
+    {
+        "type": "message",
+        "text": "hi from outside",
+        "user": "U09GUEST",
+        "ts": "1772528520.000102",
+        "user_profile": {
+            "real_name": "Guest Person",
+            "display_name": "guest",
+            "name": "guest",
+            "image_72": "https://avatars.slack-edge.com/guest_72.png"
+        }
+    },
+    {
+        "type": "message",
+        "subtype": "channel_leave",
+        "ts": "1772528580.000103",
+        "user": "U09GUEST",
+        "text": "<@U09GUEST> has left the channel"
+    },
+    {
+        "type": "message",
+        "subtype": "huddle_thread",
+        "ts": "1772528640.000104",
+        "user": "U01ADA",
+        "text": "",
+        "room": {
+            "id": "R1",
+            "name": "Standup",
+            "date_start": 1772528640,
+            "date_end": 1772529540,
+            "participant_history": [
+                "U01ADA",
+                "U02NOA"
+            ]
+        }
+    }
+]

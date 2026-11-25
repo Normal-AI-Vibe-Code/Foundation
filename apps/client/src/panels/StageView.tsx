@@ -138,7 +138,15 @@ export function StageBody({ panel }: { panel: PanelMeta }) {
         <p
           className={`stage-text${panel.stage === "brief" ? " is-brief is-editable" : ""}`}
           title={panel.stage === "brief" ? "Click to edit the brief" : undefined}
+          role={panel.stage === "brief" && panel.status !== "done" ? "button" : undefined}
+          tabIndex={panel.stage === "brief" && panel.status !== "done" ? 0 : undefined}
           onClick={() => panel.stage === "brief" && panel.status !== "done" && setEditing(true)}
+          onKeyDown={(e) => {
+            if (panel.stage === "brief" && panel.status !== "done" && (e.key === "Enter" || e.key === " ")) {
+              e.preventDefault();
+              setEditing(true);
+            }
+          }}
         >
           {panel.text}
         </p>
@@ -238,7 +246,7 @@ export function StageBody({ panel }: { panel: PanelMeta }) {
 
 function ArtifactTile({ a, onChoose }: { a: Artifact; onChoose(): void }) {
   const href = a.fileId ? `/files/${a.fileId}` : a.url;
-  const img = useFileSrc(a.kind === "image" ? href : undefined);
+  const img = useFileSrc(a.kind === "image" ? href : undefined, true, { width: 256 });
   return (
     <div className={`artifact kind-${a.kind}${a.chosen ? " is-chosen" : ""}`} title={`${a.name}${a.note ? ` — ${a.note}` : ""} · ${a.by}`}>
       <a className="artifact-face" {...(href ? fileLink(href) : {})} target="_blank" rel="noreferrer">

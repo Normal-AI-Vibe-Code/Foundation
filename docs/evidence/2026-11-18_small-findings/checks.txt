@@ -1,0 +1,55 @@
+Smaller security findings, 2026-11-18. Base: main at c866588 (fast-forwarded into the worktree).
+
+Commits
+  40cee1c  The example settings leave dev sign-in off
+  ddf9926  Running a job needs someone who can edit its board
+  0c7c3bb  A viewer's agent token is shown to reach only what the viewer reaches
+  4eb092d  Reading Slack stays tied to the board, and the Slack user token serves only its owner
+  20c0d27  Pictures from elsewhere in rendered text wait for a person's press; links show their real host
+  0efc8f8  Today's picture test says what the renderer now does with a web picture
+  fe2125b  Frames never show Foundation itself, are always sandboxed, and keep their origin only for a saved app or T3
+  8d307d3  The client's pages carry a Content Security Policy, report-only for now
+
+Tests added or changed
+  apps/server/test/env-example.test.ts      1 pass
+  apps/server/test/viewer-reach.test.ts     6 pass (a viewer's Run refused; 44 write tools and 45 person-only
+                                            routes refused to a viewer's agent token; the Slack channel route)
+  apps/server/test/slack-tie.test.ts        6 pass (Slack stubbed)
+  apps/server/test/construct.test.ts        4 pass (its stand-in now says whose the user token is)
+  apps/client/test/markdown.test.ts         10 pass (5 new)
+  apps/client/test/today-talk.test.ts       pass (web picture is a placeholder; data: image drawn)
+  apps/client/test/frame-sandbox.test.ts    9 pass
+  apps/client/test/csp.test.ts              7 pass
+
+Full suites (end of slice)
+  npm test -w @foundation/server   tests 367, pass 361, fail 0, skipped 6
+  npm test -w @foundation/client   tests 202, pass 201, fail 0, todo 1
+  npm run typecheck                exit 0
+  node scripts/check-security.mjs  clean (6 waived by the allowlist)
+  No reruns were needed.
+
+Real browser (the Claude desktop app's browser pane; a throwaway server on :24410, data in a temp folder)
+  #/design, "Pictures and links from elsewhere": the agent note shows the link's host beside it and the
+    remote picture as a placeholder (Image from cdn.example-supplier.com, Load image). No request to either
+    example host on a fresh load (resource timing). Pressing Load image replaced the placeholder with an
+    <img referrerpolicy=no-referrer> for that address; a reload brought the placeholder back.
+    01-elsewhere-night.jpg, 02-elsewhere-day.jpg
+  Built-in browser tool: 127.0.0.1:<server port>/api/me and localhost:<client port>/#/design are refused
+    with "Foundation doesn't show its own pages inside a frame…" (day and night). example.com framed with
+    sandbox "allow-scripts allow-forms allow-popups allow-modals allow-downloads", allow "clipboard-write".
+    03-browser-refuses-own-server-day.jpg, 04-browser-refuses-own-client-night.jpg
+  CSP: dev client sends Content-Security-Policy-Report-Only (dev policy); #/design scrolled end to end and
+    the board loaded: no securitypolicyviolation events. Production build under `vite preview`: same header
+    without inline scripts, frame-ancestors 'self' on desktop.html; the board (10 sections) and #/design
+    loaded with no csp-violation reports from a buffered ReportingObserver (a deliberate probe script did
+    report, so the observer works). 05-csp-report-only-production-build-board-night.jpg
+
+e2e (own ports): bottom-bar, card-use, one-interface: 14 passed (the browser tool frames the stand-in page,
+  now served from the stand-in Slack's origin; T3's sandboxed frame; a live app card; ports).
+  Not run: card-chrome, fitted-frames, frames, heavy, perf, renders, rune-frames (they only moved to the
+  stand-in page's new address).
+
+Not checked
+  The packaged desktop app (Tauri): its CSP setting is unchanged; the frame rules and the renderer were not
+  tried there. A real Slack workspace (owner lookup by email). A saved app's frame keeping its origin in a
+  live browser (unit-tested only). A frame's postMessage to the bridge from a trusted origin (unit-tested only).

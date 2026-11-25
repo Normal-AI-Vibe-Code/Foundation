@@ -1,0 +1,285 @@
+[
+    {
+        "type": "message",
+        "subtype": "channel_join",
+        "ts": "1772442000.000100",
+        "user": "U01ADA",
+        "text": "<@U01ADA> has joined the channel"
+    },
+    {
+        "type": "message",
+        "subtype": "channel_topic",
+        "ts": "1772442060.000101",
+        "user": "U01ADA",
+        "text": "<@U01ADA> set the channel topic: Shipping the shroud",
+        "topic": "Shipping the shroud"
+    },
+    {
+        "client_msg_id": "cm-1772442120.000102",
+        "type": "message",
+        "text": "Morning *team*! _Shroud rev 3_ is ~nearly~ done in <#C02DESIGN|design>. cc <@U02NOA> <!here>: see <https://formindustries.com/shroud|the spec> or mail <mailto:ada@formindustries.com|me> :rocket: :+1::skin-tone-3: `keep *this* literal` &lt;tag&gt; &amp; <!subteam^S0ENG|@engineers> on <!date^1772442000^{date_short}|Mar 2nd>",
+        "user": "U01ADA",
+        "ts": "1772442120.000102",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "thread_ts": "1772442120.000102",
+        "reply_count": 2,
+        "reply_users_count": 2,
+        "latest_reply": "1772442240.000104",
+        "reply_users": [
+            "U02NOA",
+            "U01ADA"
+        ],
+        "replies": [
+            {
+                "user": "U02NOA",
+                "ts": "1772442180.000103"
+            },
+            {
+                "user": "U01ADA",
+                "ts": "1772442240.000104"
+            }
+        ],
+        "is_locked": false,
+        "subscribed": false,
+        "edited": {
+            "user": "U01ADA",
+            "ts": "1772442400.000000"
+        },
+        "pinned_to": [
+            "C01GENERAL"
+        ],
+        "reactions": [
+            {
+                "name": "+1",
+                "users": [
+                    "U02NOA"
+                ],
+                "count": 1
+            },
+            {
+                "name": "+1::skin-tone-2",
+                "users": [
+                    "U01ADA"
+                ],
+                "count": 1
+            },
+            {
+                "name": "party_parrot",
+                "users": [
+                    "U02NOA"
+                ],
+                "count": 1
+            }
+        ]
+    },
+    {
+        "client_msg_id": "cm-1772442180.000103",
+        "type": "message",
+        "text": "Looks great <@U01ADA>, I'll check the lip",
+        "user": "U02NOA",
+        "ts": "1772442180.000103",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/noa_72.png",
+            "first_name": "Noa",
+            "real_name": "Noa Kim",
+            "display_name": "noa",
+            "team": "T0FORM",
+            "name": "noa",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "thread_ts": "1772442120.000102",
+        "parent_user_id": "U01ADA"
+    },
+    {
+        "client_msg_id": "cm-1772442240.000104",
+        "type": "message",
+        "text": "Shipping Friday",
+        "user": "U01ADA",
+        "ts": "1772442240.000104",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "subtype": "thread_broadcast",
+        "thread_ts": "1772442120.000102",
+        "parent_user_id": "U01ADA",
+        "root": {
+            "text": "Morning",
+            "user": "U01ADA",
+            "ts": "1772442120.000102"
+        }
+    },
+    {
+        "type": "message",
+        "subtype": "bot_message",
+        "ts": "1772442300.000105",
+        "bot_id": "B03DEPLOY",
+        "username": "deploybot",
+        "text": "",
+        "icons": {
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/bot_72.png"
+        },
+        "attachments": [
+            {
+                "id": 1,
+                "color": "36a64f",
+                "fallback": "Deploy finished: build #42",
+                "pretext": "Deploy finished",
+                "title": "build #42",
+                "title_link": "https://ci.formindustries.com/42",
+                "text": "All checks *green*",
+                "fields": [
+                    {
+                        "title": "Env",
+                        "value": "prod",
+                        "short": true
+                    },
+                    {
+                        "title": "Took",
+                        "value": "3m 12s",
+                        "short": true
+                    }
+                ],
+                "footer": "deploybot"
+            }
+        ]
+    },
+    {
+        "client_msg_id": "cm-1772442360.000106",
+        "type": "message",
+        "text": "the render <@U01ADA>",
+        "user": "U02NOA",
+        "ts": "1772442360.000106",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/noa_72.png",
+            "first_name": "Noa",
+            "real_name": "Noa Kim",
+            "display_name": "noa",
+            "team": "T0FORM",
+            "name": "noa",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "subtype": "file_share",
+        "upload": true,
+        "display_as_bot": false,
+        "files": [
+            {
+                "id": "F01SHROUD",
+                "created": 1772442360,
+                "timestamp": 1772442360,
+                "name": "shroud.png",
+                "title": "Shroud render",
+                "mimetype": "image/png",
+                "filetype": "png",
+                "pretty_type": "PNG",
+                "user": "U02NOA",
+                "mode": "hosted",
+                "size": 67,
+                "url_private": "https://files.slack.com/files-pri/T0FORM-F01SHROUD/shroud.png?t=xoxe-ok",
+                "url_private_download": "https://files.slack.com/files-pri/T0FORM-F01SHROUD/download/shroud.png?t=xoxe-ok",
+                "permalink": "https://form.slack.com/files/U02NOA/F01SHROUD/shroud.png"
+            }
+        ]
+    },
+    {
+        "client_msg_id": "cm-1772442420.000107",
+        "type": "message",
+        "text": "spec attached",
+        "user": "U01ADA",
+        "ts": "1772442420.000107",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/ada_72.png",
+            "first_name": "Ada",
+            "real_name": "Ada Lovelace",
+            "display_name": "ada",
+            "team": "T0FORM",
+            "name": "ada",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "files": [
+            {
+                "id": "F02SPEC",
+                "created": 1772442420,
+                "name": "spec.pdf",
+                "title": "Spec",
+                "mimetype": "application/pdf",
+                "filetype": "pdf",
+                "user": "U01ADA",
+                "mode": "hosted",
+                "size": 204800,
+                "url_private": "https://files.slack.com/files-pri/T0FORM-F02SPEC/spec.pdf?t=xoxe-expired",
+                "url_private_download": "https://files.slack.com/files-pri/T0FORM-F02SPEC/download/spec.pdf?t=xoxe-expired",
+                "permalink": "https://form.slack.com/files/U01ADA/F02SPEC/spec.pdf"
+            }
+        ]
+    },
+    {
+        "type": "message",
+        "subtype": "pinned_item",
+        "ts": "1772442480.000108",
+        "user": "U01ADA",
+        "text": "<@U01ADA> pinned a message to this channel.",
+        "item_type": "C",
+        "item": {}
+    },
+    {
+        "client_msg_id": "cm-1772442540.000109",
+        "type": "message",
+        "text": "a thing Slack added last week",
+        "user": "U02NOA",
+        "ts": "1772442540.000109",
+        "team": "T0FORM",
+        "user_team": "T0FORM",
+        "source_team": "T0FORM",
+        "user_profile": {
+            "avatar_hash": "g1",
+            "image_72": "https://avatars.slack-edge.com/2026-01-01/noa_72.png",
+            "first_name": "Noa",
+            "real_name": "Noa Kim",
+            "display_name": "noa",
+            "team": "T0FORM",
+            "name": "noa",
+            "is_restricted": false,
+            "is_ultra_restricted": false
+        },
+        "subtype": "weird_new_thing"
+    }
+]

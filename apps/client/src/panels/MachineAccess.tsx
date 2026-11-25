@@ -12,10 +12,11 @@
  */
 
 import { useState, type ReactNode } from "react";
-import type { MachineState, PanelDoc } from "@foundation/protocol";
+import type { DesktopLeave, MachineState, PanelDoc } from "@foundation/protocol";
 import { api } from "../lib/api";
 import { toast } from "../state/ui";
 import { ago, boardId } from "./MachineViewBits";
+import { useDesktopLeave } from "./MachineViewDesktop";
 import { AgentGlyph, ClusterGlyph, DesktopGlyph, EyeGlyph, GlobeGlyph, LinkGlyph, LockGlyph, PersonGlyph, PromptGlyph } from "../shell/glyphs";
 
 function Row({ icon, tone, title, children, control, name }: { icon: ReactNode; tone?: "agent" | "warn" | "ok"; title: string; children: ReactNode; control?: ReactNode; name: string }) {
@@ -32,8 +33,9 @@ function Row({ icon, tone, title, children, control, name }: { icon: ReactNode; 
 }
 
 /** the view. Also drawn on #/design (`onAllow` and `onClose` stubbed). */
-export function AccessView({ panel, m, viewer, waiting = 0, now = Date.now(), onAllow, onClose, busy }: { panel: Pick<PanelDoc, "id">; m: MachineState; viewer: boolean; waiting?: number; now?: number; onAllow?: (allow: boolean) => void; onClose?: (port: number) => void; busy?: boolean }) {
-  const may = m.agentsMay;
+export function AccessView({ panel, m, leave, viewer, waiting = 0, now = Date.now(), onAllow, onClose, busy }: { panel: Pick<PanelDoc, "id">; m: MachineState; leave?: DesktopLeave; viewer: boolean; waiting?: number; now?: number; onAllow?: (allow: boolean) => void; onClose?: (port: number) => void; busy?: boolean }) {
+  // agents' leave lives off the card now (the board's `desktopLeave`, kept by the server alone)
+  const may = leave?.agentsMay;
   return (
     <div className="machine-access" data-machine-access={panel.id}>
       <div className="machine-access-head">
@@ -111,6 +113,7 @@ export function AccessView({ panel, m, viewer, waiting = 0, now = Date.now(), on
 /** the view on a card: the leave and the links pressed through the server */
 export function Access({ panel, m, viewer, waiting }: { panel: Pick<PanelDoc, "id">; m: MachineState; viewer: boolean; waiting: number }) {
   const [busy, setBusy] = useState(false);
+  const leave = useDesktopLeave(panel.id);
   const post = async (path: string, json: object) => {
     setBusy(true);
     try {
@@ -121,5 +124,5 @@ export function Access({ panel, m, viewer, waiting }: { panel: Pick<PanelDoc, "i
       setBusy(false);
     }
   };
-  return <AccessView panel={panel} m={m} viewer={viewer} waiting={waiting} busy={busy} onAllow={(allow) => void post("agents", { allow })} onClose={(port) => void post("share", { port, close: true })} />;
+  return <AccessView panel={panel} m={m} leave={leave} viewer={viewer} waiting={waiting} busy={busy} onAllow={(allow) => void post("agents", { allow })} onClose={(port) => void post("share", { port, close: true })} />;
 }

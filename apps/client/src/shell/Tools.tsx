@@ -5,14 +5,21 @@
  * right, on the floor like search and the agents (it takes their place, and they take its).
  *
  *  - **Terminal**: a shell on the computer Foundation's server runs on, in the server's folder. An admin's, and
- *    only after they press Start (the server mints a one-time key for the socket: apps/server/src/hostterm.ts).
- *    Line-mode: the line is edited here, the shell runs it and answers with its folder as the prompt.
- *  - **Browser**: a page at an address, with back, forward, reload, open outside, and "put it on the grid" (a
- *    live app card, as ⌘L does). Sites that refuse to be framed say so here and open outside.
+ *    started by their press on the Terminal's button or tab (2026-11-20; before, a second press on Start. The
+ *    server mints a one-time key for the socket: apps/server/src/hostterm.ts).
+ *    Line-mode: the line is edited here, the shell runs it and answers with its folder as the prompt. What a
+ *    command prints arrives without the blank lines a shell pads it with (server: termtidy.ts), and one empty
+ *    line stands between a command and the next prompt, the same every time.
+ *  - **Browser** (shell/BrowserTool.tsx; 2026-11-18): a real browser, Edge or Chrome on the server's computer,
+ *    driven by the server and sent here as pictures, so any site works (a framed page failed on every site that
+ *    refuses framing). Tabs, back, forward, reload, the address, open outside, "put it on the grid", and
+ *    "Let agents use this browser": then an agent can read the page and press and type in it. An admin's, started
+ *    by a press, like the terminal. Anyone else gets a page framed here, as before.
  *  - **Files**: what's on this grid (the archive: drag a file onto the grid, or press to open it), and the
  *    folders on this computer an admin approved.
- *  - **Changes**: what changed: Foundation's code (the commits of the checkout the server runs from), its
- *    releases (docs/blog), and this grid's activity.
+ *  - **Changes**: what changed, as a release page (settings/ReleasePage.tsx): each release as a cover, a
+ *    description, a diagram of what it's made of and its parts as tiles, the full notes under them; then
+ *    Foundation's code (the commits of the checkout the server runs from, by day) and this grid's activity.
  *  - **T3**: this computer's agents. T3's server (Foundation's own instance, apart from Vision Code's) and its
  *    client: the page T3 serves is Vision's build of T3's web client (`data-vision-client`), opened here,
  *    signed in by a one-time link minted when a person opens the tool. Start and Stop are a person's presses.
@@ -25,27 +32,31 @@ import "@xterm/xterm/css/xterm.css";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
-import { onNight } from "@foundation/ui";
+import { onLook } from "@foundation/ui";
 import type { SearchHit } from "@foundation/protocol";
 import { api, wsUrl } from "../lib/api";
+import { useCapabilities } from "../lib/capabilities";
 import { refreshAvailable, useAvailable } from "../lib/agentsAvailable";
 import { HOLDS_KEYS } from "../lib/keysHeld";
 import { WIDTHS, setUi, toast, toggleTool, useUi, type ToolId } from "../state/ui";
 import { requestSnap } from "../state/store";
 import { activeBoard } from "../sync/board";
 import { openExternal } from "../utils/media";
+import { BrowserTool } from "./BrowserTool";
 import { themeFromTokens } from "../panels/MachineView";
 import { FloorEdge } from "./FloorEdge";
 import { PlacesBrowser } from "./PlacesBrowser";
 import { Draggable } from "./SearchPane";
 import { Clipboard } from "./Clipboard";
 import { glyphOf } from "../lib/hits";
-import { openUrlAsPanel } from "./CommandBar";
 import { useBoardTick } from "./Presence";
-import { POSTS } from "../settings/SettingsPage";
-import { longDate } from "../settings/releases";
-import { renderMarkdown } from "../utils/markdown";
-import { BrowserGlyph, ChangesGlyph, FilesGlyph, T3Glyph, TerminalGlyph } from "./glyphs";
+import { POSTS, RUNNING } from "../settings/SettingsPage";
+import { releaseKind } from "../settings/releases";
+import { ReleaseCard, ReleaseKindGlyph } from "../settings/ReleasePage";
+import { BrowserGlyph, ChangesGlyph, ExpandGlyph, FilesGlyph, T3Glyph, TerminalGlyph } from "./glyphs";
+import { openAppTab } from "../lib/grids";
+import { frameAllow, frameFor } from "../panels/frameSandbox";
+import { useFrameContext } from "../lib/frames";
 
 export const TOOLS: Array<{ id: ToolId; name: string; tip: string; glyph: ReactNode }> = [
   { id: "terminal", name: "Terminal", tip: "Terminal: a shell on the server's computer (admins)", glyph: <TerminalGlyph /> },
@@ -62,7 +73,16 @@ export function ToolButtons() {
   return (
     <div className="tool-buttons" role="group" aria-label="Tools">
       {TOOLS.map((t) => (
-        <button key={t.id} className={`top-btn${ui.tool === t.id ? " is-on" : ""}`} onClick={() => toggleTool(t.id)} aria-pressed={ui.tool === t.id} aria-label={t.name} data-tip={t.tip} data-tool-open={t.id}>
+        <button
+          key={t.id}
+          type="button"
+          className={`top-btn${ui.tool === t.id ? " is-on" : ""}`}
+          onClick={() => toggleTool(t.id)}
+          aria-pressed={ui.tool === t.id}
+          aria-label={ui.tool === t.id ? `Close ${t.name}` : `Open ${t.name}`}
+          data-tip={t.tip}
+          data-tool-open={t.id}
+        >
           {t.glyph}
           {t.id === "t3" && t3 !== "off" && <i className={`tool-btn-dot is-${t3}`} aria-hidden />}
         </button>
@@ -91,7 +111,7 @@ export function ToolPane() {
             <span>{t.name}</span>
           </button>
         ))}
-        <button className="top-btn tool-close" onClick={() => setUi({ tool: null })} aria-label="Close the tools" data-tip="Close">
+        <button type="button" className="top-btn tool-close" onClick={() => setUi({ tool: null })} aria-label="Close tools pane" data-tip="Close">
           ✕
         </button>
       </nav>
@@ -110,6 +130,7 @@ type TermState = "idle" | "opening" | "open" | "closed";
 
 function TerminalTool({ shown }: { shown: boolean }) {
   const role = useUi().role;
+  const caps = useCapabilities();
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<TermState>("idle");
   const [where, setWhere] = useState<{ shell: string; cwd: string } | null>(null);
@@ -150,7 +171,7 @@ function TerminalTool({ shown }: { shown: boolean }) {
     setWhere({ shell: opened.shell, cwd: opened.cwd });
     // xterm measures its font on a canvas: it needs the family itself, not a CSS variable
     const font = getComputedStyle(host.current).getPropertyValue("--font-code").trim() || "ui-monospace, monospace";
-    const term = new XTerm({ fontFamily: font, fontSize: 12.5, lineHeight: 1.25, cursorBlink: true, convertEol: false, scrollback: 4000, theme: themeFromTokens(host.current) });
+    const term = new XTerm({ fontFamily: font, fontSize: 12.5, lineHeight: 1.25, cursorBlink: true, convertEol: false, scrollback: 4000, allowTransparency: true, theme: themeFromTokens(host.current) });
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.open(host.current);
@@ -159,21 +180,36 @@ function TerminalTool({ shown }: { shown: boolean }) {
     } catch {
       /* hidden */
     }
-    const offNight = onNight(() => setTimeout(() => host.current && (term.options.theme = themeFromTokens(host.current)), 760));
+    // the look changed (day and night, or the place in focus: Today's room, a grid's paper): its colours are
+    // the tokens resolved by hand, so they are read again, now and as the 1.4 s fade passes its middle and ends
+    const offNight = onLook(() => {
+      for (const ms of [0, 760, 1500]) setTimeout(() => host.current && (term.options.theme = themeFromTokens(host.current)), ms);
+    });
     const ws = new WebSocket(wsUrl(`/host/terminal/${opened.id}?key=${encodeURIComponent(opened.key)}`));
     xt.current = { term, fit, ws };
 
     // the line is edited here; the shell runs it when Enter sends it
     let line = "";
     let busy = true;
+    /** prompts shown so far: every one after the first stands one empty line below what came before it */
+    let prompts = 0;
     const history: string[] = [];
     let back = 0;
+    /** lines entered before the shell's first prompt: kept, and run one by one as its prompts come */
+    const ahead: string[] = [];
+    /** what's typed shows once there is a prompt to type at (before that it is kept, and shown with the prompt) */
+    const echo = (text: string) => prompts > 0 && term.write(text);
     const replace = (next: string) => {
-      term.write("\b \b".repeat(line.length));
+      echo("\b \b".repeat(line.length));
       line = next;
-      term.write(line);
+      echo(line);
     };
     const send = (text: string) => {
+      if (!prompts) {
+        ahead.push(text);
+        line = "";
+        return;
+      }
       term.write("\r\n");
       if (text.trim()) history.push(text);
       back = 0;
@@ -193,6 +229,7 @@ function TerminalTool({ shown }: { shown: boolean }) {
         if (busy && !line) {
           // a command that won't stop: the shell starts again (there is no terminal to send it an interrupt)
           term.write("\r\n\x1b[2mStopping it: the shell starts again.\x1b[0m\r\n");
+          prompts = 0;
           ws.send(JSON.stringify({ t: "restart" }));
         } else term.write("\r\n");
         line = "";
@@ -204,11 +241,11 @@ function TerminalTool({ shown }: { shown: boolean }) {
         else if (ch === "\x7f" || ch === "\b") {
           if (line) {
             line = line.slice(0, -1);
-            term.write("\b \b");
+            echo("\b \b");
           }
         } else if (ch >= " " || ch === "\t") {
           line += ch;
-          term.write(ch);
+          echo(ch);
         }
       }
     });
@@ -218,7 +255,14 @@ function TerminalTool({ shown }: { shown: boolean }) {
       if (m.t === "out" && m.data) term.write(m.err ? `\x1b[33m${m.data}\x1b[0m` : m.data);
       else if (m.t === "prompt") {
         busy = false;
-        term.write(`\x1b[2m${m.cwd}\x1b[0m \x1b[1m❯\x1b[0m ${line}`);
+        // a line entered before the shell's first prompt is typed at a prompt now, and run; the rest wait their turn
+        const next = ahead.shift();
+        term.write(`${prompts++ ? "\r\n" : ""}\x1b[2m${m.cwd}\x1b[0m \x1b[1m❯\x1b[0m ${next ?? line}`);
+        if (next !== undefined) {
+          const typed = line;
+          send(next);
+          line = typed;
+        }
       } else if (m.t === "exit") term.write(`\r\n\x1b[2mThe shell ended (exit ${m.code ?? "?"}).\x1b[0m\r\n`);
     };
     ws.onclose = () => {
@@ -229,12 +273,31 @@ function TerminalTool({ shown }: { shown: boolean }) {
     term.focus();
   };
 
+  // opening the Terminal (its button in the top bar, or its tab in the pane) is the press that starts the shell:
+  // the tool is only ever opened by a person, and never restored on load (state/ui.ts keeps `tool` out of what it
+  // saves). Once per opening of the pane: if it fails, the button below is how to try again
+  const auto = useRef(false);
+  useEffect(() => {
+    if (!shown || role !== "admin" || !caps.loaded || !caps.local.terminal || auto.current) return;
+    auto.current = true;
+    void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, role, caps.loaded, caps.local.terminal]);
+
   const again = () => {
     xt.current?.ws.close();
     xt.current?.term.dispose();
     xt.current = null;
     void start();
   };
+
+  if (!caps.local.terminal)
+    return (
+      <div className="tool-empty" data-hosted-terminal>
+        <b>A terminal on the server's computer</b>
+        <p>The built-in terminal runs on a local computer and is turned off on a hosted Foundation server.</p>
+      </div>
+    );
 
   if (role !== "admin")
     return (
@@ -248,7 +311,7 @@ function TerminalTool({ shown }: { shown: boolean }) {
       {state === "idle" || state === "opening" ? (
         <div className="tool-empty">
           <b>A terminal on the server's computer</b>
-          <p>A shell in the server's own folder. Nothing runs until you start it, and it ends when you close this pane. For programs that need a full terminal (an editor, a hidden password), use the computer's own.</p>
+          <p>A shell in the server's own folder. It starts when you open the Terminal, and ends when you close this pane. For programs that need a full terminal (an editor, a hidden password), use the computer's own.</p>
           <button className="f-pill is-accent" onClick={() => void start()} disabled={state === "opening"} data-term-start>
             {state === "opening" ? "Starting…" : "Start a shell"}
           </button>
@@ -271,78 +334,7 @@ function TerminalTool({ shown }: { shown: boolean }) {
   );
 }
 
-// ---------------------------------------------------------------- browser
-
-const normal = (raw: string) => {
-  const t = raw.trim();
-  if (!t) return "";
-  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return t;
-  if (/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(t)) return `http://${t}`;
-  if (/^[^\s/]+\.[^\s/]{2,}(\/|$)/.test(t)) return `https://${t}`;
-  return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`;
-};
-
-function BrowserTool() {
-  const [stack, setStack] = useState<{ list: string[]; at: number }>({ list: [], at: -1 });
-  const [text, setText] = useState("");
-  const [nonce, setNonce] = useState(0);
-  const url = stack.list[stack.at] ?? "";
-  const go = (raw: string) => {
-    const u = normal(raw);
-    if (!u) return;
-    setText(u);
-    setStack((s) => ({ list: [...s.list.slice(0, s.at + 1), u], at: s.at + 1 }));
-  };
-  const step = (d: -1 | 1) =>
-    setStack((s) => {
-      const at = Math.max(0, Math.min(s.list.length - 1, s.at + d));
-      setText(s.list[at] ?? "");
-      return { ...s, at };
-    });
-  return (
-    <div className="tool-browser">
-      <form
-        className="tool-addr"
-        onSubmit={(e) => {
-          e.preventDefault();
-          go(text);
-        }}
-      >
-        <button type="button" className="top-btn" disabled={stack.at <= 0} onClick={() => step(-1)} aria-label="Back" data-tip="Back">
-          ←
-        </button>
-        <button type="button" className="top-btn" disabled={stack.at >= stack.list.length - 1} onClick={() => step(1)} aria-label="Forward" data-tip="Forward">
-          →
-        </button>
-        <button type="button" className="top-btn" disabled={!url} onClick={() => setNonce((n) => n + 1)} aria-label="Reload" data-tip="Reload">
-          ↻
-        </button>
-        <input className="tool-addr-field" value={text} onChange={(e) => setText(e.target.value)} placeholder="An address, or words to search" aria-label="Address" data-browser-addr />
-        <button type="button" className="top-btn" disabled={!url} onClick={() => void openExternal(url)} aria-label="Open outside" data-tip="Open in your browser">
-          ↗
-        </button>
-        <button type="button" className="f-pill" disabled={!url} onClick={() => void openUrlAsPanel(url, "app").then(() => toast("On the grid, in the section in use", "ok"))} data-tip="A live card on the grid, in the section in use">
-          On the grid
-        </button>
-      </form>
-      {url ? (
-        <iframe key={`${url}#${nonce}`} className="tool-frame" src={url} title={url} referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-downloads allow-modals" data-browser-frame />
-      ) : (
-        <div className="tool-empty">
-          <b>A page, beside the grid</b>
-          <p>Type an address or a search. Some sites won't show inside another app (they say so with a blank page); ↗ opens those in your browser. "On the grid" makes the page a live card everyone on the grid sees.</p>
-          <span className="tool-chips">
-            {["localhost:1430/#/design", "github.com/joshleong/Foundation", "docs.anthropic.com"].map((u) => (
-              <button key={u} className="f-pill" onClick={() => go(u)}>
-                {u}
-              </button>
-            ))}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-}
+// the browser is its own file: shell/BrowserTool.tsx (a real browser on the server's computer, sent here as pictures)
 
 // ---------------------------------------------------------------- files
 
@@ -438,8 +430,14 @@ const when = (iso: string) => {
   return isNaN(+d) ? iso : d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 
+/** "Tuesday 17 November" for a commit's day */
+const dayOf = (iso: string) => {
+  const d = new Date(iso);
+  return isNaN(+d) ? iso.slice(0, 10) : d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+};
+
 function ChangesTool() {
-  const [face, setFace] = useState<"code" | "releases" | "grid">("code");
+  const [face, setFace] = useState<"code" | "releases" | "grid">("releases");
   const [log, setLog] = useState<{ available: boolean; branch?: string; commits: Commit[]; why?: string } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const board = useBoardTick();
@@ -453,7 +451,7 @@ function ChangesTool() {
   return (
     <div className="tool-changes">
       <div className="tool-faces" role="tablist">
-        {(["code", "releases", "grid"] as const).map((f) => (
+        {(["releases", "code", "grid"] as const).map((f) => (
           <button key={f} role="tab" aria-selected={face === f} className={`agents-tab${face === f ? " is-on" : ""}`} onClick={() => setFace(f)} data-changes-face={f}>
             {f === "code" ? "Code" : f === "releases" ? "Releases" : "This grid"}
           </button>
@@ -468,28 +466,33 @@ function ChangesTool() {
             <p className="tool-note">{log.why}</p>
           ) : (
             <ol className="tool-log">
-              {log.commits.map((c) => (
-                <li key={c.hash} className={`tool-log-row${open === c.hash ? " is-open" : ""}`}>
-                  <button className="tool-log-head" onClick={() => setOpen(open === c.hash ? null : c.hash)} aria-expanded={open === c.hash}>
-                    <span className="tool-log-subject">{c.subject}</span>
-                    <span className="tool-log-meta">
-                      <code>{c.hash.slice(0, 7)}</code> · {c.author} · {when(c.at)}
-                    </span>
-                  </button>
-                  {open === c.hash && c.body && <pre className="tool-log-body">{c.body}</pre>}
-                </li>
-              ))}
+              {log.commits.map((c, i) => {
+                const day = dayOf(c.at);
+                const first = i === 0 || dayOf(log.commits[i - 1].at) !== day;
+                return (
+                  <li key={c.hash} className={`tool-log-row${open === c.hash ? " is-open" : ""}`}>
+                    {/* the commits of one day stand under its name */}
+                    {first && (
+                      <div className="tool-day">
+                        {day} <span>{log.commits.filter((x) => dayOf(x.at) === day).length}</span>
+                      </div>
+                    )}
+                    <button className="tool-log-head has-kind" onClick={() => setOpen(open === c.hash ? null : c.hash)} aria-expanded={open === c.hash}>
+                      <span className="tool-log-kind">
+                        <ReleaseKindGlyph kind={releaseKind(c.subject)} size={14} />
+                      </span>
+                      <span className="tool-log-subject">{c.subject}</span>
+                      <span className="tool-log-meta">
+                        <code>{c.hash.slice(0, 7)}</code> · {c.author} · {when(c.at)}
+                      </span>
+                    </button>
+                    {open === c.hash && c.body && <pre className="tool-log-body">{c.body}</pre>}
+                  </li>
+                );
+              })}
             </ol>
           ))}
-        {face === "releases" &&
-          POSTS.map((p) => (
-            <details key={p.version} className="tool-release" open={p === POSTS[0]}>
-              <summary>
-                <b>{p.version}</b> {p.title} <span className="tool-log-meta">{longDate(p.date)}</span>
-              </summary>
-              <div className="note-rendered releases-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(p.body) }} />
-            </details>
-          ))}
+        {face === "releases" && (POSTS.length === 0 ? <p className="tool-note">No release notes yet: they go in docs/blog/&lt;version&gt;.md.</p> : POSTS.map((p) => <ReleaseCard key={p.version} post={p} running={p.version === RUNNING} />))}
         {face === "grid" &&
           (activity.length === 0 ? (
             <p className="tool-note">Nothing has happened on this grid yet.</p>
@@ -520,28 +523,55 @@ export function t3PageUrl(url: string, here: string = typeof window !== "undefin
   return here === "localhost" ? url.replace(/^http:\/\/127\.0\.0\.1:/, "http://localhost:") : url;
 }
 
-function T3Tool({ shown }: { shown: boolean }) {
+/** the configured T3 address's origin: the page the server hands over for T3 (/api/t3host/open), not anything typed */
+function t3Origin(page: string): string | null {
+  try {
+    return new URL(page).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * T3, in the tools pane or (`full`) as the canvas of its own tab (shell/AppCanvas.tsx). In the pane its page
+ * follows the look around it (dark in the room and at night: `color-scheme` on the frame); the pane's ⤢ opens
+ * the app as a tab, where it wears its own look.
+ */
+export function T3Tool({ shown, full = false }: { shown: boolean; full?: boolean }) {
   const ui = useUi();
+  const caps = useCapabilities();
   const { t3, host } = useAvailable();
   const [busy, setBusy] = useState(false);
   const [page, setPage] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const viewer = ui.role === "viewer";
+  const frameCtx = useFrameContext();
+  const t3Frame = page ? frameFor(page, { ...frameCtx, t3: t3Origin(page) }) : null;
   useEffect(() => {
+    if (!caps.loaded || !caps.local.t3) return;
     void refreshAvailable();
     const t = setInterval(() => void refreshAvailable(), t3 === "running" ? 8000 : 3000);
     return () => clearInterval(t);
-  }, [t3]);
+  }, [t3, caps.loaded, caps.local.t3]);
   // T3's own page, once it runs and someone (not a viewer) has the tool open: a link minted for this opening
   useEffect(() => {
-    if (!shown || t3 !== "running" || page || viewer) return;
+    if (!caps.loaded || !caps.local.t3 || !shown || t3 !== "running" || page || viewer) return;
     void api<{ url: string }>("/api/t3host/open", { method: "POST", json: {} })
       .then((r) => setPage(t3PageUrl(r.url)))
       .catch((e: Error) => setFailed(e.message));
-  }, [shown, t3, page, viewer]);
+  }, [caps.loaded, caps.local.t3, shown, t3, page, viewer]);
   useEffect(() => {
     if (t3 !== "running") setPage(null);
   }, [t3]);
+  if (!caps.local.t3)
+    return (
+      <div className={`tool-t3${full ? " is-full" : ""}`} data-hosted-t3>
+        <div className="tool-empty">
+          <b>This computer's agents</b>
+          <p>Local T3 agents run on a local computer and are turned off on a hosted Foundation server. Connect your own local agent over MCP in Settings → Agents, or use the server's API agent.</p>
+        </div>
+      </div>
+    );
   const press = (what: "start" | "stop") => {
     setBusy(true);
     setFailed(null);
@@ -553,7 +583,7 @@ function T3Tool({ shown }: { shown: boolean }) {
   const agents = host?.agents ?? [];
   const ready = agents.filter((a) => a.state === "ready");
   return (
-    <div className="tool-t3">
+    <div className={`tool-t3${full ? " is-full" : ""}`}>
       <div className="tool-term-head">
         <span className={`f-dot ${t3 === "running" ? "is-ok" : t3 === "error" ? "is-bad" : t3 === "starting" ? "is-live" : ""}`} />
         <span>
@@ -572,9 +602,31 @@ function T3Tool({ shown }: { shown: boolean }) {
             </button>
           </>
         )}
+        {!full && (
+          <button
+            className="top-btn"
+            onClick={() =>
+              void openAppTab({ app: "t3" }).then((err) => {
+                if (err) return toast(err, "bad");
+                setUi({ tool: null });
+              })
+            }
+            aria-label="Open T3 as a tab"
+            data-tip="Open T3 as a tab of its own: it joins All Grids"
+            data-t3-expand
+          >
+            <ExpandGlyph />
+          </button>
+        )}
       </div>
-      {t3 === "running" && page ? (
-        <iframe key={page} className="tool-frame" src={page} title="T3" allow="clipboard-read; clipboard-write; microphone" data-t3-frame />
+      {t3 === "running" && page && t3Frame?.ok ? (
+        // T3's own address (from the server, not typed) keeps its origin; still sandboxed, and never Foundation (frameSandbox.ts)
+        <iframe key={page} className="tool-frame is-themed" src={t3Frame.url} title="T3" allow={frameAllow(t3Frame)} sandbox={t3Frame.sandbox} data-t3-frame />
+      ) : t3 === "running" && page && t3Frame && !t3Frame.ok ? (
+        <div className="tool-empty" data-frame-refused>
+          <b>T3</b>
+          <p>{t3Frame.reason}</p>
+        </div>
       ) : (
         <div className="tool-empty">
           <b>This computer's agents</b>
