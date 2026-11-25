@@ -13,12 +13,14 @@ import type { CharacterState } from "./characters.ts";
 import type { CollectionState } from "./collections.ts";
 import type { UploaderState } from "./avatars.ts";
 import type { LocalProject, LocalWatch } from "./localdev.ts";
+import type { FlowState, TableFeed } from "./flows.ts";
 export * from "./characters.ts";
 export * from "./collections.ts";
 export * from "./chat.ts";
 export * from "./replay.ts";
 export * from "./avatars.ts";
 export * from "./localdev.ts";
+export * from "./flows.ts";
 
 // ---------- board document layout ----------
 
@@ -41,6 +43,7 @@ export const BOARD = {
   uploaders: "uploaders", // uploader panel id → UploaderState (Foundation's avatars wired into it, its timer and its last upload; kept by the server alone)
   local: "local", // project key → LocalProject (this computer's projects, on the LOCAL_GRID_ID grid; kept by the server alone)
   localWatch: "localWatch", // "state" → LocalWatch (whether this computer is being watched, and when it last looked; kept by the server alone)
+  flows: "flows", // fed card id → FlowState (what the server did with what's wired into it: working, ok, error; kept by the server alone, flows.ts)
   desktopLeave: "desktopLeave", // machine panel id → DesktopLeave (a person's leave for agents to use its desktop, and an agent's ask for it; kept by the server alone, off the card)
 } as const;
 
@@ -153,6 +156,8 @@ export interface TableDoc extends ObjectBaseDoc {
   kind: "table";
   cols: number;
   rows: number;
+  /** the lens on what's wired into it (port `rows`), when a person set one (flows.ts) */
+  feed?: TableFeed;
 }
 export interface MapDoc extends ObjectBaseDoc {
   kind: "map";
@@ -800,6 +805,7 @@ export function boardMaps(doc: Y.Doc) {
     collections: doc.getMap<CollectionState>(BOARD.collections),
     uploaders: doc.getMap<UploaderState>(BOARD.uploaders),
     desktopLeave: doc.getMap<DesktopLeave>(BOARD.desktopLeave),
+    flows: doc.getMap<FlowState>(BOARD.flows),
     local: doc.getMap<LocalProject>(BOARD.local),
     localWatch: doc.getMap<LocalWatch>(BOARD.localWatch),
   };

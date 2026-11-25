@@ -75,6 +75,7 @@ import { audit, callScope, type AuditInput, type CallScope, type Door } from "./
 import { contentRefusal, decide, EgressHeld, heldSentence, sendsFor, type Send, type SendKind } from "./egress.ts";
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
+import { layFlowExamples } from "./flows.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
 import { CHAT_TOOLS } from "./chattools.ts";
 import { addReplayCard, placeFile, timelineText, userById } from "./replay.ts";
@@ -696,7 +697,7 @@ export const TOOLS: BoardTool[] = [
   def({
     name: "connect",
     description:
-      "Wire an app's output port to another app's input port. Values the source emits flow to the target (delivered to the running app via the Foundation bridge). A machine card has two ports: `in` (what arrives is written to /foundation/in inside the machine) and `out` (whatever the machine writes to /foundation/out). To or from a machine, the other end may also be a note (its text; port `text`) or a table (its rows, port `rows`, or one cell, e.g. port `B2`): pass the note's or table's id as the panel.",
+      "Wire an app's output port to another app's input port. Values the source emits flow to the target (delivered to the running app via the Foundation bridge). A machine card has two ports: `in` (what arrives is written to /foundation/in inside the machine) and `out` (whatever the machine writes to /foundation/out). A table takes a wire from any output into its rows (port `rows`): the server writes what arrives into its cells through the table's lens (set_table_lens), and a connector card (BomForm, FactoryForm …) puts its system's main list on its `out` port while it's wired. To or from a machine, the other end may also be a note (its text; port `text`) or a table (its rows, port `rows`, or one cell, e.g. port `B2`): pass the note's or table's id as the panel.",
     schema: z.object({ from_panel: z.string(), from_port: z.string(), to_panel: z.string(), to_port: z.string(), label: z.string().optional() }),
     write: true,
     run: (ctx, i) => {
@@ -719,6 +720,8 @@ export const TOOLS: BoardTool[] = [
         const end = (o: typeof a, id: string, port: string, dir: "in" | "out", other: typeof a) => {
           if (o?.kind === "panel") return ensurePort(objects.get(id) as PanelDoc, port, dir);
           if (o?.kind !== "note" && o?.kind !== "table") throw new Error(`no panel ${id}`);
+          // a table takes a wire from anything into its rows: the server fills it through its lens (flows.ts)
+          if (o.kind === "table" && dir === "in" && !cellRef(port) && !isMachine(other)) return TABLE_PORT;
           if (!isMachine(other)) throw new Error(`“${o.name}” is a ${o.kind}: it can be wired to a machine's in or out, not to an app`);
           return o.kind === "note" ? NOTE_PORT : cellRef(port) ? port.toUpperCase() : TABLE_PORT;
         };
@@ -732,6 +735,56 @@ export const TOOLS: BoardTool[] = [
       for (const id of [i.from_panel, i.to_panel]) if (findMachineCard(ctx.boardId, id)?.id === id) watchMachine(ctx.boardId, id);
       touch(ctx, i.to_panel, `connected ${i.from_port} → ${i.to_port}`);
       return link;
+    },
+  }),
+  def({
+    name: "disconnect",
+    description:
+      "Take a wire off (by its link id, or by its two ends). What it carried stops flowing: an app's input goes empty, a table fed by it keeps its last rows and says it's no longer fed. A person's ⌘Z puts it back. Requires confirm: true.",
+    schema: z.object({ link: z.string().optional(), from_panel: z.string().optional(), to_panel: z.string().optional(), confirm: z.boolean(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      if (!i.confirm) return "not disconnected: pass confirm: true after checking with the person";
+      const gone = editBoard(ctx.boardId, "agent", (doc) => {
+        const links = boardMaps(doc).links;
+        const hit = [...links.values()].filter((l) => (i.link ? l.id === i.link : (!i.from_panel || l.from.panel === i.from_panel) && (!i.to_panel || l.to.panel === i.to_panel) && Boolean(i.from_panel || i.to_panel)));
+        for (const l of hit) links.delete(l.id);
+        return hit;
+      });
+      if (!gone.length) throw new HttpError(404, "no wire like that on this board");
+      touch(ctx, gone[0].to.panel, `disconnected ${plural(gone.length, "wire")}`);
+      return { removed: gone.map((l) => l.id) };
+    },
+  }),
+  def({
+    name: "set_table_lens",
+    description:
+      "Set the lens on a table that has a wire into it: which rows pass (filter: clauses like `stage = testing; itemsOpen > 0; name ~ motor`, ops = != > < >= <= ~ contains !~), which columns to keep (comma separated, by name) and how many rows (limit). The server refills the table from what's wired in.",
+    schema: z.object({ table: z.string(), filter: z.string().optional(), columns: z.string().optional(), limit: z.number().int().min(1).max(500).optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      const t = editBoard(ctx.boardId, "agent", (doc) => {
+        const objects = boardMaps(doc).objects;
+        const o = objects.get(i.table);
+        if (o?.kind !== "table") throw new HttpError(404, `no table ${i.table}`);
+        const feed = { ...(o.feed ?? {}), ...(i.filter !== undefined ? { filter: i.filter } : {}), ...(i.columns !== undefined ? { columns: i.columns } : {}), ...(i.limit !== undefined ? { limit: i.limit } : {}) };
+        objects.set(o.id, { ...o, feed });
+        return o;
+      });
+      touch(ctx, t.id, `set the lens on “${t.name}”`);
+      return { table: t.id };
+    },
+  }),
+  def({
+    name: "lay_flow_examples",
+    description:
+      "Lay worked examples of data piped between cards into a \"Flows\" section: BomForm → a table with a lens (cert programs with items open), FactoryForm → a table of its stations, and a table of places → a map. Each is live: taking a wire off stops it. Laid once per board.",
+    schema: z.object({ request_id: z.string().optional() }),
+    write: true,
+    run: (ctx) => {
+      const out = layFlowExamples(ctx.boardId, ctx.actor);
+      if (!out.already) touch(ctx, undefined, `laid the flow examples (${plural(out.cards.length, "card")}, ${plural(out.links.length, "wire")})`);
+      return out;
     },
   }),
   def({
