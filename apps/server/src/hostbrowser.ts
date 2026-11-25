@@ -49,6 +49,7 @@
  *   {t:"agents", allow, by?} · {t:"agent", who, did, tab}
  *   {t:"copied", text} · {t:"note", text, bad?} · {t:"closed", why}
  *   {t:"seen", at}                           a page card's picture was kept just now
+ *   {t:"focus", editing}                     after a press is let go: whether the caret is now in a field
  */
 
 import { childOptions, spawnChild, type ChildProcess, type SpawnOptions } from "./child.ts";
@@ -1071,7 +1072,14 @@ export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo, pa
         if (!tab) break;
         const kind = m.kind === "down" ? "mousePressed" : m.kind === "up" ? "mouseReleased" : "mouseMoved";
         const button = kind === "mouseMoved" && !int(m.buttons, 0, 7) ? "none" : (BUTTONS[int(m.button, 0, 2)] ?? "left");
-        void input(run, tab, "Input.dispatchMouseEvent", { type: kind, x: num(m.x, 0, 8000), y: num(m.y, 0, 8000), button, buttons: int(m.buttons, 0, 7), clickCount: kind === "mouseMoved" ? 0 : int(m.clicks, 1, 3, 1), modifiers: int(m.mods, 0, 15) }).catch(() => {});
+        const sent = input(run, tab, "Input.dispatchMouseEvent", { type: kind, x: num(m.x, 0, 8000), y: num(m.y, 0, 8000), button, buttons: int(m.buttons, 0, 7), clickCount: kind === "mouseMoved" ? 0 : int(m.clicks, 1, 3, 1), modifiers: int(m.mods, 0, 15) });
+        // a press let go: did it land in a field? (a page card at rest takes the keys only then)
+        if (kind === "mouseReleased")
+          void sent
+            .then(() => run.cdp.send<{ result: { value?: boolean } }>("Runtime.evaluate", { expression: EDITING, returnByValue: true }, tab.session))
+            .then((v) => say(s, { t: "focus", editing: v.result.value === true }))
+            .catch(() => {});
+        else void sent.catch(() => {});
         break;
       }
       case "wheel": {
@@ -1196,6 +1204,8 @@ export function attachHostBrowser(_id: string, ws: WebSocket, user: UserInfo, pa
 }
 
 /** what the page has selected, as text (an input's selection, else the document's) */
+/** is the caret in something that takes typing (a field, an editor, or a frame from another site, which can't be looked into)? */
+const EDITING = `(() => { let a = document.activeElement; try { while (a && a.tagName === "IFRAME" && a.contentDocument) a = a.contentDocument.activeElement; } catch {} if (!a) return false; if (a.tagName === "IFRAME" || a.isContentEditable) return true; if (a.disabled || a.readOnly) return false; if (a.tagName === "TEXTAREA") return true; if (a.tagName === "INPUT") return !/^(button|submit|reset|checkbox|radio|range|color|file|image|hidden)$/i.test(a.type); return false; })()`;
 const SELECTION = `(() => { const a = document.activeElement; try { if (a && typeof a.selectionStart === "number" && a.selectionEnd > a.selectionStart && a.type !== "password") return a.value.slice(a.selectionStart, a.selectionEnd); } catch {} return String(getSelection() || ""); })()`;
 
 // ---------------------------------------------------------------- agents

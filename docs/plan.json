@@ -299,7 +299,7 @@
       "milestone": "apps",
       "area": "apps",
       "status": "needs-you",
-      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size.",
+      "body": "Today → ⤢ beside HyperForm, Ctrl/⌘-click the page, sign in with your work Google account. The server's browser keeps the sign-in, so PartForm, DeployForm and FactoryForm then open signed in and their pictures are kept. Not checked: whether Google allows its sign-in in that browser (SPEC §7); if it refuses, the next step is HyperForm's token or machine certificate. Also look at how each app reads at a section's size. PartForm then asks for OnShape's sign-in: since 2026-11-24 the PartForm card is a page of that browser by itself (OnShape refuses frames), and a plain click on its button works.",
       "issue": 220
     },
     {
@@ -2491,6 +2491,15 @@
       "status": "review",
       "body": "2026-11-24, Josh: 'the tabs are too far out on mac and should be brought back to that panel line'. The group over the open menu was sized paneW − 16, but a Mac's bar starts 84 px in for its lights, so it ran 68 px past the menu. One --bar-inset now (12 px, 84 on a Mac) and the group is the menu's width less it; at a narrow menu ChatForm, then Today, keep their marks (names kept). e2e/today-corner.spec.ts holds it at 220, 272, 340 and 420 px. A person checks: the installed Mac app after the next release.",
       "issue": 247
+    },
+    {
+      "id": "page-clicks",
+      "title": "PartForm in the built-in browser; a page card takes a click, not the wheel or the keys",
+      "kind": "plan",
+      "milestone": "apps",
+      "area": "apps",
+      "status": "review",
+      "body": "Josh, 2026-11-24: PartForm on the Form Industries grid was turned away by OnShape's sign-in; pages should take button clicks and leave scroll, zoom and the panel keys to the grid. Found: the card was a frame (pasted address), and OnShape's sign-in refuses every frame (frame-ancestors *.onshape.com). Built (SPEC §0.10): pages on HyperForm are the built-in browser's unless the card says frame; a site that refuses a frame becomes a browser card; at rest a plain click (and hover) is the page's, the wheel, Ctrl-wheel, middle/right buttons and keys are the grid's, and a click in a field gives the page the keys until Esc Esc. Checked in e2e/pages.spec.ts against a stand-in. Not done: frames unchanged; nobody has signed in to OnShape in that browser (hyperform-sign-in)."
     }
   ]
 }

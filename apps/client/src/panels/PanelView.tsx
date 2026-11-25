@@ -25,7 +25,7 @@ import { drawnScaleOf } from "./scaledMouse";
 import { ObjectFrame } from "../components/ObjectFrame";
 import { beginConnect, beginDetach, beginGather, usePortLayout } from "../shell/AgentLayer";
 import { landingsOf, toneOf } from "../shell/ports";
-import { CHARACTER_TYPE } from "@foundation/protocol";
+import { CHARACTER_TYPE, pageInBrowser } from "@foundation/protocol";
 import { api, fetchFile, uploadFile } from "../lib/api";
 import { fileLink, useFileSrc } from "../lib/fileSrc";
 import { ProgressiveImage } from "../components/ProgressiveImage";
@@ -121,7 +121,7 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
   const body =
     panel.panel === "machine" && (panel.machine || panel.vm) ? (
       <MachineBody panel={panel} />
-    ) : (panel.panel === "app" || panel.panel === "link") && panel.via === "browser" && panel.url && !panel.fromMachine ? (
+    ) : pageInBrowser(panel) ? (
       <BrowserPage panel={panel} />
     ) : panel.panel === "app" || panel.panel === "link" || panel.panel === "machine" ? (
       <LiveFrame panel={panel} />
