@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-20T22:14:26.624Z",
+  "syncedAt": "2026-11-25T04:13:51.424Z",
   "columns": [
     {
       "id": "needs-you",
@@ -2409,7 +2409,8 @@
       "milestone": "ship",
       "area": "design",
       "status": "review",
-      "body": "Josh, 2026-11-24. Every note is written as formatted text with the toolbar and kept as markdown; the card's bar has Markdown (turns the card to its markdown and back) and Background (takes the paper away); the toolbar has the text size (five steps, the whole note's). The section menu has one Note. Existing notes of both kinds open as this note with nothing rewritten, and a note is not rewritten by a click. add_note takes text_size and background. Checked in two browsers (e2e/section-agents.spec.ts and four more), day and night on #/design; evidence in docs/evidence/2026-11-24_one-note. A person checks: write in a note, set it large, take its background away and turn it to markdown, in the desktop app; and an old markdown note of your own still reads as you wrote it. Not done: Rune still opens a plain note as markdown in its own field (SPEC 7)."
+      "body": "Josh, 2026-11-24. Every note is written as formatted text with the toolbar and kept as markdown; the card's bar has Markdown (turns the card to its markdown and back) and Background (takes the paper away); the toolbar has the text size (five steps, the whole note's). The section menu has one Note. Existing notes of both kinds open as this note with nothing rewritten, and a note is not rewritten by a click. add_note takes text_size and background. Checked in two browsers (e2e/section-agents.spec.ts and four more), day and night on #/design; evidence in docs/evidence/2026-11-24_one-note. A person checks: write in a note, set it large, take its background away and turn it to markdown, in the desktop app; and an old markdown note of your own still reads as you wrote it. Not done: Rune still opens a plain note as markdown in its own field (SPEC 7).",
+      "issue": 243
     }
   ]
 }
