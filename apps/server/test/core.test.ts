@@ -68,17 +68,26 @@ test("deletes need confirm; request_id makes writes idempotent", async () => {
   assert.ok(!boardMaps(board.doc).objects.has(a.id));
 });
 
-test("add_note can make a text box: the same markdown in the note's text, marked rich on the card", async () => {
+test("add_note makes the one note: its markdown in the note's text, its text size and its paper on the card", async () => {
   const board = getBoard("test-board");
   const ctx = { boardId: "test-board", actor: "test", userId: "u" };
-  const box = (await runTool(ctx, "add_note", { title: "Plan", markdown: "# Plan\n\n**Ship** it", text_box: true })) as { id: string };
-  const plain = (await runTool(ctx, "add_note", { title: "Plain", markdown: "x" })) as { id: string };
+  const label = (await runTool(ctx, "add_note", { title: "Plan", markdown: "# Plan\n\n**Ship** it", text_size: "xl", background: false })) as { id: string };
+  const plain = (await runTool(ctx, "add_note", { title: "Plain", markdown: "x", text_size: "m", background: true })) as { id: string };
+  // what an older caller still sends: taken, and it makes the same note
+  const old = (await runTool(ctx, "add_note", { title: "Old", markdown: "y", text_box: true })) as { id: string };
   const m = boardMaps(board.doc);
-  const card = m.objects.get(box.id) as { kind: string; rich?: boolean };
+  const card = m.objects.get(label.id) as { kind: string; rich?: boolean; size?: string; bare?: boolean };
   assert.equal(card.kind, "note");
-  assert.equal(card.rich, true);
-  assert.equal(m.noteText.get(box.id)?.toString(), "# Plan\n\n**Ship** it");
-  assert.equal((m.objects.get(plain.id) as { rich?: boolean }).rich, undefined);
+  assert.equal(card.size, "xl");
+  assert.equal(card.bare, true);
+  assert.equal(m.noteText.get(label.id)?.toString(), "# Plan\n\n**Ship** it");
+  for (const id of [plain.id, old.id]) {
+    const c = m.objects.get(id) as { rich?: boolean; size?: string; bare?: boolean };
+    assert.equal(c.rich, undefined);
+    assert.equal(c.size, undefined, "the usual size isn't written");
+    assert.equal(c.bare, undefined);
+  }
+  await assert.rejects(async () => runTool(ctx, "add_note", { title: "Bad", markdown: "z", text_size: "huge" }));
 });
 
 test("repo search stays inside the company's repos: every word, name hits first", () => {

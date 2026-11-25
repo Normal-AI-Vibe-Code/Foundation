@@ -1,7 +1,7 @@
 /**
- * The note editor: CodeMirror 6 bound straight to the note's shared Y.Text
- * (y-codemirror.next). Loaded only when someone opens a note for writing, so
- * a board of notes costs one rendered markdown block each and no editors.
+ * The note's markdown, for writing: CodeMirror 6 bound straight to the note's shared Y.Text
+ * (y-codemirror.next). Loaded only when someone turns a note to its markdown, so
+ * a board of notes costs one block of formatted text each and no editors.
  *
  * - Every keystroke is a Yjs insert/delete at its own position: two people
  *   typing into the very same word keep two whole runs, never interleaved
@@ -51,8 +51,10 @@ export interface NoteEditorOptions {
   /** the note's undo stack: only your own typing */
   undoManager: Y.UndoManager | false;
   carets?: CaretSource;
-  /** Esc, ⌘↵ or focus leaving: back to the rendered note */
+  /** Esc, ⌘↵ or focus leaving: back to the formatted note */
   onDone?(): void;
+  /** focus leaving isn't done: the markdown stays showing until Esc, ⌘↵ or its button */
+  stay?: boolean;
   /** where to put the caret on open (default: the end) */
   at?: number;
   focus?: boolean;
@@ -104,7 +106,7 @@ export function mountNoteEditor(parent: HTMLElement, o: NoteEditorOptions): Note
       ),
     );
   if (o.carets) extensions.push(peerCarets(o.carets));
-  if (o.onDone) {
+  if (o.onDone && !o.stay) {
     const done = o.onDone;
     extensions.push(
       EditorView.domEventHandlers({

@@ -1,14 +1,18 @@
 /**
- * The agents of a section, in the section, and the text box (2026-11-13),
+ * The agents of a section, in the section, and the note (2026-11-13; one
+ * note since 2026-11-24: the text box and the markdown note are the same card),
  * checked by two people in their own browsers. The agents run on the
  * server's script runtime (the real board tools, no model).
  *
  * - every section carries the agents chip and the way into its own grid, at rest;
- * - the right-click menu leads with asking an agent, and adds a text box, a
- *   markdown note and the agents card;
- * - a text box is written as formatted text (a title, bold, a list, an
+ * - the right-click menu leads with asking an agent, and adds a note
+ *   and the agents card;
+ * - a note is written as formatted text (a title, bold, a list, an
  *   underline: toolbar and keys) and kept as the note's markdown; Kai sees it
  *   formatted, writes in it too, and both keep their words;
+ * - its text size (the toolbar), its background (the bar) and its markdown
+ *   (the bar: the same text, written as source), and a note written by hand
+ *   in markdown is not rewritten by being clicked in;
  * - the chip opens the section's agents in its corner; an ask from there
  *   brings an agent into that section (the chip counts it, for Kai too), the
  *   panel lists it, and afterwards what agents made there;
@@ -21,6 +25,8 @@ import { test, expect, type Page } from "@playwright/test";
 import { CLIENT, person, settle } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-15_one-interface/section-agents";
+/** the one note (2026-11-24): its text size, its background, its markdown */
+const NOTE_SHOTS = "../../docs/evidence/2026-11-24_one-note";
 let ada: Page;
 let kai: Page;
 let board = "";
@@ -28,12 +34,12 @@ let section = { id: "", name: "" };
 
 test.describe.configure({ mode: "serial" });
 
-type Store = { getState(): { sections: Record<string, { id: string; name: string }>; notes: Record<string, { id: string; text: string; rich?: boolean }>; panels: Record<string, { panel: string; sectionId: string }> }; setState(p: object): void };
+type Store = { getState(): { sections: Record<string, { id: string; name: string }>; notes: Record<string, { id: string; name: string; text: string; size?: string; bare?: boolean }>; panels: Record<string, { panel: string; sectionId: string }> }; setState(p: object): void };
 const store = (p: Page) => p.evaluateHandle(() => (window as unknown as { __foundation: Store }).__foundation);
 const richText = (p: Page) =>
   p.evaluate(() => {
     const st = (window as unknown as { __foundation: Store }).__foundation.getState();
-    return Object.values(st.notes).find((n) => n.rich)?.text ?? null;
+    return Object.values(st.notes).find((n) => /^Note \d+$/.test(n.name))?.text ?? null;
   });
 
 test.beforeAll(async ({ browser }) => {
@@ -67,7 +73,7 @@ test("a section at rest wears its council's mark and says it opens as a grid; th
   await expect(menu).toBeVisible();
   const labels = (await menu.locator(".menu-item").allInnerTexts()).map((t) => t.replace(/^\S+\s+/, "").trim());
   expect(labels[0]).toBe("Council: ask this section's agents…");
-  for (const want of ["Text box", "Markdown note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine"]) expect(labels).toContain(want);
+  for (const want of ["Note", "Table", "Map", "App or web page…", "Agents card", "Huddle", "Machine"]) expect(labels).toContain(want);
   // the grid's own actions are a row of icons now (2026-11-17), each named on roll-over
   await expect(menu.locator('.menu-iconrow button[aria-label="Open as its own grid"]')).toHaveAttribute("data-tip", "Open as its own grid");
   await expect(menu.locator(".menu-item.is-agent")).toHaveCount(2);
@@ -76,10 +82,12 @@ test("a section at rest wears its council's mark and says it opens as a grid; th
   expect(m.y).toBeGreaterThanOrEqual(0);
   expect(m.y + m.height).toBeLessThanOrEqual(900);
   await ada.screenshot({ path: `${SHOTS}/00_menu.png` });
-  await menu.locator(".menu-item", { hasText: "Text box" }).click();
+  expect(labels, "one note, not two kinds of it").not.toContain("Markdown note");
+  expect(labels).not.toContain("Text box");
+  await menu.locator(".menu-item", { hasText: /Note$/ }).click();
 });
 
-test("a text box is written as formatted text and kept as the note's markdown; two people write in it", async () => {
+test("a note is written as formatted text and kept as markdown; two people write in it", async () => {
   const text = ada.locator(".rich-text");
   await expect(text).toBeFocused();
   await expect(ada.locator(".rich-bar")).toBeVisible();
@@ -135,6 +143,141 @@ test("a text box is written as formatted text and kept as the note's markdown; t
   await expect(text.locator("em")).toHaveText("sooner");
   await settle(kai, 400);
   await kai.screenshot({ path: `${SHOTS}/02_kai-text-box-at-rest.png` });
+});
+
+test("one note: its text size, its background and its markdown, for both people; markdown written by hand isn't rewritten by a click", async () => {
+  const card = ada.locator(".note-card");
+  const text = ada.locator(".note-card .rich-text");
+  const his = kai.locator(".note-card .rich-text");
+  const WRITTEN = "# Launch plan for 0.4\n\nShip the **desktop app** this week\n\n- Sign the build\n- <u>Tell everyone</u> _sooner_";
+  const card0 = (p: Page) =>
+    p.evaluate(() => {
+      const n = Object.values((window as unknown as { __foundation: Store }).__foundation.getState().notes).find((x) => /^Note \d+$/.test(x.name))!;
+      return { id: n.id, size: n.size ?? null, bare: n.bare ?? null };
+    });
+  const px = (l: typeof text) => l.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  const away = (p: Page) => p.mouse.move(8, 892);
+
+  // ---- text size: the toolbar's two As, a step at a time, the whole note's; the caret stays in the text
+  await text.locator("h1").click();
+  const larger = ada.locator('.rich-btn[aria-label="Larger text"]');
+  const smaller = ada.locator('.rich-btn[aria-label="Smaller text"]');
+  const base = await px(text);
+  await larger.click();
+  await larger.click();
+  await expect.poll(() => card0(ada).then((c) => c.size)).toBe("xl");
+  expect(await px(text)).toBeCloseTo(base * 2, 1);
+  await expect(text).toBeFocused();
+  await expect.poll(() => kai.locator(".note-card .note-inner").getAttribute("data-size"), { message: "Kai sees it large" }).toBe("xl");
+  expect(await px(his)).toBeCloseTo(base * 2, 1);
+  // it stops at the largest, and a size is the card's: the markdown is as it was
+  await larger.click();
+  await expect(larger).toBeDisabled();
+  await smaller.click();
+  await expect.poll(() => card0(ada).then((c) => c.size)).toBe("xl");
+  expect(await richText(ada)).toBe(WRITTEN);
+  await ada.keyboard.press("Escape");
+
+  // ---- background: the sheet button in the card's bar takes the paper away, for Kai too
+  await card.hover();
+  const bare = ada.locator(".note-card .note-bare-btn");
+  await expect(bare).toHaveAttribute("aria-pressed", "false");
+  await bare.click();
+  await expect(bare).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => card0(kai).then((c) => c.bare)).toBe(true);
+  await away(kai);
+  await expect(kai.locator(".note-card")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  // no paper, so no paper's shadow: chosen (Kai wrote in it), it wears the ring alone
+  await expect(kai.locator(".note-card")).toHaveCSS("box-shadow", /0px 0px 0px 2\.5px$/);
+  await expect(his.locator("h1")).toHaveText("Launch plan for 0.4");
+  await settle(kai, 500);
+  await kai.screenshot({ path: `${NOTE_SHOTS}/01_large-no-background-night.png` });
+  expect(await richText(ada), "nor does the background touch the words").toBe(WRITTEN);
+
+  // ---- markdown: the Markdown button turns the card to its markdown, the same shared text
+  await card.hover();
+  const md = ada.locator(".note-card .note-md-btn");
+  await md.click();
+  const cm = ada.locator(".note-card .cm-content");
+  await expect(cm).toBeVisible({ timeout: 10_000 });
+  await expect(md).toHaveAttribute("aria-pressed", "true");
+  await expect(text).toHaveCount(0);
+  await expect(cm).toContainText("# Launch plan for 0.4");
+  await expect(cm).toContainText("<u>Tell everyone</u> _sooner_");
+  await ada.keyboard.press("Control+End");
+  await ada.keyboard.type("\n- **Post** it");
+  await expect.poll(() => richText(kai)).toBe(`${WRITTEN}\n- **Post** it`);
+  // Kai is reading the formatted text: what she writes as markdown arrives formatted
+  await expect(his.locator("li")).toHaveCount(3);
+  await expect(his.locator("li strong")).toHaveText("Post");
+  await settle(ada, 400);
+  await ada.screenshot({ path: `${NOTE_SHOTS}/02_as-markdown-night.png` });
+  // the markdown stays up when the caret leaves it; Esc (or the button) goes back to the formatted text
+  await card.locator(".frame-title").click();
+  await expect(cm).toBeVisible();
+  await cm.click();
+  await ada.keyboard.press("Escape");
+  await expect(cm).toHaveCount(0);
+  await expect(text.locator("li")).toHaveCount(3);
+  await expect(md).toHaveAttribute("aria-pressed", "false");
+
+  // ---- paper back, the usual size: nothing is left on the card
+  await card.hover();
+  await bare.click();
+  await text.locator("h1").click();
+  await smaller.click();
+  await smaller.click();
+  await expect.poll(() => card0(ada)).toMatchObject({ size: null, bare: null });
+  await ada.keyboard.press("Escape");
+  await away(ada);
+  await settle(ada, 500);
+  await ada.screenshot({ path: `${NOTE_SHOTS}/03_formatted-at-rest-night.png` });
+
+  // ---- a note an agent wrote by hand: read as formatted text, and a click in it and out again writes nothing
+  const HAND = "*By hand*, with a star.\n\n* one\n* two\n\n1) first\n2) second";
+  const made = await ada.context().request.post(`${CLIENT}/api/boards/${board}/tools/add_note`, { data: { section: section.name, title: "By hand", markdown: HAND } });
+  expect(made.ok(), await made.text()).toBe(true);
+  const idByName = () => ada.evaluate(() => Object.values((window as unknown as { __foundation: Store }).__foundation.getState().notes).find((x) => x.name === "By hand")?.id ?? "");
+  await expect.poll(idByName).not.toBe("");
+  const handId = await idByName();
+  const textOf = (p: Page) => p.evaluate((id) => (window as unknown as { __foundation: Store }).__foundation.getState().notes[id]?.text ?? null, handId);
+  await expect.poll(() => textOf(ada)).toBe(HAND);
+  await ada.evaluate((id) => (window as unknown as { __foundation: Store }).__foundation.setState({ snapRequest: { kind: "object", id, nonce: Math.random() } }), handId);
+  await settle(ada, 1200);
+  const byHand = ada.locator(`[data-obj-id="${handId}"] .rich-text`);
+  await expect(byHand.locator("em")).toHaveText("By hand");
+  await expect(byHand.locator("li")).toHaveCount(4);
+  await byHand.locator("em").click();
+  await expect(byHand).toBeFocused();
+  await ada.keyboard.press("Escape");
+  await settle(ada, 300);
+  expect(await textOf(ada), "looked at, not rewritten").toBe(HAND);
+  // a drag across its words selects them: the words don't move when the press puts the caret in
+  await ada.locator(`[data-obj-id="${handId}"] .frame-card`).hover();
+  await settle(ada, 500);
+  const line = (await byHand.locator("p").first().boundingBox())!;
+  const before = await byHand.locator("p").first().evaluate((el) => el.getBoundingClientRect().y);
+  await ada.mouse.move(line.x + 2, line.y + line.height / 2);
+  await ada.mouse.down();
+  await ada.mouse.move(line.x + line.width * 0.6, line.y + line.height / 2, { steps: 8 });
+  await ada.mouse.up();
+  const picked = await ada.evaluate(() => getSelection()?.toString() ?? "");
+  expect(picked.length, `a drag selects words (“${picked}”)`).toBeGreaterThan(3);
+  expect("By hand, with a star.").toContain(picked.trim());
+  expect(Math.abs((await byHand.locator("p").first().evaluate((el) => el.getBoundingClientRect().y)) - before), "the line stays where it was pressed").toBeLessThan(1);
+  await ada.keyboard.press("Escape");
+  await settle(ada, 300);
+  expect(await textOf(ada), "selected, not rewritten").toBe(HAND);
+  // written in, it is kept as the note's markdown from then on
+  await byHand.locator("em").click();
+  await ada.keyboard.press("Control+End");
+  await ada.keyboard.type("!");
+  await expect.poll(() => textOf(kai)).toBe("_By hand_, with a star.\n\n- one\n- two\n\n1. first\n2. second!");
+  await ada.keyboard.press("Escape");
+  // back where the next check expects to be: on the first note
+  const first = (await card0(ada)).id;
+  await ada.evaluate((id) => (window as unknown as { __foundation: Store }).__foundation.setState({ snapRequest: { kind: "object", id, nonce: Math.random() } }), first);
+  await settle(ada, 1200);
 });
 
 test("the chip brings the section's council up on its top edge; a line to all from there brings an agent in, for everyone", async () => {
@@ -216,7 +359,7 @@ test("the menu's Agents card puts the section's agents on the grid as a card, fo
   await expect(ask).toHaveCount(0);
 });
 
-test("agents in the section and the text box on #/design, day and night", async ({ browser }) => {
+test("agents in the section and the note on #/design, day and night", async ({ browser }) => {
   for (const scheme of ["dark", "light"] as const) {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme });
     // a refused sign-in (dev sign-in is refused while T3, the built-in terminal or a job has a shell here) says so
@@ -229,10 +372,10 @@ test("agents in the section and the text box on #/design, day and night", async 
     await agents.scrollIntoViewIfNeeded();
     await settle(p, 900);
     await agents.screenshot({ path: `${SHOTS}/08_design-agents-${when}.png` });
-    const box = p.locator(".text-box-demo");
+    const box = p.locator(".note-demo");
     await box.scrollIntoViewIfNeeded();
     await settle(p, 500);
-    await box.screenshot({ path: `${SHOTS}/09_design-text-box-${when}.png` });
+    await box.screenshot({ path: `${NOTE_SHOTS}/09_design-note-${when}.png` });
     await ctx.close();
   }
 });

@@ -81,8 +81,7 @@ const MENU: MenuItem[] = [
   { icon: "⚇", label: "Council: ask this section's agents…", agent: true },
   ...tag("add", [
     { heading: "Add" },
-    { icon: "¶", label: "Text box" },
-    { icon: "▤", label: "Markdown note" },
+    { icon: "¶", label: "Note" },
     { icon: "⊞", label: "Table" },
     { icon: "◍", label: "Map" },
     { icon: "⇪", label: "Image, video or file…" },

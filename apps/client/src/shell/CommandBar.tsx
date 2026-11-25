@@ -165,7 +165,7 @@ export function CommandBar() {
       ...(sec && st.allSections[sec] ? [{ id: "council-section", glyph: "⚇", label: `Council: the agents in ${st.allSections[sec].name}`, hint: "who's at work in this section", run: () => openCouncil({ kind: "section", id: sec }) }] : []),
       { id: "character-studio", glyph: "☺", label: "Open the Character studio", hint: "inspiration → sheet → 3D model or mesh avatar, for the council", run: () => void openCharacterStudio() },
       ...(sec ? [{ id: "character", glyph: "☺", label: "Add a character to this section", hint: "a card that draws, models and animates an avatar", run: () => void newCharacter(sec) }] : []),
-      { id: "note", glyph: "▤", label: "Add a note", run: () => void addNote(sec) },
+      { id: "note", glyph: "¶", label: "Add a note", run: () => void addNote(sec) },
       { id: "table", glyph: "⊞", label: "Add a table", run: () => void createTable(sec) },
       { id: "machine", glyph: "▣", label: "Start a machine in this section", hint: "Linux on Kiri or Docker, with a shared terminal", run: () => void startMachine(sec) },
       { id: "native-vm", glyph: "▣", label: "Add a full operating system / WildOS VM", hint: "A local VM from an ISO, desktop and guest commands", run: () => void startVm(sec) },

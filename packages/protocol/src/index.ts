@@ -172,11 +172,21 @@ export interface NoteDoc extends ObjectBaseDoc {
    */
   text?: string;
   /**
-   * A text box: the same markdown in the same Y.Text, written as formatted
-   * text (a toolbar, no markup on screen) instead of as markdown source.
+   * Retired (2026-11-24). It marked a "text box", a note written as formatted
+   * text, apart from a "markdown note" written as source. There is one note
+   * now: every note is written as formatted text and can show its markdown.
+   * Older cards still carry it; nothing reads it but Rune (which draws a note
+   * itself unless it was made as a text box).
    */
   rich?: boolean;
+  /** how large its text is set (unset: "m") */
+  size?: NoteSize;
+  /** no paper behind it: the words stand on the section itself */
+  bare?: boolean;
 }
+/** a note's text sizes, smallest first */
+export const NOTE_SIZES = ["s", "m", "l", "xl", "xxl"] as const;
+export type NoteSize = (typeof NOTE_SIZES)[number];
 export interface MediaDoc extends ObjectBaseDoc {
   kind: "media";
   w: number;

@@ -128,6 +128,7 @@ import { SlackMarkView } from "../components/SlackMark";
 import { SectionCrewView, type CrewFace } from "../components/SectionCrew";
 import { SectionAgentsChipView, SectionAgentsView } from "../components/SectionAgents";
 import { RichToolbar } from "../components/RichText";
+import { BareGlyph, MarkdownGlyph } from "../components/NoteView";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
 import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
 import { MachineTools } from "../panels/MachineTools";
@@ -177,7 +178,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
   floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
-  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Text box", "Writing together"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Note", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
   chat: ["ChatForm"],
@@ -353,7 +354,7 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
           <div key={h} className="adapt-row keys-sections">
             {[260, 400, 560].map((w) => (
               <div key={w} className="keys-section" style={{ width: w, height: h }}>
-                <SectionEmpty name={`Section · ${w} × ${h}`} onUpload={() => {}} onNote={() => {}} onText={() => {}} onAsk={() => {}} onFocus={() => {}} />
+                <SectionEmpty name={`Section · ${w} × ${h}`} onUpload={() => {}} onNote={() => {}} onAsk={() => {}} onFocus={() => {}} />
               </div>
             ))}
           </div>
@@ -1191,8 +1192,8 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <EgressDemo />
       </Section>
 
-      <Section title="Text box" note={`A note written as formatted text: what you see is what's kept. Click in it to write; a toolbar rides the card's foot while it has the caret (raised paper, card radius, 34 tall): the style (Body, Title, Heading, Subheading), bold, italic, underline, strikethrough, bulleted and numbered lists, quote, link, clear. A mark that's on is the pulse tint. ${keys("mod+B")}, ${keys("mod+I")} and ${keys("mod+U")} work as in any word processor. Under it, it is the note's own markdown in the note's shared text, so search, agents and the other renderer read it as they read any note; underline is kept as <u>. From the right-click menu (Text box), and from an empty section's Write.`}>
-        <TextBoxDemo />
+      <Section title="Note" note={`One kind of note (2026-11-24: the text box and the markdown note are the same card). It is written as formatted text: what you see is what's kept. Click in it to write; a toolbar rides the card's foot while it has the caret (raised paper, card radius, 34 tall): the style (Body, Title, Heading, Subheading), the text size (a small A and a large A: a step smaller or larger, the whole note's, five sizes), bold, italic, underline, strikethrough, bulleted and numbered lists, quote, link, clear. A mark that's on is the pulse tint. ${keys("mod+B")}, ${keys("mod+I")} and ${keys("mod+U")} work as in any word processor. It is kept as markdown in the note's shared text, so search, agents and the other renderer read what was written; underline is kept as <u>. The card's bar carries two buttons of the note's own, at its right: Background (a sheet; dashed when the paper is off) takes the paper, edge and shadow away so the words stand on the section, and Markdown (the M and arrow) turns the card to its markdown, in the editor's mono on the abyss, and back. On, each is the pulse on its tint. From the right-click menu (Note), a section's toolbar, and an empty section's Write.`}>
+        <NoteDemo />
       </Section>
 
       <Section title="Pictures and links from elsewhere" note="Text an agent, a tool, Slack, a README or another app wrote is drawn as markdown, and what it points at stays put until a person chooses. A picture from any address but Foundation's own files (or one written into the text) is a dashed pill on raised paper: Image from and its host in ink, and Load image, which loads that one picture, this time; nothing is remembered. A link says where it really goes: its host in code type, dim 11, beside the words (unless the words already name it), and it opens in a new tab that can't reach back. Only web addresses become links.">
@@ -1654,30 +1655,73 @@ function ElsewhereDemo() {
   );
 }
 
-/** a text box at rest and while it's written in (the toolbar's marks on) */
-function TextBoxDemo() {
-  const html = renderMarkdown("# Launch plan\n\nShip the **desktop app** this week, _signed_ and <u>notarised</u>.\n\n- Sign the build\n- ~~Email the list~~ post in #launch\n\n> Nothing ships on a Friday.");
+/**
+ * The note (one kind since 2026-11-24): at rest, while it's written in (the toolbar's marks on, the two As
+ * of its text size), turned to its markdown (the bar's Markdown button on), and set large with its paper
+ * taken away (the bar's Background button on).
+ */
+function NoteDemo() {
+  const md = "# Launch plan\n\nShip the **desktop app** this week, _signed_ and <u>notarised</u>.\n\n- Sign the build\n- ~~Email the list~~ post in #launch\n\n> Nothing ships on a Friday.";
+  const html = renderMarkdown(md);
   const box = (writing: boolean) => (
-    <div className="frame-card oncall-static" style={{ position: "relative", width: 400, height: 300 }}>
+    <div className="frame-card note-card oncall-static" style={{ position: "relative", width: 400, height: 300 }}>
       <div className="note-inner" style={{ height: 300 }}>
-        <div className={`note-rendered rich-text${writing ? " is-writing" : ""}`} style={writing ? { paddingTop: 14 } : undefined} dangerouslySetInnerHTML={{ __html: html }} />
+        <div className={`note-rendered rich-text${writing ? " is-writing" : ""}`} dangerouslySetInnerHTML={{ __html: html }} />
         {writing && (
           <div className="rich-bar-slot">
-            <RichToolbar marks={{ bold: true, italic: false, underline: false, strike: false, ul: false, ol: false, quote: false, style: "p" }} />
+            <RichToolbar marks={{ bold: true, italic: false, underline: false, strike: false, ul: false, ol: false, quote: false, style: "p" }} size="m" />
           </div>
         )}
       </div>
     </div>
   );
+  /** a note with its bar showing: which of its two buttons is on */
+  const barred = (on: "markdown" | "bare", body: React.ReactNode, size = "m") => (
+    <div className="frame-anchor chrome-bar oncall-static is-hover" style={{ width: 400 }}>
+      <div className={`frame-card note-card${on === "bare" ? " is-bare" : ""}`}>
+        <div className="frame-header" style={{ height: 30 }}>
+          <div className="grip mini">
+            <span />
+            <span />
+          </div>
+          <span className="frame-title">Launch plan</span>
+          <div className="header-actions">
+            <span className={`icon-btn note-bare-btn${on === "bare" ? " is-on" : ""}`}>
+              <BareGlyph off={on === "bare"} />
+            </span>
+            <span className={`icon-btn note-md-btn${on === "markdown" ? " is-on" : ""}`}>
+              <MarkdownGlyph />
+            </span>
+            <span className="icon-btn">⛶</span>
+            <span className="icon-btn">⌗</span>
+            <span className="icon-btn">✕</span>
+          </div>
+        </div>
+        <div className="frame-body note-body">
+          <div className="note-inner bar-reflow" style={{ ["--h" as string]: "300px" }} data-size={size}>
+            {body}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
   return (
-    <div className="adapt-row text-box-demo">
+    <div className="adapt-row note-demo">
       <div className="oncall-cell">
         {box(false)}
         <div className="effect-label">At rest</div>
       </div>
       <div className="oncall-cell">
         {box(true)}
-        <div className="effect-label">Writing: the caret is in bold text</div>
+        <div className="effect-label">Writing: the caret is in bold text; the two As set the note's text size</div>
+      </div>
+      <div className="oncall-cell">
+        {barred("markdown", <div className="note-cm"><div className="note-cm-waiting">{md}</div></div>)}
+        <div className="effect-label">Markdown on: the same text, as its markdown</div>
+      </div>
+      <div className="oncall-cell">
+        {barred("bare", <div className="note-rendered rich-text" dangerouslySetInnerHTML={{ __html: renderMarkdown("# Launch week\n\nEverything for **0.4** lives here.") }} />, "xl")}
+        <div className="effect-label">Background off, extra large: a label on the section's own paper (the dashed edge shows under the pointer)</div>
       </div>
     </div>
   );

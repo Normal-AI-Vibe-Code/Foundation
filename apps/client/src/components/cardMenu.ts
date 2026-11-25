@@ -29,7 +29,7 @@ export function kindWord(o: AnyObject): string {
   if (isPanel(o)) return o.panel === "app" ? "app" : o.panel === "link" ? "page" : o.panel === "file" ? "file" : o.panel === "machine" ? "machine" : o.panel;
   if ("cols" in o) return "table";
   if ("sourceTableId" in o) return "map";
-  if ("text" in o) return o.rich ? "text box" : "note";
+  if ("text" in o) return "note";
   return o.media === "video" ? "video" : "image";
 }
 

@@ -235,7 +235,9 @@ test("2 · the hover bar makes room: the content moves down, and nothing else mo
   await frame(ada, ids.Short);
   const w = slot(ada, ids.Short);
   const kw = await scaleOf(ada, ids.Short);
-  await w.locator(".note-rendered").dblclick();
+  // the note turned to its markdown (the Markdown button in its bar)
+  await w.locator(".note-rendered").hover();
+  await w.locator(".note-md-btn").click();
   await expect(w.locator(".cm-content")).toBeVisible({ timeout: 10_000 });
   await leave(ada);
   await expect(w.locator(".frame-header")).toHaveCSS("opacity", "1");

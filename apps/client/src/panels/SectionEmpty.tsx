@@ -28,7 +28,7 @@ function loadShelf() {
   return shelfPromise;
 }
 
-export function SectionEmpty({ name, onUpload, onNote, onText, onAsk, onFocus }: { name: string; onUpload(): void; onNote(): void; onText(): void; onAsk(): void; onFocus(): void }) {
+export function SectionEmpty({ name, onUpload, onNote, onAsk, onFocus }: { name: string; onUpload(): void; onNote(): void; onAsk(): void; onFocus(): void }) {
   const [apps, setApps] = useState<AppRow[]>(shelfCache ?? []);
   useEffect(() => {
     if (!shelfCache) void loadShelf().then(setApps);
@@ -70,25 +70,11 @@ export function SectionEmpty({ name, onUpload, onNote, onText, onAsk, onFocus }:
               <small>It works here under its own name, with you</small>
             </span>
           </button>
-          <button className="empty-action" data-tip="Write in a text box: formatted as you type" onClick={onText}>
+          <button className="empty-action" data-tip="Write a note: formatted as you type, kept as markdown" onClick={onNote}>
             <span className="empty-glyph">¶</span>
             <span>
               <b>Write</b>
-              <small>
-                A text box, formatted as you type · or a{" "}
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className="empty-inline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onNote();
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), onNote())}
-                >
-                  markdown note
-                </span>
-              </small>
+              <small>A note, formatted as you type · its markdown is one press away</small>
             </span>
           </button>
         </div>

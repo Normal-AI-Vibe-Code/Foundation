@@ -93,8 +93,9 @@ test("renders per gesture: the whole-board layers stay still while one card chan
   });
   const typed = await idOf("Notes A 3");
   await frame(typed);
-  await page.locator(`[data-obj-id="${typed}"] .note-rendered`).dblclick();
-  // the note editor is CodeMirror (feat/codemirror-notes): wait for it to mount and take the caret
+  await page.locator(`[data-obj-id="${typed}"] .note-rendered`).hover();
+  await page.locator(`[data-obj-id="${typed}"] .note-md-btn`).click();
+  // the note as its markdown is CodeMirror (feat/codemirror-notes): wait for it to mount and take the caret
   await page.locator(`[data-obj-id="${typed}"] .cm-editor .cm-content`).waitFor();
   await page.waitForFunction((i) => document.activeElement?.closest(`[data-obj-id="${i}"]`) !== null, typed);
   await count("type 30 characters in a note", async () => {

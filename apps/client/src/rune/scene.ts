@@ -155,8 +155,8 @@ export function isIsland(st: AppState, o: AnyObject, opts: Pick<SceneOptions, "i
   if ("sourceTableId" in o) return true;
   if ("cols" in o) return st.focusLevel === "object" && st.activeObjectId === o.id;
   if ("media" in o) return o.media === "video" || !imageSrcOf(o, opts);
-  // a text box is written in the page's own editing surface
-  if ("text" in o) return !!o.rich;
+  // a note made as a text box, set at a size of its own or left without its paper: the page's to draw (Rune draws a plain note itself)
+  if ("text" in o) return !!o.rich || !!o.bare || (!!o.size && o.size !== "m");
   return false;
 }
 

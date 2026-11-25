@@ -49,7 +49,9 @@ async function openShared(p: Page, at: "goals" | "end" | number) {
   const id = await p.evaluate(() => Object.values((window as unknown as { __foundation: { getState(): { notes: Record<string, { id: string; name: string }> } } }).__foundation.getState().notes).find((n) => n.name === "Shared")!.id);
   await p.evaluate((i) => (window as unknown as { __foundation: { setState(x: object): void } }).__foundation.setState({ snapRequest: { kind: "object", id: i, nonce: Math.random() } }), id);
   await settle(p, 1200);
-  await p.locator(`[data-obj-id="${id}"] .note-rendered`).dblclick();
+  // the Markdown button in the note's bar turns it to its markdown
+  await p.locator(`[data-obj-id="${id}"] .note-rendered`).hover();
+  await p.locator(`[data-obj-id="${id}"] .note-md-btn`).click();
   // CodeMirror, loaded on first use, bound to the note's shared text
   const ed = p.locator(`[data-obj-id="${id}"] .cm-editor`);
   await ed.waitFor();

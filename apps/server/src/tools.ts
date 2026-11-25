@@ -37,6 +37,7 @@ import {
   uid,
   type LinkDoc,
   type NoteDoc,
+  NOTE_SIZES,
   putNote,
   setNoteText,
   setTableCells,
@@ -482,13 +483,13 @@ export const TOOLS: BoardTool[] = [
   }),
   def({
     name: "add_note",
-    description: "Add a markdown note card to a section (created if missing). text_box: true makes it a text box: the same markdown, which people then edit as formatted text with a toolbar instead of as markdown source (use it for prose a person will keep writing in).",
-    schema: z.object({ section: z.string().optional(), title: z.string(), markdown: z.string(), text_box: z.boolean().optional(), request_id: z.string().optional() }),
+    description: "Add a note card to a section (created if missing). You write it as markdown; people read and edit it as formatted text with a toolbar, and can switch it to its markdown. text_size sets how large its text is (s, m, l, xl, xxl; m when left out: use the large ones for a label or a title on the board). background: false leaves the paper out, so the words stand on the section itself. (text_box is accepted and ignored: every note is one now.)",
+    schema: z.object({ section: z.string().optional(), title: z.string(), markdown: z.string(), text_size: z.enum(NOTE_SIZES).optional(), background: z.boolean().optional(), text_box: z.boolean().optional(), request_id: z.string().optional() }),
     write: true,
-    run: (ctx, { section, title, markdown, text_box }) => {
+    run: (ctx, { section, title, markdown, text_size, background }) => {
       const note = editBoard(ctx.boardId, "agent", (doc) => {
         const sec = cardSection(doc, section);
-        const n: NoteDoc & { text: string } = { id: uid("note"), kind: "note", sectionId: sec.id, name: title, x: 0, y: 0, float: false, bornAt: Date.now(), w: text_box ? 480 : 420, h: text_box ? 320 : 300, text: markdown, ...(text_box ? { rich: true } : {}), ...(madeBy(ctx) ? { createdBy: madeBy(ctx) } : {}) };
+        const n: NoteDoc & { text: string } = { id: uid("note"), kind: "note", sectionId: sec.id, name: title, x: 0, y: 0, float: false, bornAt: Date.now(), w: 420, h: 300, text: markdown, ...(text_size && text_size !== "m" ? { size: text_size } : {}), ...(background === false ? { bare: true } : {}), ...(madeBy(ctx) ? { createdBy: madeBy(ctx) } : {}) };
         putNote(doc, n);
         return n;
       });

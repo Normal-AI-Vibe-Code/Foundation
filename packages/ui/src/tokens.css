@@ -102,6 +102,11 @@
   --text-32: 32px;
   /* the Shiba's words on Today: the one size above 32, for a voice set in type */
   --text-40: 40px;
+  /* a note's text sizes (small, large, extra large, huge): how its words are set against the note's own type */
+  --note-scale-s: 0.85;
+  --note-scale-l: 1.4;
+  --note-scale-xl: 2;
+  --note-scale-xxl: 3;
   --track-caps: 0.08em;
   --track-eyebrow: 0.22em;
 

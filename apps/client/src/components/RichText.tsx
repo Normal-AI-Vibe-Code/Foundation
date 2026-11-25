@@ -1,23 +1,27 @@
 /**
- * A text box: a note written as formatted text. What you see is what's kept:
- * bold is bold, a heading is a heading, and a toolbar along the card's foot
- * does what a word processor's does (style, bold, italic, underline, strike,
- * lists, quote, link, clear). No markup on screen.
+ * A note, as it is written: formatted text. What you see is what's kept: bold
+ * is bold, a heading is a heading, and a toolbar along the card's foot does
+ * what a word processor's does (style, text size, bold, italic, underline,
+ * strike, lists, quote, link, clear). No markup on screen.
  *
- * Under it, it is still a note: the same markdown in the same shared text
- * (`NoteDoc.rich`), so search, agents, Rune and "send to another board" read
- * a text box as they read any note, and an agent's `add_note` can be opened
- * and edited as one. The page's own editing (contenteditable) holds the
- * formatted text; after each change it is written back as markdown
- * (`htmlToMarkdown`), and the board's sync turns that into the smallest edit,
- * so someone else's words in another paragraph survive yours.
+ * Under it is the note's markdown in the note's shared text, so search,
+ * agents, Rune and "send to another board" read what was written, an agent's
+ * `add_note` is edited the same way, and the card's Markdown button shows
+ * that markdown itself (NoteView.tsx). The page's own editing
+ * (contenteditable) holds the formatted text; after each change it is written
+ * back as markdown (`htmlToMarkdown`), and the board's sync turns that into
+ * the smallest edit, so someone else's words in another paragraph survive
+ * yours. A note that is only looked at, or clicked in and left, is never
+ * rewritten: markdown an agent or a person wrote by hand stays as they wrote
+ * it until someone changes the words.
  *
- * Click in it to write (no double-click: it is a text box). Esc, or a click
- * anywhere else, puts the toolbar away. A viewer reads it; links open.
+ * Click in it to write (no double-click). Esc, or a click anywhere else, puts
+ * the toolbar away. A viewer reads it; links open.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { takeFreshTextBox, updateNoteText, type NoteMeta } from "../state/store";
+import { NOTE_SIZES, type NoteSize } from "@foundation/protocol";
+import { setNoteSize, takeFreshNote, updateNoteText, type NoteMeta } from "../state/store";
 import { getUi } from "../state/ui";
 import { renderMarkdown } from "../utils/markdown";
 import { openExternal } from "../utils/media";
@@ -229,8 +233,15 @@ const STYLES: Array<{ id: Style; label: string }> = [
   { id: "h3", label: "Subheading" },
 ];
 
-/** the toolbar alone, for the text box and the design page */
-export function RichToolbar({ marks, onCommand, onStyle, onLink }: { marks: Marks; onCommand?: (cmd: string, value?: string) => void; onStyle?: (s: Style) => void; onLink?: (url: string) => void }) {
+/** what each text size is called */
+export const SIZE_NAMES: Record<NoteSize, string> = { s: "Small", m: "Normal", l: "Large", xl: "Extra large", xxl: "Huge" };
+
+/**
+ * The toolbar alone, for the note, a character's words and the design page.
+ * With `size` it carries the text size: the whole note's, a step smaller or
+ * larger (markdown has no sizes of its own, so it is the card's, not a word's).
+ */
+export function RichToolbar({ marks, size, onCommand, onStyle, onLink, onSize }: { marks: Marks; size?: NoteSize; onCommand?: (cmd: string, value?: string) => void; onStyle?: (s: Style) => void; onLink?: (url: string) => void; onSize?: (s: NoteSize) => void }) {
   const [linking, setLinking] = useState(false);
   const [url, setUrl] = useState("https://");
   const btn = (cmd: string, glyph: React.ReactNode, tip: string, on: boolean, kbd?: string, cls = "") => (
@@ -248,6 +259,24 @@ export function RichToolbar({ marks, onCommand, onStyle, onLink }: { marks: Mark
       {glyph}
     </button>
   );
+  const step = NOTE_SIZES.indexOf(size ?? "m");
+  const sizeBtn = (by: -1 | 1) => {
+    const to = NOTE_SIZES[step + by] as NoteSize | undefined;
+    const tip = by < 0 ? "Smaller text" : "Larger text";
+    return (
+      <button
+        type="button"
+        className={`rich-btn rich-size ${by < 0 ? "is-down" : "is-up"}`}
+        disabled={!to}
+        aria-label={tip}
+        data-tip={to ? `${tip}: ${SIZE_NAMES[to].toLowerCase()}` : `${tip}: this is the ${by < 0 ? "smallest" : "largest"}`}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => to && onSize?.(to)}
+      >
+        <span aria-hidden>A</span>
+      </button>
+    );
+  };
   return (
     <div className="rich-bar" role="toolbar" aria-label="Text formatting" onPointerDown={(e) => e.stopPropagation()}>
       {linking ? (
@@ -293,6 +322,12 @@ export function RichToolbar({ marks, onCommand, onStyle, onLink }: { marks: Mark
               </option>
             ))}
           </select>
+          {size && (
+            <span className="rich-sizes" role="group" aria-label={`Text size: ${SIZE_NAMES[size].toLowerCase()}`} data-size={size}>
+              {sizeBtn(-1)}
+              {sizeBtn(1)}
+            </span>
+          )}
           <span className="rich-sep" />
           {btn("bold", <b>B</b>, "Bold", marks.bold, "mod+B")}
           {btn("italic", <i>I</i>, "Italic", marks.italic, "mod+I")}
@@ -344,12 +379,19 @@ function ClearGlyph() {
   );
 }
 
-// ---------- the text box ----------
+// ---------- the note's formatted text ----------
 
 export function RichNote({ note }: { note: NoteMeta }) {
   const el = useRef<HTMLDivElement>(null);
   /** the markdown the surface shows: what we last wrote, or last drew */
   const shown = useRef<string | null>(null);
+  /**
+   * What the surface reads back as, as it was drawn (taken when the caret arrives), and whether anything has
+   * been written since. Markdown written by hand rarely reads back letter for letter (`*x*` comes back `_x_`,
+   * a nested list flat), so until the words themselves change, nothing is written.
+   */
+  const drawn = useRef<string | null>(null);
+  const wrote = useRef(false);
   const [focused, setFocused] = useState(false);
   const [marks, setMarks] = useState<Marks>(NO_MARKS);
   const canWrite = getUi().role !== "viewer";
@@ -374,13 +416,15 @@ export function RichNote({ note }: { note: NoteMeta }) {
     const before = host.textContent ?? "";
     host.innerHTML = surfaceHtml(note.text);
     shown.current = note.text;
+    wrote.current = false;
+    drawn.current = at !== null ? htmlToMarkdown(host) : null;
     // someone else wrote while the caret was here: it stays with the words it was among
     if (at !== null) placeCaret(host, mapCaret(at, before, host.textContent ?? ""));
   }, [note.text]);
 
-  // a text box you just made is ready to type in (it arrives on everyone else's board without taking their caret)
+  // a note you just made is ready to type in (it arrives on everyone else's board without taking their caret)
   useEffect(() => {
-    if (takeFreshTextBox(note.id) && canWrite) el.current?.focus({ preventScroll: true });
+    if (takeFreshNote(note.id) && canWrite) el.current?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -389,6 +433,9 @@ export function RichNote({ note }: { note: NoteMeta }) {
     if (!host) return;
     const md = htmlToMarkdown(host);
     if (md === shown.current) return;
+    // still what was drawn: the caret came and went, or a mark was put on and taken off again
+    if (!wrote.current && md === drawn.current) return;
+    wrote.current = true;
     shown.current = md;
     updateNoteText(note.id, md);
   }, [note.id]);
@@ -434,6 +481,7 @@ export function RichNote({ note }: { note: NoteMeta }) {
         spellCheck
         onFocus={() => {
           setFocused(true);
+          if (!wrote.current && el.current) drawn.current = htmlToMarkdown(el.current);
           try {
             document.execCommand("defaultParagraphSeparator", false, "p");
           } catch { /* an old engine: it makes <div>s, which read the same */ }
@@ -478,6 +526,8 @@ export function RichNote({ note }: { note: NoteMeta }) {
         >
           <RichToolbar
             marks={marks}
+            size={note.size ?? "m"}
+            onSize={(s) => setNoteSize(note.id, s)}
             onCommand={command}
             onStyle={(s) => command("formatBlock", s)}
             onLink={(url) => {

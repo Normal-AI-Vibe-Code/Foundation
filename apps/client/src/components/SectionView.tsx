@@ -13,7 +13,6 @@ import {
   addNote,
   startMachine,
   startVm,
-  addTextBox,
   addSectionAdjacent,
   getState,
   cellAtWorld,
@@ -490,7 +489,7 @@ export const SectionView = memo(function SectionView({
               }, "", keys("mod+L"))}
             {tool("Add a table", "⊞", () => createTable(section.id))}
             {tool("Add a map", "◍", () => createMap(section.id))}
-            {tool("Add a note", "▤", () => addNote(section.id))}
+            {tool("Add a note", "¶", () => addNote(section.id))}
             {tool("Upload an image or video", "⇪", () => fileRef.current?.click(), "", keys("mod+U"))}
             {tool("Start a machine here: Linux on Kiri or Docker", "▣", () => startMachine(section.id))}
             {tool("Add a full operating system here: WildOS VM", "▣", () => startVm(section.id))}
@@ -653,7 +652,6 @@ export const SectionView = memo(function SectionView({
             name={section.name}
             onUpload={() => fileRef.current?.click()}
             onNote={() => addNote(section.id)}
-            onText={() => addTextBox(section.id)}
             onAsk={() => openCouncil({ kind: "section", id: section.id })}
             onFocus={() => setActiveSection(section.id)}
           />

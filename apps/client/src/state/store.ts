@@ -11,7 +11,7 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { isHostable, type HuddleState, type LinkDoc, type PanelDoc } from "@foundation/protocol";
+import { isHostable, type HuddleState, type LinkDoc, type NoteSize, type PanelDoc } from "@foundation/protocol";
 import { workbook } from "../engine/workbook";
 
 let idCounter = 0;
@@ -55,8 +55,12 @@ export interface NoteMeta extends ObjectBase {
   w: number;
   h: number;
   text: string;
-  /** a text box: written as formatted text, not markdown source (protocol NoteDoc.rich) */
+  /** retired: it marked a "text box" apart from a "markdown note". Every note is one now (protocol NoteDoc.rich) */
   rich?: boolean;
+  /** how large its text is set (unset: "m"; protocol NoteDoc.size) */
+  size?: NoteSize;
+  /** no paper behind it: the words stand on the section itself (protocol NoteDoc.bare) */
+  bare?: boolean;
 }
 
 export interface MediaMeta extends ObjectBase {
@@ -1833,22 +1837,36 @@ function unhostFor(sectionId: string): Partial<AppState> {
 }
 
 let noteCount = 0;
+/** the note this window just made empty: its maker's caret goes in it (nobody else's does) */
+let freshNote: string | null = null;
+export function takeFreshNote(id: string): boolean {
+  if (freshNote !== id) return false;
+  freshNote = null;
+  return true;
+}
 
-export function addNote(sectionId: string, text?: string, opts: { focus?: boolean } = {}): NoteMeta {
+/**
+ * A note: written as formatted text (bold, headings, lists: a toolbar, as in
+ * a word processor), kept as markdown, which its card can show instead. With
+ * no `text` it starts empty with its maker's caret in it; `at` puts it where
+ * it was asked for.
+ */
+export function addNote(sectionId: string, text?: string, opts: { focus?: boolean; float?: boolean; x?: number; y?: number } = {}): NoteMeta {
   sectionId = leafSection(sectionId); // a section that is a grid of sections: its first one
   noteCount++;
   const meta: NoteMeta = {
     id: uid("note"),
     sectionId,
     name: `Note ${noteCount}`,
-    x: 0,
-    y: 0,
-    w: 420,
-    h: 300,
-    text: text ?? "## New note\n\nDouble-click to edit. **Markdown** works:\n\n- lists\n- `code`\n- [links](https://example.com)",
-    float: false,
+    x: opts.x ?? 0,
+    y: opts.y ?? 0,
+    w: NOTE_W,
+    h: NOTE_H,
+    text: text ?? "",
+    float: opts.float ?? false,
     bornAt: Date.now(),
   };
+  if (text === undefined) freshNote = meta.id;
   set({
     notes: { ...state.notes, [meta.id]: meta },
     ...unhostFor(sectionId),
@@ -1857,45 +1875,24 @@ export function addNote(sectionId: string, text?: string, opts: { focus?: boolea
   });
   return meta;
 }
+/** a new note's size */
+export const NOTE_W = 480;
+export const NOTE_H = 320;
 
-let textCount = 0;
-/** the text box this window just made: its maker's caret goes in it (nobody else's does) */
-let freshTextBox: string | null = null;
-export function takeFreshTextBox(id: string): boolean {
-  if (freshTextBox !== id) return false;
-  freshTextBox = null;
-  return true;
+/** how large a note's text is set; "m" is the usual size and isn't written on the card */
+export function setNoteSize(id: string, size: NoteSize) {
+  const n = state.notes[id];
+  if (!n || (n.size ?? "m") === size) return;
+  const { size: _was, ...rest } = n;
+  set({ notes: { ...state.notes, [id]: size === "m" ? rest : { ...rest, size } } });
 }
 
-/**
- * A text box: a note you write as formatted text (bold, headings, lists: a
- * toolbar, as in a word processor) instead of as markdown source. It starts
- * empty and `at` puts it where it was asked for.
- */
-export function addTextBox(sectionId: string, at: { float?: boolean; x?: number; y?: number } = {}, opts: { focus?: boolean } = {}): NoteMeta {
-  sectionId = leafSection(sectionId);
-  textCount++;
-  const meta: NoteMeta = {
-    id: uid("note"),
-    sectionId,
-    name: `Text ${textCount}`,
-    x: at.x ?? 0,
-    y: at.y ?? 0,
-    w: 480,
-    h: 320,
-    text: "",
-    rich: true,
-    float: at.float ?? false,
-    bornAt: Date.now(),
-  };
-  freshTextBox = meta.id;
-  set({
-    notes: { ...state.notes, [meta.id]: meta },
-    ...unhostFor(sectionId),
-    activeSectionId: sectionId,
-    ...(opts.focus === false ? {} : { snapRequest: { kind: "object" as const, id: meta.id, nonce: Math.random() } }),
-  });
-  return meta;
+/** take the paper from behind a note, or give it back */
+export function setNoteBare(id: string, bare: boolean) {
+  const n = state.notes[id];
+  if (!n || !!n.bare === bare) return;
+  const { bare: _was, ...rest } = n;
+  set({ notes: { ...state.notes, [id]: bare ? { ...rest, bare: true } : rest } });
 }
 
 export function updateNoteText(id: string, text: string) {

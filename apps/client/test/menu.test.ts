@@ -12,7 +12,7 @@ import { layoutMenu, nextSpot, type Counts, type MenuGroup, type MenuItem, type 
 const tag = (group: MenuGroup, items: MenuItem[]): MenuItem[] => items.map((it) => ({ ...it, group }));
 const SECTION: MenuItem[] = [
   { label: "Council: ask this section's agents…", agent: true },
-  ...tag("add", [{ heading: "Add" }, { label: "Text box" }, { label: "Markdown note" }, { label: "Table" }]),
+  ...tag("add", [{ heading: "Add" }, { label: "Note" }, { label: "Table" }]),
   ...tag("live", [{ heading: "Live" }, { label: "Agents card" }, { label: "Huddle" }]),
   ...tag("grid", [{ label: "Open as its own grid" }, { label: "Remove section…", danger: true }, { label: "Insert section left" }, { label: "Split column" }]),
 ];
@@ -21,7 +21,7 @@ test("a menu with groups is laid out in zones; the dangerous action goes last in
   const l = layoutMenu(SECTION);
   assert.equal(l.grouped, true);
   assert.deepEqual(l.top.map((i) => i.label), ["Council: ask this section's agents…"]);
-  assert.deepEqual(l.add.map((i) => i.label), ["Text box", "Markdown note", "Table"]);
+  assert.deepEqual(l.add.map((i) => i.label), ["Note", "Table"]);
   assert.deepEqual(l.live.map((i) => i.label), ["Agents card", "Huddle"]);
   assert.deepEqual(l.grid.map((i) => i.label), ["Open as its own grid", "Insert section left", "Split column", "Remove section…"]);
   assert.deepEqual(l.captions, { add: "Add", live: "Live" });
@@ -42,7 +42,7 @@ test("the section's own list says where each thing sits, and keeps the names it 
   const add = between('...tag("add", [', '...tag("live", [');
   const live = between('...tag("live", [', '...tag("grid", [');
   const grid = src.slice(src.indexOf('...tag("grid", ['));
-  for (const l of ["Text box", "Markdown note", "Table", "Map", "Image, video or file…", "App or web page…"]) assert.ok(add.includes(`"${l}"`), `Add has ${l}`);
+  for (const l of ["Note", "Table", "Map", "Image, video or file…", "App or web page…"]) assert.ok(add.includes(`"${l}"`), `Add has ${l}`);
   for (const l of ["Agents card", "Huddle", "Slack channel", "Machine", "Character: 3D", "Character: mesh avatar", "All agents on this grid"]) assert.ok(live.includes(`"${l}"`), `Live has ${l}`);
   for (const l of ["Back up a level", "Open its grid", "Open as its own grid", "Fill the screen with it", "Insert section left", "Insert section right", "Insert section above", "Insert section below", "Split column", "Split row", "fill the section", "as a card", "Remove section…"])
     assert.ok(grid.includes(l), `the icon row has ${l}`);

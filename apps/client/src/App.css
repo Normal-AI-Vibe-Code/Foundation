@@ -1282,9 +1282,8 @@ body.rewiring {
   overflow: hidden;
 }
 .rich-text.is-writing {
-  /* below the card's bar, which sits over the top edge while it has focus (as the note editor does),
-     and room for the toolbar along the foot */
-  padding-top: 42px;
+  /* room for the toolbar along the foot. Nothing at the top: the card's bar makes its own room (.bar-reflow),
+     and it is already showing when a press lands, so the words don't move under a drag that selects them */
   padding-bottom: 52px;
   overflow-y: auto;
 }
@@ -1320,7 +1319,34 @@ body.rewiring {
   border: 1px solid var(--line);
   background: var(--color-raise);
   box-shadow: var(--shadow-sheet);
-  overflow: hidden;
+  /* a note narrower than its toolbar scrolls it sideways */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+/* the text size: a small A and a large A, a step down and a step up */
+.rich-sizes {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  margin-left: 3px;
+}
+.rich-size.is-down {
+  font-size: var(--text-11);
+  font-weight: 600;
+}
+.rich-size.is-up {
+  font-size: var(--text-16);
+  font-weight: 600;
+}
+.rich-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.rich-btn:disabled:hover {
+  color: var(--color-mist);
+  background: transparent;
 }
 .rich-btn {
   flex-shrink: 0;
@@ -1903,27 +1929,35 @@ body.is-viewer .frame-grip {
   overflow: hidden;
 }
 
+/* A note's text size (NoteDoc.size; the toolbar's two As): the whole note's, a step at a time. Everything set
+   in type scales with it (the words, the headings, code, a table); the card, its padding and its rules don't.
+   Large type sits closer: the line comes in as the size goes up. */
+.note-inner[data-size="s"] { --note-scale: var(--note-scale-s); }
+.note-inner[data-size="l"] { --note-scale: var(--note-scale-l); --note-line: 1.45; }
+.note-inner[data-size="xl"] { --note-scale: var(--note-scale-xl); --note-line: 1.3; }
+.note-inner[data-size="xxl"] { --note-scale: var(--note-scale-xxl); --note-line: 1.18; }
+
 .note-rendered {
   height: 100%;
   padding: 14px 18px;
   overflow-y: auto;
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: calc(13.5px * var(--note-scale, 1));
+  line-height: var(--note-line, 1.55);
   color: var(--ink);
   cursor: text;
   user-select: text;
 }
 
-.note-rendered h1 { font-size: 20px; margin: 8px 0 6px; letter-spacing: -0.02em; }
-.note-rendered h2 { font-size: 16.5px; margin: 8px 0 5px; letter-spacing: -0.01em; }
-.note-rendered h3 { font-size: 14px; margin: 6px 0 4px; }
-.note-rendered h4 { font-size: 13px; margin: 6px 0 4px; color: var(--ink-soft); }
+.note-rendered h1 { font-size: calc(20px * var(--note-scale, 1)); margin: 8px 0 6px; letter-spacing: -0.02em; }
+.note-rendered h2 { font-size: calc(16.5px * var(--note-scale, 1)); margin: 8px 0 5px; letter-spacing: -0.01em; }
+.note-rendered h3 { font-size: calc(14px * var(--note-scale, 1)); margin: 6px 0 4px; }
+.note-rendered h4 { font-size: calc(13px * var(--note-scale, 1)); margin: 6px 0 4px; color: var(--ink-soft); }
 .note-rendered p { margin: 4px 0; }
-.note-rendered ul, .note-rendered ol { margin: 4px 0 4px 20px; }
+.note-rendered ul, .note-rendered ol { margin: 4px 0 4px calc(20px * var(--note-scale, 1)); }
 .note-rendered li { margin: 2px 0; }
 .note-rendered code {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: calc(12px * var(--note-scale, 1));
   background: color-mix(in srgb, var(--color-frost) 6%, transparent);
   border-radius: var(--radius-paper);
   padding: 1px 5px;
@@ -1996,7 +2030,7 @@ body.is-viewer .frame-grip {
 .md-img-load:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 1px; }
 /* | tables | in a note: hairlines, a soft header, scroll sideways in a narrow note */
 .note-rendered .md-table { overflow-x: auto; margin: 6px 0; }
-.note-rendered table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+.note-rendered table { border-collapse: collapse; font-size: calc(12px * var(--note-scale, 1)); min-width: 100%; }
 .note-rendered th, .note-rendered td {
   border: 1px solid var(--line);
   padding: 3px 7px;
@@ -2011,7 +2045,29 @@ body.is-viewer .frame-grip {
 }
 .note-rendered td:empty::after { content: "\00a0"; }
 
-/* the open note: CodeMirror on the note's shared text (components/noteEditor.ts) */
+/* A note without its paper (NoteDoc.bare; the sheet button in its bar): no fill, no edge, no shadow, so its
+   words stand on the section itself. Under the pointer, while it's written in and while it's carried, a dashed
+   hairline shows where it is (the edge is always there, clear, so nothing moves when it shows). Chosen, it
+   wears the ring alone. Turned to its markdown it has the editor's own ground, like any note. */
+.frame-card.note-card.is-bare {
+  background: transparent;
+  border-style: dashed;
+  border-color: transparent;
+  box-shadow: none;
+}
+.frame-anchor:is(:hover, .is-hover, .dragging, :focus-within) .frame-card.note-card.is-bare {
+  border-color: var(--line-strong);
+}
+.frame-card.note-card.is-bare.ctx-active {
+  box-shadow: 0 0 0 2.5px var(--select);
+}
+/* the note's two buttons in its bar (Background, Markdown): on, they are the pulse on its tint, like a mark in the toolbar */
+.frame-header .icon-btn:is(.note-md-btn, .note-bare-btn).is-on {
+  color: var(--color-pulse);
+  background: color-mix(in srgb, var(--color-pulse) 12%, transparent);
+}
+
+/* the note as its markdown: CodeMirror on the note's shared text (components/noteEditor.ts) */
 .note-cm {
   height: 100%;
   background: var(--color-abyss);

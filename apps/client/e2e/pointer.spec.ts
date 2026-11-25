@@ -595,7 +595,7 @@ test("3 · a section's menu: the council, Add and Live side by side, the grid's 
   expect(l.x).toBeGreaterThan(a.x + a.width - 1);
   expect(a.y).toBeGreaterThan((await box(first)).y + 20);
   const texts = async (c: Locator) => (await c.locator(".menu-item").allInnerTexts()).map((t) => t.replace(/^\S+\s+/, "").trim());
-  expect(await texts(cols.nth(0))).toEqual(["Text box", "Markdown note", "Table", "Map", "Image, video or file…", "App or web page…"]);
+  expect(await texts(cols.nth(0))).toEqual(["Note", "Table", "Map", "Image, video or file…", "App or web page…"]);
   expect(await texts(cols.nth(1))).toEqual(["Agents card", "Huddle", "Slack channel", "Machine", "Character: 3D", "Character: mesh avatar", "Collection", "Character pipeline", "All agents on this grid"]);
 
   // the grid's own actions: a row of icons along the bottom, no words, each named on roll-over
@@ -656,15 +656,15 @@ test("3 · a section's menu: the council, Add and Live side by side, the grid's 
   await ada.keyboard.press("ArrowDown");
   expect(await focused()).toBe("Council: ask this section's agents…");
   await ada.keyboard.press("ArrowDown");
-  expect(await focused()).toBe("Text box");
+  expect(await focused()).toBe("Note");
   await ada.keyboard.press("ArrowDown");
-  expect(await focused()).toBe("Markdown note");
+  expect(await focused()).toBe("Table");
   await ada.keyboard.press("ArrowRight");
   expect(await focused()).toBe("Huddle");
   await ada.keyboard.press("ArrowUp");
   expect(await focused()).toBe("Agents card");
   await ada.keyboard.press("ArrowLeft");
-  expect(await focused()).toBe("Text box");
+  expect(await focused()).toBe("Note");
   await ada.keyboard.press("End");
   expect(await focused()).toBe("Remove section…");
   await ada.keyboard.press("ArrowLeft");
@@ -679,16 +679,15 @@ test("3 · a section's menu: the council, Add and Live side by side, the grid's 
   expect(await world(ada), "the arrows are the menu's while it's open: the grid doesn't pan").toBe(w0);
   // what has the keyboard looks as it does under the pointer
   await ada.keyboard.press("ArrowDown");
-  await ada.keyboard.press("ArrowDown");
   const fill = await ada.evaluate(() => getComputedStyle(document.activeElement!).backgroundColor);
   expect(fill).not.toBe("rgba(0, 0, 0, 0)");
   // Enter does it
   const notes = () => ada.evaluate(() => Object.keys((window as unknown as { __foundation: Store }).__foundation.getState().notes).length);
   const n0 = await notes();
-  expect(await focused()).toBe("Markdown note");
+  expect(await focused()).toBe("Note");
   await ada.keyboard.press("Enter");
   await expect(ada.locator(".context-menu")).toHaveCount(0);
-  await expect.poll(notes, { message: "Enter on Markdown note adds one" }).toBe(n0 + 1);
+  await expect.poll(notes, { message: "Enter on Note adds one" }).toBe(n0 + 1);
   // Esc closes
   await ada.keyboard.press("Escape");
   await settle(ada, 600);
