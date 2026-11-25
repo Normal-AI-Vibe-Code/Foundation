@@ -1986,9 +1986,10 @@
     var(--shadow-lift);
   overflow: hidden;
 }
-.chat-emoji-picker.is-in-message {
-  top: 22px;
-  right: var(--space-6);
+/* a message's picker is on the page, over the timeline and the composer, held inside the conversation's column */
+.chat-emoji-picker.is-on-page {
+  position: fixed;
+  z-index: 70;
 }
 .chat-emoji-picker.is-over-composer {
   right: 0;

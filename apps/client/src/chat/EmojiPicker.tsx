@@ -3,17 +3,66 @@
  * in its groups (chat/emoji.ts). Raised paper, pane radius; a press outside or Esc puts it away.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "motion/react";
 import { EMOJI_GROUPS, loadRecents, matchEmoji, saveRecent, type Emoji } from "./emoji";
 
-export function EmojiPicker({ onPick, onClose, className = "" }: { onPick(char: string): void; onClose(): void; className?: string }) {
+const GAP = 6; // between the picker and the button that opened it
+const EDGE = 8; // kept from the column's edges
+
+/**
+ * With an `anchor`, the picker lives on the page (a portal), not in the message: the timeline's scroll would clip it
+ * and the composer would cover it. It opens under the button, or over it when there is no room below, and is held
+ * inside the conversation's column (the thread, or the channel with its composer), following the button as it scrolls.
+ */
+export function EmojiPicker({ onPick, onClose, className = "", anchor }: { onPick(char: string): void; onClose(): void; className?: string; anchor?: HTMLElement | null }) {
   const [q, setQ] = useState("");
   const [recent] = useState(loadRecents);
   const box = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState<{ left: number; top: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!anchor) return;
+    const place = () => {
+      const el = box.current;
+      if (!el || !anchor.isConnected) return;
+      const a = anchor.getBoundingClientRect();
+      // the conversation's own column (a thread, or the channel with its composer), not the channel list beside it
+      const f = (anchor.closest(".chat-thread, .chat-main, .chatform") ?? document.documentElement).getBoundingClientRect();
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      const lo = f.top + EDGE;
+      const hi = f.bottom - EDGE;
+      let top = a.bottom + GAP;
+      if (top + h > hi) top = a.top - GAP - h >= lo ? a.top - GAP - h : hi - h;
+      top = Math.max(lo, top);
+      // its right edge on the button's, or its left edge when the button sits near the column's left
+      const want = a.right - w >= f.left + EDGE ? a.right - w : a.left;
+      const left = Math.max(f.left + EDGE, Math.min(want, f.right - EDGE - w));
+      setAt((p) => (p && p.left === left && p.top === top ? p : { left, top }));
+    };
+    place();
+    let raf = 0;
+    const soon = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(place);
+    };
+    window.addEventListener("scroll", soon, true);
+    window.addEventListener("resize", soon);
+    const ro = new ResizeObserver(soon);
+    if (box.current) ro.observe(box.current);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", soon, true);
+      window.removeEventListener("resize", soon);
+      ro.disconnect();
+    };
+  }, [anchor]);
   useEffect(() => {
     const off = (e: PointerEvent) => {
-      if (!box.current?.contains(e.target as Node)) onClose();
+      const t = e.target as Node;
+      // the button that opened it toggles it itself
+      if (!box.current?.contains(t) && !anchor?.contains(t)) onClose();
     };
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -27,7 +76,7 @@ export function EmojiPicker({ onPick, onClose, className = "" }: { onPick(char: 
       window.removeEventListener("pointerdown", off, true);
       window.removeEventListener("keydown", key, true);
     };
-  }, [onClose]);
+  }, [onClose, anchor]);
   const found = useMemo(() => (q.trim() ? matchEmoji(q.trim(), 40) : null), [q]);
   const pick = (char: string) => {
     saveRecent(char);
@@ -38,10 +87,11 @@ export function EmojiPicker({ onPick, onClose, className = "" }: { onPick(char: 
       {em.char}
     </button>
   );
-  return (
+  const picker = (
     <motion.div
       ref={box}
-      className={`chat-emoji-picker ${className}`}
+      className={`chat-emoji-picker${anchor ? " is-on-page" : ""} ${className}`}
+      style={anchor ? { left: at?.left ?? 0, top: at?.top ?? 0, visibility: at ? undefined : "hidden" } : undefined}
       initial={{ opacity: 0, y: 4, scale: 0.98 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: "spring", stiffness: 520, damping: 38 }}
@@ -82,4 +132,5 @@ export function EmojiPicker({ onPick, onClose, className = "" }: { onPick(char: 
       </div>
     </motion.div>
   );
+  return anchor ? createPortal(picker, document.body) : picker;
 }

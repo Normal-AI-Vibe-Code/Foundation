@@ -71,7 +71,7 @@ export function ago(at: number, now = Date.now()) {
 
 export const MessageView = memo(function MessageView({ message: m, continued, me, inThread, flash, editing, actions, srcOf, liveHuddle }: MessageProps) {
   const [menu, setMenu] = useState(false);
-  const [picker, setPicker] = useState(false);
+  const [picker, setPicker] = useState<HTMLElement | null>(null);
   const [confirm, setConfirm] = useState(false);
   const mine = !!me && m.author.id === me.id && m.author.kind === "person";
   const removed = !!m.deletedAt;
@@ -132,7 +132,7 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
               );
             })}
             {actions && (
-              <button className="chat-reaction is-add" onClick={() => setPicker(true)} data-tip="Add a reaction" aria-label="Add a reaction">
+              <button className="chat-reaction is-add" onClick={(e) => setPicker(e.currentTarget)} data-tip="Add a reaction" aria-label="Add a reaction">
                 <IconReact />
               </button>
             )}
@@ -180,7 +180,14 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
             </button>
           ))}
           <span className="chat-hoverbar-rule" />
-          <button onClick={() => setPicker((p) => !p)} data-tip="Add a reaction" aria-label="Add a reaction">
+          <button
+            onClick={(e) => {
+              const b = e.currentTarget;
+              setPicker((p) => (p ? null : b));
+            }}
+            data-tip="Add a reaction"
+            aria-label="Add a reaction"
+          >
             <IconReact />
           </button>
           {!inThread && (
@@ -213,10 +220,10 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
       )}
       {picker && actions && (
         <EmojiPicker
-          className="is-in-message"
-          onClose={() => setPicker(false)}
+          anchor={picker}
+          onClose={() => setPicker(null)}
           onPick={(e) => {
-            setPicker(false);
+            setPicker(null);
             actions.react(m, e, !(me && m.reactions.find((r) => r.emoji === e)?.by.includes(me.name)));
           }}
         />
