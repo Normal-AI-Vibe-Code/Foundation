@@ -2,7 +2,7 @@ import { fullscreenCard, inUse, releaseCard } from "../lib/cardUse";
 import { cardWheel } from "../lib/cardScroll";
 import { installScrollHint, noteAltScroll } from "../lib/scrollHint";
 import { keys } from "../lib/keys";
-import { GESTURE_GAP_MS, startsOnTrackpad, wheelAction, wheelMode } from "../lib/wheel";
+import { wheelAction, wheelMode } from "../lib/wheel";
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "motion/react";
 import { ShaderBackground } from "../gl/background";
@@ -577,18 +577,12 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     publishPointer(null, null);
   }, []);
 
-  /** the wheel gesture in progress: a trackpad's two fingers pan, a mouse wheel zooms (lib/wheel.ts) */
-  const wheelGesture = useRef({ at: 0, trackpad: false });
   const onWheel = useCallback(
     (e: WheelEvent) => {
       const container = containerRef.current;
       if (!container) return;
-      // 2026-11-18: the wheel zooms. What a gesture is (a wheel, or fingers on a trackpad) is decided where it starts
-      const g = wheelGesture.current;
-      const now = performance.now();
-      if (now - g.at > GESTURE_GAP_MS) g.trackpad = !(e.ctrlKey || e.metaKey) && startsOnTrackpad(e);
-      g.at = now;
-      const zooming = wheelAction(e, wheelMode(), g.trackpad) === "zoom";
+      // the wheel zooms (lib/wheel.ts): nothing guesses what kind of device it came from
+      const zooming = wheelAction(e, wheelMode()) === "zoom";
       // panning the grid ends a card's use, so it can't catch the wheel as it slides under the pointer;
       // a zoom keeps the card under the pointer, so a terminal or a desktop in use keeps the keys
       if (!zooming) releaseCard();
@@ -613,7 +607,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
           camera.to(cx - (cx - camera.x.goal) * ratio, cy - (cy - camera.y.goal) * ratio);
         }
       } else {
-        // two fingers on a trackpad, Shift+wheel, or a wheel set to pan (Settings → General): the paper moves.
+        // Shift+wheel, a sideways wheel, or a wheel set to pan (Settings → General): the paper moves.
         // Shift turns a plain wheel sideways where the system hasn't already
         const side = e.shiftKey && e.deltaX === 0;
         camera.set(camera.x.value - (side ? e.deltaY : e.deltaX), camera.y.value - (side ? 0 : e.deltaY));
@@ -647,7 +641,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     const el = containerRef.current;
     if (!el) return;
     // No card takes the wheel (lib/cardUse.ts): over an app, a map, a terminal or a list it is the grid's
-    // (it zooms; two fingers on a trackpad pan: lib/wheel.ts), and ⌘/Ctrl-wheel always zooms it. Only the card in use (⌘/Ctrl-click, or full screen) has its own wheel.
+    // (it zooms: lib/wheel.ts), and ⌘/Ctrl-wheel always zooms it. Only the card in use (⌘/Ctrl-click, or full screen) has its own wheel.
     // Caught on the way down, so a card's own scroller (xterm, maplibre, a list) never sees it.
     // Alt-wheel over a card with more in it than fits scrolls through that card (lib/cardScroll.ts);
     // ⌘/Ctrl-wheel always zooms (2026-11-17: the zoom key does one thing).
@@ -987,16 +981,16 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
           />
         ))}
 
-        {/* track resize gutters, one per run of boundary: a boundary between two
-            sections shows its line; one running inside a merged section is
-            invisible until the pointer finds it — both reveal a grab knob */}
-        {gutterSegments(state.grid, sections).map((g) => {
+        {/* track resize gutters, one per stretch of boundary between two sections (or empty cells).
+            A boundary running inside a merged section has none: the grid is resized from the lines
+            between sections only (2026-11-24, Josh) */}
+        {gutterSegments(state.grid, sections).filter((g) => !g.interior).map((g) => {
           const key = `${g.axis}${g.index}:${g.from}`;
           const col = g.axis === "col";
           return (
             <div
               key={key}
-              className={`gutter gutter-${g.axis}${g.interior ? " is-interior" : ""}`}
+              className={`gutter gutter-${g.axis}`}
               style={
                 col
                   ? { left: xo[g.index + 1] - 7, top: yo[g.from] + GUTTER_INSET, height: yo[g.to + 1] - yo[g.from] - GUTTER_INSET * 2 }

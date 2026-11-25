@@ -129,7 +129,7 @@ test("the terminal's ink follows the place: white in the room, ink on a grid's p
   await admin.locator(".tool-close").click();
 });
 
-test("the wheel zooms the grid around the pointer; Shift+wheel slides the paper; a trackpad's two fingers still pan", async () => {
+test("the wheel zooms the grid around the pointer; Shift+wheel slides the paper; small and fractional steps zoom too", async () => {
   await settle(admin, 600);
   const cam = () => admin.locator(".world").evaluate((el) => (el as HTMLElement).style.transform);
   const before = parseInt(await zoom(admin), 10);
@@ -151,15 +151,13 @@ test("the wheel zooms the grid around the pointer; Shift+wheel slides the paper;
   await settle(admin, 500);
   expect(await zoom(admin)).toBe(z);
   expect(await cam()).not.toBe(c0);
-  // fingers on a trackpad: small, both ways at once. They pan, and the gesture doesn't turn into a zoom half way
-  const c1 = await cam();
+  // small, fractional steps (a wheel on a scaled display, a high-resolution wheel, fingers): a zoom all the same
   await admin.evaluate(() => {
     const vp = document.querySelector(".grid-viewport")!;
-    for (const d of [{ deltaX: 1, deltaY: 4 }, { deltaX: 0, deltaY: 9 }, { deltaX: 0, deltaY: 120 }]) vp.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 700, clientY: 450, ...d }));
+    for (const d of [{ deltaX: 1, deltaY: 4.5 }, { deltaX: 0, deltaY: 9 }, { deltaX: 0, deltaY: 66.67 }, { deltaX: 0, deltaY: 66.67 }]) vp.dispatchEvent(new WheelEvent("wheel", { bubbles: true, cancelable: true, clientX: 700, clientY: 450, ...d }));
   });
-  await settle(admin, 500);
-  expect(await zoom(admin)).toBe(z);
-  expect(await cam()).not.toBe(c1);
+  await settle(admin, 900);
+  expect(parseInt(await zoom(admin), 10)).toBeLessThan(parseInt(z, 10));
   // Settings → General has the other choice
   await admin.goto("/#/settings/general");
   await expect(admin.getByText("The wheel on a grid").first()).toBeVisible();

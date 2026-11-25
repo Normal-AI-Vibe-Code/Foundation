@@ -189,7 +189,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
             }}
           />
         </Row>
-        <Row name="The wheel on a grid" detail={wheel === "zoom" ? "Zooms around the pointer. Drag the paper to move it; Shift+wheel slides it sideways. Two fingers on a trackpad still pan." : "Moves the paper. Ctrl+wheel (⌘ on a Mac) zooms."}>
+        <Row name="The wheel on a grid" detail={wheel === "zoom" ? "Zooms around the pointer. Drag the paper to move it; Shift+wheel slides it sideways." : "Moves the paper. Ctrl+wheel (⌘ on a Mac) zooms."}>
           <Seg
             label="The wheel on a grid"
             value={wheel}

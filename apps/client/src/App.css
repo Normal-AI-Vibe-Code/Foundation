@@ -795,18 +795,6 @@ body.is-connecting .section-tools,
   width: 100%;
 }
 
-/* inside a merged section the boundary is invisible until the pointer finds it */
-.gutter-col.is-interior {
-  width: 10px;
-  margin-left: 2px;
-}
-.gutter-row.is-interior {
-  height: 10px;
-  margin-top: 2px;
-}
-.gutter.is-interior .gutter-line {
-  background: transparent;
-}
 .gutter:hover .gutter-line,
 .gutter:active .gutter-line {
   background: color-mix(in srgb, var(--color-pulse) 55%, transparent);

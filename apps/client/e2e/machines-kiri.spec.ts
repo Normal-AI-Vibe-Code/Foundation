@@ -47,7 +47,7 @@ const frame = (page: Page, card: string) =>
 const drawnWidth = (page: Page, sel: string) => page.evaluate((s) => (document.querySelector(s) as HTMLElement).getBoundingClientRect(), sel);
 const screenText = (page: Page, scope: string) => page.locator(`${scope} .xterm-rows`).first().innerText();
 
-test("the wheel zooms, a trackpad pans; Today's window buttons are white", async ({ browser }) => {
+test("the wheel zooms, small steps included; Today's window buttons are white", async ({ browser }) => {
   const { context, page } = await person(browser, "Ada Test", "ada@normal.dev");
   const { board, tool } = await newBoard(context, "Wheel");
   await tool("add_section", { name: "Notes" });
@@ -70,13 +70,12 @@ test("the wheel zooms, a trackpad pans; Today's window buttons are white", async
     await settle(page, 1200);
     const c = await drawnWidth(page, sel);
     expect(c.width, "and back in").toBeGreaterThan(b.width * 1.05);
-    // a trackpad's two-finger scroll: small, fractional, with a sideways part: a pan, the same size
+    // small, fractional steps with a sideways part (2026-11-24: nothing guesses a trackpad): a zoom all the same
     await settle(page, 400);
     for (let i = 0; i < 10; i++) await page.mouse.wheel(1.5, 6.5);
-    await settle(page, 600);
+    await settle(page, 1200);
     const d = await drawnWidth(page, sel);
-    expect(Math.abs(d.width - c.width), "a pan keeps the size").toBeLessThan(1);
-    expect(d.top, "and moves the paper").toBeLessThan(c.top - 20);
+    expect(d.width, "small steps zoom out too").toBeLessThan(c.width * 0.98);
     // Today: the window's own buttons (the desktop app draws them) are white over the room
     await page.locator("[data-top-today]").click();
     await page.waitForFunction(() => document.querySelector(".shell.is-place-today"));
