@@ -135,6 +135,7 @@ import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, ty
 import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
 import { MachineTools } from "../panels/MachineTools";
 import { MachineHeadSpecimens } from "./MachineSpecimens";
+import { FlowSpecimens } from "./FlowSpecimens";
 import { AgentsMayLine, AgentUseLine, DesktopWell, ViewSwitch } from "../panels/MachineViewDesktop";
 import { IoLines } from "../panels/MachineViewIo";
 import type { MachineAsk, SlackSectionState } from "@foundation/protocol";
@@ -391,6 +392,10 @@ export function DesignPage({ chapter }: { chapter?: DesignChapter }) {
         <button className="f-pill" onClick={() => setReplay((r) => r + 1)}>
           Replay
         </button>
+      </Section>
+
+      <Section title="What flows along a wire" note="A port's card opens on the page's top layer, beside its pill, never under the next card: its name, type, a peek and a sample of the value (rows as a small table, a picture as a thumbnail, fields, text), and where it's wired. A wire with something on it carries a chip at a constant screen size: a peek, or what the card it feeds is doing, from real state only (the server's word on a fed table, a character stage's progress, a card running or failed); a spinner in the agent violet while it works. Pressing a wire opens its bar with the sample and Disconnect (⌫ too; ⌘Z puts it back). A table wired into shows its lens: where its rows come from, what passed, Rows where and Columns.">
+        <FlowSpecimens />
       </Section>
 
       <Section title="Effects" note="ASCII wind (sign-in), the paper shader (grid), agent rings, live wires. Each has a frame budget and a reduced-motion still.">

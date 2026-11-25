@@ -106,9 +106,20 @@ test("the lens: filter clauses, columns by name (ignoring case and spaces), limi
   assert.deepEqual(applyLens([["Name", "Qty"], ["bolt", "4"]], {}).records, [{ Name: "bolt", Qty: "4" }], "rows with a header are records");
 });
 
-test("a connector with nothing wired out of it isn't read, and puts nothing on its port", async () => {
+test("a connector with nothing wired out of it isn't read, and puts nothing on its port; nor one wired only into another connector", async () => {
   await feedConnectors(board);
   assert.equal(reads, 0);
+  const ff = { ...bom, id: uid("pnl"), connector: "factoryform", name: "FactoryForm" } as PanelDoc;
+  editBoard(board, "test", (doc) => {
+    boardMaps(doc).objects.set(ff.id, ff);
+    boardMaps(doc).links.set("lnk_c2c", { id: "lnk_c2c", from: { panel: bom.id, port: "out" }, to: { panel: ff.id, port: "in" } });
+  });
+  await feedConnectors(board);
+  assert.equal(reads, 0, "the company map's connector-to-connector wires read nothing");
+  editBoard(board, "test", (doc) => {
+    boardMaps(doc).links.delete("lnk_c2c");
+    boardMaps(doc).objects.delete(ff.id);
+  });
   assert.equal((m().objects.get(bom.id) as PanelDoc).outputs, undefined);
 });
 
@@ -210,6 +221,11 @@ test("the examples lay once, wired: BomForm and FactoryForm into tables, places 
   assert.equal(objs.filter((o) => o.kind === "panel" && (o as { connector?: string }).connector === "bomform").length, 0);
   const again = (await runTool(ctx, "lay_flow_examples", { request_id: "ex2" })) as { already?: boolean };
   assert.equal(again.already, true);
+});
+
+test("the flows map is the server's alone: a person's socket can't write a table's state", async () => {
+  const { SERVER_MAPS } = await import("../src/boards.ts");
+  assert.ok((SERVER_MAPS as readonly string[]).includes("flows"));
 });
 
 test("an agent's disconnect needs confirm, and then the wire is gone", async () => {

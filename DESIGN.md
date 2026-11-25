@@ -243,6 +243,8 @@ Today and Settings are places in the shell: they fill the open paper above the g
 
 The board: grid paper (WebGL) → grid chrome → sections (hosted apps) → cards → formula wires → **app wires + agent rings** → peer cursors → crew cursors → *(the floor's clip: cards stop at a pane's hairline)* → search pill and the voice sheet → crew guide → call chip and the upload tray → a carried card and a result in the hand → the floor (session, side pane, search, top bar) → repo drawer → presentation → **the council** (its bar and its one canvas) → ⌘K → toast → the sign-in page → the update card (it floats over sign-in too: an update can be what fixes signing in).
 
+A port's card (what a port carries, where it's wired) is on the page's top layer (z 1000, a child of the body), placed beside its pill each frame, at a constant size on screen: never under the next card, a section, a wire or an app's frame. A wire's chip rides the wire layer at a constant screen size. A pressed wire's bar sits just above the wires. (2026-11-24, shell/flow.css; `#/design` → What flows along a wire.)
+
 ## 9. Checklist for any new UI
 
 - [ ] On tokens only — no hex, no `rgba()`

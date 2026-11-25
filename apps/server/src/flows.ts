@@ -51,6 +51,15 @@ const isConnector = (o: unknown): o is PanelDoc & { connector: string } => {
 };
 const outPort = (p: PanelDoc) => p.ports.find((x) => x.dir === "out");
 
+/**
+ * A wire out of a connector that something will read: into a table, an app, a machine… — not into another
+ * connector (connectors take no inputs: the company map's seeded wires between them are a picture of how the
+ * systems feed each other, and reading every system for them would read for nobody).
+ */
+function readFor(objects: { get(id: string): unknown }, l: LinkDoc): boolean {
+  return isConnector(objects.get(l.from.panel)) && !isConnector(objects.get(l.to.panel));
+}
+
 /** the wires into a table's rows, the newest first (the newest is the one that feeds it) */
 function feedsOf(links: LinkDoc[], tableId: string): LinkDoc[] {
   return links.filter((l) => l.to.panel === tableId && l.to.port === TABLE_PORT).reverse();
@@ -143,14 +152,14 @@ export function setConnectorReader(fn: typeof reader | null) {
 }
 
 /**
- * Read every wired connector on a board and put what it says on its out port (only those with a wire out:
- * an unwired system isn't read). `fresh` reads past the connector cache.
+ * Read every wired connector on a board and put what it says on its out port (only those with a wire out to
+ * something that reads it: an unwired system isn't read). `fresh` reads past the connector cache.
  */
 export async function feedConnectors(boardId: string, fresh = false): Promise<void> {
   const doc = getBoard(boardId).doc;
   const m = boardMaps(doc);
   const links = [...m.links.values()];
-  const wired = [...m.objects.values()].filter((o): o is PanelDoc & { connector: string } => isConnector(o) && links.some((l) => l.from.panel === o.id));
+  const wired = [...m.objects.values()].filter((o): o is PanelDoc & { connector: string } => isConnector(o) && links.some((l) => l.from.panel === o.id && readFor(m.objects, l)));
   if (!wired.length) return;
   const busy = reading.get(boardId) ?? new Set<string>();
   reading.set(boardId, busy);
@@ -195,6 +204,8 @@ function soon(boardId: string, connectors: boolean) {
     key,
     setTimeout(() => {
       pending.delete(key);
+      // the board was closed meanwhile (shutdown, tests): reading it would open it again
+      if (!followed.has(boardId)) return;
       const run = connectors ? feedConnectors(boardId) : Promise.resolve(void fill(boardId));
       run.catch((e) => console.error(`  flows              on ${boardId} failed: ${(e as Error).message}`));
     }, 40),
@@ -208,7 +219,7 @@ function flowing(board: Board): { tables: boolean; connectors: boolean } {
   let connectors = false;
   for (const l of m.links.values()) {
     if (l.to.port === TABLE_PORT && m.objects.get(l.to.panel)?.kind === "table") tables = true;
-    if (isConnector(m.objects.get(l.from.panel))) connectors = true;
+    if (readFor(m.objects, l)) connectors = true;
     if (tables && connectors) break;
   }
   return { tables, connectors };
@@ -216,6 +227,13 @@ function flowing(board: Board): { tables: boolean; connectors: boolean } {
 
 function follow(board: Board) {
   followed.set(board.id, board);
+  board.doc.on("destroy", () => {
+    if (followed.get(board.id) === board) followed.delete(board.id);
+    for (const k of [`${board.id}:c`, `${board.id}:t`]) {
+      clearTimeout(pending.get(k));
+      pending.delete(k);
+    }
+  });
   const m = boardMaps(board.doc);
   // a wire made or taken off: read what it now connects (a new wire out of a connector reads it)
   m.links.observe((_e, tr) => {
@@ -328,7 +346,7 @@ export function layFlowExamples(boardId: string, actor: string): { section: stri
     wire(bom, open, "cert programs");
 
     const ff = connector("factoryform", "FactoryForm", "Inventory, stations, work orders, builds");
-    const stations = table("Stations · from FactoryForm", { limit: 30 });
+    const stations = table("Stations · from FactoryForm", { columns: "shortName, status, wip, capacity, provenance", limit: 30 });
     wire(ff, stations, "stations");
 
     const places = table("Places · example rows, type yours", undefined, ["Name", "Lat", "Lng", "Note"], [
@@ -350,7 +368,7 @@ export function layFlowExamples(boardId: string, actor: string): { section: stri
         "Each wire here carries live data. Point at a port to see a sample of what's on it; press a wire for its bar.",
         "",
         "- **BomForm → Open cert programs**: the table's lens keeps programs with items open (`itemsOpen > 0`) and four columns. Change the lens on the table and it refills.",
-        "- **FactoryForm → Stations**: its stations as they are now, read again every minute while wired.",
+        "- **FactoryForm → Stations**: its stations as they are now (five columns; `provenance` says which are demo), read again every minute while wired.",
         "- **Places → map**: every row with a Lat and a Lng is a pin. Type your own places over the example rows.",
         "",
         "Take a wire off (press it, then Disconnect, or ⌫) and the table stops following: it keeps its last rows and says it's no longer fed. ⌘Z puts the wire back and it fills again.",

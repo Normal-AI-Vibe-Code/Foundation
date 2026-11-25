@@ -533,16 +533,30 @@ class BoardSync {
         }
       }
     }
-    // the workbook must know every table before cells arrive
-    for (const t of Object.values(slices.tables ?? {}) as Array<{ id: string; name: string; cols: number; rows: number }>) {
-      const existing = workbook.getTable(t.id);
-      if (!existing) workbook.addTable(t.id, t.name, t.cols, t.rows);
-      else {
-        if (existing.name !== t.name) workbook.renameTable(t.id, t.name);
-        if (existing.cols !== t.cols || existing.rows !== t.rows) workbook.resize(t.id, t.cols, t.rows);
+    // the workbook must know every table before cells arrive. These are someone else's changes arriving: the
+    // workbook's own change events mustn't be taken for this person's edit and pushed back (a remote resize
+    // used to push this tab's cells, stale, over the board's: the rows a server or teammate had just written
+    // in the same change were deleted — 2026-11-24, a fed table filled and grown at once came out empty)
+    const resized: string[] = [];
+    this.applyingCells = true;
+    try {
+      for (const t of Object.values(slices.tables ?? {}) as Array<{ id: string; name: string; cols: number; rows: number }>) {
+        const existing = workbook.getTable(t.id);
+        if (!existing) workbook.addTable(t.id, t.name, t.cols, t.rows);
+        else {
+          if (existing.name !== t.name) workbook.renameTable(t.id, t.name);
+          if (existing.cols !== t.cols || existing.rows !== t.rows) {
+            workbook.resize(t.id, t.cols, t.rows);
+            resized.push(t.id);
+          }
+        }
       }
+    } finally {
+      this.applyingCells = false;
     }
     applyRemote(slices as Partial<AppState>);
+    // cells that came in the same change, before the table grew to hold them: read them again at its new size
+    if (resized.length && keys !== null) this.pullCells(resized);
   }
 
   private pullNoteText(ids: string[]) {

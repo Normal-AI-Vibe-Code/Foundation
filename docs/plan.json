@@ -2411,6 +2411,16 @@
       "status": "review",
       "body": "Josh, 2026-11-24. Every note is written as formatted text with the toolbar and kept as markdown; the card's bar has Markdown (turns the card to its markdown and back) and Background (takes the paper away); the toolbar has the text size (five steps, the whole note's). The section menu has one Note. Existing notes of both kinds open as this note with nothing rewritten, and a note is not rewritten by a click. add_note takes text_size and background. Checked in two browsers (e2e/section-agents.spec.ts and four more), day and night on #/design; evidence in docs/evidence/2026-11-24_one-note. A person checks: write in a note, set it large, take its background away and turn it to markdown, in the desktop app; and an old markdown note of your own still reads as you wrote it. Not done: Rune still opens a plain note as markdown in its own field (SPEC 7).",
       "issue": 245
+    },
+    {
+      "id": "data-flows",
+      "title": "Wires carry data: connectors emit while wired, tables take a wire through a lens, disconnect stops it",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "wires",
+      "status": "review",
+      "body": "Josh, 2026-11-24: port roll-overs did not come to the front; no way to disconnect or undo it; sample the data coming out of a card; examples in the Form Industries grid (table → map, BomForm → table with filters, prompt → 3D character); test that connecting and disconnecting changes the flow; loading and generating states. Built: the port card on the page top layer with a sample; a chip on each live wire with its real state; a wire bar with Disconnect (⌘Z puts it back); the server fills a wired table through its lens and reads a connector only while wired; lay_flow_examples. Not yet: a prompt lens (a paid model call a person presses), prompt → character, and the examples on the company board (needs the :4410 server restarted). docs/flows.md; apps/server/test/flows.test.ts; apps/client/e2e/flows.spec.ts; docs/evidence/2026-11-24_flows.",
+      "issue": null
     }
   ]
 }

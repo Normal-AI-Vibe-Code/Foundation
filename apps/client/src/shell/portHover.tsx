@@ -130,12 +130,16 @@ function PortLinks({ panel, port }: { panel: string; port: Port }) {
         const end = out ? l.to : l.from;
         const other = panels[end.panel];
         const p = other?.ports.find((x) => x.id === end.port);
+        // a table or a note at the other end has no ports: it's its rows, or its text
+        const st = getState();
+        const plain = other ? null : (st.tables[end.panel] ?? st.notes[end.panel]);
+        const where = plain ? (st.tables[end.panel] ? "rows" : "text") : (p?.name ?? end.port);
         return (
           <span key={l.id} className="port-link" style={{ ["--wire-tone" as string]: toneOf(p?.type ?? port.type) }}>
             <span className="port-link-arrow">{out ? "→" : "←"}</span>
-            <b>{other?.name ?? "a card that's gone"}</b>
+            <b>{other?.name ?? plain?.name ?? "a card that's gone"}</b>
             <span>
-              {out ? "into its" : "from its"} {p?.name ?? end.port}
+              {out ? "into its" : "from its"} {where}
             </span>
             {l.label && <em>{l.label}</em>}
           </span>
