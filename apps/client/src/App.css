@@ -1733,6 +1733,11 @@ body.is-viewer .sec-rest-open.is-make {
   will-change: transform;
 }
 
+.frame-anchor.dragging .frame-card,
+.table-anchor.dragging .table-card,
+.map-anchor.dragging .map-card {
+  will-change: transform;
+}
 .frame-anchor.dragging .frame-card {
   box-shadow: var(--shadow-card-lift);
 }
@@ -1748,7 +1753,10 @@ body.is-viewer .sec-rest-open.is-make {
     box-shadow 0.3s ease,
     rotate var(--dur-lift) var(--ease-settle),
     scale var(--dur-lift) var(--ease-settle);
-  will-change: transform;
+  /* no layer of its own at rest (2026-11-25): its anchor is already one, and a second per card doubled a
+     board's layers (a studio: 432). It is lifted while it is carried, below, and while its lean eases.
+     Still its own stacking context, as the layer made it */
+  isolation: isolate;
   overflow: visible;
 }
 .frame-anchor.dragging .frame-card {
@@ -2364,7 +2372,10 @@ body.is-viewer .chrome-icons .frame-card {
   box-shadow: var(--shadow-card);
   transform-origin: center;
   transition: box-shadow 0.3s ease, scale 0.3s var(--ease-spring);
-  will-change: transform;
+  /* no layer of its own at rest (2026-11-25): its anchor is already one, and a second per card doubled a
+     board's layers (a studio: 432). It is lifted while it is carried, below, and while its lean eases.
+     Still its own stacking context, as the layer made it */
+  isolation: isolate;
 }
 
 /* header */
@@ -2785,7 +2796,10 @@ body.is-viewer .chrome-icons .frame-card {
   box-shadow: var(--shadow-card);
   transform-origin: center;
   transition: box-shadow 0.3s ease;
-  will-change: transform;
+  /* no layer of its own at rest (2026-11-25): its anchor is already one, and a second per card doubled a
+     board's layers (a studio: 432). It is lifted while it is carried, below, and while its lean eases.
+     Still its own stacking context, as the layer made it */
+  isolation: isolate;
 }
 
 .map-header {

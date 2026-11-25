@@ -45,6 +45,7 @@ import { all, db, one, run } from "./db.ts";
 import { createSession, fromLoopback, googleIdentity, googleSignIn, googleStart, googleUrlFor, hashToken, isServiceToken, setSessionCookie, signIn, upsertUser, userFromSessionHash } from "./auth.ts";
 import { HttpError, parseCookies, type Req } from "./http.ts";
 import { finishGrant, keepSession, takeGrant } from "./flowformfiles.ts";
+import { dropGoogleProof } from "./chatsession.ts";
 
 const ATTEMPT_TTL = 10 * 60_000; // flowform's own oauth_state lives 10 minutes
 /** a desktop sign-in, Google and the press included, is over in five minutes */
@@ -243,7 +244,8 @@ export async function googleDesktopDone(req: Req, res: ServerResponse): Promise<
   try {
     const refused = req.query.get("error");
     if (refused) throw new HttpError(400, refused === "access_denied" ? "The sign-in was cancelled at Google." : "Google didn't finish the sign-in.");
-    const user = await googleIdentity(req.query.get("code") ?? "");
+    // Google's proof is kept under this attempt until the press (chatsession.ts: one sign-in for ChatForm too)
+    const user = await googleIdentity(req.query.get("code") ?? "", attempt.nonce_hash);
     finishDesktop(attempt, { userId: user.id });
     const press = secret();
     run("update flowform_attempts set confirm_hash = ? where nonce_hash = ?", hash(press), attempt.nonce_hash);
@@ -448,6 +450,7 @@ export function confirm(req: Req, res: ServerResponse, answer: "yes" | "no") {
       "The sign-in was turned down in the browser.",
       a.nonce_hash,
     );
+    dropGoogleProof(a.nonce_hash);
     return page(res, 200, "Nothing was signed in", "That app was not signed in. If you didn't start this, someone may have sent you the link: you can ignore it.");
   }
   run("update flowform_attempts set confirmed_at = ?, confirm_hash = null where nonce_hash = ?", now, a.nonce_hash);
@@ -467,9 +470,9 @@ export function poll(req: Req, res: ServerResponse) {
   const now = attemptClock.now();
   // a finished attempt is collected once: read and deleted in one statement
   // released only after the person pressed "This is me" in the browser (an error carries no session)
-  const finished = one<Pick<Attempt, "result_user_id" | "result_error">>(
+  const finished = one<Pick<Attempt, "result_user_id" | "result_error" | "nonce_hash">>(
     `delete from flowform_attempts where poll_hash = ? and mode = 'desktop' and expires_at > ?
-       and ((result_user_id is not null and confirmed_at is not null) or result_error is not null) returning result_user_id, result_error`,
+       and ((result_user_id is not null and confirmed_at is not null) or result_error is not null) returning result_user_id, result_error, nonce_hash`,
     pollHash,
     now,
   );
@@ -490,7 +493,9 @@ export function poll(req: Req, res: ServerResponse) {
   if (!finished.result_user_id) return { status: "error", error: finished.result_error ?? "Sign-in didn't finish" };
   const user = one<UserInfo>("select id, email, name, color, role from users where id = ?", finished.result_user_id);
   if (!user) throw new HttpError(500, "user vanished");
-  return { status: "ok", user, ...signIn(res, user.id, bearer) };
+  // a sign-in through this server's own Google client left Google's proof under the attempt: the new session is
+  // signed in to ChatForm's server with it (through Flowform there is none, and nothing happens)
+  return { status: "ok", user, ...signIn(res, user.id, bearer, finished.nonce_hash) };
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);

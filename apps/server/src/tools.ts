@@ -79,6 +79,7 @@ import { layFlowExamples } from "./flows.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
 import { CHAT_TOOLS } from "./chattools.ts";
 import { addReplayCard, placeFile, timelineText, userById } from "./replay.ts";
+import { canSeeChannel, getChannel } from "./chat.ts";
 import { codeHash, codeTools, NO_REPLAY } from "./codemode.ts";
 
 /** the person a tool acts for (Today's tools are theirs, not the board's) */
@@ -215,6 +216,7 @@ const PANEL_SIZES: Record<PanelKind, [number, number]> = {
   crew: [380, 440],
   replay: [360, 120],
   local: [480, 420],
+  chat: [400, 560],
 };
 
 function sectionOrCreate(doc: Y.Doc, section?: string) {
@@ -1393,6 +1395,36 @@ export const TOOLS: BoardTool[] = [
     run: (ctx, i) => {
       const card = addReplayCard(ctx.boardId, { userId: ctx.userId, actor: ctx.actor, person: ctx.person }, { session: i.session, section: i.section, x: i.x, y: i.y });
       return { id: card.id, section: card.sectionId };
+    },
+  }),
+  def({
+    name: "add_chat_card",
+    description:
+      "Put a ChatForm conversation on this grid as a card, so the people working here can read it, write in it and start its huddle where the work is. `channel` is the conversation's id (chat_channels lists the ones you can see). The grid keeps only a reference: the id, and `#name` when it is an open channel; a private channel's name, its people and every message stay ChatForm's, and someone who can see the grid but not the conversation sees a locked card. It goes in the given section, else the grid's first. Asked twice for the same section, it adds one.",
+    schema: z.object({ channel: z.string().describe("the ChatForm conversation's id (ch_…)"), section: z.string().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      // access is ChatForm's: only someone who can see the conversation can put it on a grid (a hidden one answers like a missing one)
+      const user = userById(ctx.userId);
+      if (!user) throw new HttpError(403, "A conversation is put on a grid by a person who can see it (or an agent working for them): this caller isn't one");
+      const ch = getChannel(i.channel);
+      if (!ch || !canSeeChannel(user, ch)) throw new HttpError(404, "No such conversation");
+      if (ch.archivedAt) throw new HttpError(400, "That conversation is archived");
+      // what the board keeps (client chat/gridChat.ts `chatCardRef`): the id, and a name only when the channel is open
+      const name = ch.kind === "open" && ch.name ? `#${ch.name}` : "Conversation";
+      const out = editBoard(ctx.boardId, "agent", (doc) => {
+        const sec = cardSection(doc, i.section);
+        const m = boardMaps(doc);
+        const had = [...m.objects.values()].find((o) => o.kind === "panel" && o.panel === "chat" && o.sectionId === sec.id && o.channel === ch.id && !o.chatServer) as PanelDoc | undefined;
+        if (had) return { card: had, added: false };
+        const [w, h] = PANEL_SIZES.chat;
+        const card: PanelDoc = { id: uid("pnl"), kind: "panel", panel: "chat", sectionId: sec.id, name, channel: ch.id, x: 0, y: 0, float: false, bornAt: Date.now(), w, h, ports: [], createdBy: ctx.actor };
+        m.objects.set(card.id, card);
+        return { card, added: true };
+      });
+      // the log names the conversation only as the board does
+      if (out.added) touch(ctx, out.card.id, ch.kind === "open" ? `put ${name} on the grid` : "put a conversation on the grid");
+      return { id: out.card.id, section: out.card.sectionId, channel: ch.id };
     },
   }),
   def({

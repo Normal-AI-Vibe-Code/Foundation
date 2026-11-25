@@ -10,6 +10,8 @@ import { PartyAvatar } from "./Avatar";
 import { channelMark } from "./Sidebar";
 import { ago, timeOf } from "./Message";
 import type { ChatHit } from "./model";
+import { NoticeRow } from "./Bell";
+import { isSeen, type Notice, type Seen } from "./notifyLogic";
 
 export function BrowseView({ channels, meId, onOpen, onJoin }: { channels: ChatChannelView[]; meId?: string; onOpen(id: string): void; onJoin(id: string): void }) {
   const open = channels.filter((c) => c.kind === "open" && !c.archivedAt).sort((a, b) => b.lastPostAt - a.lastPostAt);
@@ -80,6 +82,33 @@ export function ThreadsView({ threads, busy, why, onOpen }: { threads: ThreadRow
         {busy && !threads && <p className="chat-view-empty" role="status">Looking…</p>}
         {why && <ErrorCard message={why} />}
         {threads && !threads.length && <p className="chat-view-empty">No threads yet. Reply in thread from a message's hover bar, and it's kept here.</p>}
+      </div>
+    </div>
+  );
+}
+
+/** what was said to me, the bell's list as a view of its own: mentions of me, @channel and @here where I'm a member, direct messages */
+export function MentionsView({ notices, seen, channels, busy, why, unseen, onOpen, onAll }: { notices: Notice[]; seen: Seen; channels?: Record<string, Pick<ChatChannelView, "me"> | undefined>; busy?: boolean; why?: string; unseen: number; onOpen(n: Notice): void; onAll?(): void }) {
+  return (
+    <div className="chat-view" data-chat-view="mentions">
+      <header className="chat-view-head is-with-action">
+        <div>
+          <h2>Recent mentions</h2>
+          <p>Where you were named, @channel and @here in the channels you're in, and what was written to you directly. Newest first; press one to open it where it was said.</p>
+        </div>
+        {onAll && unseen > 0 && (
+          <button type="button" className="f-pill" onClick={onAll} data-mentions-all>
+            Mark all read
+          </button>
+        )}
+      </header>
+      <div className="chat-view-list chat-mentions-list">
+        {notices.map((n) => (
+          <NoticeRow key={n.id} n={n} unseen={!isSeen(n, seen, channels)} onOpen={onOpen} />
+        ))}
+        {busy && !notices.length && <p className="chat-view-empty" role="status">Looking…</p>}
+        {why && <ErrorCard message={why} />}
+        {!busy && !why && !notices.length && <p className="chat-view-empty">Nobody has mentioned you or written to you directly yet. When they do, it's kept here.</p>}
       </div>
     </div>
   );

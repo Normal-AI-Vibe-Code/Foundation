@@ -95,16 +95,95 @@ export function rememberedChatServers(known: KnownChatServer[], used: string[], 
 
 /**
  * What ChatForm can do on a server of its own. Such a server says what it has (`/auth/config` → `features`); one
- * that doesn't say is taken to have what the chat store itself asks for. Files, huddles, agents, the inbox and
- * the Slack import are Foundation's own server's and are never on a separate chat server.
+ * that doesn't say is taken to have what the chat store itself asks for. Huddles, agents, the inbox and the Slack
+ * import are Foundation's own server's and are never on a separate chat server. Files (uploads, and the pictures
+ * and downloads they are read back as) and the list of what was said to me are there only when the server says so:
+ * a chat server that doesn't say has neither, and the client never falls back to Foundation's archive for them.
  */
-export type ChatFeature = "files" | "pins" | "topics" | "members" | "notify" | "star" | "export" | "archive" | "threads-list" | "huddles" | "agents";
+export type ChatFeature = "files" | "pins" | "topics" | "members" | "notify" | "star" | "export" | "archive" | "threads-list" | "huddles" | "agents" | "previews" | "mentions";
 
-const FOUNDATION_ONLY: ChatFeature[] = ["files", "huddles", "agents"];
+const FOUNDATION_ONLY: ChatFeature[] = ["huddles", "agents"];
+/** on a chat server: only when it lists them */
+const ONLY_WHEN_SAID: ChatFeature[] = ["files", "mentions"];
 
 export function chatCan(remote: boolean, features: string[] | null, what: ChatFeature): boolean {
   if (!remote) return true;
   if (FOUNDATION_ONLY.includes(what)) return false;
+  if (ONLY_WHEN_SAID.includes(what)) return !!features?.includes(what);
   if (!features) return true;
   return features.includes(what);
+}
+
+// ---------------------------------------------------------------- files on whichever server ChatForm is on
+
+/** a GIF keeps its frames only as the file it is: never asked for by width, never re-encoded */
+export function isGif(f: { name?: string; mime?: string }): boolean {
+  return (f.mime ?? "").toLowerCase() === "image/gif" || /\.gif$/i.test(f.name ?? "");
+}
+
+/** the width a chat picture is asked for: the drawn width's tier, or the file itself for a GIF or an SVG (and in the lightbox) */
+export function chatPictureTier(f: { name?: string; mime?: string }, drawn: 256 | 512 | "orig"): 256 | 512 | "orig" {
+  if (drawn === "orig" || isGif(f)) return "orig";
+  if ((f.mime ?? "").toLowerCase() === "image/svg+xml" || /\.svg$/i.test(f.name ?? "")) return "orig";
+  return drawn;
+}
+
+/** the box a picture holds before it loads, from the width and height the server kept; null when it kept none */
+export function pictureBox(f: { w?: number; h?: number }, maxW = 360, maxH = 280): { width: number; height: number } | null {
+  const w = Number(f.w), h = Number(f.h);
+  if (!(w > 0) || !(h > 0)) return null;
+  const k = Math.min(1, maxW / w, maxH / h);
+  return { width: Math.max(1, Math.round(w * k)), height: Math.max(1, Math.round(h * k)) };
+}
+
+/** "4 MB", "512 KB": a limit as a person says it */
+export function sizeWords(n: number): string {
+  if (n >= 1024 * 1024) return `${+(n / (1024 * 1024)).toFixed(n % (1024 * 1024) ? 1 : 0)} MB`;
+  if (n >= 1024) return `${Math.round(n / 1024)} KB`;
+  return `${n} bytes`;
+}
+
+/**
+ * The most a server takes in one file, in bytes, when it says: `/auth/config` may carry it (`maxUpload`,
+ * `maxUploadBytes`, `uploadLimit`, or `limits.upload`), and a refusal may (`limit`, `max`, or "4 MB" in its words).
+ * null when nothing says.
+ */
+export function uploadLimitOf(said: unknown): number | null {
+  if (!said || typeof said !== "object") return null;
+  const o = said as Record<string, unknown>;
+  const limits = (o.limits && typeof o.limits === "object" ? o.limits : {}) as Record<string, unknown>;
+  for (const v of [o.maxUpload, o.maxUploadBytes, o.uploadLimit, o.max_upload, limits.upload, limits.file, o.limit, o.max]) {
+    if (typeof v === "number" && Number.isFinite(v) && v > 0) return v;
+  }
+  const words = typeof o.error === "string" ? o.error : "";
+  const m = /(\d+(?:\.\d+)?)\s*(kb|mb|gb|kib|mib|gib)\b/i.exec(words);
+  if (m) {
+    const unit = m[2].toLowerCase()[0];
+    return Math.round(Number(m[1]) * (unit === "k" ? 1024 : unit === "m" ? 1024 * 1024 : 1024 * 1024 * 1024));
+  }
+  return null;
+}
+
+/**
+ * Why an upload didn't land, in words a person can act on. A file over the server's limit says the limit (the one
+ * the server gave, in its config or its refusal) and the file's own size; anything else is the server's own words.
+ */
+export function uploadFailure(file: { name: string; size: number }, status: number, body: unknown, where: string, knownLimit: number | null = null): string {
+  const said = body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string" ? (body as { error: string }).error : "";
+  const limit = uploadLimitOf(body) ?? knownLimit;
+  const over = status === 413 || (limit !== null && file.size > limit && status !== 401 && status !== 403);
+  if (over) {
+    return limit !== null
+      ? `Too big for ${where}: it takes files up to ${sizeWords(limit)}, and this one is ${sizeWords(file.size)}.`
+      : `Too big for ${where} (this file is ${sizeWords(file.size)}).${said ? ` It says: ${said}` : ""}`;
+  }
+  if (status === 0) return `Can't reach ${where}, or it cut the upload off (this file is ${sizeWords(file.size)}). The file wasn't sent.`;
+  if (status === 401) return `Your sign-in on ${where} ended. Sign in again, then attach it once more.`;
+  return said || `The upload didn't land (${where} answered ${status}).`;
+}
+
+/** a file too big to send, known before a byte goes (the server said its limit): the words, or null when it fits */
+export function tooBigBefore(file: { name: string; size: number }, limit: number | null, where: string): string | null {
+  if (limit === null || file.size <= limit) return null;
+  return uploadFailure(file, 413, { limit }, where, limit);
 }

@@ -23,6 +23,7 @@ import {
   type ImageTier,
 } from "../lib/imageCache";
 import { isLodDisabled, isSkippableImage, loadProgressiveImage } from "../lib/imageLod";
+import { arrivalStep } from "../lib/arrival";
 import "./progressive-image.css";
 
 export type ProgressivePhase = "well" | "preview" | "sharp" | "error";
@@ -46,6 +47,12 @@ export interface ProgressiveImageProps {
   imgClassName?: string;
   style?: CSSProperties;
   draggable?: boolean;
+  /**
+   * Arrive as part of a wave (the grid's pictures, 2026-11-25): a cold picture's reveal waits a few steps by its
+   * distance from the middle of the screen (lib/arrival.ts), so a section fills from the centre outward instead of
+   * popping in the order fetches land. Off by default (a chat's pictures arrive as they come).
+   */
+  stagger?: boolean;
   referrerPolicy?: HTMLAttributeReferrerPolicy;
   onLoad?: () => void;
   onError?: () => void;
@@ -108,6 +115,7 @@ export function ProgressiveImage({
   imgClassName,
   style,
   draggable = false,
+  stagger = false,
   referrerPolicy,
   onLoad,
   onError,
@@ -116,6 +124,8 @@ export function ProgressiveImage({
   const hostRef = useRef<HTMLSpanElement>(null);
   const [state, setState] = useState<DisplayState | null>(() => initialDisplay(src, targetWidth));
   const [directReady, setDirectReady] = useState(false);
+  // how many steps this picture's reveal waits: read once, where it is when its load starts
+  const [step, setStep] = useState(0);
 
   // Compute synchronous display for the current `src` so switching `src` hits L1 on frame 1
   const syncFallback = src && state?.forSrc !== src ? initialDisplay(src, targetWidth) : null;
@@ -198,6 +208,7 @@ export function ProgressiveImage({
     }
 
     const distance = viewportDistance(hostRef.current);
+    if (stagger) setStep(arrivalStep(distance));
     void loadProgressiveImage(src, target, {
       name: alt,
       priority,
@@ -233,7 +244,7 @@ export function ProgressiveImage({
     <span
       ref={hostRef}
       className={`f-prog${layoutClass}${isSharp ? " is-sharp" : ""}${className ? ` ${className}` : ""}`}
-      style={aspectRatio ? { ...style, aspectRatio } : style}
+      style={stagger && step ? ({ ...style, ...(aspectRatio ? { aspectRatio } : {}), "--arrive-step": step } as CSSProperties) : aspectRatio ? { ...style, aspectRatio } : style}
       data-prog-phase={active?.phase ?? "well"}
       data-prog-tier={active?.tier ?? ""}
     >

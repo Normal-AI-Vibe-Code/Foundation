@@ -83,9 +83,69 @@
     transform: scale(1.012, 1.02);
   }
 }
+/* a still that had to be read or made fades in (one already in memory is simply there), a few steps later the
+   farther it is from the middle of the screen (lib/arrival.ts): opacity alone, on the compositor */
+.avatar-still.is-arriving {
+  transition: opacity var(--dur-lift) var(--ease-out-soft) calc(var(--arrive-step, 0) * var(--dur-press) / 2);
+}
+@starting-style {
+  .avatar-still.is-arriving {
+    opacity: 0;
+  }
+}
+
+/* ---------- a poster (2026-11-25): a card's character rests on its picture and cross-fades to the live one ---------- */
+
+.avatar-poster {
+  overflow: hidden;
+}
+.avatar-rest,
+.avatar-poster > .avatar-3d,
+.avatar-poster > .avatar-mesh {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity var(--dur-lift) var(--ease-out-soft);
+}
+.avatar-rest > .avatar {
+  position: absolute;
+  inset: 0;
+}
+/* the model drawn once (portrait.ts): the stage's own camera, so it sits exactly where the live one will */
+.avatar-rest > .avatar-render {
+  object-fit: contain;
+  object-position: 50% 50%;
+  border-radius: 0;
+  animation: none;
+}
+.avatar-poster > .avatar-3d,
+.avatar-poster > .avatar-mesh {
+  opacity: 0;
+}
+.avatar-poster.is-playing > .avatar-3d,
+.avatar-poster.is-playing > .avatar-mesh {
+  opacity: 1;
+}
+.avatar-poster.is-playing > .avatar-rest {
+  opacity: 0;
+}
+/* inside a poster the canvas is always there; the poster's own fade is the arrival */
+.avatar-poster > .avatar-3d > .avatar-canvas,
+.avatar-poster > .avatar-mesh > .avatar-canvas {
+  opacity: 1;
+  animation: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .avatar-still {
     animation: none;
+  }
+  .avatar-still.is-arriving,
+  .avatar-rest,
+  .avatar-poster > .avatar-3d,
+  .avatar-poster > .avatar-mesh {
+    transition: none;
   }
 }
 

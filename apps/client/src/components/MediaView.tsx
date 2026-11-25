@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState, type CSSProperties } from "react";
 import { isNight, onNight } from "@foundation/ui";
 import {
   drawnScale,
@@ -14,6 +14,7 @@ import { useFileSrc } from "../lib/fileSrc";
 import { fetchFile } from "../lib/api";
 import { camera, FAR_ZOOM, onCamera } from "../state/camera";
 import { useCalmAdmit } from "../lib/calm";
+import { arrivalStep } from "../lib/arrival";
 import {
   isLocalDataUrl,
   peekCachedImage,
@@ -34,6 +35,8 @@ import "./progressive-image.css";
 
 /** Off-screen grace period before an image card sheds its GPU texture down to its tiny 64/256 tier. */
 const VRAM_SHED_MS = 2500;
+/** how long a picture goes on easing after its sharp level replaces the stand-in: the focus (--dur-quick) and the longest wait of the wave (lib/arrival.ts) */
+const SETTLE_MS = 160 + 6 * 40 + 60;
 
 interface Props {
   item: MediaMeta;
@@ -63,6 +66,30 @@ export const MediaView = memo(function MediaView({ item, pos, isActive, getScale
   const read = useHasAlpha(needAlphaProbe ? item.src : null, item.name);
   const clear = prog.alpha !== null ? prog.alpha : read;
   const night = useNight();
+
+  // How it arrives (2026-11-25). A picture that was in memory when its card mounted is simply there. A cold one
+  // fades in from its well as the 64 px stand-in, blurred, and the sharp level then comes into focus over it; the
+  // focus used to be a pop (the transition went away with the stand-in's class), so the card stays "settling" for
+  // the length of it. And it waits a few steps by its distance from the middle of the screen (lib/arrival.ts), so
+  // a section's pictures fill as a wave from the centre, not in the order their fetches happen to land
+  const [cold] = useState(() => image && !prog.instantSharp);
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (cold) setStep(arrivalStep(viewportDistance(hostRef.current)));
+  }, [cold]);
+  const [settling, setSettling] = useState(false);
+  const wasPreview = useRef(false);
+  useEffect(() => {
+    if (isShowingPreview) {
+      wasPreview.current = true;
+      return;
+    }
+    if (!wasPreview.current) return;
+    wasPreview.current = false;
+    setSettling(true);
+    const t = window.setTimeout(() => setSettling(false), SETTLE_MS);
+    return () => window.clearTimeout(t);
+  }, [isShowingPreview]);
 
   // Keep loaded true once a cached sharp URL is shown immediately
   useEffect(() => {
@@ -163,9 +190,11 @@ export const MediaView = memo(function MediaView({ item, pos, isActive, getScale
               className={
                 (loaded || isShowingPreview ? "is-loaded" : "") +
                 (isShowingPreview ? " f-img-preview" : "") +
+                (settling ? " f-img-settling" : "") +
+                (cold ? " f-img-cold" : "") +
                 (item.invert ? " is-inverted" : "")
               }
-              style={{ width: item.w, height: item.h }}
+              style={step ? ({ width: item.w, height: item.h, "--arrive-step": step } as CSSProperties) : { width: item.w, height: item.h }}
               draggable={false}
               decoding="async"
               onLoad={() => setLoaded(true)}

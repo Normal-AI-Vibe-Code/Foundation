@@ -245,7 +245,8 @@ export type PanelKind =
   | "pipeline" // a node of the Character studio's flow for one set (`source`: the set; `node`: which one: inspiration, a stage, or output). Without `node`, the whole flow in one card (studios of 2026-11-16)
   | "character" // a character in the making: inspiration, its sheet, its 3D model or mesh avatar, and the presses that pay for each stage
   | "local" // one of this computer's projects (localdev.ts; `source`: the project key, `node`: preview, progress or changes), kept by the server
-  | "replay"; // a recorded huddle session's clock (ChatForm R1): scrub it and the section it sits in is drawn as it was then (`sessionId`: the huddle session)
+  | "replay" // a recorded huddle session's clock (ChatForm R1): scrub it and the section it sits in is drawn as it was then (`sessionId`: the huddle session)
+  | "chat"; // a ChatForm conversation on the grid (2026-11-25): `channel` is its id and `chatServer` the chat server it lives on. A reference only: who may read it, its name when it's private, and every word said stay the chat server's
 
 export interface Port {
   id: string;
@@ -277,8 +278,14 @@ export interface PanelDoc extends ObjectBaseDoc {
   node?: string;
   /** connector id for panel === "connector" */
   connector?: string;
-  /** Slack channel id — a "slack" card's channel, or the channel a huddle was opened for */
+  /** Slack channel id — a "slack" card's channel, or the channel a huddle was opened for; a "chat" card's ChatForm channel id */
   channel?: string;
+  /**
+   * A "chat" card: the origin of the chat server its channel is on ("https://chat.example.app"); absent when that
+   * is the Foundation server the grid itself is on. A device whose ChatForm points somewhere else says so on the
+   * card instead of looking the id up on the wrong server.
+   */
+  chatServer?: string;
   /**
    * Only on boards older than schema 6. A huddle's live state lives in the
    * board's `huddles` map, written by the server alone, so a person moving

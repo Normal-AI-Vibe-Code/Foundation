@@ -1,5 +1,5 @@
-//! Channels, direct messages, messages, threads, reactions, read marks and search: the Node server's routes and JSON
-//! (`apps/server/src/chat.ts`), on Postgres.
+//! Channels, direct messages, messages (with their files and link previews), threads, reactions, pins, read marks,
+//! search and the mentions list: the Node server's routes and JSON (`apps/server/src/chat.ts`), on Postgres.
 
 use std::collections::HashMap;
 
@@ -16,7 +16,7 @@ use crate::{
     St,
     auth::{User, require_user},
     error::{Result, bad, forbidden, http, not_found},
-    hub,
+    files, hub, preview,
     util::{chat_handle, chat_slug, mention_handles, new_id, now_ms, snippet},
 };
 
@@ -64,10 +64,14 @@ pub struct MessageRow {
     pub deleted_at: Option<i64>,
     pub reactions: Value,
     pub mentions: Value,
+    /// the files it carries, as ChatFile ({ id, name, mime, size, w?, h? })
+    pub files: Value,
+    pub previews: Option<Value>,
+    pub pinned: bool,
 }
 
 const CHANNEL_COLS: &str = "id, kind, name, topic, purpose, created_by, created_at, archived_at, last_seq, last_post_at, last_text";
-const MESSAGE_COLS: &str = "id, channel_id, seq, author_id, author_name, author_color, type, text, root, created_at, edited_at, deleted_at, reactions, mentions";
+const MESSAGE_COLS: &str = "id, channel_id, seq, author_id, author_name, author_color, type, text, root, created_at, edited_at, deleted_at, reactions, mentions, files, previews, pinned";
 
 /// only these are visible to everyone; every other kind reaches its members alone, admins included
 pub fn is_open(kind: &str) -> bool {
@@ -139,11 +143,13 @@ pub async fn channel_view(st: &St, user: &User, c: &ChannelRow) -> Result<Value>
         }
         None => (Value::Null, 0),
     };
+    let pinned: Vec<(String,)> = sqlx::query_as("select id from chat_messages where channel_id = $1 and pinned and deleted_at is null order by seq").bind(&c.id).fetch_all(&st.db).await?;
+    let pinned: Vec<String> = pinned.into_iter().map(|r| r.0).collect();
     let mut v = json!({
         "id": c.id, "kind": c.kind, "name": c.name, "topic": c.topic, "purpose": c.purpose,
         "createdBy": c.created_by, "createdAt": c.created_at, "archivedAt": c.archived_at,
         "lastSeq": c.last_seq, "lastPostAt": c.last_post_at, "memberCount": count.0,
-        "huddle": null, "pinned": [], "me": me_json, "unread": unread,
+        "huddle": null, "pinned": pinned, "me": me_json, "unread": unread,
     });
     if let Some(t) = &c.last_text {
         v["lastText"] = json!(t);
@@ -179,11 +185,14 @@ pub async fn messages_json(st: &St, rows: &[MessageRow]) -> Result<Vec<Value>> {
                 "author": person_party(&m.author_id, &m.author_name, m.author_color.as_deref()),
                 "type": m.kind, "text": if gone { "" } else { m.text.as_str() }, "root": m.root,
                 "createdAt": m.created_at, "editedAt": m.edited_at, "deletedAt": m.deleted_at,
-                "files": [], "reactions": if gone { json!([]) } else { m.reactions.clone() },
-                "replyCount": n, "lastReplyAt": last, "pinned": false, "mentions": m.mentions,
+                "files": if gone { json!([]) } else { m.files.clone() }, "reactions": if gone { json!([]) } else { m.reactions.clone() },
+                "replyCount": n, "lastReplyAt": last, "pinned": m.pinned && !gone, "mentions": if gone { json!([]) } else { m.mentions.clone() },
             });
             if !who.is_empty() {
                 v["repliers"] = json!(who);
+            }
+            if !gone && let Some(p) = m.previews.as_ref().filter(|p| p.as_array().is_some_and(|a| !a.is_empty())) {
+                v["previews"] = p.clone();
             }
             if m.author_id == "system" {
                 v["author"] = json!({ "kind": "system", "id": "system", "name": "ChatForm" });
@@ -246,10 +255,35 @@ async fn mentions_in(st: &St, text: &str) -> Result<Vec<String>> {
     Ok(out)
 }
 
+/// what is being posted: words, the files it carries (ChatFile, already checked: files::attachable), where
+pub struct NewPost<'a> {
+    /// "text", or "system" for ChatForm's own lines ("Ada pinned a message.")
+    pub kind: &'a str,
+    pub text: &'a str,
+    pub files: Vec<Value>,
+    pub root: Option<&'a str>,
+    pub request_id: Option<&'a str>,
+}
+
+/// who a message is by, as the server says it: a person's session is that person; ChatForm's own lines are "system"
+pub struct Author<'a> {
+    pub id: &'a str,
+    pub name: &'a str,
+    pub color: Option<&'a str>,
+}
+pub const SYSTEM: Author<'static> = Author { id: "system", name: "ChatForm", color: None };
+
+impl<'a> From<&'a User> for Author<'a> {
+    fn from(u: &'a User) -> Self {
+        Author { id: &u.id, name: &u.name, color: Some(&u.color) }
+    }
+}
+
 /// post a message: its place in the channel is the next seq, given in one statement so two at once never share one
-pub async fn post(st: &St, c: &ChannelRow, author: &User, text: &str, root: Option<&str>, request_id: Option<&str>) -> Result<Value> {
+pub async fn post(st: &St, c: &ChannelRow, author: Author<'_>, p: NewPost<'_>) -> Result<Value> {
+    let NewPost { kind, text, files, root, request_id } = p;
     if let Some(rid) = request_id {
-        let again: Option<(String,)> = sqlx::query_as("select id from chat_messages where author_id = $1 and request_id = $2").bind(&author.id).bind(rid).fetch_optional(&st.db).await?;
+        let again: Option<(String,)> = sqlx::query_as("select id from chat_messages where author_id = $1 and request_id = $2").bind(author.id).bind(rid).fetch_optional(&st.db).await?;
         if let Some((id,)) = again {
             return Ok(message_json(st, &id).await?.unwrap_or(Value::Null));
         }
@@ -260,36 +294,50 @@ pub async fn post(st: &St, c: &ChannelRow, author: &User, text: &str, root: Opti
             _ => return Err(bad("root: a message in this channel that starts a thread")),
         }
     }
-    let mentions = mentions_in(st, text).await?;
+    let mentions = if kind == "system" { vec![] } else { mentions_in(st, text).await? };
     let now = now_ms();
     let id = new_id("m");
+    // the list's few words: the message's own, or its first file's name; a reply or a system line leaves them be
+    let in_list = root.is_none() && kind != "system";
+    let words = if text.trim().is_empty() { files.first().and_then(|f| f["name"].as_str()).unwrap_or("").to_string() } else { snippet(text, 120) };
     let mut tx = st.db.begin().await?;
-    let (seq,): (i64,) = sqlx::query_as("update chat_channels set last_seq = last_seq + 1, last_post_at = $2, last_text = case when $3::text is null then $4 else last_text end where id = $1 returning last_seq")
+    let (seq,): (i64,) = sqlx::query_as("update chat_channels set last_seq = last_seq + 1, last_post_at = $2, last_text = case when $3 then $4 else last_text end where id = $1 returning last_seq")
         .bind(&c.id)
         .bind(now)
-        .bind(root)
-        .bind(snippet(text, 120))
+        .bind(in_list)
+        .bind(words)
         .fetch_one(&mut *tx)
         .await?;
-    sqlx::query("insert into chat_messages (id, channel_id, seq, author_id, author_name, author_color, type, text, root, created_at, mentions, request_id) values ($1, $2, $3, $4, $5, $6, 'text', $7, $8, $9, $10, $11)")
+    sqlx::query("insert into chat_messages (id, channel_id, seq, author_id, author_name, author_color, type, text, root, created_at, mentions, request_id, files) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)")
         .bind(&id)
         .bind(&c.id)
         .bind(seq)
-        .bind(&author.id)
-        .bind(&author.name)
-        .bind(&author.color)
+        .bind(author.id)
+        .bind(author.name)
+        .bind(author.color)
+        .bind(kind)
         .bind(text)
         .bind(root)
         .bind(now)
         .bind(json!(mentions))
         .bind(request_id)
+        .bind(json!(files))
         .execute(&mut *tx)
         .await?;
+    // who may open a file is whoever can read a message that carries it
+    for f in &files {
+        sqlx::query("insert into chat_file_uses (file_id, message_id, channel_id) values ($1, $2, $3) on conflict do nothing").bind(f["id"].as_str().unwrap_or("")).bind(&id).bind(&c.id).execute(&mut *tx).await?;
+    }
     // the author has read what they wrote
-    sqlx::query("update chat_members set read_seq = greatest(read_seq, $3) where channel_id = $1 and user_id = $2").bind(&c.id).bind(&author.id).bind(seq).execute(&mut *tx).await?;
+    sqlx::query("update chat_members set read_seq = greatest(read_seq, $3) where channel_id = $1 and user_id = $2").bind(&c.id).bind(author.id).bind(seq).execute(&mut *tx).await?;
     tx.commit().await?;
     hub::publish(st, json!({ "t": "message", "id": id, "requestId": request_id })).await;
-    Ok(message_json(st, &id).await?.unwrap_or(Value::Null))
+    let message = message_json(st, &id).await?.unwrap_or(Value::Null);
+    // its links are read after this answers; the cards arrive as a change to the message
+    if kind == "text" {
+        preview::queue(st, &id, text);
+    }
+    Ok(message)
 }
 
 // ---------------------------------------------------------------- routes
@@ -488,7 +536,7 @@ pub struct NewMessage {
     text: Option<String>,
     root: Option<String>,
     request_id: Option<String>,
-    files: Option<Vec<Value>>,
+    files: Option<Value>,
 }
 
 pub async fn post_message(State(st): State<St>, headers: HeaderMap, Path(id): Path<String>, Json(b): Json<NewMessage>) -> Result<Json<Value>> {
@@ -500,15 +548,14 @@ pub async fn post_message(State(st): State<St>, headers: HeaderMap, Path(id): Pa
     if c.archived_at.is_some() {
         return Err(http(StatusCode::CONFLICT, "this channel is archived"));
     }
-    if b.files.as_ref().is_some_and(|f| !f.is_empty()) {
-        return Err(bad("Files aren't kept on this chat server yet."));
-    }
     let text = b.text.unwrap_or_default();
-    if text.trim().is_empty() {
-        return Err(bad("a message needs words"));
-    }
     if text.chars().count() > TEXT_MAX {
         return Err(bad(format!("a message holds at most {TEXT_MAX} characters")));
+    }
+    // its own uploads, or files this person can already see; at most twelve
+    let files = files::attachable(&st, &user, b.files.as_ref()).await?;
+    if text.trim().is_empty() && files.is_empty() {
+        return Err(bad("say something"));
     }
     if membership(&st, &c.id, &user.id).await?.is_none() {
         // posting in an open channel joins it
@@ -516,7 +563,7 @@ pub async fn post_message(State(st): State<St>, headers: HeaderMap, Path(id): Pa
         hub::publish(&st, json!({ "t": "member", "channel": c.id, "user": user.id, "joined": true })).await;
     }
     let request_id = b.request_id.map(|r| r.chars().take(120).collect::<String>());
-    let message = post(&st, &c, &user, &text, b.root.as_deref(), request_id.as_deref()).await?;
+    let message = post(&st, &c, (&user).into(), NewPost { kind: "text", text: &text, files, root: b.root.as_deref(), request_id: request_id.as_deref() }).await?;
     Ok(Json(json!({ "message": message })))
 }
 
@@ -557,13 +604,25 @@ pub async fn edit_message(State(st): State<St>, headers: HeaderMap, Path(id): Pa
         return Err(http(StatusCode::CONFLICT, "this message was removed"));
     }
     let text = b.text.unwrap_or_default();
-    if text.trim().is_empty() || text.chars().count() > TEXT_MAX {
-        return Err(bad(format!("a message holds 1 to {TEXT_MAX} characters")));
+    let has_files = m.files.as_array().is_some_and(|f| !f.is_empty());
+    if text.trim().is_empty() && !has_files {
+        return Err(bad("say something (or remove the message)"));
+    }
+    if text.chars().count() > TEXT_MAX {
+        return Err(bad(format!("a message holds at most {TEXT_MAX} characters")));
+    }
+    if text == m.text {
+        return Ok(Json(json!({ "message": message_json(&st, &id).await? })));
     }
     let mentions = mentions_in(&st, &text).await?;
-    sqlx::query("update chat_messages set text = $2, edited_at = $3, mentions = $4 where id = $1").bind(&id).bind(&text).bind(now_ms()).bind(json!(mentions)).execute(&st.db).await?;
+    // new words: the old links' previews go, and the new links are read
+    sqlx::query("update chat_messages set text = $2, edited_at = $3, mentions = $4, previews = null where id = $1").bind(&id).bind(&text).bind(now_ms()).bind(json!(mentions)).execute(&st.db).await?;
     hub::publish(&st, json!({ "t": "message-changed", "id": id })).await;
-    Ok(Json(json!({ "message": message_json(&st, &id).await? })))
+    let message = message_json(&st, &id).await?;
+    if m.kind == "text" {
+        preview::queue(&st, &id, &text);
+    }
+    Ok(Json(json!({ "message": message })))
 }
 
 #[derive(Deserialize)]
@@ -571,7 +630,7 @@ pub struct Remove {
     confirm: Option<bool>,
 }
 
-/// removing keeps the row (a thread holds together) and needs `confirm: true`
+/// removing keeps the row (a thread holds together) and its files (archived, never deleted), and needs `confirm: true`
 pub async fn remove_message(State(st): State<St>, headers: HeaderMap, Path(id): Path<String>, body: Option<Json<Remove>>) -> Result<Json<Value>> {
     let user = require_user(&st, &headers).await?;
     let (m, _) = own_message(&st, &user, &id).await?;
@@ -581,7 +640,44 @@ pub async fn remove_message(State(st): State<St>, headers: HeaderMap, Path(id): 
     if m.author_id != user.id && user.role != "admin" {
         return Err(forbidden("only who wrote a message, or an admin, removes it"));
     }
-    sqlx::query("update chat_messages set deleted_at = coalesce(deleted_at, $2), text = '', reactions = '[]' where id = $1").bind(&id).bind(now_ms()).execute(&st.db).await?;
+    sqlx::query("update chat_messages set deleted_at = coalesce(deleted_at, $2), text = '', reactions = '[]', previews = null, pinned = false where id = $1").bind(&id).bind(now_ms()).execute(&st.db).await?;
+    hub::publish(&st, json!({ "t": "message-changed", "id": id })).await;
+    if m.pinned {
+        hub::publish(&st, json!({ "t": "channel", "channel": m.channel_id })).await;
+    }
+    Ok(Json(json!({ "message": message_json(&st, &id).await? })))
+}
+
+#[derive(Deserialize)]
+pub struct Pin {
+    on: Option<bool>,
+}
+
+/// POST /api/chat/messages/:id/pin { on }: a member pins or unpins; the channel says so, and its `pinned` changes
+pub async fn pin(State(st): State<St>, headers: HeaderMap, Path(id): Path<String>, body: Option<Json<Pin>>) -> Result<Json<Value>> {
+    let user = require_user(&st, &headers).await?;
+    let (m, c) = own_message(&st, &user, &id).await?;
+    if user.role == "viewer" {
+        return Err(forbidden("View only: your account can't pin"));
+    }
+    if c.archived_at.is_some() {
+        return Err(http(StatusCode::CONFLICT, "this channel is archived"));
+    }
+    if membership(&st, &c.id, &user.id).await?.is_none() {
+        return Err(forbidden("join this channel first"));
+    }
+    if m.deleted_at.is_some() {
+        return Err(http(StatusCode::CONFLICT, "that message was removed"));
+    }
+    let on = body.and_then(|b| b.0.on) != Some(false);
+    if m.pinned != on {
+        sqlx::query("update chat_messages set pinned = $2 where id = $1").bind(&id).bind(on).execute(&st.db).await?;
+        if on {
+            let line = format!("{} pinned a message.", user.name);
+            post(&st, &c, SYSTEM, NewPost { kind: "system", text: &line, files: vec![], root: None, request_id: None }).await?;
+        }
+        hub::publish(&st, json!({ "t": "channel", "channel": c.id })).await;
+    }
     hub::publish(&st, json!({ "t": "message-changed", "id": id })).await;
     Ok(Json(json!({ "message": message_json(&st, &id).await? })))
 }
@@ -649,13 +745,111 @@ pub async fn search(State(st): State<St>, headers: HeaderMap, Query(q): Query<Se
     let mut hits = vec![];
     for (row, m) in rows.iter().zip(msgs) {
         let Some(c) = channel_row(&st, &row.channel_id).await? else { continue };
-        hits.push(json!({ "message": m, "channel": { "id": c.id, "name": c.name, "kind": c.kind }, "snippet": snippet(&row.text, 160) }));
+        hits.push(json!({ "message": m, "channel": { "id": c.id, "name": channel_name(&st, &c).await?, "kind": c.kind }, "snippet": snippet(&row.text, 160) }));
     }
     Ok(Json(json!({ "hits": hits })))
 }
 
-/// grids live on Foundation's own server: nobody is on one here
-pub async fn whereabouts(State(st): State<St>, headers: HeaderMap) -> Result<Json<Value>> {
-    require_user(&st, &headers).await?;
-    Ok(Json(json!({ "boards": {} })))
+/// a channel's name where a list names it beside a message (search, mentions), as the Node server's: a channel's own
+/// slug, and for a direct message or a group (which have none) its people
+async fn channel_name(st: &St, c: &ChannelRow) -> Result<String> {
+    if c.kind == "open" || c.kind == "private" || !c.name.is_empty() {
+        return Ok(c.name.clone());
+    }
+    let names: Vec<(String,)> = sqlx::query_as("select u.name from chat_members m join users u on u.id = m.user_id where m.channel_id = $1 order by u.name, u.id").bind(&c.id).fetch_all(&st.db).await?;
+    let label = names.into_iter().map(|n| n.0).collect::<Vec<_>>().join(", ");
+    Ok(if label.is_empty() { "Direct message".into() } else { label })
+}
+
+#[derive(Deserialize)]
+pub struct MentionsQuery {
+    limit: Option<i64>,
+    before: Option<i64>,
+}
+
+/// how many mentions a page holds: 50 unless asked, never more than 100
+pub fn mentions_limit(asked: Option<i64>) -> i64 {
+    asked.unwrap_or(50).clamp(1, 100)
+}
+
+/// The rule the mentions list follows (its query says the same in SQL): does a message reach this person as a
+/// mention. Never their own, never a removed one, never one in a channel they can't see; then a mention of them by
+/// name anywhere they can see, `@channel` or `@here` where they are a member, and anything said to them directly.
+pub fn is_mention_for(me: &str, author: &str, removed: bool, channel_kind: &str, member: bool, mentions: &[&str]) -> bool {
+    // (a message in an archived channel is left out too)
+    if removed || author == me || !(is_open(channel_kind) || member) {
+        return false;
+    }
+    mentions.contains(&me) || (member && (mentions.contains(&"channel") || mentions.contains(&"here") || matches!(channel_kind, "dm" | "group")))
+}
+
+/// GET /api/chat/mentions?limit=<n≤100>&before=<ms>: what was said to this person, newest first
+pub async fn mentions(State(st): State<St>, headers: HeaderMap, Query(q): Query<MentionsQuery>) -> Result<Json<Value>> {
+    let user = require_user(&st, &headers).await?;
+    let rows: Vec<MessageRow> = sqlx::query_as(&format!(
+        "select {} from chat_messages m
+           join chat_channels c on c.id = m.channel_id
+           left join chat_members x on x.channel_id = c.id and x.user_id = $1
+          where m.deleted_at is null and m.author_id <> $1 and m.type <> 'system' and c.archived_at is null
+            and (c.kind = 'open' or x.user_id is not null)
+            and (m.mentions ? $1
+                 or (x.user_id is not null and (m.mentions ? 'channel' or m.mentions ? 'here' or c.kind in ('dm', 'group'))))
+            and ($2::bigint is null or m.created_at < $2)
+          order by m.created_at desc, m.seq desc limit $3",
+        MESSAGE_COLS.split(", ").map(|c| format!("m.{c}")).collect::<Vec<_>>().join(", ")
+    ))
+    .bind(&user.id)
+    .bind(q.before)
+    .bind(mentions_limit(q.limit))
+    .fetch_all(&st.db)
+    .await?;
+    let msgs = messages_json(&st, &rows).await?;
+    let mut channels: HashMap<String, Value> = HashMap::new();
+    let mut out = vec![];
+    for (row, m) in rows.iter().zip(msgs) {
+        if !channels.contains_key(&row.channel_id) {
+            let Some(c) = channel_row(&st, &row.channel_id).await? else { continue };
+            channels.insert(row.channel_id.clone(), json!({ "id": c.id, "name": channel_name(&st, &c).await?, "kind": c.kind }));
+        }
+        out.push(json!({ "message": m, "channel": channels[&row.channel_id] }));
+    }
+    Ok(Json(json!({ "mentions": out })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_mentions_list_holds_what_was_said_to_a_person_where_they_can_see_it() {
+        let (me, ada) = ("u_me", "u_ada");
+        // by name, in an open channel they haven't joined, and in one they have
+        assert!(is_mention_for(me, ada, false, "open", false, &[me]));
+        assert!(is_mention_for(me, ada, false, "private", true, &[me]));
+        // @channel and @here count only where they are a member
+        assert!(is_mention_for(me, ada, false, "open", true, &["channel"]));
+        assert!(is_mention_for(me, ada, false, "private", true, &["here"]));
+        assert!(!is_mention_for(me, ada, false, "open", false, &["channel"]));
+        assert!(!is_mention_for(me, ada, false, "open", false, &["here"]));
+        // everything in a dm or a group they're in, mentioned or not
+        assert!(is_mention_for(me, ada, false, "dm", true, &[]));
+        assert!(is_mention_for(me, ada, false, "group", true, &[]));
+        assert!(!is_mention_for(me, ada, false, "open", true, &[]));
+        // never their own, a removed one, or one in a channel they can't see (even naming them)
+        assert!(!is_mention_for(me, me, false, "dm", true, &[me]));
+        assert!(!is_mention_for(me, ada, true, "dm", true, &[me]));
+        assert!(!is_mention_for(me, ada, false, "private", false, &[me]));
+        assert!(!is_mention_for(me, ada, false, "dm", false, &[me]));
+        // someone else's mention isn't theirs
+        assert!(!is_mention_for(me, ada, false, "open", true, &["u_kai"]));
+    }
+
+    #[test]
+    fn a_page_of_mentions_is_fifty_unless_asked_and_never_over_a_hundred() {
+        assert_eq!(mentions_limit(None), 50);
+        assert_eq!(mentions_limit(Some(10)), 10);
+        assert_eq!(mentions_limit(Some(1000)), 100);
+        assert_eq!(mentions_limit(Some(0)), 1);
+        assert_eq!(mentions_limit(Some(-5)), 1);
+    }
 }

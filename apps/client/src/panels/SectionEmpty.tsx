@@ -28,7 +28,7 @@ function loadShelf() {
   return shelfPromise;
 }
 
-export function SectionEmpty({ name, onUpload, onNote, onAsk, onFocus }: { name: string; onUpload(): void; onNote(): void; onAsk(): void; onFocus(): void }) {
+export function SectionEmpty({ name, onUpload, onNote, onAsk, onFocus, onChannel }: { name: string; onUpload(): void; onNote(): void; onAsk(): void; onFocus(): void; /** put a ChatForm conversation here (the card asks which) */ onChannel?(): void }) {
   const [apps, setApps] = useState<AppRow[]>(shelfCache ?? []);
   useEffect(() => {
     if (!shelfCache) void loadShelf().then(setApps);
@@ -77,6 +77,15 @@ export function SectionEmpty({ name, onUpload, onNote, onAsk, onFocus }: { name:
               <small>A note, formatted as you type · its markdown is one press away</small>
             </span>
           </button>
+          {onChannel && (
+            <button className="empty-action" data-tip="Put a ChatForm conversation here: read it, write in it and talk, where the work is" onClick={onChannel} data-empty-channel>
+              <span className="empty-glyph">#</span>
+              <span>
+                <b>Bring a channel</b>
+                <small>A ChatForm conversation, with who's on this grid</small>
+              </span>
+            </button>
+          )}
         </div>
         {apps.length > 0 && (
           <>

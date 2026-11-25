@@ -145,6 +145,20 @@
   outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
   outline-offset: -1px;
 }
+/* a picture that had to be read fades in, in its turn of the wave (lib/arrival.ts): opacity alone */
+.coll-pic > img.is-arriving {
+  transition: opacity var(--dur-lift) var(--ease-out-soft) calc(var(--arrive-step, 0) * var(--dur-press) / 2);
+}
+@starting-style {
+  .coll-pic > img.is-arriving {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coll-pic > img.is-arriving {
+    transition: none;
+  }
+}
 .coll-pic > i {
   font-style: normal;
   font-size: var(--text-32);

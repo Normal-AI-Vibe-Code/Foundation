@@ -14,12 +14,14 @@
  * one of the board's tools.
  */
 
-import { useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { boardMaps, type CollectionItem, type CollectionState } from "@foundation/protocol";
 import { CONTENT_PAD, SECTION_HEADER, addSectionAdjacent, getState, requestSnap, sectionCardRect, sectionFit, subscribe, updatePanel, type PanelMeta } from "../state/store";
 import { activeBoard, onBoardChange } from "../sync/board";
 import { toast, useUi } from "../state/ui";
 import { useFileSrc } from "../lib/fileSrc";
+import { arrivalStyle } from "../lib/arrival";
+import { viewportDistance } from "../lib/imageCache";
 import { boardTool, pressTile } from "../lib/collectionDrag";
 import "./collection.css";
 import { api } from "../lib/api";
@@ -82,7 +84,15 @@ function useSections(): Array<{ id: string; name: string }> {
 
 function Picture({ src, name }: { src?: string; name: string }) {
   const url = useFileSrc(src ?? null, true, { width: 256 });
-  return url ? <img src={url} alt={name} draggable={false} loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <i aria-hidden>{src ? "" : "☺"}</i>;
+  // one that had to be read fades in, a few steps later the farther it is from the middle of the screen
+  // (lib/arrival.ts); one already in memory when the tile mounted is simply there
+  const [cold] = useState(!url);
+  const [style, setStyle] = useState<CSSProperties | undefined>(undefined);
+  const img = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    if (cold && url && img.current) setStyle(arrivalStyle(viewportDistance(img.current)) as CSSProperties | undefined);
+  }, [cold, url]);
+  return url ? <img ref={img} className={cold ? "is-arriving" : undefined} style={style} src={url} alt={name} draggable={false} loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.visibility = "hidden")} /> : <i aria-hidden>{src ? "" : "☺"}</i>;
 }
 
 /** the size of the card a copy of an item makes (the server's: a character's card, a picture 300 wide at its shape) */

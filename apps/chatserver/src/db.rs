@@ -96,6 +96,55 @@ create table if not exists chat_online (
   user_id text not null,
   seen_at bigint not null
 );
+-- 2026-11-25: files in messages, link previews, pins (new columns have defaults: an older instance still writes rows)
+alter table chat_messages add column if not exists files jsonb not null default '[]';
+alter table chat_messages add column if not exists previews jsonb;
+alter table chat_messages add column if not exists pinned boolean not null default false;
+create index if not exists chat_messages_pinned on chat_messages (channel_id) where pinned;
+create index if not exists chat_messages_created on chat_messages (created_at desc);
+-- the bytes of an uploaded file live here (a function has no disk). Archived, never deleted
+create table if not exists chat_files (
+  id text primary key,
+  name text not null,
+  mime text not null,
+  size bigint not null,
+  sha256 text not null,
+  uploaded_by text not null,
+  created_at bigint not null,
+  archived_at bigint,
+  width integer,
+  height integer,
+  bytes bytea not null
+);
+create index if not exists chat_files_sha on chat_files (sha256, uploaded_by);
+-- which messages carry which file (who may open /files/:id)
+create table if not exists chat_file_uses (
+  file_id text not null,
+  message_id text not null,
+  channel_id text not null,
+  primary key (file_id, message_id)
+);
+-- the width tiers of a picture, made on first ask, by the hash of its bytes (the same picture uploaded twice is scaled once)
+create table if not exists chat_file_variants (
+  sha256 text not null,
+  w integer not null,
+  mime text not null,
+  width integer not null,
+  height integer not null,
+  natural_width integer not null,
+  natural_height integer not null,
+  alpha boolean not null,
+  bytes bytea not null,
+  primary key (sha256, w)
+);
+-- which grid the window behind each socket has open (whereabouts.rs). seen_at is the heartbeat of its instance
+create table if not exists chat_where (
+  conn_id text primary key,
+  user_id text not null,
+  board text not null,
+  name text,
+  seen_at bigint not null
+);
 "#;
 
 pub async fn migrate(db: &PgPool) -> Result<(), sqlx::Error> {

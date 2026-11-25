@@ -568,9 +568,9 @@ test("3. ChatForm cached image attachment + aspect ratio (w/h) + Lightbox instan
     expect(chatFile.h).toBe(1200);
     metrics.chatImageNatural = [chatFile.w!, chatFile.h!];
 
-    // Verify ChatForm renders <ProgressiveImage> at targetWidth=512 with aspect-ratio 1600 / 1200
+    // Verify ChatForm renders <ProgressiveImage> at targetWidth=512 in a box of its own shape (1600 x 1200 fitted inside 360 x 280: 360 / 270)
     const picBtn = msgLoc.locator(".chat-picture");
-    await expect(picBtn).toHaveAttribute("style", /aspect-ratio:\s*1600\s*\/\s*1200/);
+    await expect(picBtn).toHaveAttribute("style", /aspect-ratio:\s*360\s*\/\s*270/);
 
     const progSpan = picBtn.locator(".f-prog");
     await expect(progSpan).toHaveAttribute("data-prog-phase", "sharp", { timeout: 15_000 });

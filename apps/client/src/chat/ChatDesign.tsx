@@ -22,11 +22,13 @@ import { ChatMark, IconSearch } from "./Icons";
 import "./chat.css";
 import { HuddleDemo } from "../panels/HuddleDesign";
 import { ReplayDemo } from "../panels/ReplayDesign";
+import { ChatCardDemo } from "../panels/ChatCardDesign";
 import { InboxDemo } from "./tabs/InboxDesign";
 import { SideMenuDemo } from "./SideMenuDesign";
 import { ChatServerNoteView, ChatSignInView } from "./ChatServer";
 import { ChatServerSettingView } from "../settings/ChatServerSetting";
 import { FORM_CHAT_SERVER } from "./serverLogic";
+import { BellDemo } from "./BellDesign";
 
 const NOW = Date.now();
 const MIN = 60_000;
@@ -197,9 +199,11 @@ export function ChatFormDemo() {
         </div>
       </div>
       <ChatServerDemo />
+      <BellDemo />
       <SideMenuDemo />
       <HuddleDemo />
       <ReplayDemo />
+      <ChatCardDemo />
       <InboxDemo />
     </div>
   );

@@ -23,6 +23,13 @@ export function ChatMark({ size = 16 }: { size?: number }) {
   );
 }
 
+/** a mention: the at sign */
+export const IconAt = ({ size = 16 }: { size?: number }) => (
+  <Svg size={size}>
+    <circle cx="8" cy="8" r="2.3" />
+    <path d="M10.3 5.9v2.9a1.5 1.5 0 0 0 3 0V8a5.3 5.3 0 1 0-2.1 4.2" />
+  </Svg>
+);
 export const IconReact = () => (
   <Svg>
     <circle cx="7.5" cy="8.5" r="5.5" />

@@ -22,6 +22,7 @@ import { config } from "./config.ts";
 import { one, run } from "./db.ts";
 import { HttpError, parseCookies, type Req } from "./http.ts";
 import { audit } from "./audit.ts";
+import { claimChatSession, forgetChatSession, holdGoogleProof, startChatSession } from "./chatsession.ts";
 
 const SESSION_DAYS = 30;
 /** an agent's bearer (/api/agent/token) lasts a week (ADR-001 G9) */
@@ -102,15 +103,23 @@ export function createSession(userId: string, ttlMs = SESSION_DAYS * 864e5, kind
  * bearer (`{ bearer: true }`: the app on a server that isn't its own site,
  * where a SameSite cookie never arrives) gets an `app` session in the
  * response body instead, to keep outside URLs and send as Authorization.
+ *
+ * `googleProof` names a Google sign-in this session came from (the hash of the state Google returned, under
+ * which googleIdentity kept Google's proof): the new session is then also signed in to ChatForm's server,
+ * beside this and never in its way (chatsession.ts). Every other sign-in (dev, an invitation, Google through
+ * Flowform) has no such proof and passes none: ChatForm's own sign-in is theirs.
  */
-export function signIn(res: ServerResponse, userId: string, bearer: boolean): { session?: string } {
-  if (bearer) return { session: createSession(userId, SESSION_DAYS * 864e5, "app") };
-  setSessionCookie(res, createSession(userId));
+export function signIn(res: ServerResponse, userId: string, bearer: boolean, googleProof?: string): { session?: string } {
+  const token = createSession(userId, SESSION_DAYS * 864e5, bearer ? "app" : "browser");
+  if (googleProof) startChatSession(googleProof, hashToken(token));
+  if (bearer) return { session: token };
+  setSessionCookie(res, token);
   return {};
 }
 
 export function revokeSession(token: string) {
   run("delete from sessions where token = ?", hashToken(token));
+  forgetChatSession(hashToken(token));
 }
 
 export function setSessionCookie(res: ServerResponse, token: string) {
@@ -121,6 +130,8 @@ export function setSessionCookie(res: ServerResponse, token: string) {
 export function clearSession(req: Req, res: ServerResponse) {
   const token = tokenFrom(req);
   if (token) run("delete from sessions where token = ?", hashToken(token));
+  // a ChatForm sign-in this session earned and never collected goes with it (chatsession.ts)
+  if (token) forgetChatSession(hashToken(token));
   res.setHeader("set-cookie", `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
 }
 
@@ -212,6 +223,19 @@ function personBehind(req: Req, u: UserInfo): boolean {
   return Boolean(cookie) && userFromSessionHash(hashToken(cookie!))?.kind !== "agent";
 }
 
+/**
+ * `POST /api/chat-session`: the ChatForm sign-in this session's own Google sign-in earned, handed over once
+ * (chatsession.ts). A person's own session only (the cookie, or their app's bearer): an agent's bearer and the
+ * service token are refused, and a session collects only what was kept under its own hash, so never another
+ * person's. `expect` is the chat server the asking app is on, compared and never called.
+ */
+export function chatSessionFor(req: Req, expect?: string) {
+  requirePerson(req, "Collecting the ChatForm sign-in");
+  const token = tokenFrom(req);
+  if (!token) throw new HttpError(401, "sign in first");
+  return claimChatSession(hashToken(token), expect);
+}
+
 /** is this request a person (requirePerson's test), without refusing it or recording a refusal */
 export function isPerson(req: Req, _user?: UserInfo): boolean {
   try {
@@ -268,9 +292,10 @@ export function googleAuthUrl(): string {
 /**
  * Who Google says this code is: a verified address on the allowlist, as a Foundation user (made on a
  * first sign-in: a member, or an admin if FOUNDATION_ADMIN_EMAILS names them). The caller has already
- * checked the state the code came back with.
+ * checked the state the code came back with. With `proof` (the hash of that state), Google's ID token for
+ * this person is kept in memory under it for the session this sign-in becomes (signIn; chatsession.ts).
  */
-export async function googleIdentity(code: string): Promise<UserInfo> {
+export async function googleIdentity(code: string, proof?: string): Promise<UserInfo> {
   if (!code) throw new HttpError(400, "Google didn't return a sign-in. Try again.");
   const tokenRes = await fetch(`${oauthBase()}/token`, {
     method: "POST",
@@ -285,13 +310,17 @@ export async function googleIdentity(code: string): Promise<UserInfo> {
     signal: AbortSignal.timeout(10_000),
   });
   if (!tokenRes.ok) throw new HttpError(502, "Google rejected the sign-in");
-  const tokens = (await tokenRes.json()) as { access_token: string };
+  // `openid` is in the scope, so Google's answer carries an ID token: its own signed word on who this is
+  const tokens = (await tokenRes.json()) as { access_token: string; id_token?: string };
   const infoRes = await fetch(userinfoUrl(), { headers: { authorization: `Bearer ${tokens.access_token}` }, signal: AbortSignal.timeout(10_000) });
   if (!infoRes.ok) throw new HttpError(502, "Google didn't say who signed in");
   const info = (await infoRes.json()) as { email?: string; email_verified?: boolean; name?: string };
   if (!info.email || !info.email_verified) throw new HttpError(403, "Google account has no verified email");
   if (!isAllowed(info.email)) throw new HttpError(403, `${info.email} is not on Foundation's allowlist`);
-  return upsertUser(info.email, info.name ?? "");
+  const user = upsertUser(info.email, info.name ?? "");
+  // only for someone this server admitted
+  if (proof) holdGoogleProof(proof, tokens.id_token);
+  return user;
 }
 
 /**
@@ -304,5 +333,5 @@ export async function googleCallback(code: string, state: string, presented: str
   pendingStates.delete(state);
   if (!issued || Date.now() - issued > 10 * 60_000) throw new HttpError(400, "sign-in expired, try again");
   if (!presented || !safeEq(presented, state)) throw new HttpError(400, "This sign-in was started in a different browser. Start again from Foundation.");
-  return googleIdentity(code);
+  return googleIdentity(code, hashToken(state));
 }

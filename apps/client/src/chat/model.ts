@@ -33,10 +33,12 @@ import {
   type ChatPage,
   type ChatParty,
   type ChatSay,
+  type WhereBoard,
 } from "@foundation/protocol";
 import { ApiError } from "../lib/api";
-import { CHAT_REMOTE, CHAT_SERVER_NAME, chatApi as api, chatAuthHeaders as authHeaders, chatBearer, chatConfig, chatSignOut, chatUrl as serverUrl, chatWho, forgetChatBearer, openChatSocket as openSocket, type ChatAccount } from "./server";
-import { loadWhereabouts, setWhereabouts } from "../lib/whereabouts";
+import { CHAT_REMOTE, CHAT_SERVER_NAME, chatApi as api, chatAuthHeaders as authHeaders, chatBearer, chatConfig, chatSignOut, claimChatSession, chatUrl as serverUrl, chatWho, forgetChatBearer, openChatSocket as openSocket, type ChatAccount } from "./server";
+import { loadWhereabouts, setChatWhereabouts, setWhereabouts } from "../lib/whereabouts";
+import { clearImageCache } from "../lib/imageCache";
 import { bumpRoot, failPending, mergeMessages, requestId, retryPending, settlePending, toggleReaction, upsertMessage, type PendingMessage } from "./logic";
 
 export interface ChatTimeline {
@@ -101,6 +103,18 @@ function set(next: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) 
 
 export const getChat = () => state;
 
+/** signing out of a chat server (or being signed out): the pictures this device kept from it go too */
+function forgetChatPictures() {
+  if (CHAT_REMOTE) void clearImageCache();
+}
+
+const eventSubs = new Set<(ev: ChatEvent) => void>();
+/** hear every event once the store has taken it (the bell and "being told": chat/notify.ts) */
+export function onChatEvent(fn: (ev: ChatEvent) => void): () => void {
+  eventSubs.add(fn);
+  return () => void eventSubs.delete(fn);
+}
+
 const bridgeSubs = new Set<(b: Extract<ChatEvent, { t: "bridge" }>["bridge"]) => void>();
 /** hear a bridge's state as the server publishes it (`{t:"bridge"}` on the chat socket) */
 export function onBridge(fn: (b: Extract<ChatEvent, { t: "bridge" }>["bridge"]) => void): () => void {
@@ -113,6 +127,9 @@ function subscribe(fn: () => void) {
   return () => void subs.delete(fn);
 }
 
+/** follow the store outside React (chat/notify.ts) */
+export const subscribeChat = subscribe;
+
 export function useChat(): ChatState {
   return useSyncExternalStore(subscribe, getChat);
 }
@@ -124,6 +141,7 @@ let open: { channel: string | null; thread: string | null } = { channel: null, t
 export function setOpen(channel: string | null, thread: string | null) {
   open = { channel, thread };
 }
+export const getOpen = () => open;
 
 // ---------------------------------------------------------------- start: the list and the socket
 
@@ -143,6 +161,9 @@ export function startChat(me?: { id: string; name: string }) {
   if (!CHAT_REMOTE && me && (!state.me || state.me.id !== me.id || state.me.name !== me.name)) set({ me: { id: me.id, name: me.name } });
   if (started) return;
   if (CHAT_REMOTE && !chatBearer()) {
+    // one sign-in: what the Foundation sign-in earned on the chat server is collected first, once (chat/server.ts)
+    if (claiming) return;
+    if (!claimTried) return claimOr(() => startChat());
     if (state.status !== "signin") set({ status: "signin", why: "", loaded: false });
     return;
   }
@@ -175,8 +196,23 @@ async function startRemote() {
       // unreachable: the list's own failure says so and tries again
     }
   }
-  if (!state.features) void chatConfig().then((c) => set({ features: c.features ?? null }), () => undefined);
+  if (!state.features) void chatConfig().then((c) => (set({ features: c.features ?? null }), tellWhere()), () => undefined);
   if (await loadList()) connect();
+}
+
+/** the Foundation sign-in's ChatForm session has been asked for (once a page, and once more when a sign-in there ends) */
+let claimTried = false;
+let claiming = false;
+/** collect the chat session the Foundation sign-in earned and go in as that account, or do `otherwise` (the sign-in screen) */
+function claimOr(otherwise: () => void) {
+  claimTried = true;
+  claiming = true;
+  set({ status: "connecting", why: "" });
+  void claimChatSession().then((user) => {
+    claiming = false;
+    if (user) chatSignedIn(user);
+    else otherwise();
+  });
 }
 
 /** a chat server that refuses the session: this device stops sending it and asks the person to sign in again */
@@ -184,8 +220,13 @@ function signedOut(e: unknown): boolean {
   if (!CHAT_REMOTE || !(e instanceof ApiError) || e.status !== 401) return false;
   const had = !!state.account;
   forgetChatBearer();
+  forgetChatPictures();
   haltChat();
-  set({ ...EMPTY, status: "signin", why: had ? `Your sign-in on ${CHAT_SERVER_NAME} ended. Sign in again.` : "" });
+  const ended = () => set({ ...EMPTY, status: "signin", why: had ? `Your sign-in on ${CHAT_SERVER_NAME} ended. Sign in again.` : "" });
+  // a newer Foundation sign-in may have earned a fresh one (an old bearer was still on this device): ask before asking the person
+  if (claiming) return true;
+  set(EMPTY);
+  claimOr(ended);
   return true;
 }
 
@@ -212,12 +253,14 @@ export function chatSignedIn(user: ChatAccount) {
 export async function signOutOfChat() {
   haltChat();
   await chatSignOut();
+  forgetChatPictures();
   set({ ...EMPTY, status: "signin" });
 }
 
 /** for tests and sign-out: everything forgotten */
 export function stopChat() {
   haltChat();
+  claimTried = false;
   state = EMPTY;
   subs.forEach((f) => f());
 }
@@ -305,12 +348,15 @@ function onEvent(ev: ChatEvent) {
     // who is where on the grids (lib/whereabouts.ts): read now, then kept by this socket's `where`.
     // A chat server has no grids: there it stays as Foundation's own answer.
     void loadWhereabouts();
+    // a chat server of its own has no grids to read: this window tells it which one it has open (again on every reconnect)
+    tellWhere();
     if (again) void catchUp();
     return;
   }
   const gap = rev >= 0 && ev.rev !== rev + 1;
   rev = ev.rev;
   apply(ev);
+  for (const fn of eventSubs) fn(ev);
   if (gap) void catchUp();
 }
 
@@ -436,7 +482,11 @@ function apply(ev: ChatEvent) {
       return;
     }
     case "where":
+      // Foundation's own server reads its grids' presence; a chat server of its own relays what other computers'
+      // windows told it, which is merged with Foundation's answer, each person once (lib/whereabouts.ts). Where I
+      // am myself is this window's to know, not the relay's.
       if (!CHAT_REMOTE) setWhereabouts(ev.boards);
+      else setChatWhereabouts(othersWhere(ev.boards));
       return;
     case "presence":
       set({ online: ev.online });
@@ -760,6 +810,31 @@ export function sayTyping(channel: string, root: string | null = null) {
   lastTyping = now;
   lastTypingAt = key;
   say({ t: "typing", channel, root });
+}
+
+// ---------------------------------------------------------------- passing: which grid this window has open
+
+let whereNow: Extract<ChatSay, { t: "where" }> | null = null;
+/**
+ * Tell a chat server of its own which grid this window has open (chat/gridChat.ts `whereToSay` decides what, and
+ * that the grid's name stays here; chat/gridChatWhere.ts calls this as the open grid changes). Kept, and said
+ * again when the socket comes back. Said only to a chat server whose `features` include `where`; Foundation's own
+ * server reads its grids itself and is never told.
+ */
+export function sayWhere(board: string | null, name: string | null = null) {
+  if (whereNow && whereNow.board === board && whereNow.name === name) return;
+  whereNow = { t: "where", board, name };
+  tellWhere();
+}
+function tellWhere() {
+  if (!CHAT_REMOTE || !state.features?.includes("where")) return;
+  if (whereNow) say(whereNow);
+  // the first look (and after a reconnect): who the chat server says is where now; then its `where` events keep it
+  if (ws?.readyState === WebSocket.OPEN) void api<{ boards: Record<string, WhereBoard> }>("/api/whereabouts").then((r) => setChatWhereabouts(othersWhere(r.boards)), () => undefined);
+}
+/** a chat server's picture without me (where I am is this window's to know) and without agents (they are Foundation's) */
+function othersWhere(boards: Record<string, WhereBoard> | undefined): Record<string, WhereBoard> {
+  return Object.fromEntries(Object.entries(boards ?? {}).map(([id, w]) => [id, { people: (w?.people ?? []).filter((p) => p.id !== state.me?.id), agents: [] }]));
 }
 
 // ---------------------------------------------------------------- search

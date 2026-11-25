@@ -45,6 +45,7 @@ import {
   type ChatHuddleState,
   type ChatLinkPreview,
   type ChatMembership,
+  type ChatMention,
   type ChatMessage,
   type ChatMessageType,
   type ChatOrigin,
@@ -1410,6 +1411,54 @@ export function chatHitFilter(userId: string | undefined): (messageId: string) =
   };
 }
 
+/**
+ * What was said to this person, newest first (the bell, and ChatForm's Recent mentions): messages by others, not
+ * removed, that name them in a channel they may read, that say @channel or @here in a channel they are in, and every
+ * message from someone else in a direct message or a group they are in. A DM is its members' only (admins included):
+ * the membership test is the session's own person, as everywhere here.
+ */
+export function mentionsFor(user: UserInfo, opts: { limit?: number; before?: number } = {}): ChatMention[] {
+  const limit = Math.max(1, Math.min(100, Math.floor(opts.limit ?? 50)));
+  const sees = seer(user);
+  const member = new Map<string, boolean>();
+  const isIn = (channelId: string) => {
+    if (!member.has(channelId)) member.set(channelId, isMemberUser(channelId, user));
+    return member.get(channelId)!;
+  };
+  const out: ChatMention[] = [];
+  let before = opts.before !== undefined && Number.isFinite(opts.before) ? opts.before : Number.MAX_SAFE_INTEGER;
+  let skip = 0;
+  const STEP = 400;
+  // newest first, a page at a time, until enough are found or there is no more (at most 20 pages: 8000 messages back)
+  for (let page = 0; page < 20 && out.length < limit; page++) {
+    const rows = all<MessageRow>(
+      `select m.* from chat_messages m join chat_channels c on c.id = m.channel_id
+        where m.deleted_at is null and m.type not in ('system', 'draft') and c.archived_at is null and m.created_at < ?
+          and not (m.author_kind = 'person' and m.author_id = ?)
+          and (c.kind in ('dm', 'group') or m.mentions_json like ? escape '!' or m.mentions_json like '%"channel"%' or m.mentions_json like '%"here"%')
+        order by m.created_at desc, m.rowid desc limit ? offset ?`,
+      before, user.id, `%"${user.id.replace(/[!%_]/g, (x) => `!${x}`)}"%`, STEP, skip,
+    );
+    for (const r of rows) {
+      if (out.length >= limit) break;
+      const ch = sees(r.channel_id);
+      if (!ch) continue;
+      const direct = ch.kind === "dm" || ch.kind === "group";
+      const mentions = parse<string[]>(r.mentions_json, []);
+      const named = mentions.includes(user.id);
+      const everyone = mentions.includes("channel") || mentions.includes("here");
+      if (!(named || ((direct || everyone) && isIn(ch.id)))) continue;
+      out.push({
+        message: toMessage(r),
+        channel: { id: ch.id, name: ch.kind === "open" || ch.kind === "private" ? ch.name : chatTitle(toChannel(ch), user.id) || "Direct message", kind: ch.kind },
+      });
+    }
+    if (rows.length < STEP) break;
+    skip += STEP;
+  }
+  return out;
+}
+
 export function unreadsFor(user: UserInfo): { total: number; mentions: number; channels: Array<{ id: string; unread: number; mentions: number }> } {
   const rows = all<MemberRow & { last_seq: number; archived_at: number | null }>(
     "select m.*, c.last_seq, c.archived_at from chat_members m join chat_channels c on c.id = m.channel_id where m.party_kind = 'person' and m.party_id = ?",
@@ -1807,6 +1856,12 @@ export function chatRoutes(r: Router) {
     const user = requireUser(req);
     const q = (req.query.get("q") ?? "").trim();
     return { hits: q ? searchChat(user, q, Math.min(100, intParam(req.query.get("limit")) ?? 50)) : [] };
+  });
+
+  /** what was said to me: mentions, @channel and @here where I'm a member, and direct messages, newest first */
+  r.get("/api/chat/mentions", (req) => {
+    const user = requireUser(req);
+    return { mentions: mentionsFor(user, { limit: intParam(req.query.get("limit")), before: intParam(req.query.get("before")) }) };
   });
 
   r.get("/api/chat/unreads", (req) => unreadsFor(requireUser(req)));

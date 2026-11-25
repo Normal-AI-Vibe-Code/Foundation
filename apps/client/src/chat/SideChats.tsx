@@ -4,7 +4,8 @@
  * the channel's mark (# or a lock, a person's face, an agent's ✦, a service's monogram), its name (in ink
  * at 700 when unread), a count pill (the accent for mentions of you and unread direct messages; quiet for
  * other unread where you follow everything) and a dot while a huddle is live. Hover: a ✕ to take it out
- * of the side menu (it only leaves here: nothing is left or archived). Pull a row up or down to reorder.
+ * of the side menu (it only leaves here: nothing is left or archived). Pull a row up or down to reorder;
+ * pull it out of the side menu and it's in the hand (chat/carryChat.ts): a section of the grid takes it as a card.
  * At the foot, *Browse all in ChatForm*. Empty: a sentence and a button that opens ChatForm.
  *
  * Pressing a row opens the conversation full width: ChatForm's own list folds away (chat/pins.ts).
@@ -17,12 +18,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { chatTitle, type ChatChannelView } from "@foundation/protocol";
 import { goChat, type Place } from "../lib/place";
-import { channelMark } from "./Sidebar";
+import { channelMark, kindWord } from "./Sidebar";
 import { isDirect, parseRest } from "./logic";
 import { useChat } from "./model";
 import { getPins, movePin, openFromSideMenu, savePins, setListFolded, takeOutOfSideMenu, usePins } from "./pins";
 import { dropIndex, reconcilePins } from "./sideMenuLogic";
-import { PULL } from "./carryChat";
+import { PULL, carryChat, type ChatCarry } from "./carryChat";
 import { IconClose, IconPlus } from "./Icons";
 import "./sidechats.css";
 
@@ -40,6 +41,8 @@ export interface SideChatsViewProps {
   onUnpin(id: string): void;
   onMove(id: string, before: number): void;
   onBrowse(): void;
+  /** a row pulled out of the side menu goes into the hand, for a section of the grid to take (not on the design page) */
+  carry?: boolean;
 }
 
 export function SideChatsView(p: SideChatsViewProps) {
@@ -51,16 +54,29 @@ export function SideChatsView(p: SideChatsViewProps) {
     const start = e.clientY;
     const startX = e.clientX;
     let on = false;
+    let carry: ChatCarry | null = null;
     const swallow = (c: MouseEvent) => {
       c.preventDefault();
       c.stopPropagation();
     };
     const rows = () => [...(list.current?.querySelectorAll<HTMLElement>("[data-chat-pin]") ?? [])].map((el) => el.getBoundingClientRect());
     const move = (ev: PointerEvent) => {
+      if (carry) return carry.move(ev.clientX, ev.clientY);
       if (!on && Math.hypot(ev.clientY - start, ev.clientX - startX) < PULL) return;
       if (!on) {
         on = true;
         window.addEventListener("click", swallow, true);
+      }
+      // pulled out of the side menu: the conversation is in the hand, and a section of the grid can take it
+      if (p.carry && !(document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest(".side-pane")) {
+        const c = p.channels.find((x) => x.id === id);
+        const row = list.current?.querySelector<HTMLElement>(`[data-chat-pin="${CSS.escape(id)}"]`);
+        if (c && row) {
+          const title = chatTitle(c, p.meId);
+          setDrag(null);
+          carry = carryChat(id, c.kind === "open" || c.kind === "private" ? `#${title}` : title, row, { x: startX, y: start }, kindWord(c));
+          return carry.move(ev.clientX, ev.clientY);
+        }
       }
       setDrag({ id, at: dropIndex(ev.clientY, rows()) });
     };
@@ -68,6 +84,7 @@ export function SideChatsView(p: SideChatsViewProps) {
       stop();
       if (!on) return;
       window.setTimeout(() => window.removeEventListener("click", swallow, true), 0);
+      if (carry) return carry.drop(ev.clientX, ev.clientY);
       setDrag(null);
       p.onMove(id, dropIndex(ev.clientY, rows()));
     };
@@ -78,6 +95,7 @@ export function SideChatsView(p: SideChatsViewProps) {
     };
     const cancel = () => {
       stop();
+      carry?.cancel();
       setDrag(null);
       window.removeEventListener("click", swallow, true);
     };
@@ -174,6 +192,7 @@ export function SideChats({ place }: { place: Place }) {
       current={chatOpenIn(place)}
       ringed={!!pins.held}
       waiting={!pins.loaded}
+      carry
       onOpen={openFromSideMenu}
       onUnpin={takeOutOfSideMenu}
       onMove={(id, before) => {

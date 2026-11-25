@@ -2,18 +2,29 @@
  * Files in a message, drawn as what they are: pictures and GIFs as pictures (a press opens them large),
  * video and audio as players, a CAD part as the CAD card's still that turns (`CadPreview`), anything else
  * a row with its name, size and a download. Link previews as a quiet card under the words. Every
- * `/files/…` goes through `useFileSrc`, so the desktop app (a bearer, another origin) shows them too.
+ * `/files/…` is read from whichever server ChatForm is on, with that server's own sign-in (chat/chatFiles.tsx):
+ * Foundation's archive, or a chat server's files with its bearer.
+ *
+ * A picture holds its box from the width and height the server kept, so the timeline doesn't move when it lands,
+ * and fades in. A GIF is asked for as the file it is, so it plays.
+ *
+ * A link preview is what the server read from the page (its site, title and description, shown at once). Its
+ * picture is at the other site's address, so it follows the rule for every picture from elsewhere (DESIGN.md,
+ * "Pictures and links from elsewhere"): a dashed pill naming the host and **Load image**, which loads that one
+ * picture, this time, with no referrer. Only a picture the server itself holds (`/files/…`) shows on sight.
  */
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import type { ChatFile, ChatLinkPreview } from "@foundation/protocol";
-import { fileLink, useFileSrc } from "../lib/fileSrc";
-import { ProgressiveImage } from "../components/ProgressiveImage";
 import { CadAttachment } from "./CadAttachment";
-import { bytes, fileKind } from "./logic";
+import { ChatImage, chatFileLink, useChatFileSrc } from "./chatFiles";
+import { CHAT_REMOTE } from "./server";
+import { chatPictureTier, pictureBox } from "./serverLogic";
+import { bytes, fileKind, previewShape } from "./logic";
 import { IconDownload, IconFile } from "./Icons";
+import "./bell.css";
 
 export const fileSrcOf = (f: Pick<ChatFile, "id">) => `/files/${encodeURIComponent(f.id)}`;
 
@@ -41,17 +52,25 @@ export function ChatFiles({ files, srcOf = fileSrcOf }: { files: ChatFile[]; src
 }
 
 function Picture({ file, src, many, onOpen }: { file: ChatFile; src: string; many: boolean; onOpen(): void }) {
-  const ratio = !many && file.w && file.h ? `${file.w} / ${file.h}` : undefined;
+  // the box it will fill, kept before a byte of it is here (the server's width and height), so nothing below moves
+  const box = many ? null : pictureBox(file);
   return (
-    <button type="button" className="chat-picture" onClick={onOpen} data-tip={`${file.name} · ${bytes(file.size)}`} aria-label={`Open ${file.name}`} style={{ aspectRatio: ratio }}>
-      <ProgressiveImage src={src} alt={file.name} targetWidth={many ? 256 : 512} fit={many ? "cover" : undefined} draggable={false} />
+    <button
+      type="button"
+      className={`chat-picture${box ? " has-box" : ""}`}
+      onClick={onOpen}
+      data-tip={`${file.name} · ${bytes(file.size)}`}
+      aria-label={`Open ${file.name}`}
+      style={box ? { width: box.width, aspectRatio: `${box.width} / ${box.height}` } : undefined}
+    >
+      <ChatImage src={src} alt={file.name} tier={chatPictureTier(file, many ? 256 : 512)} fit={many || box ? "cover" : undefined} />
     </button>
   );
 }
 
 function FileBody({ file, src }: { file: ChatFile; src: string }) {
   const kind = fileKind(file);
-  const shown = useFileSrc(src, kind === "video" || kind === "audio");
+  const shown = useChatFileSrc(src, kind === "video" || kind === "audio");
   if (kind === "video")
     return (
       <div className="chat-player is-video">
@@ -66,7 +85,8 @@ function FileBody({ file, src }: { file: ChatFile; src: string }) {
         <audio src={shown} controls preload="metadata" />
       </div>
     );
-  if (kind === "cad") return <CadAttachment file={file} src={src} />;
+  // the CAD card converts and places through Foundation's own server: on a chat server a part is a file to download
+  if (kind === "cad" && !CHAT_REMOTE) return <CadAttachment file={file} src={src} />;
   return <FileRow file={file} src={src} />;
 }
 
@@ -84,7 +104,7 @@ export function FileRow({ file, src, quiet }: { file: Pick<ChatFile, "name" | "s
         <span className="chat-file-name" title={file.name}>{file.name}</span>
         <span className="chat-file-meta">{[bytes(file.size), kindWord(file)].filter(Boolean).join(" · ")}</span>
       </span>
-      <a className="chat-icon-btn" {...fileLink(src, file.name)} download={file.name} data-tip="Download" aria-label={`Download ${file.name}`}>
+      <a className="chat-icon-btn" {...chatFileLink(src, file.name)} download={file.name} data-tip="Download" aria-label={`Download ${file.name}`}>
         <IconDownload />
       </a>
     </div>
@@ -124,11 +144,11 @@ export function Lightbox({ file, src, onClose }: { file: ChatFile | null; src: s
           aria-label={file.name}
         >
           <motion.figure initial={{ scale: 0.96, y: 8 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.98, y: 4 }} transition={{ type: "spring", stiffness: 420, damping: 36 }}>
-            <ProgressiveImage src={src} alt={file.name} targetWidth="orig" preview={false} fit="contain" draggable={false} />
+            <ChatImage src={src} alt={file.name} tier="orig" fit="contain" />
             <figcaption>
               <span title={file.name}>{file.name}</span>
               <span className="chat-file-meta">{bytes(file.size)}</span>
-              <a className="f-pill" {...fileLink(src, file.name)} download={file.name}>
+              <a className="f-pill" {...chatFileLink(src, file.name)} download={file.name}>
                 Download
               </a>
               <button type="button" className="f-pill" onClick={onClose}>
@@ -148,22 +168,68 @@ export function LinkPreviews({ previews }: { previews?: ChatLinkPreview[] }) {
   return (
     <div className="chat-previews">
       {previews.slice(0, 3).map((p) => (
-        <a key={p.url} className="chat-preview" href={p.url} target="_blank" rel="noopener noreferrer">
-          <span className="chat-preview-text">
-            <span className="chat-preview-site">{p.site ?? hostOf(p.url)}</span>
-            {p.title && <span className="chat-preview-title">{p.title}</span>}
-            {p.description && <span className="chat-preview-desc">{p.description}</span>}
-          </span>
-          {p.image && <PreviewImage src={p.image} />}
-        </a>
+        <LinkPreview key={p.url} p={p} />
       ))}
     </div>
   );
 }
 
-function PreviewImage({ src }: { src: string }) {
-  const shown = useFileSrc(src, true, { width: 256 });
-  return shown ? <img className="chat-preview-img" src={shown} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" /> : null;
+function LinkPreview({ p }: { p: ChatLinkPreview }) {
+  // a link straight to a picture or a GIF: the picture, under the words
+  if (previewShape(p) === "picture") {
+    return (
+      <div className="chat-preview is-picture" data-preview="picture">
+        <PreviewImage src={p.image!} large link={p.url} />
+      </div>
+    );
+  }
+  return (
+    <div className="chat-preview" data-preview="card">
+      <a className="chat-preview-text" href={p.url} target="_blank" rel="noopener noreferrer">
+        <span className="chat-preview-site">{p.site ?? hostOf(p.url)}</span>
+        {p.title && <span className="chat-preview-title">{p.title}</span>}
+        {p.description && <span className="chat-preview-desc">{p.description}</span>}
+      </a>
+      {p.image && <PreviewImage src={p.image} />}
+    </div>
+  );
+}
+
+/**
+ * A preview's picture. One the server holds (`/files/…`) is read like any chat file. One at another site's address
+ * waits for a press: nothing is asked of that site until then, and then only that picture, with no referrer.
+ */
+function PreviewImage({ src, large, link }: { src: string; large?: boolean; link?: string }) {
+  const [load, setLoad] = useState(false);
+  const cls = `chat-preview-img${large ? " is-large" : ""}`;
+  if (src.startsWith("/files/")) {
+    return (
+      <span className={cls}>
+        <ChatImage src={src} alt="" tier={large ? 512 : 256} fit={large ? undefined : "cover"} />
+      </span>
+    );
+  }
+  if (!/^https?:\/\//i.test(src)) return null;
+  if (!load) {
+    return (
+      <span className={`md-img-remote chat-preview-wait${large ? " is-large" : ""}`} data-preview-wait>
+        <span className="md-img-remote-label">
+          Image from <b>{hostOf(src)}</b>
+        </span>
+        <button type="button" className="md-img-load" onClick={() => setLoad(true)}>
+          Load image
+        </button>
+      </span>
+    );
+  }
+  const img = <img className={cls} src={src} alt="" decoding="async" referrerPolicy="no-referrer" />;
+  return large && link ? (
+    <a href={link} target="_blank" rel="noopener noreferrer" className="chat-preview-open">
+      {img}
+    </a>
+  ) : (
+    img
+  );
 }
 
 const hostOf = (u: string) => {

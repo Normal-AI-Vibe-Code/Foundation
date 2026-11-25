@@ -24,6 +24,8 @@ import { CLIENT, person, settle, waitLive } from "./helpers";
 const SHOTS = "../../docs/evidence/2026-11-15_one-interface/council";
 /** 2026-11-24: one bar over each head, the run card, the one silhouette, seats as wide as their figures */
 const NEW = "../../docs/evidence/2026-11-24_council-harness";
+// the card at rest and waking (2026-11-25)
+const PERF = "../../docs/evidence/2026-11-25_character-grid-perf";
 const MESHY = `http://127.0.0.1:${process.env.E2E_MESHY_PORT ?? "4445"}`;
 let ada: Page;
 let ctx: BrowserContext;
@@ -279,6 +281,62 @@ test("a 3D character, a press at a time: each button says its cost, the card sho
   await expect.poll(() => frames(ada, `[data-character-card="Mochi"] canvas.avatar-canvas`)).toBeGreaterThan(before + 10);
   await settle(ada, 500);
   await ada.screenshot({ path: `${SHOTS}/11_card-ready-happy.png` });
+});
+
+test("a card rests on its picture: the model drawn once and kept; under the pointer it plays, cross-faded, and goes back", async () => {
+  // (2026-11-25, characters/stagePolicy.ts) every card on screen used to play. Now a card away from the pointer and
+  // not drawn large holds a picture: no canvas of its own, no frames
+  const c = card(ada, "Mochi");
+  const poster = c.locator(".avatar-poster");
+  await ada.mouse.move(700, 40);
+  // drawn large it goes on playing by itself (it's what the screen is showing): step back until it isn't
+  const zoom = async (dy: number) => {
+    await ada.mouse.move(700, 450);
+    await ada.keyboard.down("Control");
+    await ada.mouse.wheel(0, dy);
+    await ada.keyboard.up("Control");
+    await ada.mouse.move(700, 40);
+  };
+  let steps = 0;
+  for (; steps < 12 && Number(await c.evaluate((e) => e.getBoundingClientRect().width)) > 300; steps++) await zoom(40);
+  await expect(poster).not.toHaveAttribute("data-poster", "live", { timeout: 10_000 });
+  await expect(c.locator("canvas")).toHaveCount(0, { timeout: 5_000 });
+  // the picture is the 3D model itself, drawn once (characters/portrait.ts), not the sheet it was made from
+  await expect(poster).toHaveAttribute("data-poster", "render", { timeout: 20_000 });
+  const still = c.locator(".avatar-rest img.avatar-render");
+  await expect(still).toBeVisible();
+  const drawn = await still.evaluate(async (img: HTMLImageElement) => {
+    await img.decode();
+    const k = document.createElement("canvas");
+    k.width = img.naturalWidth;
+    k.height = img.naturalHeight;
+    const g = k.getContext("2d")!;
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, k.width, k.height).data;
+    let solid = 0;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 200) solid++;
+    return { w: img.naturalWidth, h: img.naturalHeight, corner: d[3], solid: solid / (k.width * k.height) };
+  });
+  expect(drawn.w).toBe(640);
+  expect(drawn.corner, "drawn on a clear ground").toBe(0);
+  expect(drawn.solid, "and there is a figure in it").toBeGreaterThan(0.03);
+  // kept under the clips file's id: in the image cache between launches
+  const kept = await ada.evaluate(async () => (await (await caches.open("foundation-image-cache-v3")).keys()).map((r) => decodeURIComponent(r.url)).filter((u) => u.includes("derived:model-still/")));
+  expect(kept.length).toBeGreaterThan(0);
+  expect(kept[0]).toMatch(/derived:model-still\/chr_[^/]+\/[^/]+\/full\/640/);
+  await ada.screenshot({ path: `${PERF}/e2e-card-at-rest.png` });
+
+  // the pointer on it: the live character over the picture; off it, back to the picture and the canvas is let go
+  await c.locator(".char-view").hover();
+  await expect(poster).toHaveAttribute("data-poster", "live", { timeout: 15_000 });
+  await expect(c.locator(".avatar-3d")).toHaveClass(/is-live/);
+  await expect.poll(async () => Number(await c.locator(".avatar-3d").evaluate((e) => getComputedStyle(e).opacity))).toBe(1);
+  await ada.mouse.move(700, 40);
+  await expect(poster).toHaveAttribute("data-poster", "render", { timeout: 10_000 });
+  await expect(c.locator("canvas")).toHaveCount(0, { timeout: 5_000 });
+  // back to where the board was, for the checks after this one
+  for (; steps > 0; steps--) await zoom(-40);
+  await settle(ada, 600);
 });
 
 test("a finished character waits for a person's approval; approved, it's one an agent can wear", async () => {

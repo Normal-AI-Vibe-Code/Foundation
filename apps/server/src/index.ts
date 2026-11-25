@@ -15,7 +15,7 @@ import { registerVmRoutes } from "./vmroutes.ts";
 import { shutdownLocalVms } from "./localvms.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
-import { AGENT_TOKEN_DAYS, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleSignIn, googleStart, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
+import { AGENT_TOKEN_DAYS, chatSessionFor, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleSignIn, googleStart, hashToken, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
 import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
@@ -164,7 +164,8 @@ r.get("/auth/google/callback", async (req, res) => {
     return flowform.page(res, e instanceof HttpError ? e.status : 500, "Sign-in didn't finish", e instanceof HttpError ? e.message : "Something went wrong finishing the sign-in. Try again.");
   }
   audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, door: "route", action: "sign_in.google", target: "browser session", decision: "allowed", result: "ok" });
-  setSessionCookie(res, createSession(user.id));
+  // the cookie, and with Google's proof from this very sign-in, ChatForm's server too (chatsession.ts)
+  signIn(res, user.id, false, hashToken(req.query.get("state") ?? ""));
   // `?arrive`: the sign-in page knows it is back from Google and goes straight through
   res.writeHead(302, { location: `${config.clientUrl.replace(/\/$/, "")}/?arrive`, "cache-control": "no-store" });
   res.end();
@@ -254,6 +255,14 @@ r.post("/api/flowform/tools/:name", async (req) => flowformCall(requireUser(req)
 r.post("/auth/logout", (req, res) => {
   clearSession(req, res);
   return { ok: true };
+});
+// one sign-in: the ChatForm session this person's Google sign-in here earned, collected once by their own
+// signed-in app (never an agent's bearer), in the body and nowhere else (chatsession.ts). `server` is the chat
+// server the app is on, to compare with this server's own setting: it is never an address anything is sent to
+r.post("/api/chat-session", async (req, res) => {
+  const { server } = await readJson<{ server?: unknown }>(req);
+  res.setHeader("cache-control", "no-store");
+  return chatSessionFor(req, typeof server === "string" ? server : undefined);
 });
 /** a one-time, 30-second ticket for one socket, for a client that can't send its session on a WebSocket (sockets.ts) */
 r.post("/api/ws-ticket", async (req) => {
@@ -1379,7 +1388,7 @@ function agentRouteScope(req: Req, path: string) {
  * and preferences (their goals, profile and settings are theirs, not a board's). The board is the
  * route's :id, or ?board=, else the person's account role decides.
  */
-const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/, /^\/api\/chat\//];
+const READ_POSTS = [/^\/api\/agent$/, /^\/api\/agent\/runs\/[^/]+\/stop$/, /^\/api\/agent\/token$/, /^\/api\/boards\/[^/]+\/tools\//, /^\/api\/boards\/[^/]+\/people$/, /^\/api\/ws-ticket$/, /^\/api\/chat-session$/, /^\/api\/today\//, /^\/api\/prefs$/, /^\/api\/flowform\/(?!rooms\/[^/]+\/pull$|files\/[^/]+\/bring$)/, /^\/api\/chat\//];
 function gateWrites(req: Req, path: string) {
   if (req.method === "GET" || req.method === "OPTIONS" || !path.startsWith("/api/")) return;
   if (READ_POSTS.some((p) => p.test(path))) return;

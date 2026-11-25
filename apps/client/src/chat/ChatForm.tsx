@@ -54,7 +54,9 @@ import {
   type ChatHit,
   type ChatState,
 } from "./model";
-import { chatApi } from "./server";
+import { chatApi, CHAT_SERVER_NAME } from "./server";
+import { openNotice, refreshNotices, seeAllNotices, useNotices } from "./notify";
+import { unseenCount } from "./notifyLogic";
 import { layoutTimeline, parseRest, restOf, type ChatRest } from "./logic";
 import { Sidebar } from "./Sidebar";
 import { setListFolded, usePins } from "./pins";
@@ -63,7 +65,7 @@ import { Timeline } from "./Timeline";
 import { Composer, type ComposerHandle } from "./Composer";
 import { ThreadPane } from "./Thread";
 import { NewChannelDialog, NewDirectDialog, QuickSwitcher } from "./Dialogs";
-import { BrowseView, ChannelIntro, SearchView, ThreadsView, type ThreadRow } from "./Views";
+import { BrowseView, ChannelIntro, MentionsView, SearchView, ThreadsView, type ThreadRow } from "./Views";
 import { ChatMark, IconClose, IconSearch } from "./Icons";
 import type { MessageActions } from "./Message";
 import { SlackNudge } from "./tabs/SlackGuide";
@@ -227,6 +229,8 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
       } catch { /* private window */ }
     }
   }, [channelId, route.thread]);
+  // leaving the Chat tab: nothing is open any more (a message that arrives now is told, not taken as read)
+  useEffect(() => () => setOpen(null, null), []);
 
   // the page: the newest, or around the message the address names
   const [centerId, setCenterId] = useState<string | null>(null);
@@ -412,6 +416,14 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
     };
   }, [route.view]);
 
+  // what was said to me (the bell's list, as a view): asked again when the view opens
+  const notices = useNotices();
+  const hasMentions = can("mentions") && notices.listed;
+  const unseen = useMemo(() => unseenCount(notices.list, notices.seen, s.channels), [notices.list, notices.seen, s.channels]);
+  useEffect(() => {
+    if (route.view === "mentions") refreshNotices();
+  }, [route.view]);
+
   const pinned = useMemo(() => (tl?.messages ?? []).filter((m) => m.pinned && !m.deletedAt), [tl]);
   // opened from the side menu: the conversation takes the whole area and the channel list folds away (chat/pins.ts)
   const folded = usePins().listFolded && !!channel && !route.view;
@@ -422,7 +434,7 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
     return <ChatSignIn note={s.why} />;
   }
 
-  const noFiles = can("files") ? undefined : "Files can't be sent on this chat server yet. They stay on Foundation's own.";
+  const noFiles = can("files") ? undefined : `${CHAT_SERVER_NAME || "This chat server"} doesn't take files yet.`;
   let main: React.ReactNode;
   if (s.status === "unavailable") {
     main = (
@@ -435,6 +447,8 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
     main = <BrowseView channels={channels} meId={meId} onOpen={(id) => go({ channel: id })} onJoin={(id) => void joinChannel(id).then(() => go({ channel: id }), fail)} />;
   } else if (route.view === "threads") {
     main = <ThreadsView threads={threadRows} busy={!threadRows} why={threadsWhy} onOpen={(m) => go({ channel: m.channel, thread: m.id })} />;
+  } else if (route.view === "mentions") {
+    main = <MentionsView notices={notices.list} seen={notices.seen} channels={s.channels} busy={notices.busy} why={notices.listed ? "" : notices.why} unseen={unseen} onOpen={openNotice} onAll={seeAllNotices} />;
   } else if (route.view === "search") {
     main = <SearchView q={route.q} hits={hits} busy={searching} why={searchWhy} onOpen={(h) => go(h.message.root ? { channel: h.channel.id, thread: h.message.root, at: h.message.seq } : { channel: h.channel.id, at: h.message.seq })} />;
   } else if (!channel) {
@@ -539,6 +553,8 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
             meId={meId}
             disabled={disabled}
             noFiles={noFiles}
+            noAttachFrom={s.remote}
+            audience={channel}
             autoFocus
             onSend={(text, files) => send(channel.id, text, files, null)}
             onTyping={() => sayTyping(channel.id, null)}
@@ -554,7 +570,7 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
 
   return (
     <div className={`chat-tab-chat${route.thread && channel ? " has-thread" : ""}${folded ? " is-list-folded" : ""}`}>
-      {!folded && <Sidebar channels={channels} meId={meId} online={s.online} current={channelId} view={route.view} onOpen={(id) => go({ channel: id })} onView={(v) => go({ view: v })} onNew={setDialog} typing={typingIn} carry={!s.remote} noThreads={!can("threads-list")} />}
+      {!folded && <Sidebar channels={channels} meId={meId} online={s.online} current={channelId} view={route.view} onOpen={(id) => go({ channel: id })} onView={(v) => go({ view: v })} onNew={setDialog} typing={typingIn} carry={!s.remote} noThreads={!can("threads-list")} mentions={hasMentions ? { unseen } : undefined} />}
       {main}
       <AnimatePresence>
         {route.thread && channel && (
@@ -583,6 +599,8 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
                 meId={meId}
                 disabled={disabled}
                 noFiles={noFiles}
+                noAttachFrom={s.remote}
+                audience={channel}
                 compact
                 autoFocus
                 onSend={(text, files) => send(channel.id, text, files, route.thread)}

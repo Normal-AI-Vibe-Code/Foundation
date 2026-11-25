@@ -21,7 +21,8 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode,
 import { boardMaps, CHARACTER_STAGES, MOODS, nextStage, stagePassed, type CharacterStageKey, type CharacterState, type Mood } from "@foundation/protocol";
 import { api, authHeaders, serverUrl } from "../lib/api";
 import { loadCosts, pressStage, STAGE_WORDS, useCosts, useInspiration, type Costs, type Inspiration } from "../lib/characterStudio";
-import { useFileSrc } from "../lib/fileSrc";
+import { useCalmAdmit } from "../lib/calm";
+import { ProgressiveImage } from "../components/ProgressiveImage";
 import { activeBoard } from "../sync/board";
 import type { PanelMeta } from "../state/store";
 import { toast, useUi } from "../state/ui";
@@ -30,6 +31,7 @@ import type { Framing } from "../characters/actor";
 import { characterFilePath, type RosterCharacter } from "../characters/roster";
 import { useOnScreen } from "./PanelView";
 import { useStage } from "../characters/stageBudget";
+import { LARGE_SCALE, LINGER_MS, wantsStage } from "../characters/stagePolicy";
 import { CharacterWords, type SaveState } from "./CharacterWords";
 import "./character.css";
 
@@ -69,27 +71,40 @@ function useSeenNear(ref: React.RefObject<HTMLElement | null>) {
   return near;
 }
 
-/** a picture the character has, by role; `still` is a picture given instead of the archive's (the design page) */
+/**
+ * a picture the character has, by role; `still` is a picture given instead of the archive's (the design page).
+ * It arrives (2026-11-25): its well holds its place, the 64 px stand-in shows blurred while its level is read, and
+ * the sharp one fades in over it, a few steps later the farther it is from the middle of the screen
+ * (components/ProgressiveImage.tsx `stagger`). Which file it is rides in its address (roster.ts), so a sheet drawn
+ * again is never the kept one.
+ */
 function Picture({ character, role, label, still, large = false }: { character: CharacterState; role: string; label: string; still?: string; large?: boolean }) {
   const id = (character.files as Record<string, string | undefined>)[role];
   const near = useContext(CardNear);
-  const fetched = useFileSrc(id && !still ? characterFilePath(character.id, role) : null, near, { width: large ? 512 : 256 });
-  const src = still ?? fetched;
-  const [broken, setBroken] = useState(false);
-  if ((!id && !still) || broken) return null;
+  // a picture that didn't load is asked for twice more (a file still landing, a dropped request) before it's left out;
+  // and a picture drawn again starts afresh
+  const [failed, setFailed] = useState<{ id: string | undefined; tries: number }>({ id, tries: 0 });
+  const tries = failed.id === id ? failed.tries : 0;
+  const again = useRef(0);
+  useEffect(() => () => window.clearTimeout(again.current), []);
+  if ((!id && !still) || tries > 2) return null;
+  const onError = () => {
+    window.clearTimeout(again.current);
+    again.current = window.setTimeout(() => setFailed({ id, tries: tries + 1 }), tries < 2 ? 1500 : 0);
+  };
   return (
     <figure className={`char-thumb${large ? " is-large" : ""}`} data-char-file={role}>
-      {src ? <img src={src} alt={`${character.name}, ${label}`} loading="lazy" decoding="async" draggable={false} onError={() => setBroken(true)} /> : <span />}
+      <ProgressiveImage key={tries} src={still ?? characterFilePath(character.id, role, id)} alt={`${character.name}, ${label}`} targetWidth={large ? 512 : 256} enabled={near} priority={1} fit={large ? "contain" : "cover"} stagger onError={onError} />
       <figcaption>{label}</figcaption>
     </figure>
   );
 }
 
 function Pick({ item, on, disabled, onToggle }: { item: Inspiration; on: boolean; disabled: boolean; onToggle: () => void }) {
-  const src = useFileSrc(item.src, useContext(CardNear), { width: 256 });
   return (
     <button type="button" className={`char-pick${on ? " is-on" : ""}`} aria-pressed={on} disabled={disabled && !on} data-tip={on ? "Drawn from this · press to leave it out" : disabled ? "Five at most reach the image model" : "Draw from this"} onClick={onToggle}>
-      {src && <img src={src} alt={item.name} loading="lazy" decoding="async" draggable={false} onError={(e) => (e.currentTarget.style.visibility = "hidden")} />}
+      {/* 44 px wide: no stand-in (it would be most of the picture), only the fade */}
+      <ProgressiveImage src={item.src} alt={item.name} targetWidth={256} preview={false} enabled={useContext(CardNear)} priority={2} fit="cover" stagger />
     </button>
   );
 }
@@ -151,6 +166,9 @@ export interface SheetProps {
   inspiration?: Inspiration[];
   /** the stage may play (it has a place in the frame budget) */
   live?: boolean;
+  /** the card has come near the screen: its character's still may be drawn (default true: the design page) */
+  near?: boolean;
+  onPointerLeave?: () => void;
   /** a stage whose press is on its way to the server */
   busy?: string | null;
   /** pictures to show instead of the archive's, by role (the design page has no archive) */
@@ -163,7 +181,7 @@ export interface SheetProps {
   onApprove?: (approval: "approved" | "archived" | "pending") => void;
 }
 
-export function CharacterSheet({ character, boardId = "", panelId = "", viewer = false, price, inspiration = [], live = false, busy = null, stills, hostRef, onPointer, onPress, onEdit, onMavatar, onApprove }: SheetProps) {
+export function CharacterSheet({ character, boardId = "", panelId = "", viewer = false, price, inspiration = [], live = false, near = true, busy = null, stills, hostRef, onPointer, onPointerLeave, onPress, onEdit, onMavatar, onApprove }: SheetProps) {
   const [mood, setMood] = useState<Mood>("idle");
   // a 3D character starts head to toe; a mesh avatar starts as what it is, a portrait
   const [framed, setFraming] = useState<Framing | null>(null);
@@ -198,13 +216,13 @@ export function CharacterSheet({ character, boardId = "", panelId = "", viewer =
   const expressions = Boolean(c.files.expressions || stills?.expressions);
 
   return (
-    <div ref={hostRef} className="char-body wheel-own" data-character-card={c.name} data-character-ready={c.ready || undefined} onPointerEnter={onPointer} onPointerMove={onPointer}>
+    <div ref={hostRef} className="char-body wheel-own" data-character-card={c.name} data-character-ready={c.ready || undefined} onPointerEnter={onPointer} onPointerMove={onPointer} onPointerLeave={onPointerLeave}>
       <header className="char-head">
         <div className="char-view">
           {stills?.thumb ? (
             <img className="char-view-still" src={stills.thumb} alt={c.name} draggable={false} />
           ) : drawn ? (
-            <Avatar character={entry} mood={mood} framing={c.ready ? framing : "full"} still={!(c.ready && live)} />
+            <Avatar character={entry} mood={mood} framing={c.ready ? framing : "full"} still={!(c.ready && live)} poster near={near} />
           ) : (
             <p className="char-note">Nothing drawn yet. Say who it is, pick its inspiration, and draw the sheet.</p>
           )}
@@ -373,12 +391,32 @@ export function CharacterSheet({ character, boardId = "", panelId = "", viewer =
 
 export function CharacterBody({ panel }: { panel: PanelMeta }) {
   const host = useRef<HTMLDivElement>(null);
-  // every card draws itself: the ones on screen at a size worth it play (as many as the frames allow:
-  // characters/stageBudget.ts), and a card without a place holds its picture, never an empty frame
+  // a card rests on its picture (a 3D character: the model drawn once and kept) and plays when it is in use (the
+  // pointer is on it, or just left) or drawn large (characters/stagePolicy.ts); as many as the frames allow play at
+  // once (characters/stageBudget.ts), each starting once the camera is calm, and the picture cross-fades to the
+  // live character and back. Every card on screen used to play: five at rest kept the page 72 % busy
   const onScreen = useOnScreen(host, 0.3);
+  const large = useOnScreen(host, LARGE_SCALE);
   const near = useSeenNear(host);
-  const { live, take: takeStage } = useStage(onScreen);
   const c = useCharacter(panel.id);
+  const [inUse, setInUse] = useState(false);
+  const leaving = useRef(0);
+  useEffect(() => () => window.clearTimeout(leaving.current), []);
+  const want = useCalmAdmit(wantsStage({ ready: Boolean(c?.ready), onScreen, large, inUse }));
+  const { live, take } = useStage(want);
+  const takeStage = () => {
+    window.clearTimeout(leaving.current);
+    if (!inUse) setInUse(true);
+    if (want) take();
+  };
+  // the card in use plays whoever has to give way (the pointer came first, the calm camera after)
+  useEffect(() => {
+    if (want && inUse) take();
+  }, [want, inUse, take]);
+  const leaveStage = () => {
+    window.clearTimeout(leaving.current);
+    leaving.current = window.setTimeout(() => setInUse(false), LINGER_MS);
+  };
   const ui = useUi();
   const price = useCosts();
   const [busy, setBusy] = useState<string | null>(null);
@@ -426,9 +464,11 @@ export function CharacterBody({ panel }: { panel: PanelMeta }) {
         price={price}
         inspiration={inspiration}
         live={live}
+        near={near}
         busy={busy}
         hostRef={host}
         onPointer={takeStage}
+        onPointerLeave={leaveStage}
         onPress={(s) => void press(s)}
         onEdit={edit}
         onMavatar={(f) => void bringMavatar(f)}

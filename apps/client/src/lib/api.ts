@@ -194,6 +194,11 @@ export async function logout() {
   await forgetDevice();
   const { clearImageCache } = await import("./imageCache");
   await clearImageCache();
+  // one sign-in, one sign-out: ChatForm's own server (chat/server.ts) forgets this device too. It gets three
+  // seconds to hear it; the device forgets its chat bearer either way
+  const chat = await import("../chat/server");
+  await Promise.race([chat.chatSignOut(), new Promise((ok) => setTimeout(ok, 3000))]);
+  chat.forgetChatBearer();
   // the server forgets the session first (it needs the bearer to know which), then this device does
   try {
     return await api("/auth/logout", { method: "POST" });

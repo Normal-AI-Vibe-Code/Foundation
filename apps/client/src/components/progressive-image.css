@@ -36,6 +36,17 @@
 .f-prog-img.is-visible {
   opacity: 1;
 }
+/* a cold picture with no stand-in before it (its <img> appears already sharp) fades in from its well, not pops */
+@starting-style {
+  .f-prog-img.is-visible {
+    opacity: 0;
+  }
+}
+/* the wave (lib/arrival.ts): a picture's reveal waits a few steps by its distance from the middle of the screen;
+   a step is half of --dur-press, six at most. Opacity, blur and a 4 % scale only: all on the compositor */
+.f-prog-img {
+  transition-delay: calc(var(--arrive-step, 0) * var(--dur-press) / 2);
+}
 .f-prog.is-sharp .f-prog-img.is-visible {
   outline: 1px solid var(--color-media-outline, color-mix(in srgb, var(--color-frost) 10%, transparent));
   outline-offset: -1px;
@@ -118,6 +129,16 @@
   height: 100%;
 }
 
+/* a cold picture's first appearance (the stand-in, or the picture itself where there is none): out of its well */
+.media-body img.f-img-cold {
+  transition: opacity var(--dur-quick) var(--ease-out-soft) calc(var(--arrive-step, 0) * var(--dur-press) / 2);
+}
+@starting-style {
+  .media-body img.f-img-cold {
+    opacity: 0;
+  }
+}
+
 /* MediaView single-<img> progressive reveal (tokens only; only filter/transform/opacity) */
 .media-body img.f-img-preview {
   filter: blur(8px);
@@ -126,10 +147,35 @@
     opacity var(--dur-quick) var(--ease-out-soft),
     filter var(--dur-quick) var(--ease-out-soft),
     transform var(--dur-quick) var(--ease-out-soft);
+  transition-delay: calc(var(--arrive-step, 0) * var(--dur-press) / 2);
+}
+/* the well stays under the stand-in while it fades in (the host is no longer :empty) */
+.media-host:has(> img.f-img-cold.f-img-preview) {
+  background: var(--color-panel);
+  border-radius: inherit;
 }
 
+/* the sharp level coming into focus over the stand-in: the same easing, held for its length (MediaView SETTLE_MS),
+   and waiting its step of the wave */
+.media-body img.f-img-settling {
+  transition:
+    opacity var(--dur-quick) var(--ease-out-soft),
+    filter var(--dur-quick) var(--ease-out-soft),
+    transform var(--dur-quick) var(--ease-out-soft);
+  transition-delay: calc(var(--arrive-step, 0) * var(--dur-press) / 2);
+}
 .media-body img.f-img-preview.is-inverted {
   filter: blur(8px) invert(var(--night-hard)) hue-rotate(calc(var(--night-hard) * 180deg));
+}
+
+/* reduced motion: pictures are simply there */
+@media (prefers-reduced-motion: reduce) {
+  .f-prog-img,
+  .media-body img.f-img-cold,
+  .media-body img.f-img-preview,
+  .media-body img.f-img-settling {
+    transition: none;
+  }
 }
 
 /* ---------- #/design specimen (ProgressiveImageDemo) ---------- */
@@ -278,4 +324,30 @@
 .prog-demo-stat span {
   font: 500 var(--text-11) / 1.2 var(--font-sans);
   color: var(--color-dim);
+}
+
+.prog-demo-wave {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-sheet), 0 0 0 1px var(--color-line);
+}
+
+.prog-demo-wave-field {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.prog-demo-wave-field .prog-demo-frame {
+  aspect-ratio: 4 / 5;
+}
+
+.prog-demo-wave-field .prog-demo-badge {
+  position: absolute;
+  left: var(--space-2);
+  bottom: var(--space-2);
 }

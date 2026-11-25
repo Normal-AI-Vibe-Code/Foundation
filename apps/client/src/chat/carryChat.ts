@@ -7,7 +7,9 @@
  * and a folded side menu opens when the hand reaches the window's left edge.
  *
  * Let go over the side menu: it's kept there (over a kept row: just before or after it), the selector
- * turns to Chats, and the slip draws into the row. Anywhere else, or Esc: it flies back into its row.
+ * turns to Chats, and the slip draws into the row. Let go over a section of the grid (2026-11-25), which rings
+ * while the slip is over it: the conversation is put there as a card (chat/gridChatPlace.ts; not for a viewer
+ * of the grid). Anywhere else, or Esc: it flies back into its row.
  *
  * Everything writes `transform` straight from the spring; the only state is the pins store's `held`.
  */
@@ -17,6 +19,8 @@ import { PAPER, grabPoint, leanToward } from "../lib/pickupMath";
 import { getUi, setUi, toast } from "../state/ui";
 import { getPins, keepInSideMenu, setHeld } from "./pins";
 import { dropIndex } from "./sideMenuLogic";
+import { getChat } from "./model";
+import { addChatCard, canPlaceChat, ringSection, sectionUnder } from "./gridChatPlace";
 
 /** how far a press travels before it's a pull, not a click (px) */
 export const PULL = 5;
@@ -51,7 +55,7 @@ export function carryChat(id: string, title: string, from: HTMLElement, press: {
   face.className = "held-face";
   const mark = document.createElement("span");
   mark.className = "chat-held-mark";
-  const theirs = from.querySelector(".chat-side-mark");
+  const theirs = from.querySelector(".chat-side-mark, .chat-pin-mark");
   if (theirs) mark.append(...[...theirs.childNodes].map((n) => n.cloneNode(true)));
   const main = document.createElement("span");
   main.className = "held-main";
@@ -82,12 +86,15 @@ export function carryChat(id: string, title: string, from: HTMLElement, press: {
   let lastX = press.x;
   let lastT = performance.now();
   let done = false;
+  /** the section of the grid the slip is over, when it could be put there */
+  let overSection: string | null = null;
   /** how the side menu listed things before the hand turned it to Chats */
   let wasView: ReturnType<typeof getUi>["spacesView"] | undefined;
 
   const finish = () => {
     done = true;
     setHeld(null);
+    ringSection((overSection = null));
     document.body.classList.remove("is-dragging-hit", "is-carrying-chat");
     window.removeEventListener("keydown", onKey, true);
     root.style.setProperty("--lean", "0deg");
@@ -133,14 +140,28 @@ export function carryChat(id: string, title: string, from: HTMLElement, press: {
         wasView ??= getUi().spacesView;
         setUi({ spacesView: "chats" });
       }
-      root.classList.toggle("is-over", over);
+      // over a section of the grid: it rings, and letting go puts the conversation there as a card
+      const sec = !over && canPlaceChat() ? sectionUnder(x, y) : null;
+      if (sec !== overSection) ringSection((overSection = sec));
+      root.classList.toggle("is-over", over || !!sec);
       setHeld({ id, over });
     },
     drop(x, y) {
       if (done) return;
       const over = overMenu(x, y);
       const at = over && getUi().spacesView === "chats" && getPins().ids.length ? landingIndex(y) : undefined;
+      const sec = over ? null : sectionUnder(x, y);
       finish();
+      if (sec) {
+        // onto the grid: a card that refers to the conversation (a board write: a viewer's slip flies home, with why)
+        const channel = getChat().channels[id];
+        const card = channel ? addChatCard(sec, channel, { x, y }) : null;
+        if (!card) return flyBack();
+        if (wasView) setUi({ spacesView: wasView });
+        root.classList.remove("is-lifted", "is-over");
+        root.classList.add("is-down");
+        return void remove(200);
+      }
       if (!over) return flyBack();
       const already = getPins().ids.includes(id);
       keepInSideMenu(id, at);

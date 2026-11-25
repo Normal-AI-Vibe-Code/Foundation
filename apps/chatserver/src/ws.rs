@@ -1,5 +1,6 @@
 //! The chat socket (`/chat`), as Foundation's: a `hello`, then every event the person may see, each with its `rev`.
-//! The client says only `typing` and `ping`; everything that changes anything goes over HTTP.
+//! The client says only `typing`, `ping` and `where` (the grid its window has open: whereabouts.rs); everything that
+//! changes anything goes over HTTP.
 //!
 //! On Vercel a socket closes when the function reaches its time limit (300 s on Hobby); the client reconnects and
 //! catches up from the list and the open channel, as it does after any drop.
@@ -61,6 +62,8 @@ async fn run(st: St, user: User, socket: WebSocket) {
     });
 
     let mut last_typing: HashMap<String, i64> = HashMap::new();
+    // the grid this window last said it has open (None: none)
+    let mut here: Option<(String, Option<String>)> = None;
     while let Some(Ok(msg)) = stream.next().await {
         match msg {
             Message::Text(t) => {
@@ -68,6 +71,15 @@ async fn run(st: St, user: User, socket: WebSocket) {
                 match m["t"].as_str() {
                     Some("ping") => {
                         let _ = sqlx::query("update chat_online set seen_at = $2 where conn_id = $1").bind(&conn.id).bind(now_ms()).execute(&st.db).await;
+                    }
+                    Some("where") => {
+                        let (board, name) = crate::whereabouts::said(&m);
+                        let now = board.map(|b| (b, name));
+                        if now == here {
+                            continue;
+                        }
+                        here = now;
+                        crate::whereabouts::say(&st, &conn.id, &conn.user.id, here.as_ref().map(|h| h.0.as_str()), here.as_ref().and_then(|h| h.1.as_deref())).await;
                     }
                     Some("typing") => {
                         let Some(channel) = m["channel"].as_str() else { continue };
@@ -97,4 +109,7 @@ async fn run(st: St, user: User, socket: WebSocket) {
     writer.abort();
     let _ = sqlx::query("delete from chat_online where conn_id = $1").bind(&conn.id).execute(&st.db).await;
     hub::publish(&st, json!({ "t": "presence" })).await;
+    if here.is_some() {
+        crate::whereabouts::say(&st, &conn.id, &conn.user.id, None, None).await;
+    }
 }

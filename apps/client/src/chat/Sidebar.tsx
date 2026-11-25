@@ -10,8 +10,9 @@ import { useState } from "react";
 import { chatTitle, type ChatChannelView, type ChatParty } from "@foundation/protocol";
 import { PartyAvatar } from "./Avatar";
 import { isDirect } from "./logic";
-import { IconChevron, IconHash, IconLock, IconPlus, IconThread } from "./Icons";
+import { IconAt, IconChevron, IconHash, IconLock, IconPlus, IconThread } from "./Icons";
 import { carryHandlers } from "./carryChat";
+import { canPlaceChat, putOnOpenGrid } from "./gridChatPlace";
 import { isKept, keepInSideMenu, takeOutOfSideMenu } from "./pins";
 import { openContextMenu } from "../components/ContextMenu";
 import { setUi } from "../state/ui";
@@ -23,9 +24,11 @@ export interface SidebarProps {
   meId?: string;
   online: string[];
   current: string | null;
-  view?: "threads" | "browse" | "search" | null;
+  view?: "threads" | "browse" | "search" | "mentions" | null;
   onOpen(id: string): void;
-  onView(v: "threads" | "browse"): void;
+  onView(v: "threads" | "browse" | "mentions"): void;
+  /** the server keeps a list of what was said to me: the Recent mentions row, with how many I haven't seen */
+  mentions?: { unseen: number };
   /** the server has no list of my threads (a chat server of its own): the row is left out */
   noThreads?: boolean;
   onNew(kind: "channel" | "direct"): void;
@@ -74,6 +77,15 @@ export function Sidebar(p: SidebarProps) {
               <IconThread />
             </span>
             <span className="chat-side-name">Threads</span>
+          </button>
+        )}
+        {p.mentions && (
+          <button type="button" className={`chat-side-row is-nav${p.view === "mentions" ? " is-current" : ""}${p.mentions.unseen > 0 ? " is-unread" : ""}`} onClick={() => p.onView("mentions")} data-side-mentions>
+            <span className="chat-side-mark">
+              <IconAt />
+            </span>
+            <span className="chat-side-name">Recent mentions</span>
+            {p.mentions.unseen > 0 && <span className="chat-count is-accent">{p.mentions.unseen > 99 ? "99+" : p.mentions.unseen}</span>}
           </button>
         )}
         {unreads.length > 0 && (
@@ -182,7 +194,11 @@ export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: Ch
               e.stopPropagation();
               const r = e.currentTarget.getBoundingClientRect();
               const at = e.clientX || e.clientY ? { x: e.clientX, y: e.clientY } : { x: r.left + 24, y: r.bottom };
-              openContextMenu(at.x, at.y, [isKept(c.id) ? { label: "Take out of the side menu", action: () => takeOutOfSideMenu(c.id) } : { label: "Keep in the side menu", action: () => (keepInSideMenu(c.id), setUi({ spacesView: "chats", pane: true, paneView: "spaces" })) }]);
+              openContextMenu(at.x, at.y, [
+                isKept(c.id) ? { label: "Take out of the side menu", action: () => takeOutOfSideMenu(c.id) } : { label: "Keep in the side menu", action: () => (keepInSideMenu(c.id), setUi({ spacesView: "chats", pane: true, paneView: "spaces" })) },
+                // onto the grid that's open, as a card (chat/gridChatPlace.ts): a board write, so not offered to a viewer of it
+                ...(canPlaceChat() ? [{ label: "Put on the open grid", action: () => putOnOpenGrid(c) }] : []),
+              ]);
             }
           : undefined
       }

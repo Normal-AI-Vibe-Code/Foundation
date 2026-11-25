@@ -103,6 +103,14 @@ export const config = {
     dataroom: env("DATAROOM_URL", "https://airformdata.com"),
     vision: env("VISION_URL", "http://localhost:1420"),
   },
+  /**
+   * the one chat server a Google sign-in here also signs the person in to (chatsession.ts): the server asks
+   * it, with Google's own proof, for a ChatForm session the signed-in app then collects. Only ever this
+   * address, never one a browser, a link or a request names. https (or this computer, for tests). Empty: off.
+   * Unset, a server the desktop app started (FOUNDATION_EXIT_WITH_PARENT, as origins.ts startedForDesktop
+   * reads it) uses the team's, which is the chat server that app's ChatForm is built for.
+   */
+  chatServer: env("FOUNDATION_CHAT_SERVER", process.env.FOUNDATION_EXIT_WITH_PARENT === "1" ? "https://foundation-chatserver.vercel.app" : "").trim(),
   /** bearer token other services/agents use for /mcp and /api when not signed in */
   serviceToken: env("FOUNDATION_SERVICE_TOKEN"),
 };

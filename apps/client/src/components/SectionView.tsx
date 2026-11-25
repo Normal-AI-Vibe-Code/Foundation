@@ -59,6 +59,7 @@ import { isHostable } from "@foundation/protocol";
 import { isPanel } from "../state/store";
 import { ingest, ingestDrop } from "../lib/ingest";
 import { SectionEmpty } from "../panels/SectionEmpty";
+import { addChatPicker } from "../chat/gridChatPlace";
 import { SectionRewind } from "../panels/ReplayView";
 import { setUi } from "../state/ui";
 import { openContextMenu } from "./ContextMenu";
@@ -677,6 +678,7 @@ export const SectionView = memo(function SectionView({
             onNote={() => addNote(section.id)}
             onAsk={() => openCouncil({ kind: "section", id: section.id })}
             onFocus={() => setActiveSection(section.id)}
+            onChannel={() => void addChatPicker(section.id)}
           />
         )}
 

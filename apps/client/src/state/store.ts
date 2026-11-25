@@ -2218,6 +2218,7 @@ const PANEL_SIZE: Record<PanelMeta["panel"], [number, number]> = {
   replay: [360, 120],
   local: [480, 420],
   uploader: [960, 1100],
+  chat: [400, 560],
 };
 
 export function addPanel(

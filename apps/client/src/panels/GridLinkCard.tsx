@@ -75,6 +75,7 @@ const GLYPH: Record<string, string> = {
   pipeline: "⇢",
   design: "◆",
   replay: "◷",
+  chat: "#",
 };
 
 const sum = (xs: number[], a: number, b: number) => xs.slice(a, b).reduce((n, x) => n + x, 0);

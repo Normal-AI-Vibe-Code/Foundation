@@ -9,6 +9,7 @@ import { useSyncExternalStore } from "react";
 import { boardMaps, characterChoosable, seatCrew, type CharacterState } from "@foundation/protocol";
 import { api, fetchFile } from "../lib/api";
 import { cachedBytes } from "../lib/byteCache";
+import { withVersion } from "../lib/imageCache";
 import { activeBoard, onBoardChange } from "../sync/board";
 
 export interface RosterCharacter extends CharacterState {
@@ -93,7 +94,12 @@ export async function chooseAvatar(name: string, character: string | null) {
   set({ ...roster, avatars: out.avatars });
 }
 
-export const characterFilePath = (id: string, role: string) => `/api/characters/${encodeURIComponent(id)}/files/${role}`;
+/**
+ * a character's file by role. `version` (the file's id, `character.files[role]`) names which file that is: the role's
+ * file changes when a stage is pressed again, and a picture kept under the bare path would be shown for the new one
+ * (lib/imageCache.ts withVersion). Pictures that are cached should always say it.
+ */
+export const characterFilePath = (id: string, role: string, version?: string | null) => withVersion(`/api/characters/${encodeURIComponent(id)}/files/${role}`, version);
 
 // one download per file, however many seats and cards show it
 const bytes = new Map<string, Promise<ArrayBuffer>>();

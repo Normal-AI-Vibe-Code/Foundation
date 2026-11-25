@@ -31,8 +31,8 @@ use crate::{
 };
 
 pub const COOKIE: &str = "chatform_session";
-/// what of ChatForm this server has; a client leaves the rest out (files, pins, huddles, agents… stay on Foundation's own)
-pub const FEATURES: [&str; 5] = ["channels", "direct", "threads", "reactions", "search"];
+/// what of ChatForm this server has; a client leaves the rest out (huddles, agents, portals… stay on Foundation's own)
+pub const FEATURES: [&str; 10] = ["channels", "direct", "threads", "reactions", "search", "files", "pins", "previews", "mentions", "where"];
 const STATE_COOKIE: &str = "chatform_oauth";
 const SESSION_DAYS: i64 = 30;
 const TICKET_MS: i64 = 30_000;
@@ -167,7 +167,11 @@ pub async fn config_route(State(st): State<St>) -> Json<Value> {
         "hosted": st.cfg.on_vercel,
         // an app can sign in here (app_signin.rs), and what of ChatForm this server has
         "app": st.cfg.google_ready(),
+        // Foundation's own Google sign-in can sign ChatForm in (POST /auth/exchange with its ID token: exchange.rs)
+        "exchange": !st.cfg.exchange_audiences().is_empty(),
         "features": FEATURES,
+        // the most one file may be, in bytes (files.rs): the app says so before sending
+        "maxUpload": crate::files::FILE_MAX,
         "server": "chatform-rust",
         "version": env!("CARGO_PKG_VERSION"),
     }))

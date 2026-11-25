@@ -72,13 +72,13 @@ pub fn chat_handle(name: &str) -> String {
     if out.is_empty() { "someone".into() } else { out }
 }
 
-/// the `@handle`s in a text, outside code (packages/protocol chatMentionHandles), lower case
-pub fn mention_handles(text: &str) -> Vec<String> {
-    // drop fenced blocks and inline code first
+/// a text with its code blanked out (fenced blocks dropped, inline spans as spaces): what mentions and links are read from
+pub fn strip_code(text: &str) -> String {
     let mut plain = String::with_capacity(text.len());
     let mut rest = text;
     while let Some(i) = rest.find("```") {
         plain.push_str(&rest[..i]);
+        plain.push(' ');
         match rest[i + 3..].find("```") {
             Some(j) => rest = &rest[i + 3 + j + 3..],
             None => {
@@ -101,6 +101,12 @@ pub fn mention_handles(text: &str) -> Vec<String> {
             no_code.push(if in_code { ' ' } else { c });
         }
     }
+    no_code
+}
+
+/// the `@handle`s in a text, outside code (packages/protocol chatMentionHandles), lower case
+pub fn mention_handles(text: &str) -> Vec<String> {
+    let no_code = strip_code(text);
     let chars: Vec<char> = no_code.chars().collect();
     let mut out: Vec<String> = Vec::new();
     for i in 0..chars.len() {

@@ -189,6 +189,27 @@ export async function chatDevLogin(email: string, name: string) {
   return r.user;
 }
 
+/**
+ * One sign-in: a Google sign-in on Foundation's server also earned this person a session on the chat server
+ * that server is set up with (apps/server/src/chatsession.ts), and this device collects it here, once, with its
+ * own Foundation session, before ChatForm asks anyone to sign in. Kept only when it is for exactly the chat
+ * server this device's ChatForm is on (the address sent along is compared there, never called). Null when there
+ * is nothing to collect: a sign-in that wasn't Google's own (dev, an invitation, Google through Flowform), one
+ * from before this existed, another chat server, or a Foundation server that doesn't do this. Then ChatForm's own
+ * sign-in is what there is, unchanged.
+ */
+export async function claimChatSession(): Promise<ChatAccount | null> {
+  if (!CHAT_REMOTE) return null;
+  try {
+    const r = await api<{ server?: string; session?: string | null; user?: ChatAccount }>("/api/chat-session", { method: "POST", json: { server: CHAT_SERVER } });
+    if (r.server !== CHAT_SERVER || !r.session || !r.user?.id) return null;
+    keepChatBearer(r.session);
+    return r.user;
+  } catch {
+    return null;
+  }
+}
+
 /** sign out of the chat server: it forgets the session first (it needs the bearer to know which), then this device does */
 export async function chatSignOut() {
   try {

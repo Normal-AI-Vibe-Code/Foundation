@@ -28,9 +28,19 @@ sha2 = "0.10"
 rand = "0.8"
 base64 = "0.22"
 url = "2"
+# the sign-in exchange checks Google's RS256 signature (already in the tree through rustls)
+ring = "0.17"
+# a picture's size for its message, and its width tiers; only the formats a chat shows in place
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 
 [dev-dependencies]
 tokio-tungstenite = "0.26"
+# a stand-in Google's signing key for the exchange's tests (made at test time: no key is kept in the repository)
+rsa = { version = "0.9", features = ["sha2"] }
+
+# the test key's primes are found many times faster optimised
+[profile.dev.package.num-bigint-dig]
+opt-level = 3
 
 [profile.release]
 codegen-units = 1

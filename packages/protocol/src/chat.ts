@@ -196,6 +196,16 @@ export interface ChatPage {
   after: boolean;
 }
 
+/**
+ * One thing said to a person (`GET /api/chat/mentions?limit=<n≤100>&before=<ms>` → `{ mentions: ChatMention[] }`,
+ * newest first): a message by someone else that names them, says @channel or @here where they are a member, or
+ * arrived in a direct message or a group they are in. The bell and ChatForm's Recent mentions read it.
+ */
+export interface ChatMention {
+  message: ChatMessage;
+  channel: { id: string; name: string; kind: ChatChannelKind };
+}
+
 // ---------- huddles in a channel ----------
 
 export interface ChatHuddleState {
@@ -247,6 +257,11 @@ export interface WherePerson {
   name: string;
   /** their cursor's colour on the grid */
   color: string;
+  /**
+   * Set by the client only, on a device whose ChatForm is on a chat server of its own: the same person's id on
+   * that server, when both it and Foundation's say they are on this grid (client lib/whereLines.ts `mergeWhere`).
+   */
+  chatId?: string;
 }
 export interface WhereAgent {
   /** its presence on the grid (crew.ts) */
@@ -288,7 +303,16 @@ export type ChatEvent =
   | { t: "bridge"; rev: number; bridge: ChatBridgeStatus };
 
 /** Client → server on the chat socket. Everything that changes anything goes over HTTP; the socket only says what's passing. */
-export type ChatSay = { t: "typing"; channel: string; root?: string | null } | { t: "ping" };
+export type ChatSay =
+  | { t: "typing"; channel: string; root?: string | null }
+  | { t: "ping" }
+  /**
+   * Which grid this window has open (null: none), said to a chat server of its own (one whose `/auth/config`
+   * `features` include `where`), which has no grids to read presence from: it tells the others so people on the
+   * same grid from different computers see each other in chat. `name` is the grid's name when the window may say
+   * it, else null. Foundation's own server never needs it (it reads its grids' presence itself) and ignores it.
+   */
+  | { t: "where"; board: string | null; name: string | null };
 
 // ---------- the pure rules ----------
 

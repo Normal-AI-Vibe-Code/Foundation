@@ -28,6 +28,11 @@ export interface Pane {
   scrollLeft: number;
   scrollWidth: number;
   clientWidth: number;
+  /**
+   * A pane that rests at its foot (`flex-direction: column-reverse`, ChatForm's timeline: 2026-11-25): its
+   * scrollTop is 0 at the foot and goes negative going up, so its room is counted from the other end.
+   */
+  reversed?: boolean;
 }
 
 /** content longer (or wider) than its pane by more than a rounding pixel */
@@ -35,8 +40,13 @@ export const overflows = (p: Pane) => p.scrollHeight - p.clientHeight > 1 || p.s
 
 /** whether a pane can still move by this much (a pixel of slack for fractional sizes) */
 export function hasRoom(p: Pane, dx: number, dy: number): boolean {
-  if (dy < 0 && p.scrollTop > 0.5) return true;
-  if (dy > 0 && p.scrollTop + p.clientHeight < p.scrollHeight - 1) return true;
+  if (p.reversed) {
+    if (dy < 0 && p.scrollTop + (p.scrollHeight - p.clientHeight) > 1) return true;
+    if (dy > 0 && p.scrollTop < -0.5) return true;
+  } else {
+    if (dy < 0 && p.scrollTop > 0.5) return true;
+    if (dy > 0 && p.scrollTop + p.clientHeight < p.scrollHeight - 1) return true;
+  }
   if (dx < 0 && p.scrollLeft > 0.5) return true;
   if (dx > 0 && p.scrollLeft + p.clientWidth < p.scrollWidth - 1) return true;
   return false;
@@ -96,7 +106,9 @@ function scrollPane(el: HTMLElement, dx: number, dy: number, direct: boolean) {
   const maxY = el.scrollHeight - el.clientHeight;
   const g = glides.get(el);
   const x = Math.max(0, Math.min(maxX, (g?.x ?? el.scrollLeft) + dx));
-  const y = Math.max(0, Math.min(maxY, (g?.y ?? el.scrollTop) + dy));
+  // a pane that rests at its foot runs from -max (its top) to 0
+  const rev = restsAtFoot(el);
+  const y = Math.max(rev ? -maxY : 0, Math.min(rev ? 0 : maxY, (g?.y ?? el.scrollTop) + dy));
   if (direct || still()) {
     if (g) cancelAnimationFrame(g.raf);
     glides.delete(el);
@@ -126,10 +138,12 @@ function scrollPane(el: HTMLElement, dx: number, dy: number, direct: boolean) {
   next.raf = requestAnimationFrame(step);
 }
 
+const restsAtFoot = (el: HTMLElement) => getComputedStyle(el).flexDirection === "column-reverse";
+
 /** where a pane is going (mid-glide) rather than where it is this frame */
 function heading(el: HTMLElement): Pane {
   const g = glides.get(el);
-  return { scrollTop: g?.y ?? el.scrollTop, scrollLeft: g?.x ?? el.scrollLeft, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+  return { scrollTop: g?.y ?? el.scrollTop, scrollLeft: g?.x ?? el.scrollLeft, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth, reversed: restsAtFoot(el) };
 }
 
 /** what of a card scrolls: the root the panes are looked for in */

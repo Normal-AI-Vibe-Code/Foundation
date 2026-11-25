@@ -1,0 +1,324 @@
+/* A ChatForm conversation on a grid (ChatCardView.tsx). Tokens only; DESIGN.md §5 "Chat card". The timeline, the
+   messages, the composer and the thread are ChatForm's own (chat/chat.css): only the card's head, its notices,
+   its picker and how those pieces sit in a card are here. */
+
+.chat-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--color-void);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.45 var(--font-sans);
+  container-type: inline-size;
+  container-name: chatcard;
+}
+
+/* in use (lib/cardUse.ts): the ring a live page in use wears, drawn over the content so nothing moves */
+.chat-card.is-in-use::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  box-shadow: inset 0 0 0 2px var(--color-pulse);
+  pointer-events: none;
+}
+
+/* ---------- the head: what it is, who is here, voice, unread, open ---------- */
+
+.chat-card-head {
+  flex: none;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  min-width: 0;
+}
+.chat-card-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--color-mist);
+}
+.chat-card-mark.is-agent {
+  color: var(--color-agent);
+}
+.chat-card-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 600 var(--text-14) / 1.2 var(--font-sans);
+}
+.chat-card-gap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.chat-card-faces {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding-left: var(--space-2);
+}
+/* a person on this grid now: whole, ringed in ok. Online in chat but elsewhere: quieter, no ring */
+.chat-card-face {
+  display: inline-grid;
+  margin-left: -4px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 2px var(--color-void);
+  opacity: 0.5;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.chat-card-face:first-child {
+  margin-left: 0;
+}
+.chat-card-face.is-here {
+  opacity: 1;
+  box-shadow:
+    0 0 0 1.5px var(--color-void),
+    0 0 0 3px var(--color-ok);
+}
+/* an agent is a figure on its violet line, never a disc: no ring; at work here it is whole */
+.chat-card-face.is-agent {
+  margin-left: var(--space-1);
+  border-radius: 0;
+  box-shadow: none;
+}
+.chat-card-face.is-agent.is-here {
+  box-shadow: none;
+}
+.chat-card-more {
+  margin-left: var(--space-1);
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.chat-card-head .chat-head-btn {
+  flex: none;
+}
+
+/* ---------- the conversation: ChatForm's pieces, in a card ---------- */
+
+.chat-card-main {
+  flex: 1 1 0;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+/* a thread opens over the timeline, the card's whole width */
+.chat-card-main > .chat-thread {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-left: 0;
+}
+.chat-card-main > .chat-thread .chat-thread-head {
+  height: 40px;
+  padding-left: var(--space-4);
+}
+.chat-card-foot {
+  flex: none;
+  padding: var(--space-1) var(--space-3) 0;
+}
+.chat-card-quiet {
+  min-height: 18px;
+  padding: 2px var(--space-1) var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+/* the call, docked under the head while you're in it or listening: at most the card's upper part */
+.chat-card > .hdock {
+  height: 46%;
+  min-height: 200px;
+  padding: var(--space-3);
+}
+
+/* ---------- a card that isn't the conversation: locked, on another server, waiting, sign in ---------- */
+
+.chat-card-notice {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  text-align: center;
+}
+.chat-card-notice b {
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+  text-wrap: balance;
+}
+.chat-card-notice.is-locked,
+.chat-card-notice.is-elsewhere {
+  margin: var(--space-4);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+}
+.chat-card-notice-mark {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+.chat-card-dim {
+  max-width: 34ch;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  font-style: normal;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.chat-card-notice .f-pill {
+  margin-top: var(--space-2);
+}
+
+/* ---------- picking which conversation ---------- */
+
+.chat-card-picker {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.chat-card-filter {
+  flex: none;
+  height: var(--h-control);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  color: var(--color-frost);
+  font: inherit;
+}
+.chat-card-filter:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+.chat-card-rows {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.chat-card-row {
+  flex: none;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: none;
+  color: var(--color-frost);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chat-card-row.is-agent {
+  color: var(--color-agent);
+}
+.chat-card-row:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
+@media (hover: hover) {
+  .chat-card-row:hover {
+    background: var(--color-panel);
+  }
+}
+.chat-card-row-mark {
+  flex: none;
+  width: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--color-mist);
+}
+.chat-card-row-name {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-card-new {
+  flex: none;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.chat-card-keeps {
+  flex: none;
+  margin: 0;
+  max-width: none;
+}
+.chat-card-rows > .chat-card-dim {
+  margin: var(--space-3) var(--space-1);
+}
+
+/* narrow (the card's smallest, 360): the faces give way before the name does */
+@container chatcard (max-width: 380px) {
+  .chat-card-head {
+    padding-left: var(--space-3);
+  }
+  .chat-card-face:nth-child(n + 4) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-card-face {
+    transition: none;
+  }
+}
+
+/* ---------- #/design ---------- */
+
+.chat-card-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: flex-start;
+}
+.chat-card-demo figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.chat-card-demo figcaption {
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+.chat-card-demo-slot {
+  position: relative;
+  width: 360px;
+  height: 480px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-sheet);
+}
+.chat-card-demo-slot.is-short {
+  height: 260px;
+}

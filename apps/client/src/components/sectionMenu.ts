@@ -40,6 +40,8 @@ import { openAsGrid } from "../lib/subgrid";
 import { keepAgentsCard } from "./SectionAgents";
 import { setUi } from "../state/ui";
 import type { MenuGroup, MenuItem } from "./menuLayout";
+import { addChatPicker } from "../chat/gridChatPlace";
+import { CHAT_CARD } from "../chat/gridChat";
 
 export interface SectionMenuContext {
   /** the app the section hosts, or the one card that could fill it */
@@ -103,6 +105,7 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     { heading: "Live" },
     { icon: "✦", label: "Agents card", agent: true, action: () => keepAgentsCard(section.id, at(380, 440)) },
     { icon: "◐", label: "Huddle", action: () => addPanel(section.id, { panel: "huddle", name: "Huddle", ...at(560, 420) }) },
+    { icon: "#", label: "ChatForm channel", action: () => void addChatPicker(section.id, at(CHAT_CARD.w, CHAT_CARD.h)) },
     { icon: "#", label: "Slack channel", action: () => addPanel(section.id, { panel: "slack", name: "Slack", ...at(420, 520) }) },
     { icon: "▣", label: "Machine", action: () => startMachine(section.id, at(760, 520)) },
     { icon: "▣", label: "Full operating system / WildOS VM", action: () => startVm(section.id, at(800, 700)) },

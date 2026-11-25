@@ -86,7 +86,7 @@ test("on Foundation's own server everything is there", () => {
 
 test("on a chat server, Foundation's own things are never there, and the rest is what the server says", () => {
   const rust = ["channels", "direct", "threads", "reactions", "search"];
-  for (const f of ["files", "huddles", "agents"] as const) {
+  for (const f of ["huddles", "agents"] as const) {
     assert.equal(chatCan(true, rust, f), false);
     assert.equal(chatCan(true, null, f), false);
     // even a server that claims them: they live on Foundation's server, which the chat store doesn't ask there
@@ -97,4 +97,15 @@ test("on a chat server, Foundation's own things are never there, and the rest is
   // a server that doesn't say (another Foundation used for chat alone) has what the chat store asks for
   assert.equal(chatCan(true, null, "pins"), true);
   assert.equal(chatCan(true, null, "export"), true);
+});
+
+test("files and the mentions list are on a chat server only when it says so (never assumed, never Foundation's instead)", () => {
+  const rust = ["channels", "direct", "threads", "reactions", "search"];
+  for (const f of ["files", "mentions"] as const) {
+    assert.equal(chatCan(true, rust, f), false, `${f}: a server that lists other things and not this`);
+    assert.equal(chatCan(true, null, f), false, `${f}: a server that doesn't say`);
+    assert.equal(chatCan(true, [...rust, f], f), true, `${f}: listed`);
+    assert.equal(chatCan(false, null, f), true, `${f}: Foundation's own`);
+  }
+  assert.equal(chatCan(true, [...rust, "previews"], "previews"), true);
 });

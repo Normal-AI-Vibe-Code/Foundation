@@ -1,0 +1,323 @@
+/* ChatForm: the bell and its panel, Recent mentions, the @channel question, and what files and link previews
+   gained (DESIGN.md §5 "ChatForm · the bell", "ChatForm · files and link previews"). On tokens only; transitions on
+   transform, opacity, box-shadow and border-color only. Every rule here outranks chat.css's by its selector, not by
+   its order, so the two files can load either way round. */
+
+/* ---------- the bell, in the top bar after ChatForm's button ---------- */
+
+.top-btn.top-bell {
+  position: relative;
+}
+/* the count rides the bell's shoulder */
+.top-bell .pane-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  margin: 0;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  pointer-events: none;
+}
+/* over the open side menu: Today, ChatForm and the bell keep the corner together; the fold keeps the menu's edge */
+.top-left.is-over-pane .top-chat:has(+ .top-bell) {
+  margin-right: 0;
+}
+.top-left.is-over-pane .top-btn.top-bell {
+  margin-right: auto;
+}
+/* a menu too narrow for both words, the bell and the fold: ChatForm keeps its mark and its tip (as spaces.css does
+   at 236 px without the bell; the bell is 30 px and a gap more) */
+@container top-left (max-width: 270px) {
+  .top-left .top-chat:has(+ .top-bell) .top-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* ---------- the panel: glass, under the bell ---------- */
+
+.chat-bell-anchor {
+  position: fixed;
+  z-index: 900;
+  width: 0;
+  height: 0;
+}
+.chat-pop.chat-bell-pop {
+  top: 0;
+  left: 0;
+  right: auto;
+  width: 380px;
+  max-width: calc(100vw - var(--space-5));
+  max-height: min(560px, calc(100dvh - 72px));
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-fill-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-glass);
+}
+/* a specimen: in the page's flow */
+.chat-pop.chat-bell-pop.is-in-place {
+  position: relative;
+}
+.chat-bell {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-bell-head {
+  flex: none;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+.chat-bell-head h2 {
+  margin: 0;
+  color: var(--color-frost);
+  font: 600 var(--text-14) / 1.3 var(--font-display);
+}
+.chat-bell-list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.chat-bell-row {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6) var(--space-3) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: var(--color-mist);
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .chat-bell-row:hover {
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
+}
+.chat-bell-row:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
+.chat-bell-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.chat-bell-who {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+}
+.chat-bell-who b {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-mist);
+  font: 600 var(--text-13) / 1.3 var(--font-sans);
+}
+.chat-bell-who span {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chat-bell-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+/* not seen yet: in full ink, with the accent's dot at the row's right */
+.chat-bell-row.is-unseen,
+.chat-bell-row.is-unseen .chat-bell-who b {
+  color: var(--color-frost);
+}
+.chat-bell-when {
+  flex: none;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.6 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.chat-bell-dot {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+}
+/* a conversation with something waiting (a server with no list of its own): its mark in a tile */
+.chat-bell-mark {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+  box-shadow: inset 0 0 0 1px var(--color-line);
+  color: var(--color-mist);
+  font: 600 var(--text-12) / 1 var(--font-sans);
+}
+.chat-bell-empty {
+  margin: var(--space-5) var(--space-4);
+  color: var(--color-mist);
+  font: 400 var(--text-13) / 1.5 var(--font-sans);
+  text-wrap: pretty;
+}
+.chat-bell-foot {
+  flex: none;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+/* ---------- Recent mentions, as a view in the Chat tab ---------- */
+
+.chat-view-head.is-with-action {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+.chat-view-head.is-with-action .f-pill {
+  flex: none;
+}
+.chat-mentions-list .chat-bell-row {
+  padding: var(--space-4) var(--space-6) var(--space-4) var(--space-3);
+}
+.chat-mentions-list .chat-bell-row + .chat-bell-row {
+  box-shadow: 0 -1px 0 var(--color-line);
+}
+.chat-mentions-list .chat-bell-text {
+  -webkit-line-clamp: 3;
+  font-size: var(--text-14);
+}
+
+/* ---------- @channel and @here in a big channel: asked first, in the accent (it sends, it doesn't remove) ---------- */
+
+.chat-confirm.chat-everyone-ask {
+  margin: 0 0 var(--space-3);
+  background: var(--color-pulse-dim);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-pulse) 35%, transparent);
+}
+.chat-confirm-yes.is-send {
+  background: var(--color-pulse);
+  color: var(--color-on-fill);
+}
+
+/* ---------- files: a picture's kept box, one that didn't come, a chip that failed ---------- */
+
+/* the box is the server's width and height, so the picture fills it exactly and nothing below it moves */
+.chat-picture.has-box {
+  max-width: min(360px, 100%);
+  max-height: none;
+}
+.chat-picture.has-box img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+}
+.chat-picture-failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  color: var(--color-dim);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  text-align: center;
+}
+/* a file that didn't land says why in full (the server's limit, in words), not cut to a line */
+.chat-chip.is-bad {
+  flex: 0 1 360px;
+  height: auto;
+  min-height: 48px;
+  padding-block: var(--space-2);
+}
+.chat-chip.is-bad .chat-chip-meta {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  line-height: 1.35;
+}
+
+/* ---------- link previews: the words are the link; a picture from the other site waits for a press ---------- */
+
+.chat-preview .chat-preview-text {
+  color: inherit;
+  text-decoration: none;
+}
+.chat-preview .chat-preview-text:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
+}
+span.chat-preview-img {
+  display: block;
+  overflow: hidden;
+}
+.chat-preview .chat-preview-wait {
+  flex: none;
+  align-self: flex-start;
+  margin: 0;
+}
+/* a link straight to a picture or a GIF: the picture, no rule beside it */
+.chat-preview.is-picture {
+  padding: 0;
+  border-left: 0;
+}
+.chat-preview-img.is-large {
+  width: auto;
+  height: auto;
+  max-width: min(360px, 100%);
+  max-height: 280px;
+  object-fit: contain;
+}
+.chat-preview-open {
+  display: inline-block;
+  border-radius: var(--radius-card);
+}
+.chat-preview-open:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}

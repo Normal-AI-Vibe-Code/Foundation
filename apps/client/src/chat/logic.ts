@@ -426,19 +426,33 @@ export function requestId(): string {
   return `rq_${r}`;
 }
 
+/**
+ * How a link preview is drawn: a link straight to a picture or a GIF (the server gives its picture and no words, or
+ * the address itself ends like a picture) is the picture; anything else is a card of its site, title and description.
+ */
+export function previewShape(p: { url: string; title?: string; description?: string; image?: string }): "picture" | "card" {
+  if (!p.image) return "card";
+  if (!p.title && !p.description) return "picture";
+  let path = "";
+  try {
+    path = new URL(p.url).pathname;
+  } catch { /* not an address: a card */ }
+  return /\.(gif|png|jpe?g|webp|avif)$/i.test(path) && p.image === p.url ? "picture" : "card";
+}
+
 /** the route's rest: a channel, a thread in it, or a message to show in place */
 export interface ChatRest {
   channel: string | null;
   thread: string | null;
   at: number | null;
-  view: "threads" | "browse" | "search" | null;
+  view: "threads" | "browse" | "search" | "mentions" | null;
   q: string;
 }
 
 export function parseRest(rest: string): ChatRest {
   const parts = rest.split("/").filter(Boolean).map((p) => decodeURIComponent(p));
   const out: ChatRest = { channel: null, thread: null, at: null, view: null, q: "" };
-  if (parts[0] === "threads" || parts[0] === "browse") {
+  if (parts[0] === "threads" || parts[0] === "browse" || parts[0] === "mentions") {
     out.view = parts[0];
     return out;
   }

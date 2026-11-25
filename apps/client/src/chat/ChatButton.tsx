@@ -9,12 +9,15 @@ import { useEffect, useMemo } from "react";
 import { goChat } from "../lib/place";
 import { startChat, useChat } from "./model";
 import { setListFolded } from "./pins";
+import { useTellWhere } from "./gridChatWhere";
 import { chatTotals, totalsWords } from "./logic";
 import { ChatMark } from "./Icons";
 import "./chat.css";
 
 export function ChatButton({ on }: { on: boolean }) {
   useEffect(() => startChat(), []);
+  // on a chat server of its own: this window says which grid it has open, so people on it see each other (gridChatWhere.ts)
+  useTellWhere();
   const s = useChat();
   const t = useMemo(() => chatTotals(Object.values(s.channels)), [s.channels]);
   const tip = s.status === "signin" ? "ChatForm: sign in to its server" : s.status === "unavailable" ? "ChatForm: this server doesn't have it yet" : t.total ? `ChatForm: ${totalsWords(t)}` : "ChatForm: channels, direct messages, agents";

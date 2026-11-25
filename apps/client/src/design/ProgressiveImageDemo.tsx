@@ -9,9 +9,14 @@
  *
  * Plus an interactive playback card demonstrating cold load, instant L1 hit,
  * off-screen GPU VRAM shedding, and live `imageCache.ts` telemetry.
+ *
+ * And the wave (2026-11-25, lib/arrival.ts): a section's cold pictures show from the middle of the screen outward,
+ * each waiting a few steps by its distance from the centre (a step is half of --dur-press, six at most), on
+ * opacity alone. "Replay the wave" plays it; with reduced motion they are simply there.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { ARRIVAL_REACH, arrivalStep } from "../lib/arrival";
 import { getImageCacheStats, subscribeImageCache, type ImageCacheStats, type ImageTier } from "../lib/imageCache";
 import "../components/progressive-image.css";
 
@@ -44,6 +49,15 @@ const SPECIMEN_ART = (() => {
 })();
 
 const TIER_LIST: ImageTier[] = [64, 256, 512, 1024, 2048];
+
+/** the wave's specimen: a 6 × 3 field of pictures, each as far from the centre as it would be on a 1440 px screen */
+const WAVE_COLS = 6;
+const WAVE_ROWS = 3;
+const WAVE_TILES = Array.from({ length: WAVE_COLS * WAVE_ROWS }, (_, i) => {
+  const dx = ((i % WAVE_COLS) - (WAVE_COLS - 1) / 2) * 220;
+  const dy = (Math.floor(i / WAVE_COLS) - (WAVE_ROWS - 1) / 2) * 260;
+  return arrivalStep(Math.hypot(dx, dy), ARRIVAL_REACH);
+});
 
 function formatKb(bytes: number): string {
   if (bytes <= 0) return "0 KB";
@@ -79,6 +93,8 @@ export function ProgressiveImageDemo() {
     if (runId === 0) return;
     return replayColdLoad();
   }, [runId]);
+
+  const [wave, setWave] = useState(0);
 
   const activeTier: ImageTier | null =
     stage === "well"
@@ -234,6 +250,28 @@ export function ProgressiveImageDemo() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="prog-demo-wave" data-design-arrival-wave>
+        <div className="prog-demo-meta">
+          <span>The wave: cold pictures arrive from the centre outward</span>
+          <button type="button" className="f-pill" onClick={() => setWave((n) => n + 1)}>
+            Replay the wave
+          </button>
+        </div>
+        <div className="prog-demo-wave-field">
+          {WAVE_TILES.map((step, i) => (
+            <div key={i} className="prog-demo-frame" data-arrive-step={step}>
+              {/* a new element each replay, so it starts from its well again */}
+              <img key={wave} src={SPECIMEN_ART} alt="" className="f-prog-img is-visible" style={{ "--arrive-step": step } as CSSProperties} draggable={false} />
+              <span className="prog-demo-badge">{step === 0 ? "at once" : `step ${step}`}</span>
+            </div>
+          ))}
+        </div>
+        <span className="prog-demo-note">
+          Each picture waits {"`--arrive-step`"} × half of --dur-press by its distance from the middle of the screen (six steps at most), then fades in over --dur-quick: opacity only, on the
+          compositor. One already in memory doesn't wait or fade.
+        </span>
       </div>
     </div>
   );

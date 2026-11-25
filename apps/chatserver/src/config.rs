@@ -36,6 +36,14 @@ pub struct Config {
     pub google_auth_url: String,
     pub google_token_url: String,
     pub google_userinfo_url: String,
+    /// Google's signing keys, for the sign-in exchange (exchange.rs). Google's own unless the same stand-in names another
+    pub google_jwks_url: String,
+    /// other Google clients whose ID tokens the exchange accepts beside GOOGLE_CLIENT_ID: Foundation's own (CHATFORM_TRUSTED_CLIENT_IDS)
+    pub trusted_client_ids: Vec<String>,
+    /// read links' social tags after a post (CHATFORM_PREVIEWS=0 turns it off)
+    pub previews: bool,
+    /// a test's stand-in page on loopback may be previewed: only with dev login (so never on Vercel) and CHATFORM_PREVIEWS_LOOPBACK=1
+    pub preview_loopback: bool,
 }
 
 impl Config {
@@ -47,13 +55,12 @@ impl Config {
             .or_else(|| env("VERCEL_PROJECT_PRODUCTION_URL").map(|h| format!("https://{h}")))
             .unwrap_or_else(|| format!("http://localhost:{port}"));
         let dev_login = !on_vercel && env("CHATFORM_DEV_LOGIN").as_deref() == Some("1");
-        let (google_auth_url, google_token_url, google_userinfo_url) = match env("CHATFORM_GOOGLE_STANDIN").filter(|_| dev_login) {
-            Some(base) => {
-                let b = base.trim_end_matches('/').to_string();
-                (format!("{b}/auth"), format!("{b}/token"), format!("{b}/userinfo"))
-            }
+        let standin = env("CHATFORM_GOOGLE_STANDIN").filter(|_| dev_login).map(|b| b.trim_end_matches('/').to_string());
+        let (google_auth_url, google_token_url, google_userinfo_url) = match &standin {
+            Some(b) => (format!("{b}/auth"), format!("{b}/token"), format!("{b}/userinfo")),
             None => Self::google_urls(),
         };
+        let google_jwks_url = standin.map(|b| format!("{b}/certs")).unwrap_or_else(Self::google_jwks);
         Self {
             database_url,
             listen_url,
@@ -69,6 +76,11 @@ impl Config {
             google_auth_url,
             google_token_url,
             google_userinfo_url,
+            google_jwks_url,
+            // client ids are kept as written (not lower-cased like the address lists)
+            trusted_client_ids: env("CHATFORM_TRUSTED_CLIENT_IDS").map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()).unwrap_or_default(),
+            previews: !matches!(env("CHATFORM_PREVIEWS").as_deref(), Some("0") | Some("off")),
+            preview_loopback: dev_login && env("CHATFORM_PREVIEWS_LOOPBACK").as_deref() == Some("1"),
         }
     }
 
@@ -86,6 +98,22 @@ impl Config {
     /// Google's own addresses (sign-in page, token exchange, userinfo)
     pub fn google_urls() -> (String, String, String) {
         ("https://accounts.google.com/o/oauth2/v2/auth".into(), "https://oauth2.googleapis.com/token".into(), "https://openidconnect.googleapis.com/v1/userinfo".into())
+    }
+
+    /// where Google publishes the keys its ID tokens are signed with
+    pub fn google_jwks() -> String {
+        "https://www.googleapis.com/oauth2/v3/certs".into()
+    }
+
+    /// the Google clients whose ID tokens the sign-in exchange accepts: this server's own, and the trusted ones
+    pub fn exchange_audiences(&self) -> Vec<String> {
+        let mut out: Vec<String> = self.google_client_id.iter().cloned().collect();
+        for id in &self.trusted_client_ids {
+            if !out.contains(id) {
+                out.push(id.clone());
+            }
+        }
+        out
     }
 
     /// the pages that may call this server with credentials: its own, and the listed ones
@@ -129,6 +157,10 @@ mod tests {
             google_auth_url,
             google_token_url,
             google_userinfo_url,
+            google_jwks_url: Config::google_jwks(),
+            trusted_client_ids: vec!["foundation.apps.example".into()],
+            previews: true,
+            preview_loopback: false,
             database_url: String::new(),
             listen_url: String::new(),
             public_url: "https://chatform.example.app".into(),
@@ -161,6 +193,17 @@ mod tests {
         assert_eq!(Config::database_urls(prefixed), ("pooled".into(), "direct".into()));
         let pooled_only = vars(&[("CHATFORM_DATABASE_PREFIX", "NEON_CHAT"), ("NEON_CHAT_POSTGRES_URL", "pooled")]);
         assert_eq!(Config::database_urls(pooled_only), ("pooled".into(), "pooled".into()));
+    }
+    #[test]
+    fn the_exchange_trusts_its_own_client_and_the_listed_ones() {
+        let mut c = cfg();
+        assert_eq!(c.exchange_audiences(), vec!["foundation.apps.example"]);
+        c.google_client_id = Some("chatform.apps.example".into());
+        c.trusted_client_ids.push("chatform.apps.example".into());
+        assert_eq!(c.exchange_audiences(), vec!["chatform.apps.example", "foundation.apps.example"]);
+        c.google_client_id = None;
+        c.trusted_client_ids.clear();
+        assert!(c.exchange_audiences().is_empty());
     }
     #[test]
     fn origins_are_its_own_and_the_listed_ones() {

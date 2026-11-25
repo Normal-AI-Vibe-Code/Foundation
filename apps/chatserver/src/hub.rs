@@ -56,6 +56,9 @@ impl Conn {
 pub struct Hub {
     conns: Mutex<HashMap<String, Arc<Conn>>>,
     listening: AtomicBool,
+    /// who is where as this instance's sockets were last told (whereabouts.rs), and whether a look is already waiting
+    pub where_last: Mutex<Option<String>>,
+    pub where_pending: AtomicBool,
 }
 
 impl Hub {
@@ -221,6 +224,8 @@ async fn deliver_inner(st: &St, v: &Value) -> Result<()> {
                 conn.send(json!({ "t": "typing", "channel": c.id, "root": v["root"], "party": v["party"] }));
             }
         }
+        // who is where may have changed: looked at once it settles, and told only if the list is different
+        "where" => crate::whereabouts::may_have_changed(st),
         "presence" => {
             let list = online(st).await?;
             for conn in &conns {

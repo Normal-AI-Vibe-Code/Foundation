@@ -8,8 +8,11 @@
 
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import type { ChatAgentRef, ChatChannelView, ChatParty } from "@foundation/protocol";
-import { uploadFile, type UploadedFile } from "../lib/api";
+import { chatMentionHandles, type ChatAgentRef, type ChatChannelView, type ChatParty } from "@foundation/protocol";
+import type { UploadedFile } from "../lib/api";
+import { chatUpload } from "./chatFiles";
+import { everyoneAsk } from "./notifyLogic";
+import "./bell.css";
 import { keys } from "../lib/keys";
 import { toast } from "../state/ui";
 import { PartyAvatar } from "./Avatar";
@@ -45,8 +48,12 @@ export interface ComposerProps {
   /** ↑ in an empty field: edit my last message (true when there was one) */
   onEditLast?(): boolean;
   upload?: (file: File, onProgress: (f: number) => void) => Promise<UploadedFile>;
-  /** files can't be sent here (a chat server of its own has no archive): the attach buttons are left out, and a drop or a paste says this */
+  /** files can't be sent here (a chat server that doesn't take them): the attach buttons are left out, and a drop or a paste says this */
   noFiles?: string;
+  /** no attaching from Vision or this computer's approved folders (those land in Foundation's archive, which a chat server of its own can't read) */
+  noAttachFrom?: boolean;
+  /** where this writes, for @channel and @here: over a few members, sending asks first */
+  audience?: Pick<ChatChannelView, "kind" | "memberCount">;
   /** why it can't send (archived, a viewer…): the field says so instead */
   disabled?: string;
   /** a fixture's text (the design page) */
@@ -87,6 +94,8 @@ export function Composer(p: ComposerProps) {
   const [emoji, setEmoji] = useState(false);
   const [drag, setDrag] = useState(false);
   const [from, setFrom] = useState(false);
+  /** @channel or @here in a big channel: asked once before it goes */
+  const [ask, setAsk] = useState<{ word: string; people: number } | null>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const filePick = useRef<HTMLInputElement>(null);
   const draftFor = useRef({ channel: p.channel, root: p.root });
@@ -98,6 +107,7 @@ export function Composer(p: ComposerProps) {
     setText(readDraft(storage(), p.channel, p.root));
     setChips([]);
     setTrigger(null);
+    setAsk(null);
     if (p.autoFocus !== false) requestAnimationFrame(() => field.current?.focus());
   }, [p.channel, p.root, p.autoFocus]);
 
@@ -123,7 +133,8 @@ export function Composer(p: ComposerProps) {
   const addFiles = (files: File[]) => {
     if (!files.length) return;
     if (p.noFiles) return toast(p.noFiles);
-    const up = p.upload ?? ((f: File, on: (x: number) => void) => uploadFile(f, "chat", on));
+    // to whichever server ChatForm is on, with that server's own sign-in (chat/chatFiles.tsx)
+    const up = p.upload ?? chatUpload;
     for (const f of files) {
       const key = `c${++chipN}`;
       const thumb = f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined;
@@ -204,8 +215,11 @@ export function Composer(p: ComposerProps) {
   const ready = chips.filter((c) => c.id);
   const can = !p.disabled && !busy && (text.trim().length > 0 || ready.length > 0);
 
-  const sendNow = () => {
+  const sendNow = (sure = false) => {
     if (!can) return;
+    const everyone = sure ? null : everyoneAsk(text, p.audience, chatMentionHandles);
+    if (everyone) return setAsk(everyone);
+    setAsk(null);
     p.onSend(
       text.trim(),
       ready.map((c) => ({ id: c.id!, name: c.name, mime: c.mime, size: c.size })),
@@ -270,6 +284,26 @@ export function Composer(p: ComposerProps) {
           </motion.div>
         )}
       </AnimatePresence>
+      {ask && (
+        <div className="chat-confirm chat-everyone-ask" role="alertdialog" aria-label={`Send to everyone in this channel`} data-everyone-ask>
+          <span>
+            {ask.word} tells all {ask.people} people in this channel. Send it?
+          </span>
+          <button type="button" className="chat-confirm-yes is-send" onClick={() => sendNow(true)}>
+            Send to everyone
+          </button>
+          <button
+            type="button"
+            className="chat-confirm-no"
+            onClick={() => {
+              setAsk(null);
+              field.current?.focus();
+            }}
+          >
+            Keep editing
+          </button>
+        </div>
+      )}
       {chips.length > 0 && (
         <div className="chat-chips">
           {chips.map((c) => (
@@ -311,6 +345,7 @@ export function Composer(p: ComposerProps) {
         aria-activedescendant={trigger && options[pick] ? `chat-ac-${p.root ? "thread" : "channel"}-${pick}` : undefined}
         onChange={(e) => {
           setText(e.target.value);
+          if (ask) setAsk(null);
           look(e.target);
           if (e.target.value) p.onTyping?.();
         }}
@@ -362,7 +397,8 @@ export function Composer(p: ComposerProps) {
           }
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
-            return sendNow();
+            // Enter again on the question is the yes
+            return sendNow(!!ask);
           }
           if (e.key === "ArrowUp" && !text && !chips.length && p.onEditLast) {
             if (p.onEditLast()) e.preventDefault();
@@ -399,11 +435,13 @@ export function Composer(p: ComposerProps) {
             <ToolBtn tip="Attach files" kbd={keys("mod+U")} onClick={() => filePick.current?.click()} label="Attach files">
               <IconClip />
             </ToolBtn>
-            <ToolBtn tip="Attach from Vision or this computer's approved folders" onClick={() => setFrom((x) => !x)} on={from} label="Attach from…">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M2.5 9.5v3a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3M8 2.5v7M5 6.5l3 3 3-3" />
-              </svg>
-            </ToolBtn>
+            {!p.noAttachFrom && (
+              <ToolBtn tip="Attach from Vision or this computer's approved folders" onClick={() => setFrom((x) => !x)} on={from} label="Attach from…">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M2.5 9.5v3a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-3M8 2.5v7M5 6.5l3 3 3-3" />
+                </svg>
+              </ToolBtn>
+            )}
           </>
         )}
         <div className="chat-compose-emoji">
@@ -421,7 +459,7 @@ export function Composer(p: ComposerProps) {
             />
           )}
         </div>
-        <button type="button" className={`chat-send${can ? " is-ready" : ""}`} onClick={sendNow} disabled={!can} data-tip={busy ? "Waiting for the files to land" : "Send"} data-kbd="Enter" aria-label="Send">
+        <button type="button" className={`chat-send${can ? " is-ready" : ""}`} onClick={() => sendNow(!!ask)} disabled={!can} data-tip={busy ? "Waiting for the files to land" : "Send"} data-kbd="Enter" aria-label="Send">
           <IconSend />
         </button>
       </div>
@@ -436,7 +474,7 @@ export function Composer(p: ComposerProps) {
         }}
       />
       {drag && <div className="chat-drop-hint">Drop to attach</div>}
-      {from && <AttachFrom onPicked={addUploaded} onClose={() => setFrom(false)} />}
+      {from && !p.noAttachFrom && <AttachFrom onPicked={addUploaded} onClose={() => setFrom(false)} />}
     </div>
   );
 }

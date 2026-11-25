@@ -851,6 +851,73 @@ export function scheduleImageFetch<T>(
   return defaultScheduler.schedule(key, tier, task, opts);
 }
 
+// ---------- Versioned and derived pictures ----------
+
+/**
+ * `src` naming one version of what's behind it (`?v=<version>`): a character's picture is asked for by role
+ * (`/api/characters/:id/files/front`), and the role's file changes when a stage is pressed again. The version (the
+ * file's id) makes that a new key in L1 and L2, so nothing kept from before is shown for the new picture. The server
+ * ignores the parameter.
+ */
+export function withVersion(src: string, version: string | null | undefined): string {
+  if (!version || isLocalDataUrl(src)) return src;
+  const hashIdx = src.indexOf("#");
+  const base = hashIdx >= 0 ? src.slice(0, hashIdx) : src;
+  const hash = hashIdx >= 0 ? src.slice(hashIdx) : "";
+  if (/[?&]v=/.test(base)) return src;
+  return `${base}${base.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}${hash}`;
+}
+
+/**
+ * The key of a picture made here from something else (a still with its ground cut away, a 3D character drawn once):
+ * `kind` says what was made, `parts` everything the result depends on (the file's id, the size, the framing), so a
+ * change in any of them is a different picture and the old one is simply never asked for again (it ages out of the
+ * LRU). Never a server path: nothing fetches it.
+ */
+export function derivedImageSrc(kind: string, parts: ReadonlyArray<string | number>): string {
+  return `derived:${kind}/${parts.map((p) => encodeURIComponent(String(p))).join("/")}`;
+}
+
+export function isDerivedImageSrc(src: string): boolean {
+  return src.startsWith("derived:");
+}
+
+export interface DerivedImage {
+  blob: Blob;
+  width: number;
+  natural: [number, number] | null;
+  alpha: boolean | null;
+}
+
+const derivedInFlight = new Map<string, Promise<CachedImageEntry | null>>();
+
+/**
+ * A made picture, from memory, else from the persistent cache, else made now (once, however many ask) and kept in
+ * both. `make` returning null means it can't be made here (no WebGL, no worker): nothing is kept and the caller shows
+ * what it had.
+ */
+export function loadDerivedImage(src: string, make: () => Promise<DerivedImage | null>): Promise<CachedImageEntry | null> {
+  const hit = defaultL1.getExact(src, "orig");
+  if (hit) return Promise.resolve(hit);
+  const key = imageCacheKey(src, "orig");
+  let p = derivedInFlight.get(key);
+  if (!p) {
+    p = (async () => {
+      const kept = await readL2Image(src, "orig");
+      if (kept) return putCachedImage(src, "orig", { blob: kept.blob, bytes: kept.bytes, width: kept.width, natural: kept.natural, alpha: kept.alpha });
+      const made = await make();
+      if (!made) return null;
+      const entry = putCachedImage(src, "orig", { blob: made.blob, bytes: made.blob.size, width: made.width, natural: made.natural, alpha: made.alpha });
+      void writeL2Image(src, "orig", made);
+      return entry;
+    })()
+      .catch(() => null)
+      .finally(() => derivedInFlight.delete(key));
+    derivedInFlight.set(key, p);
+  }
+  return p;
+}
+
 /** Current live diagnostics for `#/design` and debugging. */
 export function getImageCacheStats(): ImageCacheStats {
   return {

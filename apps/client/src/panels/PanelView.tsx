@@ -36,6 +36,7 @@ import { StageBody } from "./StageView";
 import { onConnectorChange } from "../lib/connectorEvents";
 import { HuddleBody } from "./HuddleView";
 import { ReplayBody } from "./ReplayView";
+import { ChatCardBody } from "./ChatCardView";
 import { SlackBody } from "./SlackView";
 import { CrewCardBody } from "../components/SectionAgents";
 import { AppToolAsks, MachineBody, machineAction } from "./MachineView";
@@ -81,6 +82,7 @@ const GLYPH: Record<PanelMeta["panel"], string> = {
   replay: "◷",
   uploader: "⇪",
   local: "⌂",
+  chat: "#",
 };
 
 /** cards whose content only slides when the hover bar makes room (a page, a terminal or desktop, a model or PDF:
@@ -155,6 +157,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <ReplayBody panel={panel} />
     ) : panel.panel === "uploader" ? (
       <UploaderBody panel={panel} />
+    ) : panel.panel === "chat" ? (
+      <ChatCardBody panel={panel} />
     ) : panel.panel === "crew" ? (
       <CrewCardBody sectionId={panel.sectionId} />
     ) : (
