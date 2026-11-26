@@ -210,7 +210,13 @@ function why(e: unknown, what: "timeline" | "history"): { state: Load; why: stri
   return { state: "error", why: (e as Error)?.message || `The ${what} didn't load.` };
 }
 
-async function load(key: string, quiet = false) {
+/** history last fetched, per timeline; and the ones whose events are newer than their history */
+const historyAt = new Map<string, number>();
+const behind = new Set<string>();
+/** while at now, the history (up to tens of MB on a big grid) is fetched again at most this often; scrubbing catches it up */
+const HISTORY_EVERY_MS = 10_000;
+
+async function load(key: string, quiet = false, history = true) {
   const tl0 = open.get(key);
   if (!tl0) return;
   ctrls.get(key)?.abort();
@@ -250,6 +256,11 @@ async function load(key: string, quiet = false) {
   const tl1 = open.get(key)!;
   tl1.head.window = { from, to, start: typeof slice.start === "number" ? slice.start : null };
   patch(key, { slice, sliceState: "ok", sliceWhy: null, skew, from, to });
+  // the events are new; the board as it was waits for a scrub, or the next slower read
+  if (!history && open.get(key)?.player) {
+    behind.add(key);
+    return;
+  }
   // the board as it was, to scrub
   try {
     const hFrom = Math.max(from, typeof slice.start === "number" ? slice.start : from);
@@ -269,12 +280,48 @@ async function load(key: string, quiet = false) {
     const old = open.get(key)?.player;
     patch(key, { player, historyHead: frames.head as HistoryHead, historyState: "ok", historyWhy: null });
     old?.destroy();
+    historyAt.set(key, Date.now());
+    behind.delete(key);
   } catch (e) {
     if ((e as Error).name === "AbortError" || ctrl.signal.aborted) return;
     const w = why(e, "history");
     patch(key, { historyState: w.state, historyWhy: w.why });
   }
 }
+
+/** the timelines told something new while they looked back: read again once they come back to now */
+const stale = new Set<string>();
+const lastRead = new Map<string, number>();
+const nudgeTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function refresh(key: string) {
+  stale.delete(key);
+  lastRead.set(key, Date.now());
+  return load(key, true, Date.now() - (historyAt.get(key) ?? 0) >= HISTORY_EVERY_MS);
+}
+
+/** the server's nudge (sync/board.ts): every open timeline of that grid reads again, soon, if it's at now */
+if (typeof window !== "undefined")
+  window.addEventListener("foundation:timeline", (ev) => {
+    const board = (ev as CustomEvent<{ board: string }>).detail?.board;
+    for (const tl of open.values()) {
+      if (tl.board !== board) continue;
+      if (tl.head.t !== null) {
+        stale.add(tl.key);
+        continue;
+      }
+      // at most one read in 1.5 s, however busy the grid (the last nudge of a stretch is always read)
+      if (nudgeTimers.has(tl.key)) continue;
+      const wait = Math.max(150, 1500 - (Date.now() - (lastRead.get(tl.key) ?? 0)));
+      nudgeTimers.set(
+        tl.key,
+        setTimeout(() => {
+          nudgeTimers.delete(tl.key);
+          void refresh(tl.key);
+        }, wait),
+      );
+    }
+  });
 
 function schedule(key: string, ms = 160) {
   clearTimeout(timers.get(key));
@@ -296,14 +343,25 @@ function make(key: string, p: Pick<Timeline, "scope" | "sectionId" | "board" | "
 function start(tl: Timeline) {
   open.set(tl.key, tl);
   emit();
+  // leaving now with history older than the events: read it whole once, so the past holds what just happened
+  let wasNow = true;
+  tl.head.onMove(() => {
+    const now = tl.head.t === null;
+    if (wasNow && !now && behind.has(tl.key) && open.get(tl.key) === tl) void load(tl.key, true, true);
+    wasNow = now;
+  });
+  lastRead.set(tl.key, Date.now());
   void load(tl.key);
-  // quietly kept up to date while it sits at now (a scrub keeps what it has, so the past doesn't shift under it)
+  // kept up to date while it sits at now: the server nudges every window on the grid when something is recorded
+  // (below); this is the fallback for a grid this window isn't joined to (a section that is another grid) and for
+  // what a nudge missed. A scrub keeps what it has, so the past doesn't shift under it; it's read again at now.
   refreshers.set(
     tl.key,
     setInterval(() => {
       const cur = open.get(tl.key);
-      if (cur && cur.head.t === null && !document.hidden) void load(tl.key, true);
-    }, 45_000),
+      if (!cur || cur.head.t !== null || document.hidden) return;
+      if (stale.has(tl.key) || Date.now() - (lastRead.get(tl.key) ?? 0) > 20_000) void refresh(tl.key);
+    }, 1_000),
   );
 }
 
@@ -316,6 +374,12 @@ export function closeTimeline(key: string) {
   clearInterval(refreshers.get(key));
   timers.delete(key);
   refreshers.delete(key);
+  clearTimeout(nudgeTimers.get(key));
+  nudgeTimers.delete(key);
+  stale.delete(key);
+  lastRead.delete(key);
+  historyAt.delete(key);
+  behind.delete(key);
   tl.head.destroy();
   tl.player?.destroy();
   open.delete(key);

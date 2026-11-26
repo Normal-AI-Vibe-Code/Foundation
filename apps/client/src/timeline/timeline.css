@@ -620,24 +620,38 @@ b.is-agent,
   }
 }
 
-/* ---------- a section's bar: along its foot, over the body ---------- */
+/* ---------- a section's bar: under its header, where its clock is (2026-11-26, Josh: "the timeline should come from
+   under the top menu of the section since that's where you call it"), over the top of the body ---------- */
 
 .tl-section {
   position: absolute;
   left: 1px;
   right: 1px;
-  bottom: 1px;
+  /* the body's top (App.css .section-body): the bar unfolds from the header's foot */
+  top: 42px;
   z-index: 6;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 2px var(--space-3) var(--space-2);
   border-top: 1px solid var(--color-line);
-  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  border-bottom: 1px solid var(--color-line);
   background: var(--color-abyss);
+  box-shadow: var(--shadow-sheet);
   font: 400 var(--text-12) / 1.4 var(--font-sans);
   container: tlsec / inline-size;
-  animation: tl-rise var(--dur-pane) var(--ease-out-soft);
+  transform-origin: top center;
+  animation: tl-unfold var(--dur-pane) var(--ease-out-soft);
+}
+@keyframes tl-unfold {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  to {
+    clip-path: inset(0 0 -24px 0);
+  }
 }
 .tl-section .tl-transport {
   min-height: 32px;
@@ -660,7 +674,7 @@ b.is-agent,
   padding-top: 2px;
 }
 .tl-section.is-detached {
-  border-top-color: var(--color-pulse);
+  border-bottom-color: var(--color-pulse);
 }
 @container tlsec (min-width: 560px) {
   .tl-section .tl-nearest {

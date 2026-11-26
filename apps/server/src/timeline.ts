@@ -42,7 +42,7 @@ import {
   type UserInfo,
 } from "@foundation/protocol";
 import { all, db, one, run } from "./db.ts";
-import { getBoard, liveBoardIds, onBoardOpen, onBoardsClosed, onBoardUpdate, socketUserId, whoIsOn, type Board } from "./boards.ts";
+import { getBoard, liveBoardIds, nudgeTimeline, onBoardOpen, onBoardsClosed, onBoardUpdate, socketUserId, whoIsOn, type Board } from "./boards.ts";
 import { actorScope, type ScopeActor } from "./audit.ts";
 import { canSeeBoard } from "./members.ts";
 import { canSeeChannel, getChannel } from "./chat.ts";
@@ -121,7 +121,11 @@ const num = (name: string, d: number) => {
 /** changes this close together are one kept burst */
 const burstMs = () => num("FOUNDATION_TIMELINE_BURST_MS", 2000);
 /** a card's edits by one actor are one event until they pause this long */
-const editQuietMs = () => num("FOUNDATION_TIMELINE_EDIT_QUIET_MS", 5 * 60_000);
+const editQuietMs = () => num("FOUNDATION_TIMELINE_EDIT_QUIET_MS", 60_000);
+/** a card dragged or resized about by one actor is one event until they leave it alone this long */
+const placeQuietMs = () => num("FOUNDATION_TIMELINE_PLACE_QUIET_MS", 20_000);
+/** the windows on a grid hear "something new" at most this often (nudgeTimeline) */
+const nudgeMs = () => num("FOUNDATION_TIMELINE_NUDGE_MS", 600);
 /** reads by one agent with one tool within this long are one event, counted */
 const readCoalesceMs = () => num("FOUNDATION_TIMELINE_READ_MS", 30_000);
 /** a person who comes back within this long is still on the same stretch */
@@ -148,7 +152,7 @@ export const HISTORY_CURSORS = 4000;
 export const DENSITY_STEPS = 240;
 
 const SPAN_KINDS = ["person.here", "agent.run", "terminal", "huddle"];
-const CHANGE_KINDS = ["card.add", "card.remove", "card.move", "card.rename", "card.edit", "section.add", "section.remove", "section.rename", "section.move", "wire.add", "wire.remove", "note.audio", "note.video"];
+const CHANGE_KINDS = ["card.add", "card.remove", "card.move", "card.place", "card.rename", "card.edit", "section.add", "section.remove", "section.rename", "section.move", "wire.add", "wire.remove", "note.audio", "note.video"];
 
 // ---------- who did it ----------
 
@@ -254,7 +258,7 @@ const numOf = (v: unknown): number | null => (typeof v === "number" && Number.is
 const rec = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 const clip = (s: unknown, n: number) => {
   const t = str(s).replace(/\s+/g, " ").trim();
-  return t.length > n ? `${t.slice(0, n - 1)}â€¦` : t;
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
 
 function insertEvent(e: NewEvent): string {
@@ -282,7 +286,26 @@ function insertEvent(e: NewEvent): string {
     e.requestKey ?? null,
   );
   if (!r.changes && e.requestKey) return one<{ id: string }>("select id from timeline_events where board_id = ? and request_key = ?", e.board, e.requestKey)?.id ?? id;
+  nudge(e.board);
   return id;
+}
+
+/** each grid's pending "something new" (trailing: the last thing recorded in a stretch is always told) */
+const nudges = new Map<string, ReturnType<typeof setTimeout>>();
+function nudge(boardId: string) {
+  if (nudges.has(boardId)) return;
+  const t = actorScope.exit(() =>
+    setTimeout(() => {
+      nudges.delete(boardId);
+      try {
+        nudgeTimeline(boardId, Date.now());
+      } catch {
+        /* a window that went away */
+      }
+    }, nudgeMs()),
+  );
+  t.unref?.();
+  nudges.set(boardId, t);
 }
 
 /** record one event where its thing happened; returns its id (a replayed request key returns the first one's). Never throws into its caller. */
@@ -320,7 +343,10 @@ interface Change {
   now?: unknown;
   was?: unknown;
   actor: Actor;
+  /** when it was seen (the quiet stretches are measured on this) */
   at: number;
+  /** when it is on the timeline: its burst's time (flushLive) */
+  stamp?: number;
 }
 
 interface Live {
@@ -510,6 +536,8 @@ function flushLive(l: Live) {
         // a checkpoint when the tail after the newest base has grown (the live board is history's state right now)
         if (row.since + m.length >= checkpointBytes(row.base_bytes) && settled(l.board.doc)) writeCheckpoint(l.id, l.board.doc, at, seq);
       });
+      // the grid's history moved on: windows that show it read it again
+      nudge(l.id);
     } catch (e) {
       // kept for the next flush, so the chain of changes isn't broken (the state vector wasn't moved)
       console.error("timeline: couldn't keep a burst", e);
@@ -518,8 +546,11 @@ function flushLive(l: Live) {
       l.bufAt = Math.max(l.bufAt, at);
     }
   }
-  // 2. events: each change on its own, so one malformed card costs its own event and nothing else
+  // 2. events: each change on its own, so one malformed card costs its own event and nothing else.
+  // An event is stamped with the time of the burst that keeps its change (never before it): the board at an
+  // event's moment then always holds that event's change, and events of one burst keep the order they happened in.
   if (changes.length) {
+    if (buf.length) for (const c of changes) c.stamp = Math.max(c.at, at);
     try {
       inTx(() => eventsFromChanges(l, changes));
     } catch (e) {
@@ -687,7 +718,7 @@ function sectionOf(id: string, v: unknown): SectionView | null {
 
 const KIND_WORD: Record<string, string> = { note: "a note", table: "a table", map: "a map", image: "a picture", video: "a video", audio: "a sound", file: "a file", link: "a page", app: "an app", machine: "a machine", chat: "a conversation", huddle: "a huddle", agent: "an agent card", ask: "an ask", grid: "a grid" };
 const kindWord = (k: string) => KIND_WORD[k] ?? `a ${k} card`;
-const q = (s: unknown) => `â€œ${clip(s, 60) || "untitled"}â€`;
+const q = (s: unknown) => `“${clip(s, 60) || "untitled"}”`;
 /** what about a card counts as an edit of its settings (not where it sits, its size, its name or section) */
 const LAYOUT = new Set(["x", "y", "w", "h", "float", "bornAt", "name", "sectionId", "z"]);
 function settingsChanged(a: Record<string, unknown>, b: Record<string, unknown>) {
@@ -709,9 +740,13 @@ function eventsFromChanges(l: Live, changes: Change[]) {
   const live = doc.isDestroyed ? null : boardMaps(doc);
   const secName = (id: string | null) => (id && live ? clip(rec(live.sections.get(id))?.name, 200) || undefined : undefined);
   const quiet = editQuietMs();
+  // a card made in this burst: what it was filled with, laid out as or wired to in the same burst is its making
+  // (an agent's add_note writes the card, then its words), not an edit; what comes in a later burst is
+  const born = new Set<string>();
+  for (const c of changes) if (c.t === "obj" && c.action === "add") born.add(c.id);
   for (const c of changes) {
     try {
-      eventFromChange(l, c, live, secName, quiet);
+      eventFromChange(l, c, live, secName, quiet, born);
     } catch (e) {
       // one malformed change costs its own event, never the burst's history or anyone else's events
       console.error(`timeline: couldn't read a change to ${clip(c.id, 60)}: ${(e as Error).message}`);
@@ -720,9 +755,9 @@ function eventsFromChanges(l: Live, changes: Change[]) {
   if (editSeen.size > 5000) for (const [k, t] of editSeen) if (Date.now() - t > quiet) editSeen.delete(k);
 }
 
-function eventFromChange(l: Live, c: Change, live: ReturnType<typeof boardMaps> | null, secName: (id: string | null) => string | undefined, quiet: number) {
+function eventFromChange(l: Live, c: Change, live: ReturnType<typeof boardMaps> | null, secName: (id: string | null) => string | undefined, quiet: number, born: Set<string> = new Set()) {
   const a = named(c.actor);
-  const ev = (e: Omit<NewEvent, "board" | "actor" | "at">) => insertEvent({ board: l.id, at: c.at, actor: a, ...e });
+  const ev = (e: Omit<NewEvent, "board" | "actor" | "at">) => insertEvent({ board: l.id, at: c.stamp ?? c.at, actor: a, ...e });
   const sn = (id: string | null) => {
     const n = secName(id);
     return n ? { _sn: n } : {};
@@ -731,7 +766,6 @@ function eventFromChange(l: Live, c: Change, live: ReturnType<typeof boardMaps> 
     const now = c.now === undefined ? null : cardOf(c.id, c.now);
     const was = c.was === undefined ? null : cardOf(c.id, c.was);
     if (c.action === "add" && now) {
-      editSeen.set(`${l.id}|${now.id}|${actorKey(a)}`, c.at);
       if (now.note) noteEvent(c, l.id, now, a, secName(now.section));
       else ev({ section: now.section, kind: "card.add", object: now.id, text: `added ${kindWord(now.kind)} ${q(now.name)}`, data: { card: now.kind, name: now.name, ...sn(now.section) } });
     } else if (c.action === "delete" && was) {
@@ -739,11 +773,14 @@ function eventFromChange(l: Live, c: Change, live: ReturnType<typeof boardMaps> 
     } else if (c.action === "update" && now && was) {
       const base = { card: now.kind, name: now.name };
       if (now.section !== was.section) ev({ section: now.section, kind: "card.move", object: now.id, text: `moved ${q(now.name)} to ${q(secName(now.section) ?? "another section")}`, data: { ...base, from: was.section, ...sn(now.section) } });
+      // dragged or resized inside its section: a person's or an agent's hand, not the server laying cards out
+      else if (a.kind !== "system" && !born.has(now.id) && placeChanged(now.raw, was.raw)) placeOnce(c, l.id, now, was, a);
       if (now.name !== was.name) ev({ section: now.section, kind: "card.rename", object: now.id, text: `renamed ${q(was.name)} to ${q(now.name)}`, data: { ...base, was: was.name } });
       if (now.note && !was.note) noteEvent(c, l.id, now, a, secName(now.section));
-      else if (a.kind !== "system" && settingsChanged(now.raw, was.raw)) editOnce(c, l.id, now, a, quiet);
+      else if (a.kind !== "system" && !born.has(now.id) && settingsChanged(now.raw, was.raw)) editOnce(c, l.id, now, a, quiet);
     }
   } else if (c.t === "edit") {
+    if (born.has(c.id)) return;
     const o = live ? cardOf(c.id, live.objects.get(c.id)) : null;
     if (o) editOnce(c, l.id, o, a, quiet);
   } else if (c.t === "sec") {
@@ -771,13 +808,30 @@ function eventFromChange(l: Live, c: Change, live: ReturnType<typeof boardMaps> 
   } else if (c.t === "asks") askEvents(l, c, live);
 }
 
+/** where a card sits and how big it is, inside its section (a move to another section is card.move) */
+const PLACE = ["x", "y", "w", "h", "float"] as const;
+function placeChanged(a: Record<string, unknown>, b: Record<string, unknown>) {
+  return PLACE.some((k) => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
+}
+const placeSeen = new Map<string, number>();
+/** one card.place per card and actor for each stretch of dragging and resizing: "moved" or "resized" by what changed first */
+function placeOnce(c: Change, boardId: string, now: CardView, was: CardView, a: Actor) {
+  const key = `${boardId}|${now.id}|${actorKey(a)}`;
+  const last = placeSeen.get(key);
+  placeSeen.set(key, c.at);
+  if (placeSeen.size > 5000) for (const [k, t] of placeSeen) if (c.at - t > placeQuietMs()) placeSeen.delete(k);
+  if (last !== undefined && c.at - last < placeQuietMs()) return;
+  const sized = JSON.stringify(now.raw.w) !== JSON.stringify(was.raw.w) || JSON.stringify(now.raw.h) !== JSON.stringify(was.raw.h);
+  insertEvent({ board: boardId, at: c.stamp ?? c.at, actor: a, section: now.section, kind: "card.place", object: now.id, text: `${sized ? "resized" : "moved"} ${q(now.name)}`, data: { card: now.kind, name: now.name, how: sized ? "size" : "place" } });
+}
+
 /** one card.edit per card and actor for each stretch of work */
 function editOnce(c: Change, boardId: string, o: CardView, a: Actor, quiet: number) {
   const key = `${boardId}|${o.id}|${actorKey(a)}`;
   const last = editSeen.get(key);
   editSeen.set(key, c.at);
   if (last !== undefined && c.at - last < quiet) return;
-  insertEvent({ board: boardId, at: c.at, actor: a, section: o.section, kind: "card.edit", object: o.id, text: `edited ${q(o.name)}`, data: { card: o.kind, name: o.name } });
+  insertEvent({ board: boardId, at: c.stamp ?? c.at, actor: a, section: o.section, kind: "card.edit", object: o.id, text: `edited ${q(o.name)}`, data: { card: o.kind, name: o.name } });
 }
 
 /** a voice or video note left: who left it is the transaction's person, never the card's own `note.by` */
@@ -785,7 +839,7 @@ function noteEvent(c: Change, boardId: string, o: CardView, a: Actor, sn?: strin
   const note = o.note!;
   insertEvent({
     board: boardId,
-    at: c.at,
+    at: c.stamp ?? c.at,
     actor: a,
     section: o.section,
     kind: o.media === "audio" ? "note.audio" : "note.video",
@@ -1145,6 +1199,8 @@ export function runEnded(r: { board: string; section?: string | null; runId: str
 // ---------- reading ----------
 
 interface EventRow {
+  /** the row's place in the order the server recorded (rowid) */
+  n?: number;
   id: string;
   board_id: string;
   section_id: string | null;
@@ -1181,7 +1237,7 @@ function answerOf(runId: string): { by: string | null; prompt: string | null; te
   } catch {
     /* no transcript */
   }
-  return { by: r.created_by, prompt: r.prompt, text: text.length > 4000 ? `${text.slice(0, 3999)}â€¦` : text };
+  return { by: r.created_by, prompt: r.prompt, text: text.length > 4000 ? `${text.slice(0, 3999)}…` : text };
 }
 
 /** one stored event as this reader gets it: the server's own keys never leave; an ask's and an answer's words only as far as they may */
@@ -1355,10 +1411,10 @@ export function timelineFor(reader: UserInfo, boardId: string, qy: SliceQuery): 
   const under = section ? sectionsUnder(doc, section) : null;
   const inSec = under ? ` and section_id in (${[...under].map(() => "?").join(", ")})` : "";
   const secArgs = under ? [...under] : [];
-  const rows = all<EventRow>(`select * from timeline_events where board_id = ? and at >= ? and at <= ?${inSec} order by at desc limit ?`, boardId, from, to, ...secArgs, limit + 1);
+  const rows = all<EventRow>(`select rowid as n, * from timeline_events where board_id = ? and at >= ? and at <= ?${inSec} order by at desc, rowid desc limit ?`, boardId, from, to, ...secArgs, limit + 1);
   // spans that began before the range and were still going in it
   const spans = all<EventRow>(
-    `select * from timeline_events where board_id = ? and kind in (${SPAN_KINDS.map(() => "?").join(", ")}) and at < ? and (end_at is null or end_at >= ?)${inSec} order by at desc limit ?`,
+    `select rowid as n, * from timeline_events where board_id = ? and kind in (${SPAN_KINDS.map(() => "?").join(", ")}) and at < ? and (end_at is null or end_at >= ?)${inSec} order by at desc, rowid desc limit ?`,
     boardId,
     ...SPAN_KINDS,
     from,
@@ -1366,9 +1422,12 @@ export function timelineFor(reader: UserInfo, boardId: string, qy: SliceQuery): 
     ...secArgs,
     limit,
   );
+  // one order, the same for every reader and every read: time, then the order the server recorded them in
+  const order = new Map<string, number>();
+  for (const r of [...rows, ...spans]) order.set(r.id, r.n ?? 0);
   let events = [...rows, ...spans].map((r) => eventFor(r, reader));
   events.push(...chatMessages(reader, boardId, doc, from, to, limit + 1, under), ...huddleSpans(reader, boardId, doc, from, to, under));
-  events.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+  events.sort((a, b) => a.at - b.at || (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const more = events.length > limit;
   if (more) events = events.slice(events.length - limit);
 
@@ -1422,14 +1481,14 @@ export function timelineText(reader: UserInfo, boardId: string, qy: SliceQuery):
   const utc = (at: number) => new Date(at).toISOString().slice(0, 16).replace("T", " ");
   let words = false;
   const lines = s.events.map((e) => {
-    const where = e.section ? ` in â€œ${names.get(e.section) ?? e.section}â€` : "";
+    const where = e.section ? ` in “${names.get(e.section) ?? e.section}”` : "";
     const who = `${e.actor.name}${e.actor.kind === "agent" ? ` (agent${e.actor.for ? `, for ${e.actor.for}` : ""})` : ""}`;
     const end = e.end === null ? " (still going)" : e.end ? ` until ${utc(e.end)}` : "";
     const body = typeof e.data?.body === "string" ? e.data.body : null;
     if (body && (e.kind === "chat.message" || e.kind === "chat.answer")) words = true;
     return `[${utc(e.at)}] ${who} ${e.text}${where}${end}${body ? `: ${clip(body, 300)}` : ""}${e.withheld ? ` (${e.withheld})` : ""}`;
   });
-  const head = `Timeline of â€œ${boardId}â€${s.section ? ` â€º ${names.get(s.section) ?? s.section}` : ""}, ${utc(s.from)}â€“${utc(s.to)} UTC. History begins ${utc(s.start)} UTC.${s.more ? " Only the newest are listed: ask for a shorter stretch for the rest." : ""}`;
+  const head = `Timeline of “${boardId}”${s.section ? ` › ${names.get(s.section) ?? s.section}` : ""}, ${utc(s.from)}–${utc(s.to)} UTC. History begins ${utc(s.start)} UTC.${s.more ? " Only the newest are listed: ask for a shorter stretch for the rest." : ""}`;
   return { text: `${head}\n\n${lines.join("\n") || "(nothing happened in this stretch)"}`, words };
 }
 

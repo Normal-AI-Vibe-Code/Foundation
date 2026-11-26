@@ -1478,16 +1478,58 @@ body.rewiring {
 /* A note's toolbar (2026-11-25, Josh: "about 20% larger … animate up"): drawn into the card under its foot, 6 px
    below the edge, centred on the card; it rises 6 px into place as it fades in (RichText.tsx). 40 tall, with
    32 px buttons, the picker and the link field 32, letters 16, words 14, glyphs a fifth larger. */
+/* and the formatting is the box, grown down (2026-11-26, Josh: "the formatting should be in the box at the
+   bottom"): flush on the card's foot, the card's paper and edge, a hairline over it; the words keep their place */
 .frame-card > .rich-bar-slot.is-under {
   z-index: 5;
-  top: calc(100% + 6px);
+  top: 100%;
   bottom: auto;
   left: -1px;
   right: -1px;
+  justify-content: stretch;
+}
+.frame-card > .rich-bar-slot.is-under .rich-bar {
+  flex: 1 1 auto;
+  max-width: none;
+  /* a narrow note's toolbar takes a second row rather than hiding its last buttons */
+  height: auto;
+  min-height: 40px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+  padding: 3px var(--space-2);
+  overflow: visible;
+  border: 1px solid var(--line-strong);
+  border-top-color: var(--line);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  background: var(--paper-raised);
+  box-shadow: none;
+}
+.frame-card.ctx-active > .rich-bar-slot.is-under .rich-bar {
+  box-shadow: 0 0 0 2.5px var(--select);
+  clip-path: inset(0 -4px -4px -4px);
+}
+.frame-card:has(> .rich-bar-slot.is-under) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* writing in it: the card's ring is the one outline (the words draw none of their own) */
+.frame-card .rich-text:focus-visible,
+.frame-card .rich-text.is-writing {
+  box-shadow: none;
 }
 .frame-card:fullscreen > .rich-bar-slot.is-under {
   top: auto;
   bottom: var(--space-3);
+  left: var(--space-3);
+  right: var(--space-3);
+  justify-content: center;
+}
+.frame-card:fullscreen > .rich-bar-slot.is-under .rich-bar {
+  flex: 0 1 auto;
+  border-radius: var(--radius-card);
+  border-top-color: var(--line-strong);
+  box-shadow: var(--shadow-sheet);
+  clip-path: none;
 }
 .rich-bar-slot .rich-bar {
   height: 40px;
@@ -1934,19 +1976,51 @@ body.is-connecting .frame-card,
   padding: 0 var(--space-2) 0 var(--space-3);
   translate: 0 6px;
 }
+/* The bar is the box, grown up (2026-11-26, Josh: "the menu up top should be an extension of the box, it just
+   doesn't need to push the text down, it just pushes the box up to accommodate the menu"): flush on the card's
+   top edge, the card's own paper, edge and width, a hairline between it and the words. It unfolds upward from
+   that edge (clip, not a slide), so the box is seen to grow; nothing inside the card moves. The card's top
+   corners square off while it shows, and the selection ring goes round both as one. */
 .frame-anchor.bar-rise:not(.is-folded) > .frame-card > .frame-header {
   top: auto;
-  bottom: calc(100% + 4px);
+  bottom: 100%;
   left: -1px;
   right: -1px;
+  translate: 0 0;
+  border: 1px solid var(--line-strong);
+  border-bottom-color: var(--line);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--paper-raised);
+  box-shadow: none;
+  clip-path: inset(100% -4px 0 -4px);
+  transition:
+    opacity var(--dur-quick) var(--ease-out-soft) 140ms,
+    clip-path var(--dur-pane) var(--ease-out-soft) 140ms;
 }
-.frame-anchor.bar-rise:not(.is-folded) > .frame-card > .frame-header::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 6px;
+.frame-anchor.bar-rise:not(.is-folded):is(.is-hover, .dragging, .is-confirming, :focus-within) > .frame-card > .frame-header {
+  clip-path: inset(-4px -4px 0 -4px);
+  transition-delay: 0s;
+}
+@media (hover: hover) {
+  .frame-anchor.bar-rise:not(.is-folded):hover > .frame-card > .frame-header {
+    clip-path: inset(-4px -4px 0 -4px);
+    transition-delay: 0s;
+  }
+  .frame-anchor.bar-rise:not(.is-folded):hover > .frame-card {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+}
+.frame-anchor.bar-rise:not(.is-folded):is(.is-hover, .dragging, .is-confirming, :focus-within, .bar-linger) > .frame-card {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+/* one ring round the card and its bar: the bar carries the ring's top and sides (its foot is the card's) */
+.frame-anchor.bar-rise:not(.is-folded) > .frame-card.ctx-active > .frame-header {
+  box-shadow: 0 0 0 2.5px var(--select);
+}
+body.is-connecting .frame-anchor.bar-rise > .frame-card > .frame-header {
+  clip-path: inset(100% -4px 0 -4px);
 }
 /* minimized, it is the card (40 tall: a pixel all round inside its edge) */
 .frame-anchor.bar-rise.is-folded .frame-header {
@@ -1986,7 +2060,7 @@ body.is-connecting .frame-card,
    too, and the section is drawn over the one below it, so the toolbar of a note in the bottom row shows whole */
 .section-body:has(> .section-content > .obj-slot > .frame-anchor.bar-rise .rich-bar-slot.is-under) {
   overflow: visible;
-  clip-path: inset(-42px 0 -56px 0 round 0 0 var(--radius-pane) var(--radius-pane));
+  clip-path: inset(-42px 0 -96px 0 round 0 0 var(--radius-pane) var(--radius-pane));
   z-index: 4;
 }
 .section-card:not(.expanded, .section-dragging):has(> .section-body > .section-content > .obj-slot > .frame-anchor.bar-rise .rich-bar-slot.is-under) {

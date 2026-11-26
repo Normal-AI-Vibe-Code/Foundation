@@ -40,7 +40,8 @@ export const TIMELINE_KINDS = {
   // what the grid holds
   "card.add": { lane: "changes", span: false },
   "card.remove": { lane: "changes", span: false },
-  "card.move": { lane: "changes", span: false }, // to another section (a nudge inside one is not an event)
+  "card.move": { lane: "changes", span: false }, // to another section
+  "card.place": { lane: "changes", span: false }, // dragged or resized inside its section; one per card and actor for each stretch
   "card.rename": { lane: "changes", span: false },
   "card.edit": { lane: "changes", span: false }, // its words, cells or settings; one per card and person for each stretch of work
   "section.add": { lane: "changes", span: false },

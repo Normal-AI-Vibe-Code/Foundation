@@ -22,6 +22,8 @@ import { actorScope } from "./audit.ts";
 
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
+/** "the timeline of this grid has something new": no content, only a nudge to read it again (timeline.ts) */
+const MSG_TIMELINE = 2;
 const COMPACT_AFTER = 500;
 
 export interface Board {
@@ -251,6 +253,21 @@ function objectText(o: ObjectDoc, note: string | undefined, cells?: Record<strin
     default:
       return o.kind;
   }
+}
+
+/**
+ * Tell every window on a grid that its timeline has something new (a change kept, an event recorded). It carries
+ * nothing but the time: each window reads the timeline again as the person it is, so who may read what stays the
+ * route's to say. A window that doesn't know the message ignores it.
+ */
+export function nudgeTimeline(boardId: string, at: number) {
+  const board = boards.get(boardId);
+  if (!board || !board.conns.size) return;
+  const enc = encoding.createEncoder();
+  encoding.writeVarUint(enc, MSG_TIMELINE);
+  encoding.writeVarUint(enc, Math.max(0, Math.floor(at)));
+  const data = encoding.toUint8Array(enc);
+  for (const ws of board.conns.keys()) send(ws, data);
 }
 
 function send(ws: WebSocket, data: Uint8Array) {
