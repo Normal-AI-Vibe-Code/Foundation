@@ -10,7 +10,7 @@ import { useState } from "react";
 import { chatTitle, type ChatChannelView, type ChatParty } from "@foundation/protocol";
 import { PartyAvatar } from "./Avatar";
 import { isDirect } from "./logic";
-import { IconAt, IconChevron, IconHash, IconLock, IconPlus, IconThread } from "./Icons";
+import { IconAt, IconChevron, IconHash, IconLock, IconPlus, IconSideList, IconThread } from "./Icons";
 import { carryHandlers } from "./carryChat";
 import { canPlaceChat, putOnOpenGrid } from "./gridChatPlace";
 import { isKept, keepInSideMenu, takeOutOfSideMenu } from "./pins";
@@ -39,6 +39,15 @@ export interface SidebarProps {
 }
 
 const FOLD = "chatform-folds";
+/** the list folded to its icons (2026-11-26, Josh: "channels should be collapsable to icons"), kept on this device */
+const ICONS = "chatform-list-icons";
+function readIcons() {
+  try {
+    return localStorage.getItem(ICONS) === "1";
+  } catch {
+    return false;
+  }
+}
 function readFolds(): Record<string, boolean> {
   try {
     return JSON.parse(localStorage.getItem(FOLD) ?? "{}") as Record<string, boolean>;
@@ -57,6 +66,16 @@ export function Sidebar(p: SidebarProps) {
       } catch { /* private window */ }
       return next;
     });
+  const [icons, setIcons] = useState(readIcons);
+  const toggleIcons = () =>
+    setIcons((v) => {
+      try {
+        localStorage.setItem(ICONS, v ? "0" : "1");
+      } catch { /* private window */ }
+      return !v;
+    });
+  // as icons, every section shows its rows (there's no head to unfold it by)
+  const folded = (k: string) => !icons && !!folds[k];
 
   const live = p.channels.filter((c) => c.me && !c.archivedAt);
   const byName = (a: ChatChannelView, b: ChatChannelView) => chatTitle(a, p.meId).localeCompare(chatTitle(b, p.meId));
@@ -66,13 +85,18 @@ export function Sidebar(p: SidebarProps) {
   const channels = live.filter((c) => !c.me?.starred && (c.kind === "open" || c.kind === "private")).sort(byName);
   const direct = live.filter((c) => !c.me?.starred && isDirect(c)).sort(byRecent);
 
-  const row = (c: ChatChannelView, where: string) => <Row key={`${where}-${c.id}`} c={c} meId={p.meId} online={p.online} current={p.current === c.id && !p.view} onOpen={p.onOpen} typing={p.typing?.has(c.id)} carry={p.carry} />;
+  const row = (c: ChatChannelView, where: string) => <Row key={`${where}-${c.id}`} c={c} meId={p.meId} online={p.online} current={p.current === c.id && !p.view} onOpen={p.onOpen} typing={p.typing?.has(c.id)} carry={p.carry} icon={icons} />;
 
   return (
-    <nav className="chat-sidebar" aria-label="Conversations">
+    <nav className={`chat-sidebar${icons ? " is-icons" : ""}`} aria-label="Conversations" data-chat-side-icons={icons ? "on" : "off"}>
+      <div className="chat-side-top">
+        <button type="button" className="chat-side-iconize" onClick={toggleIcons} aria-pressed={icons} aria-label={icons ? "Show the conversations' names" : "Fold the list to icons"} data-tip={icons ? "Show names" : "Fold to icons"} data-chat-side-iconize>
+          <IconSideList />
+        </button>
+      </div>
       <div className="chat-side-scroll">
         {!p.noThreads && (
-          <button type="button" className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads>
+          <button type="button" className={`chat-side-row is-nav${p.view === "threads" ? " is-current" : ""}`} onClick={() => p.onView("threads")} data-side-threads data-tip={icons ? "Threads" : undefined}>
             <span className="chat-side-mark">
               <IconThread />
             </span>
@@ -80,7 +104,7 @@ export function Sidebar(p: SidebarProps) {
           </button>
         )}
         {p.mentions && (
-          <button type="button" className={`chat-side-row is-nav${p.view === "mentions" ? " is-current" : ""}${p.mentions.unseen > 0 ? " is-unread" : ""}`} onClick={() => p.onView("mentions")} data-side-mentions>
+          <button type="button" className={`chat-side-row is-nav${p.view === "mentions" ? " is-current" : ""}${p.mentions.unseen > 0 ? " is-unread" : ""}`} onClick={() => p.onView("mentions")} data-side-mentions data-tip={icons ? "Recent mentions" : undefined}>
             <span className="chat-side-mark">
               <IconAt />
             </span>
@@ -88,26 +112,26 @@ export function Sidebar(p: SidebarProps) {
             {p.mentions.unseen > 0 && <span className="chat-count is-accent">{p.mentions.unseen > 99 ? "99+" : p.mentions.unseen}</span>}
           </button>
         )}
-        {unreads.length > 0 && (
-          <Section id="unreads" name="Unreads" folded={!!folds.unreads} onFold={fold} count={unreads.length}>
+        {unreads.length > 0 && !icons && (
+          <Section id="unreads" name="Unreads" folded={folded("unreads")} onFold={fold} count={unreads.length}>
             {unreads.map((c) => row(c, "u"))}
           </Section>
         )}
         {starred.length > 0 && (
-          <Section id="starred" name="Starred" folded={!!folds.starred} onFold={fold}>
+          <Section id="starred" name="Starred" folded={folded("starred")} onFold={fold}>
             {starred.map((c) => row(c, "s"))}
           </Section>
         )}
-        <Section id="channels" name="Channels" folded={!!folds.channels} onFold={fold} onAdd={() => p.onNew("channel")} addTip="New channel">
+        <Section id="channels" name="Channels" folded={folded("channels")} onFold={fold} onAdd={() => p.onNew("channel")} addTip="New channel">
           {channels.map((c) => row(c, "c"))}
-          <button type="button" className={`chat-side-row is-quiet${p.view === "browse" ? " is-current" : ""}`} onClick={() => p.onView("browse")} data-side-browse>
+          <button type="button" className={`chat-side-row is-quiet${p.view === "browse" ? " is-current" : ""}`} onClick={() => p.onView("browse")} data-side-browse data-tip={icons ? "Browse channels" : undefined}>
             <span className="chat-side-mark">
               <IconPlus />
             </span>
             <span className="chat-side-name">Browse channels</span>
           </button>
         </Section>
-        <Section id="direct" name="Direct messages" folded={!!folds.direct} onFold={fold} onAdd={() => p.onNew("direct")} addTip="New message">
+        <Section id="direct" name="Direct messages" folded={folded("direct")} onFold={fold} onAdd={() => p.onNew("direct")} addTip="New message">
           {direct.map((c) => row(c, "d"))}
           {!direct.length && <p className="chat-side-empty">Start one with ＋: a person, or a few people.</p>}
         </Section>
@@ -173,7 +197,7 @@ export const kindWord = (c: Pick<ChatChannelView, "kind">) => (c.kind === "open"
  * `carry`: the row can be pulled out into the side menu (chat/carryChat.ts) and its right-click (or the
  * menu key, Shift+F10) menu keeps it there or takes it out (2026-11-20).
  */
-export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: ChatChannelView; meId?: string; online: string[]; current: boolean; onOpen(id: string): void; typing?: boolean; carry?: boolean }) {
+export function Row({ c, meId, online, current, onOpen, typing, carry, icon }: { c: ChatChannelView; meId?: string; online: string[]; current: boolean; onOpen(id: string): void; typing?: boolean; carry?: boolean; icon?: boolean }) {
   const mentions = c.me?.mentions ?? 0;
   const muted = c.me?.notify === "none";
   const unread = c.unread > 0 && !muted;
@@ -204,6 +228,8 @@ export function Row({ c, meId, online, current, onOpen, typing, carry }: { c: Ch
       }
       data-channel-row={c.id}
       data-channel-name={title}
+      data-tip={icon ? (c.kind === "open" || c.kind === "private" ? `#${title}` : title) : undefined}
+      aria-label={icon ? title : undefined}
       aria-current={current ? "page" : undefined}
     >
       <span className="chat-side-mark">{channelMark(c, meId, online)}</span>

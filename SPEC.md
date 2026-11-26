@@ -424,6 +424,8 @@ Not built, or not as asked: **only tables pin** (a note, a map or a picture span
 
 **Not verified.** The zoom-out fix was not measured or watched in a browser (no frames trace, no before/after); a real pointer carry onto the panel and a message dragged out onto a section were not driven, only the composer's drop event. Day was not looked at. No e2e spec yet.
 
+**Follow-up (2026-11-26, Josh: "a pill with just the chatform icon and a small number icon if there are notifications … channels should be collapsable to icons").** The top right's ChatForm is now one pill holding the mark alone, with the count of what's waiting beside it (the word stays the button's name, out of sight); it opens ChatForm, and a conversation goes to the right panel from the panel button in its own head. ChatForm's channel list folds to a 56 px column of icons from a control at its top (kept on this device): each conversation's mark with its name as a tip, its count or an unread dot on the mark's corner, hairlines between the sections, Unreads left out. Checked in the browser on a copy of the data (night, 1100×700): the pill, the list folding to 56 px and back to 256 px (`docs/evidence/2026-11-26_chat-pill-icons/`). Not looked at: day, a live count on the pill, the column with many unread rows.
+
 ## 1. What Foundation is
 
 | | |
