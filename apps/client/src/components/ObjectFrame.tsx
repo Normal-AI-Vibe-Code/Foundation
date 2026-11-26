@@ -38,6 +38,16 @@ import { FullscreenBar, FullscreenButton, useFullscreenCard } from "./Fullscreen
  * cheaply, so its last line and its bottom controls stay in the card) or just
  * slides (`.bar-slide`: a live app, a terminal, a model — nothing that would
  * have to resize a document).
+ *
+ * `barRise` (notes and chat cards, 2026-11-25, Josh: "the menus for notes
+ * should be about 20% larger, and should actually animate up, not moving the
+ * text down, keep it steady, same with the chat window"): the bar is 36 tall
+ * and rises into place just above the card's top edge instead, so nothing in
+ * the card moves at all. It is drawn over its neighbours (the anchor and its
+ * section's body are lifted while it shows, App.css), a strip under it bridges
+ * the gap to the card so the pointer can travel up to it, and it lingers as
+ * long as it takes to fade (`bar-linger`), so the lift doesn't drop under it.
+ * Another card opts in with this one prop.
  */
 interface Props {
   id: string;
@@ -69,7 +79,12 @@ interface Props {
   openUrl?: string;
   /** removing it loses something a person paid for or made: ✕ asks first, saying this (deletes need confirm) */
   confirmRemove?: { name: string; note: string };
+  /** `bar` chrome: the bar rises above the card's top edge and the content holds still (see above) */
+  barRise?: boolean;
 }
+
+/** how long a risen bar's lift outlasts the pointer: its 140 ms linger and its fade (App.css) */
+const RISE_LINGER = 340;
 
 export function ObjectFrame({
   id,
@@ -93,10 +108,24 @@ export function ObjectFrame({
   onTap,
   openUrl,
   confirmRemove,
+  barRise = false,
 }: Props) {
   countRender("ObjectFrame");
   const fullscreen = useFullscreenCard() === id;
   const rootRef = useRef<HTMLDivElement>(null);
+  const rise = barRise && chrome === "bar";
+
+  // a risen bar fades for a moment after the pointer leaves: its card stays lifted (over its neighbours, its
+  // section's header) until it has gone, so it doesn't drop under them mid-fade
+  const lingerRef = useRef(0);
+  useEffect(() => () => window.clearTimeout(lingerRef.current), []);
+  const linger = (on: boolean) => {
+    const el = rootRef.current;
+    if (!rise || !el) return;
+    window.clearTimeout(lingerRef.current);
+    if (on) el.classList.add("bar-linger");
+    else lingerRef.current = window.setTimeout(() => el.classList.remove("bar-linger"), RISE_LINGER);
+  };
 
   // ----- remove: a card that would lose something asks first -----
   const [confirming, setConfirming] = useState(false);
@@ -284,13 +313,17 @@ export function ObjectFrame({
   return (
     <div
       ref={rootRef}
-      className={`frame-anchor chrome-${chrome}${confirming ? " is-confirming" : ""}${folded ? " is-folded" : ""}`}
+      className={`frame-anchor chrome-${chrome}${rise ? " bar-rise" : ""}${confirming ? " is-confirming" : ""}${folded ? " is-folded" : ""}`}
       style={{ width }}
       // how small this card is drawn right now (the grid's zoom times its section's fit), for the ✕'s press area (App.css)
       onPointerEnter={(e) => {
         const el = e.currentTarget;
         if (el.offsetWidth) el.style.setProperty("--view-scale", (el.getBoundingClientRect().width / el.offsetWidth).toFixed(3));
+        linger(true);
       }}
+      onPointerLeave={rise ? () => linger(false) : undefined}
+      onFocus={rise ? () => linger(true) : undefined}
+      onBlur={rise ? () => linger(false) : undefined}
       {...Object.fromEntries(Object.entries(data ?? {}).map(([k, v]) => [`data-${k}`, v]))}
     >
       <motion.div
@@ -317,7 +350,7 @@ export function ObjectFrame({
       >
         {fullscreen && <FullscreenBar id={id} title={title} url={openUrl} />}
         {chrome === "bar" && (
-          <div className="frame-header" style={{ height: MINI_HEADER - 4 }} {...dragHandlers}>
+          <div className="frame-header" style={rise ? undefined : { height: MINI_HEADER - 4 }} {...dragHandlers}>
             <div className="grip mini">
               <span />
               <span />

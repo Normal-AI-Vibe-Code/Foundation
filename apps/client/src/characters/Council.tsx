@@ -911,7 +911,7 @@ function askedFrom(crewId: string): string | undefined {
 export async function tellSeat(seat: Pick<CouncilSeat, "agentKey" | "name" | "alias"> | null, text: string, section: { id: string; name: string } | null, from?: CouncilScope): Promise<string | undefined> {
   const key = seat?.agentKey ?? "claude";
   if (!key.startsWith("t3:")) {
-    const session = askCrew(section ? `In the “${section.name}” section: ${text}` : text, seat?.alias);
+    const session = askCrew(section ? `In the “${section.name}” section: ${text}` : text, seat?.alias, section?.id);
     if (from) launched.set(session, scopeKey(from));
     return session;
   }
@@ -1086,7 +1086,7 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
   const sec = section ? { id: section.id, name: section.name } : null;
   const f = floorInsets(ui);
   const stand = (
-    <div ref={standEl} className={`council-place is-${scope.kind}`} style={scope.kind === "board" ? { left: f.left, right: f.right } : undefined} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
+    <div ref={standEl} className={`council-place is-${scope.kind}`} style={scope.kind === "board" ? { left: f.left, right: f.right, bottom: f.bottom } : undefined} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onContextMenu={(e) => e.stopPropagation()}>
       {[...waiting].map(([id, p]) => (
         <PendingWatch key={id} id={id} session={p.session} at={p.at} />
       ))}

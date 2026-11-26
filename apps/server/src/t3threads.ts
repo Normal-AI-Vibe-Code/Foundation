@@ -32,6 +32,7 @@ import { boardDigest, editBoard, getBoard } from "./boards.ts";
 import { aim, joinCrew, leaveCrew, seatName, setDoing, type CrewMember } from "./crew.ts";
 import { HttpError } from "./http.ts";
 import { audit } from "./audit.ts";
+import { runEnded, runStarted } from "./timeline.ts";
 import { BOARD_TOOLS_FILE, interruptT3Thread, onT3Work, startT3Thread, t3Host, type T3Work } from "./t3host.ts";
 
 interface Bound {
@@ -39,6 +40,7 @@ interface Bound {
   boardId: string;
   sectionId: string;
   by: string;
+  byName: string;
   member: CrewMember;
   /** T3 has shown it at work: after that, at rest means done */
   worked: boolean;
@@ -107,8 +109,10 @@ export async function askT3(user: UserInfo, input: { board: string; section: str
     }
     const brief = t3Brief({ board: input.board, section: section.name, person: user.name, name: member.name, tools: agent.boardTools, digest: boardDigest(input.board), text });
     const started = await startT3Thread({ agent: agent.id, model: input.model, title: short(text.split("\n")[0], 80), text: brief, folder, projectTitle: `Foundation · ${input.board} · ${short(text.split("\n")[0], 40)}` });
-    const b: Bound = { threadId: started.threadId, boardId: input.board, sectionId: section.id, by: user.id, member, worked: false, at: Date.now(), token, toolsFile };
+    const b: Bound = { threadId: started.threadId, boardId: input.board, sectionId: section.id, by: user.id, byName: user.name, member, worked: false, at: Date.now(), token, toolsFile };
     bound.set(started.threadId, b);
+    // the timeline: the ask (its words as the board's activity says them) and the thread's span, in its section
+    runStarted({ board: input.board, section: section.id, runId: `t3:${started.threadId}`, agent: { id: member.id, name: member.name }, user: { id: user.id, name: user.name }, ask: { shown: true, body: short(text) } });
     audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, board_id: input.board, door: "route", action: "t3_thread.start", target: `${started.threadId} ${agent.id}`, provenance: "ours-local", service: `T3 · ${agent.id}`, decision: "allowed", approved_by: user.id, result: "ok" });
     setDoing(member, `starting on ${started.model}`);
     // T3 may have shown the thread at work before the start call came back: catch up
@@ -135,6 +139,8 @@ function endPass(token?: string, file?: string) {
 
 function release(b: Bound, how: "done" | "stopped" | "error") {
   bound.delete(b.threadId);
+  // its answer stays in T3: the timeline has its span and how many steps it took on the board
+  runEnded({ board: b.boardId, section: b.sectionId, runId: `t3:${b.threadId}`, agent: { id: b.member.id, name: b.member.name }, user: { id: b.by, name: b.byName }, answered: false, private: Boolean(b.member.private) });
   endPass(b.token, b.toolsFile);
   leaveCrew(b.member, how);
 }

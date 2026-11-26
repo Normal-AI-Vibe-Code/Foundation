@@ -115,6 +115,8 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
       headerExtras={bar}
       bodyClass="note-body"
       cardClass={"note-card" + (note.bare ? " is-bare" : "")}
+      // its bar rises above it and the words hold still (2026-11-25)
+      barRise
     >
       <div style={{ ["--h" as string]: `${note.h}px` }} className="note-inner bar-reflow" data-size={note.size ?? "m"}>
         {note.createdBy && !source && (

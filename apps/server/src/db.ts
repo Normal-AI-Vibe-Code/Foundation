@@ -314,6 +314,8 @@ for (const sql of [
   "create index if not exists agent_runs_session on agent_runs(session_id, created_at)",
   // the name its cursor wore (2026-11-25): a council seat finds its own last runs, failed ones too, by it
   "alter table agent_runs add column crew_name text",
+  // the section a run was asked in (2026-11-25, the timeline): null for the grid, or a run from before
+  "alter table agent_runs add column section_id text",
   // a CAD card fed by an app (cadfeed.ts): what it asks and as whom is the server's record, never the card's (a card's
   // `feed` in the board can be written by anyone who can edit it; it is only shown)
   `create table if not exists cad_feeds (

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged into the Mac app's Info.plist by Tauri. macOS refuses the microphone and the camera to an app
+     that doesn't say why it wants them: huddles, and voice and video notes, need both. -->
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Foundation uses the microphone when you join a huddle, talk to an agent, or record a voice or video note.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>Foundation uses the camera when you turn it on in a huddle or record a video note.</string>
+</dict>
+</plist>

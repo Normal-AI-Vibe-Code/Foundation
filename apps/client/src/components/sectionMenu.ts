@@ -9,7 +9,8 @@ import { newCharacter } from "../lib/characterStudio";
 import { addCollection, addCharacterPipeline } from "../lib/collections";
 import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
-import { toast } from "../state/ui";
+import { getUi, toast } from "../state/ui";
+import { openNoteRecorder } from "../notes/open";
 import {
   CONTENT_PAD,
   SECTION_HEADER,
@@ -89,6 +90,8 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     ...tag("add", [
     { heading: "Add" },
     { icon: "¶", label: "Note", action: () => addNote(section.id, undefined, at(NOTE_W, NOTE_H)) },
+    // a voice or video note opens the recorder (notes/); never a viewer's
+    ...(getUi().role === "viewer" ? [] : [{ icon: "◉", label: "Voice or video note…", action: () => openNoteRecorder(section.id) }]),
     { icon: "⊞", label: "Table", action: () => createTable(section.id) },
     { icon: "◍", label: "Map", action: () => createMap(section.id) },
     { icon: "⇪", label: "Image, video or file…", action: () => upload() },

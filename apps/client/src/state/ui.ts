@@ -46,6 +46,8 @@ export interface UiState {
   councilH: number;
   /** how wide the grid's council stands at the bottom right (Council.tsx measures it): the bottom bar keeps clear of it */
   councilW: number;
+  /** the grid's timeline, open as a band along the grid's foot (timeline/TimelineBar.tsx measures it): the grid frames above it */
+  timelineH: number;
   /** the top bar's tabs: the spaces open in this window (board ids), in order */
   spaces: string[];
   /** sessions opened in this window, and the one showing in the session column (null: none) */
@@ -129,6 +131,7 @@ let ui: UiState = {
   strip: 0,
   councilH: 0,
   councilW: 0,
+  timelineH: 0,
   spaces: Array.isArray(s0.spaces) ? s0.spaces.filter((id) => typeof id === "string").slice(0, 24) : [],
   sessions: Array.isArray(s0.sessions) ? s0.sessions.filter((t) => t && typeof t.id === "string").slice(0, 12) : [],
   session: null,
@@ -229,7 +232,7 @@ if (typeof window !== "undefined") {
 export function floorInsets(u: UiState = ui) {
   if (u.presenting) return { left: 0, top: 0, right: 0, bottom: 0 };
   const session = u.session ? u.sessionW : 0;
-  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR + u.strip + u.councilH, right: u.search ? u.searchW : u.tool ? u.toolW : u.agents || u.agentInfo || u.detail ? u.agentsW : 0, bottom: 0 };
+  return { left: (u.pane ? u.paneW : 0) + session, top: TOP_BAR + u.strip + u.councilH, right: u.search ? u.searchW : u.tool ? u.toolW : u.agents || u.agentInfo || u.detail ? u.agentsW : 0, bottom: u.timelineH };
 }
 
 /** ⌘F and the bar's search pill: search where it was last kept (over the bar, or pinned on the right), or put it away */

@@ -57,6 +57,7 @@ import { isSystemGridKey, openSystemGrid } from "./systemgrids.ts";
 import { connectLocal, localStatus, resumeLocal, stopLocal } from "./localdev.ts";
 import { availableAgents, findSeat, postAgent, seatKind, seatModel, unpostAgent } from "./posted.ts";
 import { startGridLog } from "./gridlog.ts";
+import { flushTimeline, startTimeline, timelineRoutes } from "./timeline.ts";
 import { answerAsk, startMachineAsks } from "./machineasks.ts";
 import { answerAppToolAsk } from "./apptools.ts";
 import { createPlanCard, movePlanCard, readPlan, syncPlan, type NewCard } from "./plan.ts";
@@ -80,12 +81,14 @@ import { serveClient } from "./clientfiles.ts";
 import { whereaboutsFor } from "./whereabouts.ts";
 import { gridOutline } from "./subgrids.ts";
 import { canSeeChatFile, chatRoutes } from "./chat.ts";
-import { audit, callScope, readAudit, verifyAudit } from "./audit.ts";
+import { actorScope, audit, callScope, readAudit, verifyAudit, type ScopeActor } from "./audit.ts";
 import { egressState, routeScope, serviceKind, setAllowance } from "./egress.ts";
 import { listServerUsers, requireLocalFeature, serverCapabilities, setServerUserRole, type ServerRole } from "./hosted.ts";
 
 // people's grid edits go in the activity log, from the first board loaded
 startGridLog();
+// every grid's history and timeline (timeline.ts), from the first board loaded
+startTimeline();
 startFlowformSync();
 startMachineAsks();
 startMachineIo();
@@ -624,6 +627,7 @@ function huddleOn(boardId: string, id: string) {
 // a grid's huddle and a channel's (ChatForm H1): start, lines, recordings, take to a grid, agents, live list, archive
 huddleRoutes(r);
 (await import("./replay.ts")).replayRoutes(r); // replay: a recorded session's timeline and takes (the grid as it was); attaching from Vision and approved places in chat
+timelineRoutes(r); // a grid's timeline and its history (timeline.ts): reads only, for anyone who can see the grid
 
 // ---------- Slack channels (bot token; posts go out under the person's name) ----------
 
@@ -1305,9 +1309,15 @@ r.get("/api/t3host/presets", (req) => {
 // in-process (agent.ts startRun), not through this route. Still in READ_POSTS: a viewer who is a person may ask
 r.post("/api/agent", async (req, res) => {
   const user = requirePerson(req, "Asking the agent");
-  const body = await readJson<{ board?: string; prompt?: string; session?: string; persona?: string; as?: string; seat?: string }>(req);
+  const body = await readJson<{ board?: string; prompt?: string; session?: string; persona?: string; as?: string; seat?: string; section?: string }>(req);
   if (!body.prompt?.trim()) throw new HttpError(400, "say something");
   requireBoard(user, body.board || "company");
+  // the section it was asked in (the timeline places the run there): one of this grid's, or none
+  let section: string | null = null;
+  if (body.section !== undefined && body.section !== null && body.section !== "") {
+    if (typeof body.section !== "string" || !boardMaps(getBoard(body.board || "company").doc).sections.has(body.section)) throw new HttpError(400, "No such section on this grid");
+    section = body.section;
+  }
   // which seat it's for (its id, or the name it goes by): how it runs is that seat's kind as this server knows it,
   // never a runtime the request names (a `runtime` in the body is not read). No seat: the server's own default
   const seat = findSeat(body.board || "company", { seat: body.seat, as: body.as });
@@ -1318,7 +1328,7 @@ r.post("/api/agent", async (req, res) => {
   const send = sse(res);
   const session = body.session && /^ses_[a-z0-9]{6,24}$/.test(body.session) ? body.session : undefined;
   // the run lives on the server: closing this stream detaches, it doesn't stop it
-  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, kind, model: seat?.model, session, persona: body.persona === "shiba" ? "shiba" : undefined, as: body.as });
+  const r = startRun({ boardId: body.board || "company", user, prompt: body.prompt, kind, model: seat?.model, session, persona: body.persona === "shiba" ? "shiba" : undefined, as: body.as, section });
   await new Promise<void>((done) => {
     const detach = followRun(r.id, user.id, send, done);
     res.on("close", () => (detach?.(), done()));
@@ -1386,6 +1396,16 @@ function agentRouteScope(req: Req, path: string) {
   const named = req.query.get("board");
   const board = named && canSeeBoard(user, named) ? named : null;
   return routeScope(req.method ?? "GET", path, board, { kind: service ? "service" : "agent", id: service ? "agent" : `agent:${user.id}`, name: user.name, for: service ? null : user.id });
+}
+
+/** who a request is, as the timeline names them: a person at their own screen, or an agent bearer for its person */
+function requestActor(req: Req): ScopeActor | null {
+  const user = req.user ?? userFromRequest(req);
+  if (!user) return null;
+  req.user = user; // the route's own requireUser reads it again from here
+  if (isPerson(req)) return { kind: "person", id: user.id, name: user.name };
+  if (user.id === "agent") return { kind: "agent", id: "agent", name: user.name };
+  return { kind: "agent", id: `agent:${user.id}`, name: `${user.name}'s agent`, for: user.name, forId: user.id };
 }
 
 // ---------- view only ----------
@@ -1470,7 +1490,10 @@ const server = createServer(async (rawReq, res: ServerResponse) => {
     req.params = m.params;
     gateWrites(req, url.pathname);
     const scope = agentRouteScope(req, url.pathname);
-    const out = scope ? await callScope.run(scope, () => m.handler(req, res)) : await m.handler(req, res);
+    const handle = scope ? () => callScope.run(scope, () => m.handler(req, res)) : () => m.handler(req, res);
+    // who a write request is, for the timeline's Changes lane (audit.ts actorScope): the session's, never the body's
+    const actor = req.method !== "GET" ? requestActor(req) : null;
+    const out = actor ? await actorScope.run(actor, handle) : await handle();
     if (!res.headersSent && out !== undefined) json(res, out);
   } catch (e) {
     const status = e instanceof HttpError ? e.status : 500;
@@ -1526,6 +1549,7 @@ if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
     leaving = true;
     try {
       stopEveryRun();
+      flushTimeline(); // the last burst of every grid's history
     } catch {
       /* going anyway */
     }
@@ -1538,6 +1562,11 @@ if (process.env.FOUNDATION_EXIT_WITH_PARENT === "1") {
 }
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.once(sig, () => {
+  try {
+    flushTimeline(); // the last burst of every grid's history
+  } catch {
+    /* going anyway */
+  }
   void shutdownLocalVms().finally(() => process.exit(0));
 });
 

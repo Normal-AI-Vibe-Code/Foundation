@@ -64,6 +64,9 @@ import { ingest, ingestDrop } from "../lib/ingest";
 import { SectionEmpty } from "../panels/SectionEmpty";
 import { addChatPicker } from "../chat/gridChatPlace";
 import { SectionRewind } from "../panels/ReplayView";
+import { TimelinePast } from "../timeline/TimelinePast";
+import { SectionClock, SectionTimeline } from "../timeline/SectionTimeline";
+import { NoteRecorderHost, NoteTool } from "../notes/NoteRecorder";
 import { setUi } from "../state/ui";
 import { openContextMenu } from "./ContextMenu";
 import { sectionMenuItems } from "./sectionMenu";
@@ -462,6 +465,9 @@ export const SectionView = memo(function SectionView({
         )}
         {/* a section that follows a Slack channel says how that connection stands */}
         <SlackMark sectionId={section.id} />
+        {/* the section's timeline: its clock beside its name, quiet, always there (the right end of a section wider
+            than the window is off screen; this end is where the name is read) */}
+        {!mini && <SectionClock sectionId={section.id} variant="rest" />}
 
         {/* at rest, what a section is: somewhere agents build with you, and a grid of its own to open */}
         {!mini && (
@@ -531,6 +537,8 @@ export const SectionView = memo(function SectionView({
             {tool("Add a table", "⊞", () => createTable(section.id))}
             {tool("Add a map", "◍", () => createMap(section.id))}
             {tool("Add a note", "¶", () => addNote(section.id))}
+            {/* a voice or video note (notes/): hidden from a viewer; it opens the recorder, not the microphone */}
+            <NoteTool sectionId={section.id} />
             {tool("Upload an image or video", "⇪", () => fileRef.current?.click(), "", keys("mod+U"))}
           </div>
           {/* machines, and how the section's app is shown: as a card, or full screen (rightmost) */}
@@ -540,7 +548,8 @@ export const SectionView = memo(function SectionView({
             {host && tool(`Show ${host.name} as a card`, "◱", () => setSectionHost(section.id, null))}
             {host && <FullscreenButton id={host.id} />}
           </div>
-          <div className="sec-group">
+          <div className="sec-group sec-meta">
+            <SectionClock sectionId={section.id} variant="tool" />
             {tool("Council: this section's agents. Talk to them, add more", <CouncilGlyph size={14} />, () => toggleCouncil({ kind: "section", id: section.id }), "sec-agent sec-council")}
             {canRemove && !isOpen && tool("Remove this section…", "✕", () => setConfirming(true), "sec-remove")}
           </div>
@@ -644,6 +653,10 @@ export const SectionView = memo(function SectionView({
         <div ref={contentRef} className="section-content">
           {/* a clock card off "now": this section as it was, for this viewer only (ReplayView.tsx) */}
           {!mini && <SectionRewind sectionId={section.id} />}
+          {/* a timeline off "now" (the grid's, or this section's own): this section as it was, for this viewer only */}
+          {!mini && <TimelinePast sectionId={section.id} />}
+          {/* the voice and video note recorder, when it's open for this section (drawn on the screen, not the grid) */}
+          {!mini && <NoteRecorderHost sectionId={section.id} />}
           {objects.map((o) => {
             const pos = layout.get(o.id) ?? { x: o.x, y: o.y };
             const isObjActive = view.activeObjectId === o.id;
@@ -712,6 +725,9 @@ export const SectionView = memo(function SectionView({
           getScale={getScale}
         />
       )}
+
+      {/* the section's own timeline, along its foot over the body (timeline/SectionTimeline.tsx) */}
+      {!mini && <SectionTimeline sectionId={section.id} />}
 
       {/* add-section affordances on all four edges (an opened section adds beside itself, in its own grid) */}
       {!mini && ADD_EDGES.map((e) => (

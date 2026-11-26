@@ -30,7 +30,8 @@ export function kindWord(o: AnyObject): string {
   if ("cols" in o) return "table";
   if ("sourceTableId" in o) return "map";
   if ("text" in o) return "note";
-  return o.media === "video" ? "video" : "image";
+  if (o.note) return o.media === "audio" ? "voice note" : "video note";
+  return o.media === "audio" ? "sound" : o.media === "video" ? "video" : "image";
 }
 
 /** does this card have anything coming in or going out: ports of its own, or a wire to it */

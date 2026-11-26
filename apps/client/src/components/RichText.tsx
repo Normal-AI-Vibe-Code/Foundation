@@ -17,9 +17,17 @@
  *
  * Click in it to write (no double-click). Esc, or a click anywhere else, puts
  * the toolbar away. A viewer reads it; links open.
+ *
+ * The toolbar sits just outside the card's foot, under it, and rises a few px
+ * into place (2026-11-25, Josh: "should actually animate up, not moving the
+ * text down, keep it steady"): it is drawn into the card itself, outside the
+ * clipped body, so the words keep their padding and their scroll while it
+ * shows and every line stays in view.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { NOTE_SIZES, type NoteSize } from "@foundation/protocol";
 import { setNoteSize, takeFreshNote, updateNoteText, type NoteMeta } from "../state/store";
 import { getUi } from "../state/ui";
@@ -395,6 +403,9 @@ export function RichNote({ note }: { note: NoteMeta }) {
   const [focused, setFocused] = useState(false);
   const [marks, setMarks] = useState<Marks>(NO_MARKS);
   const canWrite = getUi().role !== "viewer";
+  /** the card the toolbar is drawn into, under its foot (outside the body, which clips); none: in place, as before */
+  const [card, setCard] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setCard(el.current?.closest<HTMLElement>(".frame-card") ?? null), []);
   /** where the caret was in the text, for a toolbar control that takes the focus (the style picker, the link field) */
   const range = useRef<Range | null>(null);
   const restore = () => {
@@ -513,31 +524,43 @@ export function RichNote({ note }: { note: NoteMeta }) {
           }
         }}
       />
-      {focused && canWrite && (
-        <div
-          className="rich-bar-slot"
-          onBlur={(e) => {
-            // leaving the toolbar for anywhere but the text puts it away
-            const to = e.relatedTarget as HTMLElement | null;
-            if (to && (to === el.current || to.closest(".rich-bar"))) return;
-            if (!to && e.currentTarget.contains(document.activeElement)) return;
-            setFocused(false);
-          }}
-        >
-          <RichToolbar
-            marks={marks}
-            size={note.size ?? "m"}
-            onSize={(s) => setNoteSize(note.id, s)}
-            onCommand={command}
-            onStyle={(s) => command("formatBlock", s)}
-            onLink={(url) => {
-              restore();
-              document.execCommand("createLink", false, url);
-              commit();
-            }}
-          />
-        </div>
+      {portalTo(
+        card,
+        <AnimatePresence>
+          {focused && canWrite && (
+            <motion.div
+              key="bar"
+              className={`rich-bar-slot${card ? " is-under" : ""}`}
+              // rises 6 px into place and fades in; goes the same way (DESIGN §6: --dur-pane in, --dur-quick out, ease-out-soft)
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
+              exit={{ opacity: 0, y: 6, transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] } }}
+              onBlur={(e) => {
+                // leaving the toolbar for anywhere but the text puts it away
+                const to = e.relatedTarget as HTMLElement | null;
+                if (to && (to === el.current || to.closest(".rich-bar"))) return;
+                if (!to && e.currentTarget.contains(document.activeElement)) return;
+                setFocused(false);
+              }}
+            >
+              <RichToolbar
+                marks={marks}
+                size={note.size ?? "m"}
+                onSize={(s) => setNoteSize(note.id, s)}
+                onCommand={command}
+                onStyle={(s) => command("formatBlock", s)}
+                onLink={(url) => {
+                  restore();
+                  document.execCommand("createLink", false, url);
+                  commit();
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>,
       )}
     </>
   );
 }
+
+const portalTo = (to: HTMLElement | null, node: React.ReactNode) => (to ? createPortal(node, to) : node);

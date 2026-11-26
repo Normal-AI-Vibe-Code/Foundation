@@ -33,6 +33,7 @@ import {
   nextLevel,
 } from "../lib/imageLod";
 import "./progressive-image.css";
+import { VideoNoteCard, VoiceNoteCard } from "../notes/NoteCards";
 
 /** Off-screen grace period before an image card sheds its GPU texture down to its tiny 64/256 tier. */
 const VRAM_SHED_MS = 2500;
@@ -46,7 +47,18 @@ interface Props {
   getScale(): number;
 }
 
-export const MediaView = memo(function MediaView({ item, pos, isActive, getScale }: Props) {
+/**
+ * A media card: a picture, a video, or (2026-11-25) a voice or video note and a sound, which are players
+ * (notes/NoteCards.tsx). A note never autoplays and plays with its sound: it is not a video that starts when
+ * the camera is calm, and a sound has no picture to load levels for.
+ */
+export const MediaView = memo(function MediaView(props: Props) {
+  if (props.item.media === "audio") return <VoiceNoteCard {...props} />;
+  if (props.item.note) return <VideoNoteCard {...props} />;
+  return <PictureView {...props} />;
+});
+
+const PictureView = memo(function PictureView({ item, pos, isActive, getScale }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const image = item.media === "image";

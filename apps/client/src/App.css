@@ -1445,12 +1445,15 @@ body.rewiring {
   box-shadow: inset 0 0 0 2px var(--color-pulse);
 }
 .rich-text.is-writing {
-  /* room for the toolbar along the foot. Nothing at the top: the card's bar makes its own room (.bar-reflow),
-     and it is already showing when a press lands, so the words don't move under a drag that selects them */
-  padding-bottom: 52px;
+  /* No room of its own for the toolbar or the bar (2026-11-25): the card's bar rises above the card and the
+     toolbar hangs under it, both outside, so the words keep their padding and their scroll while you write */
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-padding-block: 44px 54px;
+}
+/* full screen has no outside: there the toolbar rides the foot, inside, and the words make room for it */
+.frame-card:fullscreen .rich-text.is-writing {
+  padding-bottom: 60px;
+  scroll-padding-block-end: 64px;
 }
 .rich-text:empty::before {
   content: attr(data-placeholder);
@@ -1471,6 +1474,56 @@ body.rewiring {
   display: flex;
   justify-content: center;
   pointer-events: none;
+}
+/* A note's toolbar (2026-11-25, Josh: "about 20% larger … animate up"): drawn into the card under its foot, 6 px
+   below the edge, centred on the card; it rises 6 px into place as it fades in (RichText.tsx). 40 tall, with
+   32 px buttons, the picker and the link field 32, letters 16, words 14, glyphs a fifth larger. */
+.frame-card > .rich-bar-slot.is-under {
+  z-index: 5;
+  top: calc(100% + 6px);
+  bottom: auto;
+  left: -1px;
+  right: -1px;
+}
+.frame-card:fullscreen > .rich-bar-slot.is-under {
+  top: auto;
+  bottom: var(--space-3);
+}
+.rich-bar-slot .rich-bar {
+  height: 40px;
+  padding: 0 var(--space-2);
+}
+.rich-bar-slot :is(.rich-btn, .rich-style, .rich-link-field) {
+  height: 32px;
+}
+.rich-bar-slot .rich-btn {
+  min-width: 32px;
+  font-size: var(--text-16);
+}
+.rich-bar-slot .rich-btn.is-word {
+  padding: 0 var(--space-3);
+  font-size: var(--text-14);
+}
+.rich-bar-slot .rich-btn > svg {
+  scale: 1.2;
+}
+.rich-bar-slot .rich-size.is-down {
+  font-size: var(--text-13);
+}
+.rich-bar-slot .rich-size.is-up {
+  font-size: var(--text-20);
+}
+.rich-bar-slot .rich-sep {
+  height: 20px;
+}
+.rich-bar-slot :is(.rich-style, .rich-link-field) {
+  font-size: var(--text-14);
+}
+.rich-bar-slot .rich-style {
+  padding: 0 var(--space-2);
+}
+.rich-bar-slot .rich-link-field {
+  width: 260px;
 }
 .rich-bar {
   pointer-events: auto;
@@ -1838,14 +1891,14 @@ body.is-connecting .frame-header {
   --bar-push: 0px;
 }
 @media (hover: hover) {
-  .frame-anchor.chrome-bar:hover .frame-card {
+  .frame-anchor.chrome-bar:not(.bar-rise):hover .frame-card {
     --bar-push: 38px;
   }
   .frame-anchor.chrome-bar:hover .frame-body > :is(.bar-reflow, .bar-slide) {
     transition-delay: 0s;
   }
 }
-.frame-anchor.chrome-bar:is(.is-hover, .dragging, .is-confirming, :focus-within) .frame-card {
+.frame-anchor.chrome-bar:not(.bar-rise):is(.is-hover, .dragging, .is-confirming, :focus-within) .frame-card {
   --bar-push: 38px;
 }
 body.is-connecting .frame-card,
@@ -1865,6 +1918,79 @@ body.is-connecting .frame-card,
 }
 .frame-anchor.chrome-bar:is(.is-hover, .dragging, .is-confirming, :focus-within) .frame-body > :is(.bar-reflow, .bar-slide) {
   transition-delay: 0s;
+}
+
+/* The bar rises (2026-11-25, Josh: "the menus for notes should be about 20% larger, and should actually animate
+   up, not moving the text down, keep it steady, same with the chat window"): on a note and a chat card
+   (ObjectFrame `barRise`, .bar-rise) the bar is 36 tall, a fifth larger, with 30 px buttons, 14 px type and its
+   glyphs to match, and it sits just outside the card, 4 px above its top edge, the card's own width. It comes
+   up 6 px into place as it fades in (instantly), and goes down the same way after the same 140 ms linger. The
+   card is not given room: nothing in it moves or changes size. While it shows, the card is lifted over its
+   neighbours (z 3; .bar-linger holds it through the fade), and a strip under the bar bridges the 4 px to the
+   card, so the pointer can travel up to it. Every other card keeps the room above. */
+.bar-rise .frame-header {
+  height: 36px;
+  gap: var(--space-3);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  translate: 0 6px;
+}
+.frame-anchor.bar-rise:not(.is-folded) > .frame-card > .frame-header {
+  top: auto;
+  bottom: calc(100% + 4px);
+  left: -1px;
+  right: -1px;
+}
+.frame-anchor.bar-rise:not(.is-folded) > .frame-card > .frame-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 6px;
+}
+/* minimized, it is the card (40 tall: a pixel all round inside its edge) */
+.frame-anchor.bar-rise.is-folded .frame-header {
+  top: 1px;
+  left: 1px;
+  right: 1px;
+}
+.bar-rise .frame-header .icon-btn:not(.panel-chip) {
+  width: 30px;
+  height: 30px;
+  font-size: var(--text-14);
+}
+.bar-rise .frame-header .icon-btn > svg {
+  scale: 1.2;
+}
+.bar-rise .frame-header .frame-title {
+  font-size: var(--text-14);
+}
+.bar-rise .frame-header .grip.mini {
+  gap: 3px;
+}
+.bar-rise .frame-header .grip.mini span {
+  width: 13px;
+}
+.frame-anchor.bar-rise:is(:hover, .is-hover, :focus-within, .dragging, .is-confirming, .bar-linger) {
+  z-index: 3;
+}
+/* Drawn over its section's header too: while a card's risen bar shows, its section's body is lifted over the
+   header (z 4) and clips 42 px higher, to the section's top edge, so a card in the top row (28 px under the
+   header) still shows its whole bar. At rest the body clips as it always has. */
+.section-body:has(> .section-content > .obj-slot > .frame-anchor.bar-rise:is(:hover, .is-hover, :focus-within, .dragging, .is-confirming, .bar-linger)) {
+  overflow: visible;
+  clip-path: inset(-42px 0 0 0 round 0 0 var(--radius-pane) var(--radius-pane));
+  z-index: 4;
+}
+/* and while a note is written in, its toolbar hangs under the card (RichText.tsx): the body clips 56 px lower
+   too, and the section is drawn over the one below it, so the toolbar of a note in the bottom row shows whole */
+.section-body:has(> .section-content > .obj-slot > .frame-anchor.bar-rise .rich-bar-slot.is-under) {
+  overflow: visible;
+  clip-path: inset(-42px 0 -56px 0 round 0 0 var(--radius-pane) var(--radius-pane));
+  z-index: 4;
+}
+.section-card:not(.expanded, .section-dragging):has(> .section-body > .section-content > .obj-slot > .frame-anchor.bar-rise .rich-bar-slot.is-under) {
+  z-index: 6;
 }
 /* the room the bar is given shows the card's own ground (what its content stands on), not the paper behind it */
 .panel-card .frame-body {
@@ -1893,6 +2019,16 @@ body.is-connecting .frame-card,
 }
 [data-card-chrome] .oncall-cell {
   width: 348px;
+}
+/* a risen bar sits above its card, a hanging toolbar under it: the specimens leave them the room */
+[data-card-chrome] .chrome-demo.bar-rise {
+  margin-top: var(--space-6);
+}
+[data-card-chrome] .is-writing-demo .chrome-demo {
+  margin-bottom: calc(var(--space-7) + var(--space-3));
+}
+[data-card-chrome] .oncall-cell.is-chat-demo {
+  width: auto;
 }
 
 /* #/design, "Using a card": what the pointer does (design/PointerDemo.tsx) */

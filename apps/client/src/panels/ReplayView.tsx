@@ -31,7 +31,10 @@ import { Avatar } from "../characters/Avatar";
 import { seats, useRoster } from "../characters/roster";
 import { CadPreview } from "../cad/CadPreview";
 import { MODEL_EXT } from "../cad/model";
+import { renderMarkdown } from "../utils/markdown";
 import { Portrait, goToCard } from "./HuddleCall";
+import { VoicePlayer } from "../notes/NoteCards";
+import { clock, whoWhen } from "../notes/recorder";
 import "./replay.css";
 
 // ---------- data: the timeline and the takes ----------
@@ -503,15 +506,19 @@ export function flowOf(objects: ObjectDoc[], availW: number, host?: string): Map
   return out;
 }
 
-const GLYPH: Record<string, string> = { note: "▤", table: "⊞", map: "◍", image: "▨", video: "▶", file: "▯", huddle: "◐", app: "◳", link: "↗", machine: "▣", agent: "✦", replay: "◷" };
+const GLYPH: Record<string, string> = { note: "▤", table: "⊞", map: "◍", image: "▨", video: "▶", file: "▯", huddle: "◐", app: "◳", link: "↗", machine: "▣", agent: "✦", replay: "◷", chat: "#", grid: "▦" };
 
 /** one card as it was: a note's words, a table's cells, a picture, a CAD file's still; anything else its mark and name */
 function OldCard({ o, doc }: { o: ObjectDoc; doc: Y.Doc }) {
   if (o.kind === "note") {
+    // as the grid drew it: the live note's formatted side (renderMarkdown, which escapes the text first), its size
+    // and whether it stands on its paper, on the live card's own classes; read-only
     const text = noteTextOf(doc, o);
     return (
-      <div className="rp-card is-note" data-rp-card={o.name}>
-        <div className="rp-note-text">{text.replace(/^#+\s*/gm, "")}</div>
+      <div className={`frame-card note-card rp-past-note${o.bare ? " is-bare" : ""}`} data-rp-card={o.name}>
+        <div className="note-inner rp-past-note-inner" data-size={o.size ?? "m"}>
+          <div className="note-rendered rich-text rp-past-note-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }} />
+        </div>
       </div>
     );
   }
@@ -522,10 +529,20 @@ function OldCard({ o, doc }: { o: ObjectDoc; doc: Y.Doc }) {
     return (
       <div className="rp-card is-table" data-rp-card={o.name}>
         <div className="rp-card-head">{o.name}</div>
-        <div className="rp-cells" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {Array.from({ length: rows * cols }, (_, i) => (
-            <span key={i}>{cells[`${i % cols},${Math.floor(i / cols)}`] ?? ""}</span>
+        {/* as the sheet draws it: the column letters across the top, the row numbers down the side */}
+        <div className="rp-cells" style={{ gridTemplateColumns: `28px repeat(${cols}, minmax(0, 1fr))` }}>
+          <span className="rp-cells-corner" />
+          {Array.from({ length: cols }, (_, c) => (
+            <span key={`h${c}`} className="rp-cells-head">
+              {String.fromCharCode(65 + c)}
+            </span>
           ))}
+          {Array.from({ length: rows }, (_, r) => [
+            <span key={`n${r}`} className="rp-cells-num">
+              {r + 1}
+            </span>,
+            ...Array.from({ length: cols }, (_, c) => <span key={`${c},${r}`}>{cells[`${c},${r}`] ?? ""}</span>),
+          ])}
         </div>
       </div>
     );
@@ -548,7 +565,25 @@ function OldCard({ o, doc }: { o: ObjectDoc; doc: Y.Doc }) {
 
 function OldMedia({ o }: { o: Extract<ObjectDoc, { kind: "media" }> }) {
   const src = useFileSrc(o.src, o.media === "image");
+  // a voice or video note in the past draws as one: its player, which plays the archived clip (notes/NoteCards.tsx)
+  if (o.media === "audio" || o.note)
+    return (
+      <div className="rp-card is-media is-note" data-rp-card={o.name}>
+        <OldNote o={o} />
+      </div>
+    );
   return <div className="rp-card is-media" data-rp-card={o.name}>{o.media === "image" && src ? <img src={src} alt={o.name} draggable={false} /> : <span className="rp-card-glyph">▶</span>}</div>;
+}
+
+function OldNote({ o }: { o: Extract<ObjectDoc, { kind: "media" }> }) {
+  const src = useFileSrc(o.src);
+  if (o.media === "audio") return <VoicePlayer src={src} peaks={o.note?.peaks} ms={o.note?.ms} caption={o.note ? whoWhen(o.note.byName, o.note.at) : o.name} label={o.name} />;
+  return (
+    <>
+      {src && <video src={`${src}#t=0.05`} controls playsInline preload="metadata" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+      <span className="rp-card-glyph">{o.note ? `${whoWhen(o.note.byName, o.note.at)} · ${clock(o.note.ms)}` : o.name}</span>
+    </>
+  );
 }
 
 /** the cards of a section in a rebuilt document, at their places; they move on short springs between moments */
@@ -747,7 +782,7 @@ function setRewind(sectionId: string, r: Rewind | null) {
   rewindVersion++;
   rewindSubs.forEach((f) => f());
 }
-function useRewind(sectionId: string): Rewind | null {
+export function useRewind(sectionId: string): Rewind | null {
   useSyncExternalStore(
     (f) => {
       rewindSubs.add(f);
@@ -896,6 +931,15 @@ function RewoundCards({ r, sectionId }: { r: Rewind; sectionId: string }) {
   const player = r.takeId ? r.data.players.get(r.takeId) : undefined;
   const at = useDocAt(r.clock, player, r.data.timeline.session.startedAt);
   if (!at) return null;
+  return <PastSectionCards sectionId={sectionId} doc={at.doc} cursors={at.cursors} version={at.version} />;
+}
+
+/**
+ * A section's cards from a rebuilt document, laid out at the section's live width and fit, with the pointers that
+ * were in it (world points brought into the section's content). The clock card's rewind and the timeline both draw
+ * the past with it (timeline/TimelinePast.tsx).
+ */
+export function PastSectionCards({ sectionId, doc, cursors, version, only }: { sectionId: string; doc: Y.Doc; cursors?: ReturnType<TakePlayer["cursorsAt"]>; version: number; only?: (c: ReturnType<TakePlayer["cursorsAt"]>[number], origin: { x: number; y: number; fit: number; w: number; h: number }) => boolean }) {
   const flow = sectionFlow(sectionId);
   const fit = liveFit.get(sectionId) ?? flow.fit;
   const st = getState();
@@ -904,9 +948,10 @@ function RewoundCards({ r, sectionId }: { r: Rewind; sectionId: string }) {
   let origin: { x: number; y: number; fit: number } | undefined;
   const el = document.querySelector<HTMLElement>(`[data-section-id="${sectionId}"]`);
   if (sec && el) origin = { x: el.offsetLeft + 1, y: el.offsetTop + 1 + 42, fit };
+  const shown = only && origin && el ? cursors?.filter((c) => only(c, { ...origin!, w: el.offsetWidth, h: el.offsetHeight })) : cursors;
   return (
-    <div className="rp-rewind-cards" data-rp-doc-version={at.version} data-rp-count={[...boardMaps(at.doc).objects.values()].filter((o) => o.sectionId === sectionId && !(o.kind === "panel" && o.panel === "replay")).length}>
-      <OldCards doc={at.doc} sectionId={sectionId} availW={Math.max(360, flow.availW)} cursors={at.cursors} origin={origin} />
+    <div className="rp-rewind-cards" data-rp-doc-version={version} data-rp-count={[...boardMaps(doc).objects.values()].filter((o) => o.sectionId === sectionId && !(o.kind === "panel" && o.panel === "replay")).length}>
+      <OldCards doc={doc} sectionId={sectionId} availW={Math.max(360, flow.availW)} cursors={shown} origin={origin} />
     </div>
   );
 }

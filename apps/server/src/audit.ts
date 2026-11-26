@@ -221,6 +221,26 @@ export interface CallScope {
 
 export const callScope = new AsyncLocalStorage<CallScope>();
 
+/**
+ * Who is acting in the code running now (the timeline's Changes lane, timeline.ts): set by runTool around a
+ * tool's run (the agent, or the person acting directly, as actorOf decides), by index.ts around a person's (or an
+ * agent bearer's) own write request, and by agent.ts around a run. A board write's Yjs observer runs inside
+ * editBoard, synchronously, so it reads this to say who made the change. Never taken from a request's body.
+ */
+export interface ScopeActor {
+  kind: "person" | "agent" | "system";
+  /** a person's user id; an agent's crew id (or `agent:<user>` for an outside one) */
+  id?: string;
+  name: string;
+  /** an agent's: the person it works for, by name */
+  for?: string;
+  /** and by id */
+  forId?: string;
+  /** a label the caller gave itself (MCP `?as=`): shown as a claim only, never as the name */
+  claim?: string;
+}
+export const actorScope = new AsyncLocalStorage<ScopeActor>();
+
 /** the person who approved what the current call sends (an app tool's press, a standing leave) */
 export function noteApproval(personId: string | null | undefined) {
   const s = callScope.getStore();

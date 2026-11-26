@@ -74,6 +74,8 @@ export function itemsForCard(card: AnyObject | null, board: string | null | unde
   if (!card || !board) return [];
   const place = placeOf(card, board, name);
   if (!isPanel(card) && "media" in card && card.media === "image" && /^\/files\//.test(card.src)) return [{ kind: "file", src: card.src, name: card.name || "picture", place }];
+  // a voice or video note goes as its clip (the same archived file), so the conversation can play it
+  if (!isPanel(card) && "media" in card && card.note && /^\/files\//.test(card.src)) return [{ kind: "file", src: card.src, name: card.name || (card.media === "audio" ? "voice note" : "video note"), place }];
   return [{ kind: "place", place }];
 }
 

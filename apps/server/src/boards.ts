@@ -18,6 +18,7 @@ import * as decoding from "lib0/decoding";
 import type { WebSocket } from "ws";
 import { appendSection, boardMaps, describeBoard, logActivity, noteTextOf, tableCellsOf, uid, type ObjectDoc, type PanelDoc } from "@foundation/protocol";
 import { all, db, indexDoc, one, run, unindexDoc } from "./db.ts";
+import { actorScope } from "./audit.ts";
 
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
@@ -192,7 +193,10 @@ export function getBoard(id: string): Board {
 
   boards.set(id, board);
   guardServerMaps(board);
-  for (const fn of openListeners) fn(board);
+  // a board's watchers start outside whoever's request opened it: what they arm later is the server's, not that person's (timeline.ts)
+  actorScope.exit(() => {
+    for (const fn of openListeners) fn(board);
+  });
   // the board's lineage: a device's offline copy only merges into the board it came from
   if (!boardMaps(doc).meta.get("epoch")) doc.transact(() => boardMaps(doc).meta.set("epoch", `ep_${randomUUID()}`), "system");
   scheduleIndex(board);

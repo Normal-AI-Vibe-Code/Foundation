@@ -57,6 +57,7 @@ import { HttpError } from "./http.ts";
 import { canSeeBoard } from "./members.ts";
 import { plural } from "./words.ts";
 import { SYSTEM_GRIDS } from "./systemgrids.ts";
+import { moveNoteFile } from "./medianotes.ts";
 
 /** panel kinds that stay on the grid they were made on (their engine, their sockets and their pipeline are that grid's) */
 const STAYS: Record<string, string> = { machine: "machine", huddle: "huddle", stage: "pipeline stage" };
@@ -137,7 +138,12 @@ export function extractSection(boardId: string, sectionRef: string, by: ExtractB
     const next = { ...card } as ObjectDoc & { text?: string; huddle?: unknown };
     if (next.kind === "media") {
       const m = /^\/files\/([^/?#]+)/.exec(next.src);
-      if (m) next.src = next.src.replace(m[1], shareFileWith(m[1], child, by.userId));
+      if (m) {
+        const there = shareFileWith(m[1], child, by.userId);
+        next.src = next.src.replace(m[1], there);
+        // a voice or video note goes whole: who, when, its wave, and its file on the new grid
+        if (next.note) next.note = moveNoteFile(next, m[1], there).note;
+      }
     }
     if (next.kind === "panel" && next.fileId) next.fileId = shareFileWith(next.fileId, child, by.userId);
     if (next.kind === "map" && next.sourceTableId && !movingIds.has(next.sourceTableId)) next.sourceTableId = null;

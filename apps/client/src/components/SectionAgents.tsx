@@ -189,7 +189,7 @@ export function SectionAgentsBody({ sectionId, sectionName, focus }: { sectionId
       focus={focus}
       recent={recent}
       onAsk={(text) => {
-        askCrew(`In the “${sectionName}” section: ${text}`);
+        askCrew(`In the “${sectionName}” section: ${text}`, undefined, sectionId);
         toast(`An agent is on its way to ${sectionName}`, "agent");
       }}
       teams={

@@ -23,6 +23,7 @@ import { CREW_NAMES } from "./crew.ts";
 import { editBoard, getBoard } from "./boards.ts";
 import { HttpError } from "./http.ts";
 import { t3Host, type T3Agent } from "./t3host.ts";
+import { recordEvent } from "./timeline.ts";
 
 export interface AvailableAgent extends Omit<PostedAgent, "by" | "byName" | "at"> {
   /** what it is (docs/agent-harness.md §1): always set on what's available */
@@ -183,7 +184,7 @@ export function postAgent(boardId: string, place: string, key: string, user: Use
   const found = availableAgents().agents.find((a) => a.key === key);
   if (!found) throw new HttpError(404, key.startsWith("t3:") ? "That agent isn't on this computer right now. Start this computer's agents in Settings → Agents." : "No such agent");
   if (model !== undefined && found.kind !== "claude-api" && found.kind !== "claude-federated") throw new HttpError(400, "Only a Claude on the API (an API key or federated identity) takes a model of its own.");
-  return editBoard(boardId, "posted", (doc) => {
+  const out = editBoard(boardId, "posted", (doc) => {
     const m = boardMaps(doc);
     const now = postedAgentsOf(doc, place);
     if (now.length >= MAX_SEATS) throw new HttpError(409, `A council holds ${MAX_SEATS} agents at most; take one off first.`);
@@ -201,6 +202,21 @@ export function postAgent(boardId: string, place: string, key: string, user: Use
     m.agents.set(place, next);
     logActivity(doc, { who: user.name, role: "human", text: `put ${seat.alias} (${found.name}) on the council of ${where}`, objectId: place === GRID_PLACE ? undefined : place });
     return { agents: next, seat };
+  });
+  seatEvent(boardId, place, out.seat, user, true);
+  return out;
+}
+
+/** the timeline (timeline.ts): a seat put on, or taken off, a place's council; who did it is the session's person */
+function seatEvent(boardId: string, place: string, seat: PostedAgent, user: UserInfo, on: boolean) {
+  const name = seat.alias ?? seat.name;
+  recordEvent({
+    board: boardId,
+    section: place === GRID_PLACE ? null : place,
+    kind: "agent.seat",
+    actor: { kind: "agent", ...(seat.id ? { id: seat.id } : {}), name },
+    text: on ? `was put on the council by ${user.name}` : `was taken off the council by ${user.name}`,
+    data: { on, by: user.name, agent: seat.name },
   });
 }
 
@@ -221,17 +237,21 @@ export async function seatModel(raw: unknown): Promise<string | undefined> {
 
 /** take a seat off a council: by its id, or (an older seat, with none) by its agent's key */
 export function unpostAgent(boardId: string, place: string, seatOrKey: string, user: UserInfo): PostedAgent[] {
-  return editBoard(boardId, "posted", (doc) => {
+  let off: PostedAgent | undefined;
+  const out = editBoard(boardId, "posted", (doc) => {
     const m = boardMaps(doc);
     const now = postedAgentsOf(doc, place);
     const gone = now.find((p) => p.id === seatOrKey) ?? now.find((p) => !p.id && p.key === seatOrKey);
     if (!gone) return now;
+    off = gone;
     const next = now.filter((p) => p !== gone);
     if (next.length) m.agents.set(place, next);
     else m.agents.delete(place);
     logActivity(doc, { who: user.name, role: "human", text: `took ${gone.alias ?? gone.name} off the council of ${place === GRID_PLACE ? "the grid" : (m.sections.get(place)?.name ?? "a section")}`, objectId: place === GRID_PLACE ? undefined : place });
     return next;
   });
+  if (off) seatEvent(boardId, place, off, user, false);
+  return out;
 }
 
 /**
