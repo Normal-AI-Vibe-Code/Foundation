@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { getUi } from "../state/ui";
 import { MINI_HEADER, getObject, liveObjPos, setActiveObject, setObjectFloat, setObjectFolded } from "../state/store";
@@ -49,6 +49,9 @@ import { FullscreenBar, FullscreenButton, useFullscreenCard } from "./Fullscreen
  * long as it takes to fade (`bar-linger`), so the lift doesn't drop under it.
  * Another card opts in with this one prop.
  */
+/** which edge or corner is pulled: east, south, west, and the two bottom corners */
+type ResizeDir = "e" | "s" | "w" | "sw" | "se";
+
 interface Props {
   id: string;
   title: string;
@@ -277,13 +280,18 @@ export function ObjectFrame({
   }, [spring, onMove]);
 
   // ----- resize -----
-  const resizeRef = useRef({ active: false, startX: 0, startY: 0 });
+  // by its corner and by its edges (2026-11-26, Josh: "Most of the edges of notes and other panels should be
+  // re-sizable"): right, bottom, and, floating, left (the card's left side moves with the edge). The top is its bar.
+  const resizeRef = useRef({ active: false, startX: 0, startY: 0, dir: "se" as ResizeDir });
   const onResizeDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
     e.stopPropagation();
     const d = resizeRef.current;
     d.active = true;
+    d.dir = ((e.currentTarget as HTMLElement).dataset.dir as ResizeDir | undefined) ?? "se";
     d.startX = e.clientX;
     d.startY = e.clientY;
+    rootRef.current?.classList.add("is-resizing");
     try {
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     } catch { /* synthetic */ }
@@ -293,15 +301,38 @@ export function ObjectFrame({
       const d = resizeRef.current;
       if (!d.active || !onResize) return;
       const s = getScale();
-      onResize((e.clientX - d.startX) / s, (e.clientY - d.startY) / s);
+      const dx = (e.clientX - d.startX) / s;
+      const dy = (e.clientY - d.startY) / s;
+      const dw = d.dir.includes("e") ? dx : d.dir.includes("w") ? -dx : 0;
+      const dh = d.dir.includes("s") ? dy : 0;
+      if (dw || dh) onResize(dw, dh);
       d.startX = e.clientX;
       d.startY = e.clientY;
     },
     [onResize, getScale],
   );
   const onResizeUp = useCallback(() => {
-    resizeRef.current.active = false;
-  }, []);
+    const d = resizeRef.current;
+    if (!d.active) return;
+    d.active = false;
+    rootRef.current?.classList.remove("is-resizing");
+    // the left edge moved the card: where it now stands is kept
+    if (d.dir.includes("w")) onMove(spring.x.goal, spring.y.goal);
+  }, [onMove, spring]);
+  // pulling the left edge: the card grows by what the store allowed (its own limits), and its left side follows
+  const lastWidth = useRef(width);
+  useLayoutEffect(() => {
+    const grew = width - lastWidth.current;
+    lastWidth.current = width;
+    const d = resizeRef.current;
+    if (grew && d.active && d.dir.includes("w")) spring.set(spring.x.goal - grew, spring.y.goal);
+  }, [width, spring]);
+  const resizeHandlers = {
+    onPointerDown: onResizeDown,
+    onPointerMove: onResizeMove,
+    onPointerUp: onResizeUp,
+    onPointerCancel: onResizeUp,
+  };
 
   const dragHandlers = {
     onPointerDown: onHeaderDown,
@@ -341,7 +372,7 @@ export function ObjectFrame({
         onClick={
           chrome === "icons" && onTap
             ? (e) => {
-                if ((e.target as Element).closest("button, .map-resize, .fs-bar")) return;
+                if ((e.target as Element).closest("button, .map-resize, .frame-edge, .fs-bar")) return;
                 if (dragRef.current.dragged) dragRef.current.dragged = false;
                 else onTap();
               }
@@ -426,15 +457,14 @@ export function ObjectFrame({
           </div>
         )}
         {!folded && overlay}
-        {onResize && !folded && (
-          <div
-            className="map-resize"
-            onPointerDown={onResizeDown}
-            onPointerMove={onResizeMove}
-            onPointerUp={onResizeUp}
-            onPointerCancel={onResizeUp}
-            data-tip="Resize"
-          />
+        {onResize && !folded && !fullscreen && (
+          <>
+            <div className="frame-edge is-e" data-dir="e" aria-hidden {...resizeHandlers} />
+            <div className="frame-edge is-s" data-dir="s" aria-hidden {...resizeHandlers} />
+            {float && <div className="frame-edge is-w" data-dir="w" aria-hidden {...resizeHandlers} />}
+            {float && <div className="frame-edge is-sw" data-dir="sw" aria-hidden {...resizeHandlers} />}
+            <div className="map-resize" data-dir="se" {...resizeHandlers} data-tip="Resize" />
+          </>
         )}
       </motion.div>
     </div>

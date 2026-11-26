@@ -1491,12 +1491,9 @@ body.rewiring {
 .frame-card > .rich-bar-slot.is-under .rich-bar {
   flex: 1 1 auto;
   max-width: none;
-  /* a narrow note's toolbar takes a second row rather than hiding its last buttons */
-  height: auto;
-  min-height: 40px;
-  flex-wrap: wrap;
-  row-gap: 2px;
-  padding: 3px var(--space-2);
+  /* one line: a narrow note's last buttons wait under More (RichText.tsx, useToolbarFit) */
+  height: 40px;
+  padding: 0 var(--space-2);
   overflow: visible;
   border: 1px solid var(--line-strong);
   border-top-color: var(--line);
@@ -1506,7 +1503,8 @@ body.rewiring {
 }
 .frame-card.ctx-active > .rich-bar-slot.is-under .rich-bar {
   box-shadow: 0 0 0 2.5px var(--select);
-  clip-path: inset(0 -4px -4px -4px);
+  /* the ring's top is the card's; below, room for the More menu */
+  clip-path: inset(0 -4px -400px -4px);
 }
 .frame-card:has(> .rich-bar-slot.is-under) {
   border-bottom-left-radius: 0;
@@ -1579,11 +1577,43 @@ body.rewiring {
   border: 1px solid var(--line);
   background: var(--color-raise);
   box-shadow: var(--shadow-sheet);
-  /* a note narrower than its toolbar scrolls it sideways */
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
+  /* one line, never scrolled: what doesn't fit is under More, whose menu hangs out of the bar */
+  position: relative;
+  overflow: visible;
 }
+/* More: the buttons that didn't fit the line, on a sheet under its right end (over it, near the window's foot) */
+.rich-more-menu {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + var(--space-1));
+  right: var(--space-1);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1px;
+  max-width: 290px;
+  padding: var(--space-2);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--line-strong);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-sheet);
+  animation: rich-more-in var(--dur-quick) var(--ease-out-soft);
+}
+.rich-more-menu.is-up {
+  top: auto;
+  bottom: calc(100% + var(--space-1));
+}
+.rich-more-menu .rich-sizes {
+  margin-left: 0;
+}
+@keyframes rich-more-in {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
 /* the text size: a small A and a large A, a step down and a step up */
 .rich-sizes {
   flex-shrink: 0;
@@ -1665,8 +1695,11 @@ body.rewiring {
   display: flex;
   align-items: center;
   gap: 2px;
+  min-width: 0;
 }
 .rich-link-field {
+  min-width: 0;
+  flex: 0 1 auto;
   width: 220px;
   max-width: 50cqw;
   height: 26px;
@@ -3189,6 +3222,101 @@ body.is-viewer .chrome-icons .frame-card {
   .map-resize {
     opacity: 1;
   }
+}
+
+/* A card's edges resize it too (2026-11-26, Josh: "Most of the edges of notes and other panels should be
+   re-sizable, using the highlight animation on the bottom right corner"): an 8 px band straddling the right and
+   bottom edges (and, floating, the left one and the bottom-left corner; the top is the card's bar). Resting, the
+   band is clear; under the pointer the edge gleams like the corner — the border lifted toward ink, fading out at
+   both ends, and --color-pulse while it's pulled. Opacity only, never a transitioned colour. */
+.frame-edge {
+  position: absolute;
+  z-index: 5;
+  user-select: none;
+  touch-action: none;
+}
+.frame-edge.is-e {
+  top: 14px;
+  bottom: 18px;
+  right: -4px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.frame-edge.is-w {
+  top: 14px;
+  bottom: 18px;
+  left: -4px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.frame-edge.is-s {
+  left: 18px;
+  right: 18px;
+  bottom: -4px;
+  height: 8px;
+  cursor: ns-resize;
+}
+.frame-edge.is-sw {
+  left: -2px;
+  bottom: -2px;
+  width: 18px;
+  height: 18px;
+  z-index: 6;
+  cursor: nesw-resize;
+}
+.frame-edge::after {
+  content: "";
+  position: absolute;
+  opacity: 0;
+  border: solid color-mix(in srgb, var(--color-frost) 60%, var(--color-line-strong));
+  border-width: 0;
+  transition: opacity var(--dur-quick) var(--ease-out-soft) 120ms;
+}
+/* the gleam sits on the card's border line itself (the band is centred on it) */
+.frame-edge.is-e::after,
+.frame-edge.is-w::after {
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 0;
+  border-left-width: 1px;
+  mask-image: linear-gradient(to bottom, transparent, black 30%, black 70%, transparent);
+}
+.frame-edge.is-s::after {
+  left: 0;
+  right: 0;
+  top: 3px;
+  height: 0;
+  border-top-width: 1px;
+  mask-image: linear-gradient(to right, transparent, black 30%, black 70%, transparent);
+}
+.frame-edge.is-sw::after {
+  left: 1px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  border-width: 0 0 1px 1px;
+  border-bottom-left-radius: var(--radius-card);
+  mask-image: linear-gradient(to bottom left, transparent 50%, black 78%);
+}
+@media (hover: hover) {
+  .frame-edge:hover::after {
+    opacity: 1;
+    transition-delay: 0s;
+  }
+  .frame-edge:hover::after {
+    border-color: var(--color-pulse);
+  }
+}
+.frame-edge:active::after,
+.frame-anchor.is-resizing .frame-edge:active::after {
+  opacity: 1;
+  transition-delay: 0s;
+  border-color: var(--color-pulse);
+}
+/* the bottom edge gives way to the toolbar hanging under a note while it's written in */
+.frame-card:has(> .rich-bar-slot.is-under) > :is(.frame-edge.is-s, .frame-edge.is-sw, .map-resize) {
+  display: none;
 }
 
 /* The mark that says a card scrolls (lib/scrollHint.ts, 2026-11-17): on the card's right edge, by its scroll
