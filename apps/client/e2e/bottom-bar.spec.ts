@@ -119,9 +119,9 @@ test("the grid's council stands at the right; the bar steps to the bottom left; 
   await admin.locator("[data-council-open]").click();
   const council = admin.locator(".council.is-board");
   await expect(council).toBeVisible();
-  // nobody in it: one silhouette, asleep, and the small one beside it that adds (2026-11-24)
+  // nobody in it: one silhouette, asleep, with the + on it (2026-11-25)
   await expect(council.locator(".council-ghost")).toHaveCount(1);
-  await expect(council.locator(".council-ghost-small")).toHaveCount(1);
+  await expect(council.locator(".council-ghost-small")).toHaveCount(0);
   await expect(council.locator("[data-council-add]")).toHaveCount(1);
   await settle(admin, 900);
   const hud = await box(admin, "[data-hud]");
@@ -139,10 +139,11 @@ test("the grid's council stands at the right; the bar steps to the bottom left; 
   expect(ghosts.x).toBeGreaterThan(hud.x + hud.width);
   expect(tools.x - (ghosts.x + ghosts.width)).toBeLessThan(16);
   expect(tools.x - (ghosts.x + ghosts.width)).toBeGreaterThanOrEqual(-1);
-  // the + is the small one: it stands over it, not beside it
-  const small = await box(admin, ".council.is-board .council-ghost-small");
-  const plus = await box(admin, ".council.is-board [data-council-add]");
-  expect(Math.abs(plus.x + plus.width / 2 - (small.x + small.width / 2))).toBeLessThan(3);
+  // the + is on the silhouette, not beside it
+  const fig = await box(admin, ".council.is-board .council-ghost .council-crop");
+  const plus = await box(admin, ".council.is-board [data-council-add] > .council-mark.is-plus");
+  expect(plus.x).toBeGreaterThan(fig.x);
+  expect(plus.x + plus.width).toBeLessThan(fig.x + fig.width);
   await admin.screenshot({ path: `${SHOTS}/04_council-of-the-grid.png` });
   await admin.keyboard.press("Escape");
   await expect(admin.locator(".council")).toHaveCount(0);

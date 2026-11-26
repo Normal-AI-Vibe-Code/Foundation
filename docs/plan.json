@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-25T04:20:21.382Z",
+  "syncedAt": "2026-11-26T01:36:51.515Z",
   "columns": [
     {
       "id": "needs-you",
@@ -111,6 +111,16 @@
       "status": "review",
       "body": "Josh, 2026-11-24 (SPEC §0.17, docs/agent-harness.md). Built: one bar over each agent's head that carries its work and becomes the text box; seats as wide as their figures; one sleeping silhouette with a small one to add; a run card (plan and reasoning) for everyone on the grid; Claude as three kinds (account on this computer, API key with a model picker, federated identity) and T3 as its own; Connect Claude Code or another MCP client; read_card, search_tools, run_code in a QuickJS isolate, /mcp mode=code (about 14,100 tokens of tools down to about 1,270). Checked: 637 server and 290 client tests, the council, section-agents, agent-setup, crew, build and one-interface browser specs, two real Claude Code turns, an independent review whose ten findings were fixed. For Josh to check: restart the server on :4410; try a real API key and, if wanted, a federation rule (neither has run against Anthropic); say whether code mode should be the default (FOUNDATION_AGENT_TOOLS=code). Evidence: docs/evidence/2026-11-24_council-harness/.",
       "issue": 248
+    },
+    {
+      "id": "council-trace-cad",
+      "title": "A run's trace on the council, the silhouette that adds, and CAD cards fed by an app",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agents",
+      "status": "review",
+      "body": "Josh 2026-11-25: one silhouette with the + on it, peeking from behind the last agent when there are agents; more room in the line to an agent; pointing at an agent shows its pane with its profile small and its last run step by step (thinking, tools and what each answered, the error) and whether it worked, failed runs too; an agent takes a part's STL out of an app and puts 3D CAD cards beside it, wired so they follow the app, orphaned when the wire is cut, copied and pasted to work on apart. Built: Council.tsx/RunTrace.tsx/AgentInfo.tsx, agent_runs.crew_name + GET /api/agent/seat-runs, call_app_tool keeps an app's files, add_cad/refresh_cad (cadfeed.ts, docs/cad-feed.md), the fed CAD card's strip, card copy/cut/paste. Not done: PartForm (Airform BOM) has no MCP or API, so no real STL has come out of it yet; what it needs is in docs/cad-feed.md.",
+      "issue": 249
     },
     {
       "id": "usability-pass-2026-11-22",
@@ -2510,7 +2520,7 @@
       "area": "wires",
       "status": "review",
       "body": "Josh, 2026-11-24: port roll-overs did not come to the front; no way to disconnect or undo it; sample the data coming out of a card; examples in the Form Industries grid (table → map, BomForm → table with filters, prompt → 3D character); test that connecting and disconnecting changes the flow; loading and generating states. Built: the port card on the page top layer with a sample; a chip on each live wire with its real state; a wire bar with Disconnect (⌘Z puts it back); the server fills a wired table through its lens and reads a connector only while wired; lay_flow_examples. Not yet: a prompt lens (a paid model call a person presses), prompt → character, and the examples on the company board (needs the :4410 server restarted). docs/flows.md; apps/server/test/flows.test.ts; apps/client/e2e/flows.spec.ts; docs/evidence/2026-11-24_flows.",
-      "issue": null
+      "issue": 250
     },
     {
       "id": "chat-together-2026-11-25",
@@ -2520,7 +2530,7 @@
       "area": "chat",
       "status": "review",
       "body": "Josh, 2026-11-25. main, the edges branch and Rune's three commits merged (merge/bring-together-2026-11-25). Built: the Rust chat server gets files (Postgres, 4 MB), link previews from social tags behind an address guard, pins, a mentions list, a Google ID-token exchange and who-is-where; ChatForm gets uploads and GIFs on a chat server, a bell with recent mentions and direct messages, desktop notifications a person turns on; a Foundation Google sign-in signs ChatForm in; a channel is a card in a section (panel chat); character cards rest on a cached still (pan 47 -> 60 fps on the real studio). Checked: all unit suites, cargo test against Postgres, and in a browser on Foundation's own server at night (a mention arriving, the bell, a link card, a channel card added and written in). Not checked: the app against the Rust server in a browser, day theme, a second person, huddle from the card, the real Google, Vercel or Neon. Open: the desktop app signs in through Flowform, which carries no Google proof, so one sign-in doesn't reach it yet; a link card's picture waits for a press; boards still sync only within one Foundation server; no voice through the chat server. Evidence: docs/evidence/2026-11-25_chat-together/, 2026-11-25_character-grid-perf/.",
-      "issue": null
+      "issue": 251
     },
     {
       "id": "mac-studio-perf",
@@ -2549,7 +2559,8 @@
       "milestone": "apps",
       "area": "apps",
       "status": "review",
-      "body": "Josh, 2026-11-24: PartForm on the Form Industries grid was turned away by OnShape's sign-in; pages should take button clicks and leave scroll, zoom and the panel keys to the grid. Found: the card was a frame (pasted address), and OnShape's sign-in refuses every frame (frame-ancestors *.onshape.com). Built (SPEC §0.10): pages on HyperForm are the built-in browser's unless the card says frame; a site that refuses a frame becomes a browser card; at rest a plain click (and hover) is the page's, the wheel, Ctrl-wheel, middle/right buttons and keys are the grid's, and a click in a field gives the page the keys until Esc Esc. Checked in e2e/pages.spec.ts against a stand-in. Not done: frames unchanged; nobody has signed in to OnShape in that browser (hyperform-sign-in)."
+      "body": "Josh, 2026-11-24: PartForm on the Form Industries grid was turned away by OnShape's sign-in; pages should take button clicks and leave scroll, zoom and the panel keys to the grid. Found: the card was a frame (pasted address), and OnShape's sign-in refuses every frame (frame-ancestors *.onshape.com). Built (SPEC §0.10): pages on HyperForm are the built-in browser's unless the card says frame; a site that refuses a frame becomes a browser card; at rest a plain click (and hover) is the page's, the wheel, Ctrl-wheel, middle/right buttons and keys are the grid's, and a click in a field gives the page the keys until Esc Esc. Checked in e2e/pages.spec.ts against a stand-in. Not done: frames unchanged; nobody has signed in to OnShape in that browser (hyperform-sign-in).",
+      "issue": 252
     }
   ]
 }

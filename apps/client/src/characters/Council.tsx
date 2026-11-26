@@ -24,7 +24,8 @@
  *
  * A seat is as wide as its figure (a mesh avatar's picture, a 3D figure's frame, a still's own
  * proportions): never cut at the sides, only at the edge it stands behind. Beside the agents, one
- * silhouette asleep, and a small one peeking from behind it that adds an agent.
+ * silhouette asleep with the + on it (pressed, it adds an agent): full size on an empty council, and
+ * half size peeking out from behind the last agent's right side once there are agents.
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -282,6 +283,42 @@ const subPending = (f: () => void) => {
 };
 export const usePending = () => useSyncExternalStore(subPending, () => pending);
 
+/**
+ * The agent under the pointer (2026-11-25, Josh: "when you have your mouse over the agent … the panel to the right should
+ * minimize his profile to the top, and show his chain of reasoning"). Pointing at an agent a moment shows its pane, as a
+ * sheet over the grid so nothing under the pointer moves; leaving the agent (and the sheet) puts it away. With the pane
+ * already open, pointing at an agent shows that one in it.
+ */
+let peek: string | null = null;
+let peekTimer = 0;
+const peekSubs = new Set<() => void>();
+export function peekAt(id: string | null, delay = 0) {
+  window.clearTimeout(peekTimer);
+  const set = () => {
+    if (id && getUi().agentInfo) {
+      selectSeat(id, true);
+      return;
+    }
+    if (peek === id) return;
+    peek = id;
+    peekSubs.forEach((f) => f());
+  };
+  if (delay > 0) peekTimer = window.setTimeout(set, delay);
+  else set();
+}
+/** the pointer came onto the sheet: it stays */
+export function holdPeek() {
+  window.clearTimeout(peekTimer);
+}
+export const usePeek = () =>
+  useSyncExternalStore(
+    (f) => {
+      peekSubs.add(f);
+      return () => peekSubs.delete(f);
+    },
+    () => peek,
+  );
+
 /** the crew members the open council shows over their heads: the strip above the bottom bar leaves them out (shell/Talk.tsx) */
 let onCouncil: ReadonlySet<string> = new Set();
 let onCouncilKey = "";
@@ -518,6 +555,8 @@ export function figureAr(c: RosterCharacter | undefined, still = false): number 
 }
 /** a figure's full height, at full size (148 of it shows above the edge: council.css) */
 const FIG_H = 190;
+/** the silhouette's size beside agents, as a share of a figure's (council.css .council-ghosts.is-peek) */
+const GHOST_PEEK = 0.5;
 
 type BarSeat = Pick<CouncilSeat, "name" | "provider" | "where" | "offline" | "why" | "status" | "doing" | "crewId" | "mine" | "session" | "pending">;
 
@@ -611,6 +650,8 @@ interface ViewProps {
   onAdd?: () => void;
   /** press an agent, or its card: what it is, on the right */
   onAbout?: (seat: CouncilSeat) => void;
+  /** the pointer comes onto an agent, or leaves it: its pane shows a moment later, its trace first */
+  onHover?: (seat: CouncilSeat, on: boolean) => void;
   /** the agents panel, on its Council tab */
   onPanel?: () => void;
   panelOpen?: boolean;
@@ -653,7 +694,7 @@ export function fitScale(seats: CouncilSeat[], room: number, extra: { fig: numbe
   return scale;
 }
 
-export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, onAbout, onPanel, panelOpen, onClose, inline, hot }: ViewProps) {
+export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, onAbout, onHover, onPanel, panelOpen, onClose, inline, hot }: ViewProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<AvatarStage | null>(null);
@@ -719,7 +760,7 @@ export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, o
   const ghostAr = ghost && ghostSeen ? figureAr(ghost, true) : PLAIN_AR;
   // the grid's leaves the bottom bar its room beside it; the buttons and the council's padding never shrink
   const room = Math.max(0, avail - (kind === "board" && !inline ? 380 : 0));
-  const scale = avail ? fitScale(seats, room, { fig: canAsk && onAdd ? FIG_H * ghostAr * 1.24 : 0, fixed: 120 + 32 + 8 }) : 1;
+  const scale = avail ? fitScale(seats, room, { fig: canAsk && onAdd ? FIG_H * ghostAr * (seats.length ? GHOST_PEEK * 0.6 : 1) : 0, fixed: 120 + 32 + 8 }) : 1;
 
   const mid = (seats.length - 1) / 2;
   const where = title === "this grid" ? "on this grid" : `in ${title}`;
@@ -741,6 +782,8 @@ export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, o
                 data-council-seat={s.name}
                 data-council-agent={s.agentKey}
                 data-mood={s.offline ? "sad" : s.mood}
+                onPointerEnter={(e) => e.pointerType !== "touch" && onHover?.(s, true)}
+                onPointerLeave={(e) => e.pointerType !== "touch" && onHover?.(s, false)}
               >
                 {run.status !== "idle" && (
                   <div className="council-card-slot">
@@ -793,25 +836,23 @@ export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, o
             );
           })}
           {canAsk && onAdd && (
-            // 2026-11-24 (Josh): one silhouette, asleep and breathing, and from behind it a small one peeking out with the +:
-            // the small one adds an agent. They fade as one group, so where they overlap it doesn't darken
-            <div className="council-ghosts" role="none" data-council-ghosts={1} style={{ ["--fig-ar" as string]: ghostAr.toFixed(4), ["--i" as string]: seats.length } as CSSProperties}>
-              <div className="council-ghost-fade" role="none">
-                <div className="council-ghost-small" role="none" aria-hidden>
-                  <PlainGhost />
-                </div>
-                <div className="council-seat council-ghost" role="listitem" aria-label="A place for another agent">
-                  <div className="council-crop">
-                    <div className={`council-figure${ghost && !ghostSeen ? " is-reading" : ""}`} data-fig-id={ghost?.id} data-ghost={ghostSeen ? "picture" : "plain"}>
-                      {/* a picture whose head can't be found stands as the plain figure, which has eyes */}
-                      {ghost && ghostEyes.get(ghost.id) !== null && <Still character={ghost} role={stillRole(ghost, "bust") ?? "thumb"} />}
-                      {!ghostSeen && <PlainGhost />}
-                      <SleepingEyes eyes={ghostSeen ?? PLAIN_EYES} />
-                    </div>
-                  </div>
-                </div>
-              </div>
+            // 2026-11-25 (Josh): one silhouette, asleep, and the + is on it: the silhouette itself adds an agent. Alone on
+            // the council it stands full size; beside agents it is much smaller and peeks out from behind the last one's
+            // right side, as if around a wall
+            <div className={`council-ghosts${seats.length ? " is-peek" : ""}`} role="none" data-council-ghosts={1} data-council-peek={seats.length ? "" : undefined} style={{ ["--fig-ar" as string]: ghostAr.toFixed(4), ["--i" as string]: seats.length } as CSSProperties}>
               <button type="button" className="council-ghost-add" aria-label="Add an agent to this council" data-tip="Add an agent here" data-council-add onClick={onAdd}>
+                <span className="council-ghost-fade" role="none">
+                  <span className="council-seat council-ghost" role="none">
+                    <span className="council-crop">
+                      <span className={`council-figure${ghost && !ghostSeen ? " is-reading" : ""}`} data-fig-id={ghost?.id} data-ghost={ghostSeen ? "picture" : "plain"}>
+                        {/* a picture whose head can't be found stands as the plain figure, which has eyes */}
+                        {ghost && ghostEyes.get(ghost.id) !== null && <Still character={ghost} role={stillRole(ghost, "bust") ?? "thumb"} />}
+                        {!ghostSeen && <PlainGhost />}
+                        <SleepingEyes eyes={ghostSeen ?? PLAIN_EYES} />
+                      </span>
+                    </span>
+                  </span>
+                </span>
                 <span className="council-mark is-plus" aria-hidden>
                   <PlusGlyph size={11} />
                 </span>
@@ -955,7 +996,13 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
   useEffect(() => {
     showOnCouncil(seats.flatMap((s) => (s.crewId ? [s.crewId] : [])));
   }, [seats]);
-  useEffect(() => () => showOnCouncil([]), []);
+  useEffect(
+    () => () => {
+      showOnCouncil([]);
+      peekAt(null);
+    },
+    [],
+  );
 
   // a section that's gone takes its council with it
   useEffect(() => {
@@ -1052,9 +1099,12 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
         panelOpen={ui.agents && ui.agentsTab === "council"}
         onClose={closeCouncil}
         onAbout={(s) => {
+          // a press keeps it: the sheet becomes the pane
+          peekAt(null);
           selectSeat(s.id, true);
           setUi({ agentInfo: true });
         }}
+        onHover={(s, on) => (on ? peekAt(s.id, 260) : peekAt(null, 420))}
         onPanel={() => setUi(ui.agents && ui.agentsTab === "council" ? { agents: false } : { agents: true, agentsTab: "council" })}
         onAdd={() => setUi({ agents: true, agentsTab: "add" })}
         onSay={(text, to, all) => sayToCouncil(scope, text, to, all, sec)}

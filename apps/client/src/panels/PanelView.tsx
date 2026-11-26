@@ -18,6 +18,7 @@ import { UploaderBody } from "./UploaderView";
 import { PortLabel, portHoverProps } from "../shell/portHover";
 import { DesignBody, GridLinkBody, KanbanBody } from "./SystemCards";
 import { CadPreview } from "../cad/CadPreview";
+import { CadFeedStrip } from "../cad/CadFeedStrip";
 import { MODEL_EXT } from "../cad/model";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { drawnScale, isHosted, MINI_HEADER, emitPort, getState, subscribe, inputValue, movePanel, removePanel, requestSnap, resizePanel, sectionBodyRect, updatePanel, usePanel, type PanelMeta } from "../state/store";
@@ -630,13 +631,16 @@ function MachineHold({ page, from, viewer }: { page: Exclude<MachinePage, { kind
 // ---------- files ----------
 
 const CAD = /\.(step|stp|iges|igs|stl|obj|3mf|glb|gltf|f3d|sldprt|sldasm|x_t|dxf|dwg)$/i;
+/** a model's type as the server keeps it (cadfeed.ts), as the extension the viewer loads by */
+const MODEL_MIME_EXT: Record<string, string> = { "model/stl": ".stl", "application/sla": ".stl", "model/obj": ".obj", "model/gltf-binary": ".glb", "model/step": ".step", "model/iges": ".iges" };
 const TEXTY = /\.(txt|md|markdown|csv|tsv|json|ya?ml|toml|xml|log|js|ts|tsx|py|rs|go)$/i;
 
 function FilePreview({ panel }: { panel: PanelMeta }) {
   // the file's own path (`/files/…`): fetched with this device's session, wherever the server is (lib/fileSrc.ts)
   const url = panel.fileId ? `/files/${panel.fileId}` : panel.url;
   const mime = panel.mime ?? "";
-  const name = panel.name;
+  // a card named for its part ("Fan hub", from add_cad) is still its model: the type gives the viewer its loader
+  const name = !CAD.test(panel.name) && MODEL_MIME_EXT[mime.toLowerCase()] ? `${panel.name}${MODEL_MIME_EXT[mime.toLowerCase()]}` : panel.name;
   const [text, setText] = useState<string | null>(null);
   const host = useRef<HTMLDivElement>(null);
   const live = useOnScreen(host, 0.2);
@@ -682,7 +686,9 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
         // download of opaque bytes, so this frame can only ever hold the browser's PDF viewer or a download (files.ts)
         live && shown ? <iframe src={shown} title={name} /> : <div className="file-card-glyph">PDF</div>
       ) : CAD.test(name) ? (
-        <div className="cad-card">
+        // a model fills the card (the card is the 3D node); a fed card says where its model comes from on top
+        <div className={`cad-card${MODEL_EXT.test(name) ? " is-model" : ""}`}>
+          {panel.feed && <CadFeedStrip panel={panel as PanelMeta & { feed: NonNullable<PanelMeta["feed"]> }} />}
           {MODEL_EXT.test(name) && url && (live || seenLive) ? (
             // the part itself (OpenCascade for STEP/IGES, as Vision reads it)
             <CadPreview url={url} name={name} />

@@ -4,9 +4,12 @@
  * and whether that runs in the cloud or on this computer, what it's doing, what it did here lately,
  * and a box to write to it alone. A floor pane like search and the agents list: it takes their place,
  * and the council moves over to stay in the middle of what's left.
+ *
+ * 2026-11-25 (Josh): pointing at an agent shows this pane as a sheet over the grid (nothing under the pointer moves);
+ * its profile goes small at the top and its last run takes the room, step by step, with whether it worked (RunTrace).
  */
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { boardMaps, type ActivityEntry } from "@foundation/protocol";
 import { useCouncilOpen, useCouncilSelection, selectSeat } from "../lib/councilOpen";
 import { GRID_PLACE, unpostAgent } from "../lib/posted";
@@ -16,11 +19,12 @@ import { ago } from "../shell/SidePane";
 import { useActiveBoard } from "../shell/Presence";
 import { crewAsk, stopSession } from "../state/sessions";
 import { getState, subscribe } from "../state/store";
-import { WIDTHS, setUi, toast, useUi } from "../state/ui";
+import { WIDTHS, floorInsets, setUi, toast, useUi } from "../state/ui";
 import { Avatar } from "./Avatar";
-import { SEAT_STATUS, tellSeat, useCouncilSeats, type CouncilSeat } from "./Council";
+import { SEAT_STATUS, holdPeek, peekAt, tellSeat, useCouncilSeats, usePeek, type CouncilSeat } from "./Council";
 import { PROVIDER_NAME, ProviderMark } from "./providers";
 import { RunCard } from "./RunCard";
+import { RunTrace } from "./RunTrace";
 import { chooseAvatar, readyCharacters, useRoster } from "./roster";
 
 const sectionsOf = () => getState().allSections;
@@ -52,23 +56,54 @@ function useDid(names: string[]): ActivityEntry[] {
 export function AgentInfoPane() {
   const ui = useUi();
   const scope = useCouncilOpen();
-  const { seats, sectionId } = useCouncilSeats(ui.agentInfo ? scope : null);
+  const peeking = usePeek();
+  const kept = useRef<CouncilSeat | null>(null);
+  const sheet = !ui.agentInfo && Boolean(peeking);
+  const { seats, sectionId } = useCouncilSeats(ui.agentInfo || peeking ? scope : null);
   const selected = useCouncilSelection();
   // with no council up there is nobody to show: the pane goes
   useEffect(() => {
     if (ui.agentInfo && !scope) setUi({ agentInfo: false });
   }, [ui.agentInfo, scope]);
-  if (!ui.agentInfo || !scope || ui.presenting) return null;
-  const seat = seats.find((s) => selected.includes(s.id)) ?? seats[0];
+  if ((!ui.agentInfo && !sheet) || !scope || ui.presenting) return null;
+  let seat = sheet ? seats.find((s) => s.id === peeking) : (seats.find((s) => selected.includes(s.id)) ?? seats[0]);
+  // an agent here for one ask leaves the council when it's done: its pane keeps it, so how it went can be read
+  if (seat) kept.current = seat;
+  else if (!sheet && kept.current) seat = { ...kept.current, status: kept.current.status === "working" ? "done" : kept.current.status, crewId: undefined, doing: undefined, plan: null, thought: undefined };
+  if (sheet && !seat) return null;
   return (
-    <aside className="agents-pane agent-info floor-pane" style={{ width: ui.agentsW }} aria-label={seat ? `About ${seat.name}` : "About the agent"} data-agent-info={seat?.name}>
-      <FloorEdge side="left" value={ui.agentsW} {...WIDTHS.agents} onChange={(w) => setUi({ agentsW: w })} label="The agent's pane" />
+    <aside
+      className={`agents-pane agent-info floor-pane${sheet ? " is-sheet" : ""}`}
+      style={sheet ? { width: ui.agentsW, top: floorInsets(ui).top } : { width: ui.agentsW }}
+      aria-label={seat ? `About ${seat.name}` : "About the agent"}
+      data-agent-info={seat?.name}
+      data-agent-sheet={sheet ? "" : undefined}
+      onPointerEnter={sheet ? holdPeek : undefined}
+      onPointerLeave={sheet ? () => peekAt(null, 300) : undefined}
+    >
+      {!sheet && <FloorEdge side="left" value={ui.agentsW} {...WIDTHS.agents} onChange={(w) => setUi({ agentsW: w })} label="The agent's pane" />}
       <header className="agents-head">
         {seat ? seat.name : "Nobody here"}
         <span className="agents-head-n">{seat ? SEAT_STATUS[seat.status] : ""}</span>
-        <button type="button" className="top-btn" onClick={() => setUi({ agentInfo: false })} aria-label="Close agent details" data-tip="Close">
-          ✕
-        </button>
+        {sheet ? (
+          <button
+            type="button"
+            className="top-btn"
+            onClick={() => {
+              if (seat) selectSeat(seat.id, true);
+              peekAt(null);
+              setUi({ agentInfo: true });
+            }}
+            aria-label="Keep this pane open"
+            data-tip="Keep it open"
+          >
+            ⇥
+          </button>
+        ) : (
+          <button type="button" className="top-btn" onClick={() => setUi({ agentInfo: false })} aria-label="Close agent details" data-tip="Close">
+            ✕
+          </button>
+        )}
       </header>
       {seat ? <AgentInfoBody key={seat.id} seat={seat} seats={seats} sectionId={sectionId} viewer={ui.role === "viewer"} /> : <p className="agents-empty">No agents are on this council yet. ＋ on the council adds one.</p>}
     </aside>
@@ -88,11 +123,21 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
   const ready = readyCharacters(roster);
   return (
     <div className="agents-scroll agent-info-body">
-      <div className="agent-info-figure" style={{ ["--crew" as string]: `var(--color-crew-${seat.hue % 6})` }}>
-        <Avatar character={seat.character} mood={seat.mood} framing="full" still={still} />
-        <span className="council-provider">
-          <ProviderMark provider={seat.provider} where={seat.where} size={26} />
-        </span>
+      {/* its profile, small at the top (2026-11-25): the room below is its last run's */}
+      <div className="agent-info-who" style={{ ["--crew" as string]: `var(--color-crew-${seat.hue % 6})` }} data-agent-who>
+        <div className="agent-info-figure is-small">
+          <Avatar character={seat.character} mood={seat.mood} framing="bust" still={still ?? true} />
+        </div>
+        <div className="agent-info-who-text">
+          <b>
+            <ProviderMark provider={seat.provider} where={seat.where} size={16} /> {seat.agentName ?? seat.name}
+          </b>
+          <span>
+            {PROVIDER_NAME[seat.provider]}
+            {seat.model ? ` · ${seat.model}` : ""}
+            {seat.where ? ` · ${seat.where === "local" ? "on this computer" : "in the cloud"}` : ""}
+          </span>
+        </div>
       </div>
 
       {seats.length > 1 && (
@@ -106,6 +151,13 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
         </div>
       )}
 
+      {seat.status === "working" && (seat.plan || seat.thought) && (
+        <RunCard run={{ status: "working", doing: seat.doing, plan: seat.plan, thought: seat.thought, started: seat.started, hue: seat.hue }} variant="full" />
+      )}
+      {!viewer && <RunTrace seat={seat} />}
+
+      <details className="agent-info-about">
+        <summary>About {seat.name}</summary>
       <dl className="agent-info-facts">
         <dt>Agent</dt>
         <dd>
@@ -156,16 +208,13 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
           </>
         )}
       </dl>
+      </details>
 
       {(seat.task || seat.doing) && (
         <section className="agent-info-now">
           {seat.task && <p className="council-task">“{seat.task}”</p>}
           {/* the run card in full (2026-11-24): every step and the reasoning; an older server's run is its doing line */}
-          {seat.status === "working" && (seat.plan || seat.thought) ? (
-            <RunCard run={{ status: "working", doing: seat.doing, plan: seat.plan, thought: seat.thought, started: seat.started, hue: seat.hue }} variant="full" />
-          ) : (
-            seat.doing && <p className="council-doing">{seat.doing}</p>
-          )}
+          {!(seat.status === "working" && (seat.plan || seat.thought)) && seat.doing && <p className="council-doing">{seat.doing}</p>}
           {(seat.askerName || seat.leadName) && (
             <p className="council-for">
               {seat.leadName ? `called in by ${seat.leadName}` : ""}

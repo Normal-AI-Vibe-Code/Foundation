@@ -20,6 +20,45 @@ export function CadPreview({ url, name }: { url: string; name: string }) {
   const [err, setErr] = useState<string | null>(null);
   const [live, setLive] = useState(false);
   const viewer = useRef<ReturnType<typeof stage> | null>(null);
+  /** the size the still was drawn at */
+  const drawn = useRef({ w: 0, h: 0 });
+
+  /** the box's own size, not as drawn: a card on a zoomed-out grid still gets a still sharp enough to zoom in on */
+  const boxSize = () => {
+    const el = box.current;
+    return { w: Math.max(160, el?.offsetWidth ?? 0), h: Math.max(120, el?.offsetHeight ?? 0) };
+  };
+  /** draw the part once into a still (a WebGL context for a moment, then none) */
+  const render = () => {
+    const m = model.current;
+    if (!m || viewer.current) return;
+    const { w, h } = boxSize();
+    const v = stage(m, w, h, isNight());
+    setStill(v.still());
+    v.dispose();
+    drawn.current = { w, h };
+  };
+
+  // the card grew or shrank a good deal (a resize, the card filling its section): draw the still again at its size
+  useEffect(() => {
+    const el = box.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const ro = new ResizeObserver(() => {
+      if (t) clearTimeout(t);
+      t = setTimeout(() => {
+        const { w, h } = boxSize();
+        const d = drawn.current;
+        if (d.w && (Math.abs(w - d.w) / d.w > 0.2 || Math.abs(h - d.h) / d.h > 0.2)) render();
+      }, 300);
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      if (t) clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -29,10 +68,7 @@ export function CadPreview({ url, name }: { url: string; name: string }) {
         const m = await loadModel(name, bytes);
         if (!alive) return;
         model.current = m;
-        const r = box.current!.getBoundingClientRect();
-        const v = stage(m, Math.max(160, r.width), Math.max(120, r.height), isNight());
-        setStill(v.still());
-        v.dispose();
+        render();
         const s = m.size;
         const u = m.units === "mm" ? " mm" : "";
         setInfo(`${Math.round(s.x)} × ${Math.round(s.y)} × ${Math.round(s.z)}${u} · ${m.triangles.toLocaleString()} triangles`);
@@ -59,9 +95,9 @@ export function CadPreview({ url, name }: { url: string; name: string }) {
     e.stopPropagation(); // turning the part, not dragging the card
     if (liveOwner && liveOwner !== stop) liveOwner();
     liveOwner = stop;
-    const r = box.current.getBoundingClientRect();
     if (!viewer.current) {
-      viewer.current = stage(model.current, r.width, r.height, isNight());
+      const { w, h } = boxSize();
+      viewer.current = stage(model.current, w, h, isNight());
       viewer.current.canvas.className = "cad-live";
       box.current.appendChild(viewer.current.canvas);
       setLive(true);

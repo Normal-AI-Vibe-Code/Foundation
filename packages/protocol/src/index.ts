@@ -330,6 +330,45 @@ export interface PanelDoc extends ObjectBaseDoc {
   via?: "browser" | "frame";
   /** when the picture of a `via: "browser"` page was last saved (GET /api/boards/:id/pages/:panel/picture) */
   seenAt?: number;
+  /**
+   * A CAD card fed by an app (2026-11-25, docs/cad-feed.md): a "file" card whose model comes from an app card's tool.
+   * Written by the server alone. It refreshes only while a wire runs from that app card's `cad` port into this card's
+   * `model` port; cut the wire and it is an orphan that keeps its last model.
+   */
+  feed?: CadFeed;
+}
+
+/** the out port an app card feeds CAD cards from, and the in port a CAD card takes its model on */
+export const CAD_OUT_PORT = "cad";
+export const CAD_IN_PORT = "model";
+
+/** where a fed CAD card's model comes from, and how the last fetch went (docs/cad-feed.md) */
+export interface CadFeed {
+  /** the app card (panel id) and its name then */
+  app: string;
+  appName: string;
+  /** the app's MCP tool that returns the model, and its arguments (a part's id, say) */
+  tool: string;
+  args: Record<string, unknown>;
+  /** what this card stands for in the app, shown on the card ("Fan hub, rev C") */
+  label?: string;
+  /** the model's content hash: a fetch that returns the same bytes changes nothing */
+  sha?: string;
+  /** when it last asked the app, and when the model last changed */
+  checkedAt?: number;
+  changedAt?: number;
+  state: "ok" | "error" | "waiting";
+  /** what went wrong, or what it waits on (a person's Allow on the app's card) */
+  note?: string;
+  /** who set it up: refreshes run under their name and that board's Allow */
+  by: string;
+}
+
+/** is this CAD card still wired to the app it's fed from? (an orphan keeps its model and isn't refreshed) */
+export function cadLinked(links: Iterable<LinkDoc>, card: { id: string; feed?: CadFeed }): boolean {
+  if (!card.feed) return false;
+  for (const l of links) if (l.to.panel === card.id && l.to.port === CAD_IN_PORT && l.from.panel === card.feed.app) return true;
+  return false;
 }
 
 // ---------- machines: Linux machines and containers on a local engine ----------

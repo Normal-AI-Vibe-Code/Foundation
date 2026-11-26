@@ -46,13 +46,15 @@ import {
   type PanelKind,
   type Port,
 } from "@foundation/protocol";
+import { cadLinked, type CadFeed } from "@foundation/protocol";
 import { editBoard, getBoard, listBoards } from "./boards.ts";
 import { canSeeBoard } from "./members.ts";
 import type { UserInfo } from "@foundation/protocol";
 import { one } from "./db.ts";
 import { searchAll } from "./search.ts";
 import { checkRepo, discoverRepo, parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
-import { callAppTool, listAppTools } from "./apptools.ts";
+import { callAppTool, listAppTools, type AppCallResult } from "./apptools.ts";
+import { feedRecord, isModel, recordFeed, recordLinked, setCadRefresher, settleFeed, wireCad } from "./cadfeed.ts";
 import { companySnapshot, readConnector } from "./connectors.ts";
 import { createAsk } from "./hermes.ts";
 import { queueJob } from "./jobs.ts";
@@ -879,6 +881,91 @@ export const TOOLS: BoardTool[] = [
       }
       touch(ctx, panel, `called ${tool}`);
       return result.text;
+    },
+  }),
+  // CAD cards fed by an app (cadfeed.ts, docs/cad-feed.md)
+  def({
+    name: "add_cad",
+    description:
+      "Put a 3D CAD card on the grid that draws a model (STL, OBJ, GLB, STEP, IGES). Either give file_id (a file already in this grid's files, e.g. one call_app_tool kept), or give from: { panel, tool, args } to take the model from an app card's MCP tool (one that answers with the file): the card is then wired to that app (its `cad` port into the card's `model` port) and is asked again while the wire is there, so when the app's part changes the model does. A person can cut the wire (the card keeps its last model) or copy the card elsewhere. One card per part; give each a name (the part's). section: where it goes (default: the app card's section, beside it).",
+    schema: z.object({
+      name: z.string().min(1).max(120),
+      file_id: z.string().optional(),
+      from: z.object({ panel: z.string(), tool: z.string(), args: z.record(z.any()).default({}) }).optional(),
+      label: z.string().max(120).optional().describe("what the card stands for in the app, e.g. 'Fan hub, rev C'"),
+      section: z.string().optional(),
+      request_id: z.string().optional(),
+    }),
+    sends: [ext("Saved apps", "call", { when: (i) => Boolean(i.from), ownGate: "a person's press on each tool of a saved app, on first use and after it changes (apptools.ts)" })],
+    write: true,
+    run: async (ctx, i) => {
+      if (!i.file_id === !i.from) throw new HttpError(400, "give either file_id or from, not both and not neither");
+      const doc = getBoard(ctx.boardId).doc;
+      let file: { id: string; name: string; mime: string; sha256?: string } | undefined;
+      let app: PanelDoc | undefined;
+      let label = i.label;
+      if (i.file_id) {
+        const row = one<{ id: string; name: string; mime: string; sha256: string }>("select id, name, mime, sha256 from files where id = ? and archived_at is null", i.file_id);
+        if (!row) throw new HttpError(404, `no file ${i.file_id}`);
+        requireFileVisible(ctx.userId, row.id);
+        if (!isModel(row.name)) throw new HttpError(400, `“${row.name}” isn't a model the grid draws in 3D (STL, OBJ, GLB, STEP, IGES)`);
+        file = row;
+      } else {
+        app = getPanel(doc, i.from!.panel);
+        const forName = forNameOf(ctx);
+        const got = await callAppTool({ boardId: ctx.boardId, actor: ctx.actor, userId: ctx.userId, crew: ctx.crew, ...(forName ? { forName } : {}) }, app, i.from!.tool, i.from!.args);
+        // not allowed yet: nothing was called and a person was asked; no card until there's a model
+        if (!got.called) return got.text;
+        file = got.files.find((f) => isModel(f.name));
+        if (!file) throw new Error(`${got.appName}'s ${i.from!.tool} answered without a model file (an STL, OBJ, GLB, STEP or IGES as an embedded resource). What it said: ${got.text.slice(0, 600)}`);
+        label ??= String(i.from!.args.name ?? i.from!.args.part ?? i.from!.args.id ?? "") || undefined;
+      }
+      const section = i.section ?? (app ? boardMaps(doc).sections.get(app.sectionId)?.name : undefined);
+      const card = addPanel(ctx, { section, panel: "file", name: i.name, fileId: file.id, mime: file.mime, w: 420, h: 360 });
+      if (app) {
+        const feed: CadFeed = { app: app.id, appName: app.name, tool: i.from!.tool, args: i.from!.args, ...(label ? { label } : {}), sha: file.sha256, checkedAt: Date.now(), changedAt: Date.now(), state: "ok", by: ctx.userId };
+        editBoard(ctx.boardId, "agent", (d) => {
+          const m = boardMaps(d);
+          const cur = m.objects.get(card.id) as PanelDoc;
+          m.objects.set(card.id, { ...cur, feed });
+        });
+        recordFeed(ctx.boardId, card.id, { app: app.id, tool: i.from!.tool, args: i.from!.args, by: ctx.userId });
+        wireCad(ctx.boardId, app.id, card.id, ctx.actor);
+      }
+      touch(ctx, card.id, app ? `put ${i.name} beside ${app.name}, in 3D, wired to it` : `put ${i.name} on the grid in 3D`);
+      return { id: card.id, file: file.id, wired: Boolean(app) };
+    },
+  }),
+  def({
+    name: "refresh_cad",
+    description: "Ask a fed CAD card's app for its model again now (it is also asked every 10 minutes while wired). A card whose wire was cut is an orphan and isn't asked.",
+    schema: z.object({ id: z.string(), request_id: z.string().optional() }),
+    sends: [ext("Saved apps", "call", { ownGate: "a person's press on each tool of a saved app, on first use and after it changes (apptools.ts)" })],
+    write: true,
+    run: async (ctx, { id }) => {
+      const doc = getBoard(ctx.boardId).doc;
+      const m = boardMaps(doc);
+      const card = m.objects.get(id) as PanelDoc | undefined;
+      // what it asks is the server's record of the card (written by add_cad), never the card's own `feed`, which anyone
+      // who can edit the board can write: a copy, or a card made by hand, isn't fed
+      const rec = card?.kind === "panel" ? feedRecord(ctx.boardId, id) : null;
+      if (card?.kind !== "panel" || !rec) throw new HttpError(404, `no CAD card fed by an app with id ${id} (a copy keeps its model and isn't fed)`);
+      const appName = card.feed?.appName ?? "its app";
+      if (!recordLinked(ctx.boardId, id, rec)) throw new HttpError(409, `“${card.name}” isn't wired to ${appName} any more: it keeps its last model. Wire ${appName}'s CAD port into it to have it follow the app again.`);
+      const app = m.objects.get(rec.app) as PanelDoc | undefined;
+      if (app?.kind !== "panel") return settleFeed(ctx.boardId, id, { state: "error", note: `${appName}'s card is gone from the grid` });
+      let got: AppCallResult;
+      try {
+        got = await callAppTool({ boardId: ctx.boardId, actor: ctx.actor, userId: ctx.userId, crew: ctx.crew }, app, rec.tool, rec.args);
+      } catch (e) {
+        return settleFeed(ctx.boardId, id, { state: "error", note: (e as Error).message.slice(0, 300) });
+      }
+      if (!got.called) return settleFeed(ctx.boardId, id, { state: "waiting", note: `waiting for a person's Allow on ${app.name}'s card` });
+      const file = got.files.find((f) => isModel(f.name));
+      if (!file) return settleFeed(ctx.boardId, id, { state: "error", note: `${app.name} answered without a model file` });
+      const feed = settleFeed(ctx.boardId, id, { state: "ok", file });
+      if (feed?.changedAt && feed.changedAt === feed.checkedAt) touch(ctx, id, `took ${card.name}'s new model from ${app.name}`);
+      return feed;
     },
   }),
   def({
@@ -1785,3 +1872,11 @@ export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Pr
   }
   return out;
 }
+
+// a fed CAD card asked again while wired (cadfeed.ts): through runTool, under the name of the person who set it up, so
+// the board's Allow on the app's tool, the role check and the audit row are the same as any call
+setCadRefresher(async (boardId, cardId) => {
+  const rec = feedRecord(boardId, cardId);
+  if (!rec) return;
+  return runTool({ boardId, actor: "CAD feed", userId: rec.by, door: "route" }, "refresh_cad", { id: cardId });
+});
