@@ -98,7 +98,7 @@ test("a tool whose code reaches the network says what it sends and where", () =>
   }
   assert.deepEqual(missing, [], "these reach the network and have no `sends`");
   // the list this test knows reaches out, so a change to it is seen
-  assert.deepEqual(reaching.sort(), ["add_slack_channel", "app_tools", "ask_person", "call_app_tool", "call_in_help", "company", "find_images", "find_repo", "flowform", "lay_out", "read_repo", "search", "slack_read", "stage_request", "write_digest"]);
+  assert.deepEqual(reaching.sort(), ["add_cad", "add_slack_channel", "app_tools", "ask_person", "call_app_tool", "call_in_help", "company", "find_images", "find_repo", "flowform", "lay_out", "read_repo", "refresh_cad", "search", "slack_read", "stage_request", "write_digest"]);
 });
 
 test("every `sends` names a service, a kind and where it runs; external ones are gated or say what gates them", () => {

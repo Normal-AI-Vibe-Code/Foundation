@@ -113,6 +113,15 @@
       "issue": 248
     },
     {
+      "id": "council-trace-cad",
+      "title": "A run's trace on the council, the silhouette that adds, and CAD cards fed by an app",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agents",
+      "status": "review",
+      "body": "Josh 2026-11-25: one silhouette with the + on it, peeking from behind the last agent when there are agents; more room in the line to an agent; pointing at an agent shows its pane with its profile small and its last run step by step (thinking, tools and what each answered, the error) and whether it worked, failed runs too; an agent takes a part's STL out of an app and puts 3D CAD cards beside it, wired so they follow the app, orphaned when the wire is cut, copied and pasted to work on apart. Built: Council.tsx/RunTrace.tsx/AgentInfo.tsx, agent_runs.crew_name + GET /api/agent/seat-runs, call_app_tool keeps an app's files, add_cad/refresh_cad (cadfeed.ts, docs/cad-feed.md), the fed CAD card's strip, card copy/cut/paste. Not done: PartForm (Airform BOM) has no MCP or API, so no real STL has come out of it yet; what it needs is in docs/cad-feed.md."
+    },
+    {
       "id": "usability-pass-2026-11-22",
       "title": "Whole-app usability, legibility, spacing, accessibility & motion pass (jakubkrehel/skills)",
       "kind": "plan",

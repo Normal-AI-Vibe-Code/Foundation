@@ -24,7 +24,7 @@ import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
 import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
-import { claudeAccount, followRun, listSessions, pickRuntime, runtimes, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
+import { claudeAccount, followRun, listSessions, pickRuntime, runtimes, seatRuns, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
 import { apiState, claudeModels, clearApiKey, federationState, setApiKey, setDefaultModel, setFederation } from "./agentkinds.ts";
 import { t3Thread, t3Threads } from "./t3.ts";
 import { hostTerminals, requestHostTerminal } from "./hostterm.ts";
@@ -425,6 +425,12 @@ r.get("/api/whereabouts", (req) => ({ boards: whereaboutsFor(requireUser(req)) }
 r.get("/api/boards/:id/presence", (req) => {
   requireBoard(requireUser(req), req.params.id);
   return { people: presence(req.params.id) };
+});
+// a fed CAD card's Refresh (cadfeed.ts): the tool refresh_cad, by a person's press
+r.post("/api/boards/:id/cad/:panel/refresh", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  return { feed: await runTool(httpToolCtx(req.params.id, u, isPerson(req)), "refresh_cad", { id: req.params.panel }) };
 });
 r.get("/api/boards/:id/tools", () => ({ tools: TOOLS.map((t) => ({ name: t.name, description: t.description, write: Boolean(t.write) })) }));
 r.post("/api/boards/:id/tools/:name", async (req) => {
@@ -1142,6 +1148,11 @@ r.get("/api/agent/sessions", (req) => {
 r.get("/api/agent/sessions/:id", (req) => {
   const user = requireUser(req);
   return { turns: sessionTurns(req.params.id, user.id) };
+});
+// a council seat's last runs that this person asked for, with their transcripts (the agent's pane shows the trace)
+r.get("/api/agent/seat-runs", (req) => {
+  const user = requireUser(req);
+  return { runs: seatRuns(req.query.get("board") || "company", user.id, req.query.get("name") ?? "", Number(req.query.get("limit")) || 3) };
 });
 
 // ---------- Today: the person's own page ----------

@@ -168,6 +168,7 @@ import { ChatFormDemo } from "../chat/ChatDesign";
 import { UploaderDemo } from "./UploaderDemo";
 import { UsabilityDemo } from "./UsabilityDemo";
 import { AgentSetupDemo } from "./AgentSetupDemo";
+import { CadFeedDemo } from "./CadFeedDemo";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -1432,6 +1433,10 @@ function DesignSections() {
           <HeldPageDemo width={260} word="Not started" tone="idle" kind="removed" title="Machine gone — web-box was removed" reason="Removed by Ada, with its disk. Start makes a fresh one." show />
           <HeldPageDemo width={260} word="Gone" tone="idle" kind="gone" title="Machine gone — web-box isn't on the board any more" reason="This page was port 80 of it. There's nothing left to load." />
         </div>
+      </Section>
+
+      <Section title="CAD from an app" note="An agent pulls a part's model out of an app card (Airform BOM) into a CAD card to its right, wired from the app's cad port to the card's model port. The model fills the card; a strip on top says where it comes from, when it last changed and was checked, and Refresh (people who can write). Waiting is amber with what it waits on, an error says why in the bad colour, and a card whose wire was cut (or that was pasted) says it is unlinked and keeps its last model. Shown at 260, 400 and 560 px.">
+        <CadFeedDemo />
       </Section>
 
       <Section title="Running a job" note="A job an agent queued (reverse-engineering with REA, a Vision hand-off) waits on its card for a person. Before Run the card shows what will run, from the job itself, never the card's text: the whole target and the whole goal, in code type, wrapping anywhere and scrolling, never cut. Run asks first, on a raised pane inside the card: which program will run (Claude Code, rea-agents, Vision Code), the target and goal again, Run it in violet and Cancel. The press names exactly what it showed; the server runs only that, and refuses if the job changed since. A finished job's text starts with whose output it is.">

@@ -1679,6 +1679,30 @@ export function setObjectPinned(id: string, pinned: boolean) {
   }
 }
 
+/**
+ * Cards pasted onto the grid (lib/cardClipboard.ts, state/cardClip.ts), as one change: each into its kind's
+ * slice, a table into the workbook with its cells. A hosted app in the section gives way, as for any card added
+ * there. The last one is selected, so ⌘C right after copies what was just pasted.
+ */
+export function putCards(cards: Array<{ card: AnyObject; cells?: Record<string, string> }>, sectionId: string) {
+  if (!cards.length) return;
+  const next: Partial<Record<ReturnType<typeof slotOf>, Record<string, AnyObject>>> = {};
+  for (const { card } of cards) {
+    const slot = slotOf(card);
+    next[slot] = { ...((next[slot] ?? state[slot]) as Record<string, AnyObject>), [card.id]: card };
+    if ("cols" in card) workbook.addTable(card.id, card.name, card.cols, card.rows);
+  }
+  const last = cards[cards.length - 1].card;
+  set({ ...(next as Partial<AppState>), ...unhostFor(sectionId), activeSectionId: sectionId, activeObjectId: last.id, focusLevel: "object" });
+  for (const { card, cells } of cards) {
+    if (!("cols" in card) || !cells) continue;
+    for (const [k, raw] of Object.entries(cells)) {
+      const [c, r] = k.split(",").map(Number);
+      if (Number.isInteger(c) && Number.isInteger(r) && raw) workbook.setCell(card.id, c, r, raw);
+    }
+  }
+}
+
 /** minimize a card to its title bar, or bring it back */
 export function setObjectFolded(id: string, folded: boolean) {
   const obj = getObject(id);

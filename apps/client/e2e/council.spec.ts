@@ -24,6 +24,8 @@ import { CLIENT, person, settle, waitLive } from "./helpers";
 const SHOTS = "../../docs/evidence/2026-11-15_one-interface/council";
 /** 2026-11-24: one bar over each head, the run card, the one silhouette, seats as wide as their figures */
 const NEW = "../../docs/evidence/2026-11-24_council-harness";
+/** 2026-11-25: the silhouette with the +, the pane while pointing, a run step by step */
+const TRACE = "../../docs/evidence/2026-11-25_council-trace-cad";
 // the card at rest and waking (2026-11-25)
 const PERF = "../../docs/evidence/2026-11-25_character-grid-perf";
 const MESHY = `http://127.0.0.1:${process.env.E2E_MESHY_PORT ?? "4445"}`;
@@ -364,23 +366,26 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   await ada.locator("[data-council-open]").click();
   const council = ada.locator(".council");
   await expect(council).toHaveAttribute("data-council", "0");
-  // nobody yet: one silhouette, asleep, and a small one peeking from behind it that adds (2026-11-24); nothing to type into
+  // nobody yet (2026-11-25): one silhouette, asleep and full size, with the + on it: it is the button; nothing to type into
   await expect(council.locator(".council-ghost")).toHaveCount(1);
   await expect(council.locator("[data-council-eye]")).toHaveCount(2);
-  await expect(council.locator(".council-ghost-small")).toHaveCount(1);
+  await expect(council.locator(".council-ghost-small")).toHaveCount(0);
   await expect(council.locator("[data-council-add]")).toHaveCount(1);
+  await expect(council.locator("[data-council-add] .council-ghost")).toHaveCount(1);
+  await expect(council.locator("[data-council-peek]")).toHaveCount(0);
   await expect(council.locator("input")).toHaveCount(0);
-  // the small one is about 40 % of the big one, and stands at its bottom right
   await settle(ada, 900);
   const ghostBoxes = await council.evaluate((c) => {
-    const big = c.querySelector(".council-ghost .council-crop")!.getBoundingClientRect();
-    const small = c.querySelector(".council-ghost-small")!.getBoundingClientRect();
-    return { bigH: c.querySelector<HTMLElement>(".council-ghost .council-figure")!.getBoundingClientRect().height, smallH: small.height, bigRight: big.right, smallRight: small.right, bigBottom: big.bottom, smallBottom: small.bottom };
+    const fig = c.querySelector(".council-ghost .council-crop")!.getBoundingClientRect();
+    const plus = c.querySelector("[data-council-add] > .council-mark.is-plus")!.getBoundingClientRect();
+    return { figH: c.querySelector<HTMLElement>(".council-ghost .council-figure")!.getBoundingClientRect().height, fig: { l: fig.left, r: fig.right, t: fig.top, b: fig.bottom }, plus: { x: plus.left + plus.width / 2, y: plus.top + plus.height / 2 } };
   });
-  expect(ghostBoxes.smallH / ghostBoxes.bigH).toBeGreaterThan(0.35);
-  expect(ghostBoxes.smallH / ghostBoxes.bigH).toBeLessThan(0.45);
-  expect(ghostBoxes.smallRight).toBeGreaterThan(ghostBoxes.bigRight);
-  expect(Math.abs(ghostBoxes.smallBottom - ghostBoxes.bigBottom)).toBeLessThan(2);
+  // full size alone, and the + sits on the figure itself
+  expect(ghostBoxes.figH).toBeGreaterThan(150);
+  expect(ghostBoxes.plus.x).toBeGreaterThan(ghostBoxes.fig.l);
+  expect(ghostBoxes.plus.x).toBeLessThan(ghostBoxes.fig.r);
+  expect(ghostBoxes.plus.y).toBeGreaterThan(ghostBoxes.fig.t);
+  expect(ghostBoxes.plus.y).toBeLessThan(ghostBoxes.fig.b);
   // the same silhouette however often it's drawn (chosen once for the grid)
   const ghostIs = () => council.locator(".council-ghost .council-figure").getAttribute("data-fig-id");
   const firstGhost = await ghostIs();
@@ -528,7 +533,8 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   await expect(info).toBeVisible();
   await expect(info.locator('[data-agent-where="cloud"]')).toContainText("In the cloud");
   await expect(info).toContainText("To the whole grid, by Ada Test");
-  await expect(info.locator(".avatar-3d")).toHaveAttribute("data-framing", "full");
+  // its profile is small at the top (2026-11-25): the room below is its runs'
+  await expect(info.locator("[data-agent-who]")).toBeVisible();
   await settle(ada, 500);
   const moved = (await ada.locator(".council-place.is-board").boundingBox())!;
   const infoBox = (await info.boundingBox())!;
@@ -644,11 +650,13 @@ test("an agent at work stands in the council on its cursor's colour, wearing a c
   await ada.screenshot({ path: `${SHOTS}/13_council-agent-at-work.png` });
   await ada.screenshot({ path: `${NEW}/04_grid-agent-at-work-day.png` });
 
-  // pressed: its pane shows it head to toe, with what it was asked and who for
+  // pressed: its pane, its profile small at the top (2026-11-25) and its run step by step, live, with what it was asked and who for
   await seat.locator(".council-figure").click({ position: { x: 40, y: 40 } });
   const info = ada.locator(".agent-info");
   await expect(info).toHaveAttribute("data-agent-info", name);
-  await expect(info.locator(".avatar-3d")).toHaveAttribute("data-framing", "full");
+  await expect(info.locator("[data-agent-who]")).toBeVisible();
+  await expect(info.locator("[data-run-trace]")).toBeVisible();
+  await expect.poll(async () => info.locator("[data-run-trace] [data-step]").count(), { timeout: 20_000 }).toBeGreaterThan(0);
   await expect(info).toContainText("Supply");
   await expect(info).toContainText("for Ada");
   await expect(info).toContainText("Not assigned: it's here for one ask");
@@ -658,6 +666,11 @@ test("an agent at work stands in the council on its cursor's colour, wearing a c
   // done: it cheers, then leaves; the council is empty again
   await expect.poll(async () => (await council.locator(".council-seat:not(.council-ghost)").count()) === 0 || (await seat.getAttribute("data-mood")) === "happy", { timeout: 40_000 }).toBe(true);
   await expect(council).toHaveAttribute("data-council", "0", { timeout: 20_000 });
+  // gone from the council, its run is still in the pane: how it ended, and every step it took
+  await expect(info.locator("[data-run-outcome]")).not.toHaveText("Working", { timeout: 20_000 });
+  expect(await info.locator("[data-run-trace] [data-step]").count()).toBeGreaterThan(0);
+  await settle(ada, 400);
+  await ada.screenshot({ path: `${TRACE}/03_its-run-step-by-step-day.png` });
   await kai.context().close();
 });
 
@@ -761,6 +774,25 @@ await council.locator("[data-council-all]").click();
   await expect(seat).toBeVisible();
   await expect(council.locator(".council-ghost")).toHaveCount(1);
   await settle(ada, 900);
+  // beside an agent (2026-11-25): the silhouette is half size and peeks out from behind its right side, the + on it
+  await expect(council.locator("[data-council-peek]")).toHaveCount(1);
+  const peek = await council.evaluate((c) => {
+    const last = [...c.querySelectorAll(".council-seat:not(.council-ghost) .council-crop")].at(-1)!.getBoundingClientRect();
+    const g = c.querySelector(".council-ghost .council-crop")!.getBoundingClientRect();
+    return { lastR: last.right, lastH: last.height, gL: g.left, gR: g.right, gH: g.height };
+  });
+  expect(peek.gH / peek.lastH).toBeLessThan(0.6);
+  expect(peek.gL).toBeLessThan(peek.lastR);
+  expect(peek.gR).toBeGreaterThan(peek.lastR);
+  await ada.screenshot({ path: `${TRACE}/01_silhouette-peeks-beside-an-agent-day.png` });
+  // pointing at the agent shows its pane as a sheet: its profile small at the top, then its last run (none yet)
+  await seat.locator(".council-figure").hover({ position: { x: 40, y: 40 } });
+  const sheet = ada.locator("[data-agent-sheet]");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator("[data-agent-who]")).toBeVisible();
+  await expect(sheet.locator('[data-run-trace="none"]')).toBeVisible();
+  await ada.mouse.move(10, 300);
+  await expect(sheet).toHaveCount(0);
   await seat.locator(".council-figure").click({ position: { x: 40, y: 40 } });
   await expect(seat.locator("[data-council-say] input")).toBeFocused();
   await settle(ada, 400);

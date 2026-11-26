@@ -312,6 +312,13 @@ for (const sql of [
   "alter table agent_runs add column session_id text",
   "alter table agent_runs add column claude_session text",
   "create index if not exists agent_runs_session on agent_runs(session_id, created_at)",
+  // the name its cursor wore (2026-11-25): a council seat finds its own last runs, failed ones too, by it
+  "alter table agent_runs add column crew_name text",
+  // a CAD card fed by an app (cadfeed.ts): what it asks and as whom is the server's record, never the card's (a card's
+  // `feed` in the board can be written by anyone who can edit it; it is only shown)
+  `create table if not exists cad_feeds (
+     board_id text not null, card_id text not null, app_id text not null, tool text not null, args_json text not null,
+     by text not null, created_at integer not null, primary key (board_id, card_id))`,
   // what a session is for: 'browser' (the sign-in cookie), 'app' (a person's app holding a bearer), 'agent' (/api/agent/token); null = before kinds
   "alter table sessions add column kind text",
   // files: what an import said about where it came from (kept so a re-index keeps it), and the text

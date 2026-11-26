@@ -15,6 +15,7 @@ import { cardOf, fullscreenCard, installCardUse, modHeld } from "../lib/cardUse"
  */
 
 import { installGridKeys } from "../lib/gridUndo";
+import { installCardClipboard } from "../lib/cardClipboard";
 import { DetailPane } from "./DetailPane";
 import { Council, CouncilPreload } from "../characters/Council";
 import { AgentInfoPane } from "../characters/AgentInfo";
@@ -257,6 +258,8 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
 
   // undo and redo on the grid, and Delete on the selected card (lib/gridUndo.ts)
   useEffect(() => installGridKeys(() => placeOf(window.location.hash).kind === "grid"), []);
+  // copy, cut and paste of cards (lib/cardClipboard.ts)
+  useEffect(() => installCardClipboard(() => placeOf(window.location.hash).kind === "grid"), []);
 
   // clicking anywhere else releases the card in use
   useEffect(() => {

@@ -92,6 +92,7 @@ How you work:
 - When a design needs CAD or a decision you don't have, use ask_person rather than guessing.
 - Building pages: when asked to lay out, gather, or make a board, page or document of things ("lay out all the images from Slack about the Airform PTHP"), call find_images, choose what belongs, then lay_out with a fitting style (grid for a set, board for a mood board, document to be read top to bottom with captions, timeline when the order in time matters) and a short intro. Say how many you placed and where, and what you couldn't search (e.g. Slack not connected).
 - Unless the ask is a single question, call set_plan first (the goal and two to six short steps; reading and then writing is already two), and again as each step starts and finishes. Everyone on the grid sees it as a card beside you while you work, and the person follows along in the session tab.
+- A part's 3D model out of an app on the grid (CAD, STL): app_tools on its card to find the tool that gives a part's model, then add_cad with from: { panel, tool, args } for each part (named for the part, in the section the person said): the card draws it in 3D and stays wired to the app, so it follows the part. An app whose card has no MCP address can't be reached that way: say so plainly, and what would open it (its MCP address saved in Foundation's app registry).
 - Be brief and concrete. No preamble.
 
 You are one of the crew: people see you on the board as a named cursor (your name is in <you>), moving to whatever you're working on, and every change you make is signed with your name. So work in the open:
@@ -283,8 +284,8 @@ export async function runAgent(opts: {
     const runtime = picked.runtime;
     const runId = opts.runId ?? newRunId();
     run(
-      "insert into agent_runs (id, board_id, runtime, prompt, status, created_by, created_at, session_id) values (?, ?, ?, ?, 'running', ?, ?, ?)",
-      runId, opts.boardId, runtime, opts.prompt, opts.user.id, Date.now(), opts.session ?? null,
+      "insert into agent_runs (id, board_id, runtime, prompt, status, created_by, created_at, session_id, crew_name) values (?, ?, ?, ?, 'running', ?, ?, ?, ?)",
+      runId, opts.boardId, runtime, opts.prompt, opts.user.id, Date.now(), opts.session ?? null, opts.crew?.name ?? null,
     );
     const transcript: AgentEvent[] = [];
     // the transcript is saved as the turn runs, so a reload mid-turn replays it
@@ -1032,6 +1033,22 @@ export function sessionTurns(sessionId: string, userId: string) {
     "select id, prompt, status, runtime, transcript_json, created_at from agent_runs where session_id = ? and created_by = ? order by created_at asc",
     sessionId, userId,
   ).map((r) => ({ id: r.id, prompt: r.prompt, status: r.status, runtime: r.runtime, at: r.created_at, events: JSON.parse(r.transcript_json) as AgentEvent[] }));
+}
+
+/**
+ * A council seat's last runs for this person, newest first (2026-11-25, Josh: "one of the agents tried and failed, but
+ * there was no trace"): matched by the name its cursor wore (the seat's own, or "<name> 2" beside another). Only the
+ * person's own runs: the transcript holds its full reasoning and what it read, which is the asker's alone.
+ */
+export function seatRuns(boardId: string, userId: string, name: string, limit = 3) {
+  const n = name.trim().slice(0, 80);
+  if (!n) return [];
+  return all<{ id: string; session_id: string | null; prompt: string; status: string; runtime: string; transcript_json: string | null; created_at: number; finished_at: number | null }>(
+    `select id, session_id, prompt, status, runtime, transcript_json, created_at, finished_at from agent_runs
+      where board_id = ? and created_by = ? and (crew_name = ? or crew_name like ? escape '\\')
+      order by created_at desc limit ?`,
+    boardId, userId, n, `${n.replace(/[\\%_]/g, (c) => `\\${c}`)} %`, Math.max(1, Math.min(10, limit)),
+  ).map((r) => ({ id: r.id, session: r.session_id, prompt: r.prompt, status: r.status, runtime: r.runtime, at: r.created_at, finishedAt: r.finished_at, events: JSON.parse(r.transcript_json ?? "[]") as AgentEvent[] }));
 }
 
 export function titleOf(prompt: string) {
