@@ -13,7 +13,8 @@ const ROWS = [
   { code: "IEC-60335", agency: "IEC", stage: "planned", itemsOpen: 11 },
   { code: "UN-38.3", agency: "UN", stage: "testing", itemsOpen: 1 },
 ];
-const PICTURE = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><rect width="80" height="80" fill="gray" fill-opacity=".4"/><circle cx="40" cy="40" r="20" fill="gray" fill-opacity=".55"/></svg>')}`;
+// a picture on a wire: the app's own mark stands in (no raw colours in a component: test/design.test.ts)
+const PICTURE = "/foundation.svg";
 
 const SAMPLES: Array<{ label: string; value: unknown }> = [
   { label: "rows (a connector's list)", value: { from: "BomForm", summary: "5 cert programs", rows: ROWS } },

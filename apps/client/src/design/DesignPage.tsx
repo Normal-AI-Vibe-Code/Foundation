@@ -36,7 +36,7 @@ import type { UpdatePhase } from "../update/updater";
 import { NightOrb } from "../shell/NightOrb";
 import { InfoGlyph } from "../shell/TopBar";
 import { WindowControls } from "../shell/WindowControls";
-import { GearGlyph, MicGlyph, PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
+import { SunGlyph, MicGlyph, PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { FitGlyph, LayoutGlyph, OsGlyph } from "../components/SectionView";
 import { ExpandGlyph } from "../components/Fullscreen";
@@ -787,7 +787,7 @@ function DesignSections() {
             <section className="pane-band pane-low pane-low-row">
               <span className="pane-row pane-place">
                 <span className="pane-glyph">
-                  <GearGlyph />
+                  <SunGlyph />
                 </span>
                 <span className="pane-label">Settings</span>
               </span>

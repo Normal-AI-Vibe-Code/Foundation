@@ -3,8 +3,9 @@
  *
  * A framed page fails on every site that refuses framing, so for an admin this is the site's own page in Edge or
  * Chrome on the computer Foundation's server runs on (apps/server/src/hostbrowser.ts): the server sends the page
- * as pictures and this pane sends the pointer and the keys back. Nothing runs until Start is pressed (the server
- * mints a one-time key for the socket, as the terminal's does), and it ends when the pane closes. Agents can read
+ * as pictures and this pane sends the pointer and the keys back. It starts when a person opens this pane (2026-11-25,
+ * Josh: no Start press first; the server mints a one-time key for the socket, as the terminal's does), and it ends
+ * when the pane closes. A failed start waits for a press. Agents can read
  * and use it only while it is open here and "Agents" is switched on; what they do is shown under the page.
  *
  * Everyone else gets the framed page this tool was before: fine for sites that allow it, with ↗ for the rest.
@@ -15,7 +16,7 @@
 
 import { ErrorCard } from "../components/ErrorCard";
 import "./browser-tool.css";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCapabilities } from "../lib/capabilities";
 import { HOLDS_KEYS } from "../lib/keysHeld";
 import { hostOf, useHostBrowser } from "./hostBrowser";
@@ -36,13 +37,21 @@ export function BrowserTool() {
 function HostBrowser() {
   const b = useHostBrowser();
   const { state, name, why, tabs, at, tab, url, text, setText, held, setHeld, painted, dialog, answer, setAnswer, agents, did, page, canvas, addr, editing, send, start, again, go, settle, onPointerDown, onPointerMove, onPointerUp, onKeyDown, onKeyUp } = b;
+  // opening the pane is the press: start once, on open (a failed start shows why and waits for the button)
+  const tried = useRef(false);
+  useEffect(() => {
+    if (tried.current || state !== "idle") return;
+    tried.current = true;
+    void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (state === "idle" || state === "opening")
     return (
       <div className="tool-browser btool">
         <div className="tool-empty">
           <b>A browser on the server's computer</b>
-          <p>A real browser (Edge or Chrome), run on the computer Foundation's server is on and shown here, so any site works, and what you sign in to stays signed in. It opens on HyperForm, where our apps are. Nothing runs until you start it, and it ends when you close this pane.</p>
+          <p>A real browser (Edge or Chrome), run on the computer Foundation's server is on and shown here, so any site works, and what you sign in to stays signed in. It opens on HyperForm, where our apps are. It starts when you open this pane and ends when you close it.</p>
           {why && <ErrorCard message={why} />}
           <button className="f-pill is-accent" onClick={() => void start()} disabled={state === "opening"} data-browser-start>
             {state === "opening" ? "Starting…" : "Start the browser"}
@@ -158,12 +167,13 @@ function HostBrowser() {
           className={`f-pill btool-agents${agents ? " is-agent" : ""}`}
           disabled={state !== "open"}
           aria-pressed={agents}
+          aria-label="Agents"
           onClick={() => send({ t: "agents", allow: !agents })}
           data-tip={agents ? "Agents can read and use this browser while it's open. Press to stop them." : "Let agents use this browser: they can read pages and press and type here, while it's open"}
           data-browser-agents
         >
           <i className={`f-dot${agents ? " is-agent" : ""}`} aria-hidden />
-          Agents
+          <span className="btool-agents-word">Agents</span>
         </button>
       </form>
       <div className={`btool-load${state === "open" && tab?.loading ? " is-on" : ""}`} aria-hidden />

@@ -15,7 +15,7 @@
  * opened from the grid's tab.
  */
 
-import { GearGlyph, PlusGlyph } from "./glyphs";
+import { SunGlyph, PlusGlyph } from "./glyphs";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
@@ -238,7 +238,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           <section className="pane-band pane-low pane-low-row">
             <button type="button" className={`pane-row pane-place${place.kind === "settings" ? " is-current" : ""}`} onClick={() => goSettings()} data-place="settings">
               <span className="pane-glyph" aria-hidden>
-                <GearGlyph />
+                <SunGlyph />
               </span>
               <span className="pane-label">Settings</span>
             </button>

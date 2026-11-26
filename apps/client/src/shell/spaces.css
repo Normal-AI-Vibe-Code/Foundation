@@ -976,12 +976,12 @@
   align-self: stretch;
   align-items: flex-end;
   gap: 0;
-  /* 2026-11-23, Josh: no room before the first tab; it starts on the line that parts the menu from the tabs */
+  /* 2026-11-23, Josh: no room before the first tab; it starts on the line that parts the menu from the tabs.
+     2026-11-25: the strip scrolls, so it clips: it reaches 1px left over that line and 1px down over the bar's
+     hairline, so the first tab's edge lands on the line and the open tab's foot covers the hairline, not cut off */
   padding-left: 0;
-}
-/* the first tab's own edge lands on that line (over the menu, the menu's edge), not a second line beside it */
-.top-bar .tabs > .tab.is-space:first-child {
   margin-left: -1px;
+  margin-bottom: -1px;
 }
 /* a full strip fades where it cuts a tab */
 .top-bar .tabs.is-clip-right {
@@ -1027,8 +1027,7 @@
 }
 .top-bar .tab.is-space {
   position: relative;
-  height: calc(100% + 1px);
-  margin-bottom: -1px;
+  height: 100%;
   padding: 0 var(--space-2);
   border: 0;
   border-left: 1px solid transparent;
@@ -1065,8 +1064,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -1px;
-  height: 2px;
+  bottom: 0;
+  height: 1px;
   background: var(--color-void);
 }
 @media (hover: hover) {

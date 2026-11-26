@@ -14,11 +14,12 @@ export function SearchGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
-export function GearGlyph({ size = 16 }: { size?: number }) {
+/** Settings (2026-11-25, Josh): a sun, a round disc and eight short rays */
+export function SunGlyph({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
-      <circle cx="8" cy="8" r="2.1" />
-      <path d="M8 1.8v1.7M8 12.5v1.7M1.8 8h1.7M12.5 8h1.7M3.6 3.6l1.2 1.2M11.2 11.2l1.2 1.2M12.4 3.6l-1.2 1.2M4.8 11.2l-1.2 1.2" />
+      <circle cx="8" cy="8" r="2.9" />
+      <path d="M12.7 8L14.2 8M11.32 11.32L12.38 12.38M8 12.7L8 14.2M4.68 11.32L3.62 12.38M3.3 8L1.8 8M4.68 4.68L3.62 3.62M8 3.3L8 1.8M11.32 4.68L12.38 3.62" />
     </svg>
   );
 }

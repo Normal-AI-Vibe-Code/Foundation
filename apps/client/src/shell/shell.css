@@ -5652,6 +5652,21 @@ body.is-viewer .port {
   right: 0;
   border-left: 1px solid var(--color-line);
   background: var(--color-void);
+  /* its own width decides how much the menu says (2026-11-25: a narrow pane cut the menu off at its right side) */
+  container-type: inline-size;
+}
+/* narrow: the tools you're not in are their glyphs (named on hover), the one you're in keeps its name, and
+   Close stays in reach */
+@container (max-width: 520px) {
+  .tool-tab:not(.is-on) {
+    padding: 0 var(--space-3);
+  }
+  .tool-tab:not(.is-on) .tool-tab-name {
+    display: none;
+  }
+  .btool-agents-word {
+    display: none;
+  }
 }
 .tool-tabs {
   flex: none;

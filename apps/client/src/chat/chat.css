@@ -820,7 +820,10 @@
   padding-top: 2px;
 }
 .chat-msg-gutter-time {
-  display: block;
+  /* wider than the avatar's column ("12:01 PM"): it ends at the column's edge and spills left into the margin,
+     so the column gap stays between it and the words (2026-11-25: it spilled right, onto them) */
+  display: flex;
+  justify-content: flex-end;
   padding-top: 3px;
   color: var(--color-dim);
   font: 500 var(--text-11) / 1.6 var(--font-sans);
