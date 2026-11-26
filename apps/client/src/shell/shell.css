@@ -4812,6 +4812,7 @@ body.is-viewer .add-btn,
 body.is-viewer .section-tools,
 body.is-viewer .gutter-knob,
 body.is-viewer .map-resize,
+body.is-viewer .frame-edge,
 body.is-viewer .frame-header .header-actions,
 body.is-viewer .frame-icon.is-remove,
 body.is-viewer .tab-new,
@@ -5583,6 +5584,7 @@ body.is-viewer .port {
 }
 .fs-able:fullscreen > .frame-header,
 .fs-able:fullscreen > .map-resize,
+.fs-able:fullscreen > .frame-edge,
 .fs-able:fullscreen > .port-rail,
 .fs-able:fullscreen .frame-engage,
 .fs-able:fullscreen .map-shield {

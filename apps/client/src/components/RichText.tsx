@@ -25,7 +25,7 @@
  * shows and every line stays in view.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { NOTE_SIZES, type NoteSize } from "@foundation/protocol";
@@ -291,8 +291,65 @@ export function RichToolbar({ marks, size, onCommand, onStyle, onLink, onSize, l
       </button>
     );
   };
+  const items: Array<{ key: string; sep?: true; node: React.ReactNode }> = [
+    {
+      key: "style",
+      node: (
+        <select
+          className="rich-style"
+          value={marks.style}
+          aria-label="Text style"
+          data-tip="Text style"
+          onChange={(e) => onStyle?.(e.target.value as Style)}
+        >
+          {STYLES.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      ),
+    },
+    ...(size
+      ? [
+          {
+            key: "size",
+            node: (
+              <span className="rich-sizes" role="group" aria-label={`Text size: ${SIZE_NAMES[size].toLowerCase()}`} data-size={size}>
+                {sizeBtn(-1)}
+                {sizeBtn(1)}
+              </span>
+            ),
+          },
+        ]
+      : []),
+    { key: "sep1", sep: true, node: <span className="rich-sep" /> },
+    { key: "bold", node: btn("bold", <b>B</b>, "Bold", marks.bold, "mod+B") },
+    { key: "italic", node: btn("italic", <i>I</i>, "Italic", marks.italic, "mod+I") },
+    { key: "underline", node: btn("underline", <u>U</u>, "Underline", marks.underline, "mod+U") },
+    { key: "strike", node: btn("strikeThrough", <s>S</s>, "Strikethrough", marks.strike) },
+    { key: "sep2", sep: true, node: <span className="rich-sep" /> },
+    { key: "ul", node: btn("insertUnorderedList", <ListGlyph />, "Bulleted list", marks.ul) },
+    { key: "ol", node: btn("insertOrderedList", <ListGlyph numbered />, "Numbered list", marks.ol) },
+    { key: "quote", node: btn("quote", <QuoteGlyph />, "Quote", marks.quote) },
+    { key: "sep3", sep: true, node: <span className="rich-sep" /> },
+    {
+      key: "link",
+      node: (
+        <button type="button" className="rich-btn" aria-label="Link" data-tip="Link the selected words" onMouseDown={(e) => e.preventDefault()} onClick={() => setLinking(true)}>
+          <LinkGlyph />
+        </button>
+      ),
+    },
+    { key: "clear", node: btn("removeFormat", <ClearGlyph />, "Clear formatting", false) },
+  ];
+  const { barRef, fit, more, setMore, moreUp } = useToolbarFit(items.map((i) => i.key), linking);
+  // one line: what doesn't fit goes under "More", last first; a line never ends on a divider
+  let shown = items.slice(0, fit);
+  while (shown.length && shown[shown.length - 1].sep) shown = shown.slice(0, -1);
+  const rest = items.slice(fit).filter((i) => !i.sep);
   return (
-    <div className="rich-bar" role="toolbar" aria-label="Text formatting" onPointerDown={(e) => e.stopPropagation()}>
+    <div ref={barRef} className="rich-bar" role="toolbar" aria-label="Text formatting" onPointerDown={(e) => e.stopPropagation()}>
       {linking ? (
         <form
           className="rich-link"
@@ -323,43 +380,122 @@ export function RichToolbar({ marks, size, onCommand, onStyle, onLink, onSize, l
         </form>
       ) : (
         <>
-          <select
-            className="rich-style"
-            value={marks.style}
-            aria-label="Text style"
-            data-tip="Text style"
-            onChange={(e) => onStyle?.(e.target.value as Style)}
-          >
-            {STYLES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          {size && (
-            <span className="rich-sizes" role="group" aria-label={`Text size: ${SIZE_NAMES[size].toLowerCase()}`} data-size={size}>
-              {sizeBtn(-1)}
-              {sizeBtn(1)}
-            </span>
+          {shown.map((i) => (
+            <Fragment key={i.key}>{i.node}</Fragment>
+          ))}
+          {rest.length > 0 && (
+            <>
+              <button
+                type="button"
+                className={"rich-btn rich-more" + (more ? " is-on" : "")}
+                data-rich-more
+                aria-label="More formatting"
+                aria-haspopup="true"
+                aria-expanded={more}
+                data-tip="More formatting"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => setMore((m) => !m)}
+              >
+                <MoreGlyph />
+              </button>
+              {more && (
+                <div className={"rich-more-menu" + (moreUp ? " is-up" : "")} role="group" aria-label="More formatting">
+                  {rest.map((i) => (
+                    <Fragment key={i.key}>{i.node}</Fragment>
+                  ))}
+                </div>
+              )}
+            </>
           )}
-          <span className="rich-sep" />
-          {btn("bold", <b>B</b>, "Bold", marks.bold, "mod+B")}
-          {btn("italic", <i>I</i>, "Italic", marks.italic, "mod+I")}
-          {btn("underline", <u>U</u>, "Underline", marks.underline, "mod+U")}
-          {btn("strikeThrough", <s>S</s>, "Strikethrough", marks.strike)}
-          <span className="rich-sep" />
-          {btn("insertUnorderedList", <ListGlyph />, "Bulleted list", marks.ul)}
-          {btn("insertOrderedList", <ListGlyph numbered />, "Numbered list", marks.ol)}
-          {btn("quote", <QuoteGlyph />, "Quote", marks.quote)}
-          <span className="rich-sep" />
-          <button type="button" className="rich-btn" aria-label="Link" data-tip="Link the selected words" onMouseDown={(e) => e.preventDefault()} onClick={() => setLinking(true)}>
-            <LinkGlyph />
-          </button>
-          {btn("removeFormat", <ClearGlyph />, "Clear formatting", false)}
         </>
       )}
     </div>
   );
+}
+
+/**
+ * Keeps the toolbar to one line (2026-11-26, Josh: "the format bar itself should collapse into a drop down of
+ * more options, it should try to keep within one line"). Each item's width is measured as it's drawn (offsetWidth:
+ * the grid's zoom doesn't change it), and the line holds as many as fit its holder; the rest wait under "More".
+ */
+function useToolbarFit(keys: string[], paused: boolean) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const widths = useRef(new Map<string, number>());
+  const [fit, setFit] = useState(keys.length);
+  const [more, setMore] = useState(false);
+  const [moreUp, setMoreUp] = useState(false);
+  const sig = keys.join(",");
+  const fitRef = useRef(fit);
+  fitRef.current = fit;
+
+  const measure = useCallback(() => {
+    const bar = barRef.current;
+    const holder = bar?.parentElement;
+    if (!bar || !holder || paused) return;
+    const ks = sig.split(",");
+    // what's on the line now, in order (the More button, its menu, last)
+    const kids = Array.from(bar.children) as HTMLElement[];
+    // the line is always the first items, in order
+    kids.forEach((el, i) => {
+      if (i < ks.length && !el.matches("[data-rich-more], .rich-more-menu")) widths.current.set(ks[i], el.offsetWidth);
+    });
+    const bs = getComputedStyle(bar);
+    const hs = getComputedStyle(holder);
+    const gap = parseFloat(bs.columnGap) || 0;
+    const chrome = parseFloat(bs.paddingLeft) + parseFloat(bs.paddingRight) + parseFloat(bs.borderLeftWidth) + parseFloat(bs.borderRightWidth);
+    const room = holder.clientWidth - parseFloat(hs.paddingLeft) - parseFloat(hs.paddingRight) - chrome;
+    const w = (key: string) => widths.current.get(key) ?? (key.startsWith("sep") ? 7 : 32);
+    const all = ks.reduce((s, key) => s + w(key), 0) + gap * (ks.length - 1);
+    let n = ks.length;
+    if (all > room) {
+      const moreW = (bar.querySelector<HTMLElement>("[data-rich-more]")?.offsetWidth ?? 32) + gap;
+      let used = 0;
+      n = 0;
+      while (n < ks.length) {
+        const next = used + (n ? gap : 0) + w(ks[n]);
+        if (next > room - moreW) break;
+        used = next;
+        n++;
+      }
+      n = Math.max(1, n);
+    }
+    if (n !== fitRef.current) setFit(n);
+  }, [sig, paused]);
+
+  useLayoutEffect(measure);
+  useEffect(() => {
+    const holder = barRef.current?.parentElement;
+    if (!holder || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(holder);
+    return () => ro.disconnect();
+  }, [measure]);
+
+  // everything fits again: nothing to show under More
+  useEffect(() => {
+    if (fit >= keys.length) setMore(false);
+  }, [fit, keys.length]);
+
+  // the menu opens down, unless the bar is near the window's foot (a note full screen); a press elsewhere, or Esc, closes it
+  useLayoutEffect(() => {
+    if (!more) return;
+    const r = barRef.current?.getBoundingClientRect();
+    setMoreUp(!!r && window.innerHeight - r.bottom < 120);
+    const away = (e: PointerEvent) => {
+      if (!barRef.current?.contains(e.target as Node)) setMore(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMore(false);
+    };
+    window.addEventListener("pointerdown", away, true);
+    window.addEventListener("keydown", key, true);
+    return () => {
+      window.removeEventListener("pointerdown", away, true);
+      window.removeEventListener("keydown", key, true);
+    };
+  }, [more]);
+
+  return { barRef, fit, more, setMore, moreUp };
 }
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -382,6 +518,14 @@ function LinkGlyph() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden {...stroke}>
       <path d="M6 8a2.5 2.5 0 0 0 3.5 0l2-2A2.5 2.5 0 0 0 8 2.5l-.8.8M8 6a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 6 11.5l.8-.8" />
+    </svg>
+  );
+}
+function MoreGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden {...stroke}>
+      <path d="M2.6 5.6h.01M7 5.6h.01M11.4 5.6h.01" strokeWidth="2.2" />
+      <path d="M5 9.6l2 1.6 2-1.6" />
     </svg>
   );
 }
@@ -609,7 +753,8 @@ export function RichNote({ note }: { note: NoteMeta }) {
               // the box grows down to hold it: it unfolds from the card's foot, and folds back the same way (DESIGN §6:
               // --dur-pane in, --dur-quick out, ease-out-soft). Full screen it floats inside instead (App.css).
               initial={card ? { opacity: 0, clipPath: "inset(0px -6px 100% -6px)" } : { opacity: 0, y: 6 }}
-              animate={card ? { opacity: 1, clipPath: "inset(0px -6px -6px -6px)", transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } } : { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
+              // once unfolded, the clip opens below so the More menu can hang under the bar
+              animate={card ? { opacity: 1, clipPath: "inset(0px -6px -6px -6px)", transitionEnd: { clipPath: "inset(0px -6px -400px -6px)" }, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } } : { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
               exit={card ? { opacity: 0, clipPath: "inset(0px -6px 100% -6px)", transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] } } : { opacity: 0, y: 6, transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] } }}
               onBlur={(e) => {
                 // leaving the toolbar for anywhere but the text puts it away

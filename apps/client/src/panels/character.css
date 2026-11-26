@@ -223,16 +223,14 @@
 .char-words.note-rendered > :last-child {
   margin-bottom: 0;
 }
-/* the text box's toolbar, in the card's flow under the field (a narrow card scrolls it sideways) */
+/* the text box's toolbar, in the card's flow under the field (a narrow card puts its last buttons under More) */
 .char-words-bar {
   display: flex;
   padding: 0 var(--space-3);
   min-width: 0;
 }
 .char-words-bar .rich-bar {
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
+  min-width: 0;
 }
 
 /* ---------- stages ---------- */
