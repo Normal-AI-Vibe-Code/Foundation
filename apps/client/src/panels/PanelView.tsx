@@ -37,7 +37,7 @@ import { StageBody } from "./StageView";
 import { onConnectorChange } from "../lib/connectorEvents";
 import { HuddleBody } from "./HuddleView";
 import { ReplayBody } from "./ReplayView";
-import { ChatCardBody } from "./ChatCardView";
+import { ChatBareButton, ChatCardBody } from "./ChatCardView";
 import { SlackBody } from "./SlackView";
 import { CrewCardBody } from "../components/SectionAgents";
 import { AppToolAsks, MachineBody, machineAction } from "./MachineView";
@@ -119,7 +119,14 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
     </>
   );
 
-  const extras = <PanelActions panel={panel} />;
+  // a chat card can take its paper away, as a note can (2026-11-25)
+  const chat = panel.panel === "chat";
+  const extras = (
+    <>
+      {chat && <ChatBareButton panel={panel} />}
+      <PanelActions panel={panel} />
+    </>
+  );
 
   const body =
     panel.panel === "machine" && (panel.machine || panel.vm) ? (
@@ -241,7 +248,9 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       confirmRemove={panel.panel === "character" ? { name: panel.name, note: "Its pictures and files stay in the archive." } : undefined}
       headerExtras={extras}
       bodyClass={`panel-body panel-${panel.panel}`}
-      cardClass={`panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}`}
+      cardClass={`panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}${chat && panel.bare ? " is-bare" : ""}`}
+      // a chat card's bar rises above it and the conversation holds still, as a note's does (2026-11-25)
+      barRise={chat}
       data={{ "panel-id": panel.id }}
       openUrl={panel.url}
       overlay={panel.ports.length ? <div className="port-rail">{ports}</div> : null}

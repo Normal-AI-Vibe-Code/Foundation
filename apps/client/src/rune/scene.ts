@@ -154,7 +154,8 @@ export function isIsland(st: AppState, o: AnyObject, opts: Pick<SceneOptions, "i
   if (isPanel(o)) return true;
   if ("sourceTableId" in o) return true;
   if ("cols" in o) return st.focusLevel === "object" && st.activeObjectId === o.id;
-  if ("media" in o) return o.media === "video" || !imageSrcOf(o, opts);
+  // Rune draws pictures: a video, a sound and a voice or video note (players, 2026-11-25) are the page's
+  if ("media" in o) return o.media !== "image" || !!o.note || !imageSrcOf(o, opts);
   // a note made as a text box, set at a size of its own or left without its paper: the page's to draw (Rune draws a plain note itself)
   if ("text" in o) return !!o.rich || !!o.bare || (!!o.size && o.size !== "m");
   return false;

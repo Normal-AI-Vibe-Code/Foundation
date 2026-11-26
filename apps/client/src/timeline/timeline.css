@@ -1,0 +1,890 @@
+/* The timeline (docs/timeline.md §3, DESIGN.md §5 Timeline): the grid's band on the floor, a section's bar, the
+   moment, the grid shown as it was. Tokens only; times in tabular figures; violet only for agents. */
+
+/* ---------- the floor's foot: the band takes its height from the grid as a pane takes its width ---------- */
+
+@property --floor-b {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.grid-viewport > .world-mask {
+  clip-path: inset(var(--floor-t) var(--floor-r) var(--floor-b) var(--floor-l));
+  transition:
+    --floor-l 0.42s var(--ease-move),
+    --floor-t 0.42s var(--ease-move),
+    --floor-r 0.42s var(--ease-move),
+    --floor-b 0.42s var(--ease-move);
+}
+
+/* ---------- the band ---------- */
+
+.tl-band {
+  position: absolute;
+  z-index: 35;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-5) var(--space-3);
+  border-top: 1px solid var(--color-line);
+  /* on the floor: the grid's paper shows through */
+  background: transparent;
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  container: tl / inline-size;
+  animation: tl-rise var(--dur-pane) var(--ease-out-soft);
+}
+.tl-band.is-still {
+  position: relative;
+  animation: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-void);
+}
+@keyframes tl-rise {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+.tl-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: var(--space-5);
+  min-height: 0;
+}
+.tl-main {
+  min-width: 0;
+}
+.tl-state {
+  margin: var(--space-3) 0;
+  color: var(--color-mist);
+  font-size: var(--text-13);
+  text-wrap: pretty;
+}
+.tl-state.is-missing,
+.tl-state.is-error {
+  color: var(--color-warn);
+}
+.tl-state.is-quiet {
+  margin: 2px 0 0;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+}
+
+/* ---------- the transport ---------- */
+
+.tl-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  min-width: 0;
+}
+.tl-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  color: var(--color-frost);
+  font-weight: 600;
+  font-size: var(--text-12);
+  margin-right: var(--space-2);
+}
+.tl-play,
+.tl-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--color-line-strong);
+  background: transparent;
+  color: var(--color-frost);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out-soft);
+}
+.tl-play:active,
+.tl-close:active {
+  transform: scale(0.97);
+}
+.tl-close {
+  border-color: transparent;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+@media (hover: hover) {
+  .tl-play:hover,
+  .tl-close:hover,
+  .tl-speed:hover,
+  .tl-range:hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+  }
+}
+.tl-speeds,
+.tl-ranges {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  outline: 1px solid var(--color-line-strong);
+  outline-offset: -1px;
+}
+.tl-speed,
+.tl-range {
+  height: 22px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.tl-speed {
+  padding: 0 var(--space-2);
+}
+.tl-speed.is-on,
+.tl-range.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  box-shadow: var(--shadow-sheet);
+}
+.tl-when {
+  flex: none;
+  min-width: 96px;
+  font: 600 var(--text-13) / 1 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-mist);
+}
+.tl-when.is-past {
+  color: var(--color-pulse);
+}
+.tl-now,
+.tl-follow {
+  flex: none;
+  height: 24px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-pulse);
+  background: var(--color-pulse-dim);
+  color: var(--color-pulse);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  cursor: pointer;
+}
+.tl-follow {
+  border-color: var(--color-line-strong);
+  background: transparent;
+  color: var(--color-frost);
+}
+.tl-nearest {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-mist);
+  display: none;
+}
+.tl-nearest b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.tl-gap {
+  flex: 1;
+}
+.tl-span {
+  flex: none;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tl-warn {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--color-warn);
+  font-size: var(--text-11);
+}
+b.is-agent,
+.tl-said b.is-agent {
+  color: var(--color-agent);
+}
+
+/* ---------- the lanes ---------- */
+
+.tl-lanes {
+  display: flex;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+.tl-names {
+  position: relative;
+  flex: none;
+  width: 112px;
+}
+.tl-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  color: var(--color-dim);
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  white-space: nowrap;
+}
+.tl-track-col {
+  flex: 1;
+  min-width: 0;
+}
+.tl-track {
+  position: relative;
+  cursor: ew-resize;
+  touch-action: none;
+  border-radius: var(--radius-paper);
+  outline: 2px solid transparent;
+}
+.tl-track:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 3px;
+}
+.tl-canvas {
+  display: block;
+}
+.tl-playhead {
+  position: absolute;
+  left: 0;
+  top: -6px;
+  bottom: -4px;
+  width: 0;
+  border-left: 1.5px solid var(--color-pulse);
+  margin-left: -0.75px;
+  pointer-events: none;
+  will-change: transform;
+  z-index: 3;
+}
+.tl-playhead-knob {
+  position: absolute;
+  top: -3px;
+  left: -5.5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-pulse);
+  box-shadow: 0 0 0 2px var(--color-void);
+}
+.tl-playhead[data-now="1"] {
+  border-left-color: var(--color-dim);
+}
+.tl-playhead[data-now="1"] .tl-playhead-knob {
+  background: var(--color-dim);
+}
+.tl-begins {
+  position: absolute;
+  left: 0;
+  top: -4px;
+  bottom: -4px;
+  width: 0;
+  border-left: 1px dashed var(--color-mist);
+  pointer-events: none;
+  z-index: 2;
+}
+.tl-begins-words {
+  position: absolute;
+  right: 6px;
+  top: 2px;
+  padding: 0 4px;
+  border-radius: var(--radius-paper);
+  background: var(--color-void);
+  color: var(--color-mist);
+  font: 600 var(--text-11) / 1.4 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* the edge near the track's start: the words read to its right, clear of the lanes' names */
+.tl-begins.is-right .tl-begins-words {
+  right: auto;
+  left: 6px;
+}
+.tl-marker {
+  position: absolute;
+  left: 0;
+  top: -6px;
+  bottom: -4px;
+  width: 0;
+  border-left: 1.5px dashed var(--color-frost);
+  pointer-events: none;
+  z-index: 2;
+  will-change: transform;
+}
+.tl-marker-name {
+  position: absolute;
+  bottom: 100%;
+  left: -1px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-frost);
+  color: var(--color-on-fill);
+  font: 600 var(--text-11) / 1.5 var(--font-sans);
+  white-space: nowrap;
+}
+.tl-tip {
+  position: absolute;
+  left: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: 280px;
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow-glass);
+  color: var(--color-mist);
+  font-size: var(--text-12);
+  pointer-events: none;
+}
+.tl-tip.is-left {
+  translate: -100% 0;
+}
+.tl-tip-head b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.tl-tip-body {
+  color: var(--color-frost);
+  text-wrap: pretty;
+}
+.tl-tip-withheld {
+  color: var(--color-dim);
+  font-style: italic;
+}
+.tl-tip-when {
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  font-variant-numeric: tabular-nums;
+}
+.tl-axis {
+  position: relative;
+  height: 18px;
+  margin-top: 2px;
+}
+.tl-tick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding-left: 4px;
+  border-left: 1px solid var(--color-line);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 16px var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tl-tick.is-day {
+  color: var(--color-mist);
+  border-left-color: var(--color-line-strong);
+}
+
+/* ---------- the moment ---------- */
+
+.tl-moment {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--color-line);
+}
+.tl-moment-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+.tl-eyebrow {
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.4 var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: var(--track-eyebrow, 0.22em);
+}
+.tl-moment-when {
+  color: var(--color-mist);
+  font-variant-numeric: tabular-nums;
+}
+.tl-moment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 140px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.tl-quiet {
+  margin: 0;
+  color: var(--color-dim);
+  font-size: var(--text-12);
+  text-wrap: pretty;
+}
+.tl-said {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.45 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.tl-said time {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+}
+.tl-said.is-now {
+  background: var(--color-pulse-dim);
+}
+.tl-said.is-later {
+  opacity: 0.55;
+}
+.tl-said.is-remote {
+  cursor: default;
+}
+@media (hover: hover) {
+  .tl-said:hover {
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
+}
+.tl-said-main {
+  min-width: 0;
+}
+.tl-said-main b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.tl-said-kind {
+  color: var(--color-dim);
+}
+.tl-said-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--color-frost);
+  text-wrap: pretty;
+}
+.tl-said-body.is-plain {
+  color: var(--color-mist);
+}
+.tl-withheld {
+  display: block;
+  color: var(--color-dim);
+  font-style: italic;
+  font-size: var(--text-11);
+}
+.tl-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 6px;
+}
+.tl-note-play {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  background: var(--color-frost);
+  color: var(--color-on-fill);
+  cursor: pointer;
+}
+.tl-note-play:disabled {
+  background: var(--color-line-strong);
+  cursor: default;
+}
+.tl-note.is-video .tl-note-play {
+  border-radius: var(--radius-card);
+}
+.tl-note-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.tl-note-head b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.tl-note-head time {
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+}
+.tl-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 14px;
+}
+.tl-wave i {
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-mist);
+}
+.tl-note-video {
+  flex: none;
+  width: 72px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-card);
+  background: var(--color-panel);
+}
+.tl-remote,
+.tl-gone {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--color-line);
+}
+.tl-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-pulse);
+  font: 600 var(--text-12) / 1.4 var(--font-sans);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---------- narrow and short ---------- */
+
+/* a short window: two rows of lanes, and the moment keeps to their height */
+.tl-band.is-short .tl-moment-list {
+  max-height: 56px;
+}
+.tl-band.is-short .tl-moment-head {
+  padding: 0;
+}
+
+@container tl (max-width: 900px) {
+  .tl-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tl-band .tl-moment,
+  .tl-band .tl-names {
+    display: none;
+  }
+  .tl-band .tl-nearest {
+    display: block;
+    flex: 1 1 0;
+  }
+  .tl-band .tl-gap {
+    display: none;
+  }
+}
+@container tl (max-width: 640px) {
+  .tl-band .tl-speeds,
+  .tl-band .tl-title-words,
+  .tl-band .tl-span,
+  .tl-band .tl-nearest {
+    display: none;
+  }
+  .tl-band .tl-gap {
+    display: block;
+  }
+}
+
+/* ---------- a section's bar: under its header, where its clock is (2026-11-26, Josh: "the timeline should come from
+   under the top menu of the section since that's where you call it"), over the top of the body ---------- */
+
+.tl-section {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  /* the body's top (App.css .section-body): the bar unfolds from the header's foot */
+  top: 42px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px var(--space-3) var(--space-2);
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-abyss);
+  box-shadow: var(--shadow-sheet);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+  container: tlsec / inline-size;
+  transform-origin: top center;
+  animation: tl-unfold var(--dur-pane) var(--ease-out-soft);
+}
+@keyframes tl-unfold {
+  from {
+    clip-path: inset(0 0 100% 0);
+    transform: translateY(-6px);
+    opacity: 0;
+  }
+  to {
+    clip-path: inset(0 0 -24px 0);
+  }
+}
+.tl-section .tl-transport {
+  min-height: 32px;
+  gap: 6px;
+}
+.tl-section .tl-when {
+  min-width: 0;
+  font-size: var(--text-12);
+}
+.tl-section .tl-play,
+.tl-section .tl-close {
+  width: 22px;
+  height: 22px;
+}
+.tl-section .tl-range {
+  height: 20px;
+  padding: 0 var(--space-2);
+}
+.tl-section .tl-lanes {
+  padding-top: 2px;
+}
+.tl-section.is-detached {
+  border-bottom-color: var(--color-pulse);
+}
+@container tlsec (min-width: 560px) {
+  .tl-section .tl-nearest {
+    display: block;
+    flex: 1 1 0;
+  }
+  .tl-section .tl-gap {
+    display: none;
+  }
+}
+@container tlsec (max-width: 559px) {
+  .tl-section .tl-span,
+  .tl-section .tl-play {
+    display: none;
+  }
+}
+@container tlsec (max-width: 399px) {
+  .tl-section .tl-ranges,
+  .tl-section .tl-title-words,
+  .tl-section .tl-warn {
+    display: none;
+  }
+}
+@container tlsec (max-width: 300px) {
+  .tl-section .tl-follow {
+    padding: 0 var(--space-2);
+  }
+}
+
+/* ---------- the clock in a section's header and the grid's tab ---------- */
+
+.sec-time.is-on {
+  color: var(--color-pulse);
+  background: var(--color-pulse-dim);
+}
+/* beside the name, before the layout tools: never hidden by hover, never pushed off the screen's edge */
+.sec-time-head {
+  flex: none;
+  margin-left: -2px;
+  /* a quiet chip, as the header’s other rest marks are; a class of its own, so "opens as a grid" stays the one .sec-rest-open */
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-dim);
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .sec-time-head:not(.is-on):hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 7%, transparent);
+  }
+}
+
+/* ---------- looking at the past ---------- */
+
+.tl-past-ground:not(.is-own) {
+  background-color: color-mix(in srgb, var(--color-abyss) 94%, var(--color-pulse));
+}
+.tl-past-note {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: max-content;
+  max-width: 420px;
+  margin: 0;
+  color: var(--color-mist);
+  font-size: var(--text-16);
+}
+.tl-past-note.is-absent {
+  color: var(--color-dim);
+}
+/* while looking back, the grid's own handles rest: nothing is added, split or resized in the past */
+body.is-looking-back .add-btn,
+body.is-looking-back .gutter,
+body.is-looking-back .empty-cell-add {
+  pointer-events: none;
+  opacity: 0.35;
+}
+.tl-banner {
+  position: fixed;
+  z-index: 60;
+  left: 50%;
+  top: calc(var(--h-bar) + var(--space-3));
+  transform: translateX(-50%);
+  width: min(640px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+  padding: 4px 6px 4px var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid color-mix(in srgb, var(--color-pulse) 45%, transparent);
+  box-shadow: var(--shadow-glass);
+  color: var(--color-frost);
+  font-size: var(--text-13);
+  animation: tl-drop var(--dur-pane) var(--ease-out-soft);
+}
+@keyframes tl-drop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+/* a key that would write while looking back: the banner says it again, with a short nudge */
+.tl-banner.is-pulse {
+  animation: tl-nudge 0.42s var(--ease-out-soft);
+}
+@keyframes tl-nudge {
+  30% {
+    transform: translateX(-50%) scale(1.035);
+    box-shadow: 0 0 0 4px var(--color-pulse-dim), var(--shadow-glass);
+  }
+}
+/* toasts rise clear of the band and the bottom bar sitting on it */
+body.has-timeline-band .toast {
+  bottom: calc(var(--tl-foot, 0px) + 76px);
+}
+.tl-banner-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-pulse);
+}
+.tl-banner-text {
+  flex: none;
+  white-space: nowrap;
+}
+.tl-banner-text b {
+  font-variant-numeric: tabular-nums;
+}
+.tl-banner-note {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-mist);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tl-banner-now {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: var(--color-pulse);
+  color: var(--color-on-fill);
+  font: 600 var(--text-12) / 1.2 var(--font-sans);
+  cursor: pointer;
+}
+.tl-banner-now kbd {
+  font: 500 var(--text-11) / 1 var(--font-code);
+  opacity: 0.8;
+}
+
+/* ---------- #/design ---------- */
+
+.tldemo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+.tldemo-cap {
+  margin: 0 0 var(--space-2);
+  color: var(--color-dim);
+  font-size: var(--text-12);
+}
+.tldemo-bars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+  align-items: flex-end;
+}
+.tldemo-section {
+  position: relative;
+  height: 150px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  overflow: hidden;
+}
+.tldemo-section-head {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  font-weight: 600;
+  font-size: var(--text-14);
+  color: var(--color-frost);
+}
+.tldemo-moment {
+  width: 320px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  background: var(--color-void);
+}
+.tldemo-moment .tl-moment-list {
+  max-height: none;
+}
+.tldemo-night {
+  padding: var(--space-4);
+  border-radius: var(--radius-pane);
+}

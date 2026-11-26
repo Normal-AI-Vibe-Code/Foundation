@@ -16,8 +16,10 @@ import type { SearchHit } from "@foundation/protocol";
 import { isNight, setNight } from "@foundation/ui";
 import { api, logout, search } from "../lib/api";
 import { addNote, addPanel, appendSectionLocal, createTable, getState, requestSnap, startMachine, startVm, updatePanel } from "../state/store";
-import { askAgent, setUi, toast, useUi } from "../state/ui";
+import { askAgent, getUi, setUi, toast, useUi } from "../state/ui";
 import { activeBoard } from "../sync/board";
+import { openNoteRecorder } from "../notes/open";
+import { openGridTimeline, openSectionTimeline } from "../timeline/model";
 import { snippetHtml } from "../lib/snippet";
 import { stopAllCrew } from "../state/sessions";
 
@@ -173,9 +175,19 @@ export function CommandBar() {
       { id: "slack-board", glyph: "#", label: "Open the Slack board", hint: "a section for every channel, kept live", run: () => void openSlackBoard() },
       { id: "council", glyph: "⚇", label: "Council: the agents on this grid", hint: "each agent as a character, in its cursor's colour", run: () => openCouncil({ kind: "board" }) },
       ...(sec && st.allSections[sec] ? [{ id: "council-section", glyph: "⚇", label: `Council: the agents in ${st.allSections[sec].name}`, hint: "who's at work in this section", run: () => openCouncil({ kind: "section", id: sec }) }] : []),
+      // the timeline (timeline/): the grid's band, or one section's bar
+      { id: "timeline", glyph: "◷", label: "Timeline", hint: "this grid's past: what changed, who was here, what was said", keys: "H", run: () => openGridTimeline() },
+      ...(sec && st.sections[sec] ? [{ id: "timeline-section", glyph: "◷", label: `Timeline of ${st.sections[sec].name}`, hint: "scrub just this section", run: () => openSectionTimeline(sec) }] : []),
       { id: "character-studio", glyph: "☺", label: "Open the Character studio", hint: "inspiration → sheet → 3D model or mesh avatar, for the council", run: () => void openCharacterStudio() },
       ...(sec ? [{ id: "character", glyph: "☺", label: "Add a character to this section", hint: "a card that draws, models and animates an avatar", run: () => void newCharacter(sec) }] : []),
       { id: "note", glyph: "¶", label: "Add a note", run: () => void addNote(sec) },
+      // a voice or video note: the recorder opens on the section; the microphone or camera waits for Record
+      ...(sec && getUi().role !== "viewer"
+        ? [
+            { id: "voice-note", glyph: "◉", label: "Voice note", hint: "leave a short recording here, to be played back", run: () => openNoteRecorder(sec, "audio") },
+            { id: "video-note", glyph: "◉", label: "Video note", hint: "leave a short clip of yourself here", run: () => openNoteRecorder(sec, "video") },
+          ]
+        : []),
       { id: "table", glyph: "⊞", label: "Add a table", run: () => void createTable(sec) },
       { id: "machine", glyph: "▣", label: "Start a machine in this section", hint: "Linux on Kiri or Docker, with a shared terminal", run: () => void startMachine(sec) },
       { id: "native-vm", glyph: "▣", label: "Add a full operating system / WildOS VM", hint: "A local VM from an ISO, desktop and guest commands", run: () => void startVm(sec) },

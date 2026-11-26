@@ -9,7 +9,7 @@ import { cardOf, fullscreenCard, installCardUse, modHeld } from "../lib/cardUse"
  * mode, the repo drawer and toasts.
  *
  * Keys (⌘ is Ctrl off a Mac, and lib/keys.ts labels it so): ⌘K commands · ⌘F search · ⌘\ side menu · ⌘I this grid · ⌘J the agent ·
- * ⌘1…9 the tabs · ⌘W close the tab · P present · ⌘U upload ·
+ * ⌘1…9 the tabs · ⌘W close the tab · P present · H the grid's timeline · ⌘U upload ·
  * ⌘Z / ⇧⌘Z undo and redo on the grid · Delete removes the selected card (lib/gridUndo.ts) ·
  * Esc releases an engaged app (then steps up the grid's levels).
  */
@@ -52,6 +52,8 @@ import { holdsKeys } from "../lib/keysHeld";
 import { getState, requestSnap } from "../state/store";
 import { closeSpaceTab, getUi, noteSpaceOpen, setUi, toast, toggleSearch, toggleSession, useUi } from "../state/ui";
 import { ToolPane } from "./Tools";
+import { TimelineLayer } from "../timeline/TimelineBar";
+import { toggleGridTimeline } from "../timeline/model";
 import { activeBoard, joinBoard, onBoardChange } from "../sync/board";
 
 function typing(e: KeyboardEvent) {
@@ -250,6 +252,8 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
       } else if (!mod && !inChat && !typing(e) && !talkTyping() && !getUi().command && !getUi().presenting) {
         if (e.key === "v" || e.key === "V") toggleTalk();
         else if (e.key === "p" || e.key === "P") setUi({ presenting: true });
+        // H: this grid's timeline (timeline/), on a grid
+        else if ((e.key === "h" || e.key === "H") && placeOf(window.location.hash).kind === "grid") toggleGridTimeline();
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -331,6 +335,8 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
       <CouncilPreload />
       <TouchedRings />
       <SectionAgentsPanel />
+      {/* the grid's timeline: a band at the floor's foot, the banner while looking back (timeline/TimelineBar.tsx) */}
+      <TimelineLayer onGrid={onGrid && !isPageKind(space?.kind)} />
       <Council />
       <ContextMenuView />
       <CommandBar />

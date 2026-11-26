@@ -34,8 +34,9 @@ import { all, one, run } from "./db.ts";
 import { boardDigest, editBoard } from "./boards.ts";
 import { runTool, toolContent, TOOLS, type ToolCtx } from "./tools.ts";
 import { CODE_MODE_TOOLS } from "./codemode.ts";
-import { audit } from "./audit.ts";
+import { actorScope, audit } from "./audit.ts";
 import { canWrite } from "./roles.ts";
+import { runEnded, runStarted } from "./timeline.ts";
 import { createSession, revokeSession } from "./auth.ts";
 import { logActivity } from "@foundation/protocol";
 import { todayDigest, todayFor } from "./today.ts";
@@ -255,6 +256,8 @@ export async function runAgent(opts: {
   persona?: "shiba";
   /** a council seat's own name ("Zephyr"): its cursor goes by it (posted.ts) */
   as?: string;
+  /** the section it was asked in (the route checked it is one of this board's); null/absent: the grid */
+  section?: string | null;
   runId?: string;
   /** the visible agent doing this run */
   crew?: CrewMember;
@@ -284,8 +287,8 @@ export async function runAgent(opts: {
     const runtime = picked.runtime;
     const runId = opts.runId ?? newRunId();
     run(
-      "insert into agent_runs (id, board_id, runtime, prompt, status, created_by, created_at, session_id, crew_name) values (?, ?, ?, ?, 'running', ?, ?, ?, ?)",
-      runId, opts.boardId, runtime, opts.prompt, opts.user.id, Date.now(), opts.session ?? null, opts.crew?.name ?? null,
+      "insert into agent_runs (id, board_id, runtime, prompt, status, created_by, created_at, session_id, crew_name, section_id) values (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?)",
+      runId, opts.boardId, runtime, opts.prompt, opts.user.id, Date.now(), opts.session ?? null, opts.crew?.name ?? null, opts.section ?? null,
     );
     const transcript: AgentEvent[] = [];
     // the transcript is saved as the turn runs, so a reload mid-turn replays it
@@ -428,12 +431,21 @@ export function startRun(opts: Omit<Parameters<typeof runAgent>[0], "emit" | "si
     if (e.type === "error") failed = true;
     emit(e);
   };
+  // the timeline (timeline.ts): a run on a grid is a span in the agents' lane, a person's ask and the answer are in its chat
+  const tl = crew ? { board: opts.boardId, section: opts.section ?? null, runId: r.id, agent: { id: crew.id, name: crew.name }, user: { id: opts.user.id, name: opts.user.name } } : null;
+  // a helper's brief is its lead's, not a person's ask; a viewer's ask isn't in the board's activity, so its words stay the asker's
+  const askShown = opts.lead ? true : canWrite(opts.user.id, opts.boardId);
+  if (tl) runStarted({ ...tl, ...(opts.lead ? {} : { ask: { shown: askShown } }) });
+  const go = () => runAgent({ ...opts, prompt, crew, runId: r.id, emit: watch, signal: r.ctrl.signal });
   // runAgent ends every throw as an error event; this catch is the fence behind it, so nothing escapes as an unhandled rejection
-  void runAgent({ ...opts, prompt, crew, runId: r.id, emit: watch, signal: r.ctrl.signal })
+  void (crew ? actorScope.run({ kind: "agent", id: crew.id, name: crew.name, for: opts.user.name, forId: opts.user.id }, go) : go())
     .catch((e) => {
       if (!r.ctrl.signal.aborted) watch({ type: "error", message: scrub((e as Error)?.message ?? String(e)) });
     })
     .finally(() => {
+      // its answer is shared with the grid as its reasoning is: not once it has read beyond the grid (crew.ts markPrivate),
+      // and not when the ask itself was the asker's alone (a viewer's ask isn't on the board, so neither is its answer)
+      if (tl && crew) runEnded({ ...tl, answered: r.events.some((e) => e.type === "text" && e.text.trim()), private: Boolean(crew.private) || !askShown, why: crew.private ? "read" : "ask" });
       if (crew) {
         leaveCrew(crew, r.ctrl.signal.aborted ? "stopped" : failed ? "error" : "done");
         crewUsers.delete(crew.id);

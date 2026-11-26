@@ -17,12 +17,23 @@
  *
  * Click in it to write (no double-click). Esc, or a click anywhere else, puts
  * the toolbar away. A viewer reads it; links open.
+ *
+ * The toolbar sits just outside the card's foot, under it, and rises a few px
+ * into place (2026-11-25, Josh: "should actually animate up, not moving the
+ * text down, keep it steady"): it is drawn into the card itself, outside the
+ * clipped body, so the words keep their padding and their scroll while it
+ * shows and every line stays in view.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { NOTE_SIZES, type NoteSize } from "@foundation/protocol";
 import { setNoteSize, takeFreshNote, updateNoteText, type NoteMeta } from "../state/store";
-import { getUi } from "../state/ui";
+import { getUi, toast } from "../state/ui";
+import { openContextMenu, type MenuItem } from "./ContextMenu";
+import { cardMenuItems } from "./cardMenu";
+import { IS_MAC, keys } from "../lib/keys";
 import { renderMarkdown } from "../utils/markdown";
 import { openExternal } from "../utils/media";
 
@@ -241,9 +252,12 @@ export const SIZE_NAMES: Record<NoteSize, string> = { s: "Small", m: "Normal", l
  * With `size` it carries the text size: the whole note's, a step smaller or
  * larger (markdown has no sizes of its own, so it is the card's, not a word's).
  */
-export function RichToolbar({ marks, size, onCommand, onStyle, onLink, onSize }: { marks: Marks; size?: NoteSize; onCommand?: (cmd: string, value?: string) => void; onStyle?: (s: Style) => void; onLink?: (url: string) => void; onSize?: (s: NoteSize) => void }) {
+export function RichToolbar({ marks, size, onCommand, onStyle, onLink, onSize, linkAsk = 0 }: { marks: Marks; size?: NoteSize; onCommand?: (cmd: string, value?: string) => void; onStyle?: (s: Style) => void; onLink?: (url: string) => void; onSize?: (s: NoteSize) => void; /** bumped to open the link field (the right-click menu's Link…) */ linkAsk?: number }) {
   const [linking, setLinking] = useState(false);
   const [url, setUrl] = useState("https://");
+  useEffect(() => {
+    if (linkAsk) setLinking(true);
+  }, [linkAsk]);
   const btn = (cmd: string, glyph: React.ReactNode, tip: string, on: boolean, kbd?: string, cls = "") => (
     <button
       type="button"
@@ -394,7 +408,11 @@ export function RichNote({ note }: { note: NoteMeta }) {
   const wrote = useRef(false);
   const [focused, setFocused] = useState(false);
   const [marks, setMarks] = useState<Marks>(NO_MARKS);
+  const [linkAsk, setLinkAsk] = useState(0);
   const canWrite = getUi().role !== "viewer";
+  /** the card the toolbar is drawn into, under its foot (outside the body, which clips); none: in place, as before */
+  const [card, setCard] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setCard(el.current?.closest<HTMLElement>(".frame-card") ?? null), []);
   /** where the caret was in the text, for a toolbar control that takes the focus (the style picker, the link field) */
   const range = useRef<Range | null>(null);
   const restore = () => {
@@ -466,11 +484,79 @@ export function RichNote({ note }: { note: NoteMeta }) {
     [commit],
   );
 
+  /**
+   * Right-click in the words (2026-11-26, Josh: "you should be able to right click format selections, in addition
+   * to other things to the note"): the selection's formatting first, then the clipboard, the text's size, and the
+   * note's own card menu (frame it, full screen, float, copy a link, remove). A reader gets the card's menu only.
+   */
+  const onContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sel = window.getSelection();
+    // the selection in these words, or none (never one left over from before)
+    range.current = sel?.rangeCount && el.current?.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
+    const card = cardMenuItems(note.id) ?? [];
+    if (!canWrite) return openContextMenu(e.clientX, e.clientY, card);
+    const m = readMarks();
+    const picked = !!range.current && !range.current.collapsed;
+    const tick = (on: boolean) => (on ? "✓" : "");
+    const mod = (k: string) => `  ${keys(`mod+${k}`)}`;
+    const fmt = (label: string, cmd: string, on: boolean, kbd = ""): MenuItem => ({ icon: tick(on), label: label + kbd, action: () => command(cmd) });
+    const step = NOTE_SIZES.indexOf(note.size ?? "m");
+    const smaller = NOTE_SIZES[step - 1] as NoteSize | undefined;
+    const larger = NOTE_SIZES[step + 1] as NoteSize | undefined;
+    const items: MenuItem[] = [
+      { heading: picked ? "Format the selection" : "Format" },
+      fmt("Bold", "bold", m.bold, mod("B")),
+      fmt("Italic", "italic", m.italic, mod("I")),
+      fmt("Underline", "underline", m.underline, mod("U")),
+      fmt("Strikethrough", "strikeThrough", m.strike),
+      { divider: true },
+      ...STYLES.map((st): MenuItem => ({ icon: tick(m.style === st.id), label: st.label, action: () => command("formatBlock", st.id) })),
+      fmt("Bulleted list", "insertUnorderedList", m.ul),
+      fmt("Numbered list", "insertOrderedList", m.ol),
+      fmt("Quote", "quote", m.quote),
+      { divider: true },
+      {
+        icon: "⌁",
+        label: "Link…",
+        disabled: !picked,
+        action: () => {
+          restore();
+          setFocused(true);
+          setLinkAsk((n) => n + 1);
+        },
+      },
+      { icon: "⌫", label: "Clear formatting", disabled: !picked, action: () => command("removeFormat") },
+      { divider: true },
+      { label: `Cut${mod("X")}`, disabled: !picked, action: () => (restore(), document.execCommand("cut"), commit()) },
+      { label: `Copy${mod("C")}`, disabled: !picked, action: () => (restore(), document.execCommand("copy")) },
+      {
+        label: `Paste${mod("V")}`,
+        action: () =>
+          void navigator.clipboard.readText().then(
+            (t) => {
+              restore();
+              document.execCommand("insertText", false, t);
+              commit();
+            },
+            () => toastPaste(),
+          ),
+      },
+      { divider: true },
+      { icon: "A", label: "Smaller text", disabled: !smaller, action: () => smaller && setNoteSize(note.id, smaller) },
+      { icon: "A", label: "Larger text", disabled: !larger, action: () => larger && setNoteSize(note.id, larger) },
+    ];
+    // the note itself: its card's menu, under its name
+    openContextMenu(e.clientX, e.clientY, card.length ? [...items, { divider: true }, ...card] : items);
+  };
+
   return (
     <>
       <div
         ref={el}
         className={`note-rendered rich-text${focused ? " is-writing" : ""}`}
+        onContextMenu={onContextMenu}
         contentEditable={canWrite}
         suppressContentEditableWarning
         role="textbox"
@@ -513,31 +599,50 @@ export function RichNote({ note }: { note: NoteMeta }) {
           }
         }}
       />
-      {focused && canWrite && (
-        <div
-          className="rich-bar-slot"
-          onBlur={(e) => {
-            // leaving the toolbar for anywhere but the text puts it away
-            const to = e.relatedTarget as HTMLElement | null;
-            if (to && (to === el.current || to.closest(".rich-bar"))) return;
-            if (!to && e.currentTarget.contains(document.activeElement)) return;
-            setFocused(false);
-          }}
-        >
-          <RichToolbar
-            marks={marks}
-            size={note.size ?? "m"}
-            onSize={(s) => setNoteSize(note.id, s)}
-            onCommand={command}
-            onStyle={(s) => command("formatBlock", s)}
-            onLink={(url) => {
-              restore();
-              document.execCommand("createLink", false, url);
-              commit();
-            }}
-          />
-        </div>
+      {portalTo(
+        card,
+        <AnimatePresence>
+          {focused && canWrite && (
+            <motion.div
+              key="bar"
+              className={`rich-bar-slot${card ? " is-under" : ""}`}
+              // the box grows down to hold it: it unfolds from the card's foot, and folds back the same way (DESIGN §6:
+              // --dur-pane in, --dur-quick out, ease-out-soft). Full screen it floats inside instead (App.css).
+              initial={card ? { opacity: 0, clipPath: "inset(0px -6px 100% -6px)" } : { opacity: 0, y: 6 }}
+              animate={card ? { opacity: 1, clipPath: "inset(0px -6px -6px -6px)", transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } } : { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] } }}
+              exit={card ? { opacity: 0, clipPath: "inset(0px -6px 100% -6px)", transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] } } : { opacity: 0, y: 6, transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] } }}
+              onBlur={(e) => {
+                // leaving the toolbar for anywhere but the text puts it away
+                const to = e.relatedTarget as HTMLElement | null;
+                if (to && (to === el.current || to.closest(".rich-bar"))) return;
+                if (!to && e.currentTarget.contains(document.activeElement)) return;
+                setFocused(false);
+              }}
+            >
+              <RichToolbar
+                marks={marks}
+                size={note.size ?? "m"}
+                onSize={(s) => setNoteSize(note.id, s)}
+                linkAsk={linkAsk}
+                onCommand={command}
+                onStyle={(s) => command("formatBlock", s)}
+                onLink={(url) => {
+                  restore();
+                  document.execCommand("createLink", false, url);
+                  commit();
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>,
       )}
     </>
   );
 }
+
+/** the browser keeps the clipboard from a page that wasn't given it: the keys still paste */
+function toastPaste() {
+  toast(`The browser keeps the clipboard from menus here: press ${IS_MAC ? "⌘" : "Ctrl+"}V to paste.`, "warn");
+}
+
+const portalTo = (to: HTMLElement | null, node: React.ReactNode) => (to ? createPortal(node, to) : node);

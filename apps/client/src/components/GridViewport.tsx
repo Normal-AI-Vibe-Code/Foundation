@@ -256,7 +256,8 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
       const left = f.left ? f.left + FLOOR_FADE / 2 : 0;
       const top = f.top + SAFE_GAP;
       const availW = Math.max(160, vp.w - left - (f.right ? f.right + FLOOR_FADE / 2 : 0));
-      const availH = Math.max(120, vp.h - top - SAFE_BOTTOM);
+      // the grid's timeline, when open, is the floor's foot: framing fits above it (and the bottom bar above that)
+      const availH = Math.max(120, vp.h - top - SAFE_BOTTOM - f.bottom);
       const s = Math.max(
         MIN_SCALE,
         Math.min(cap, (availW * FIT_MARGIN) / rect.w, (availH * FIT_MARGIN) / rect.h),
@@ -862,9 +863,9 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
     const prev = lastInsets.current;
     lastInsets.current = insets;
     const dx = (insets.left - prev.left - (insets.right - prev.right)) / 2;
-    const dy = (insets.top - prev.top) / 2;
+    const dy = (insets.top - prev.top - (insets.bottom - prev.bottom)) / 2;
     if (dx || dy) camera.to(camera.x.goal + dx, camera.y.goal + dy);
-  }, [insets.left, insets.right, insets.top, camera]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [insets.left, insets.right, insets.top, insets.bottom, camera]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----- render -----
   const size = gridSize(state.grid);
@@ -896,7 +897,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
           The floor's edges are set (and transition) on the mask alone: on the viewport, every card under
           it restyled on each frame of a pane opening */}
       {rune && <RuneSurface />}
-      <div className="world-mask" style={{ "--floor-l": `${insets.left}px`, "--floor-t": `${insets.top}px`, "--floor-r": `${insets.right}px` } as CSSProperties}>
+      <div className="world-mask" style={{ "--floor-l": `${insets.left}px`, "--floor-t": `${insets.top}px`, "--floor-r": `${insets.right}px`, "--floor-b": `${insets.bottom}px` } as CSSProperties}>
       <div ref={worldRef} className={"world" + (state.expandedSection && state.sections[state.expandedSection] ? " has-expanded" : "")}>
         {/* Rune draws the grid, its cells and sections on its own canvas; here the web renderer does */}
         {!rune && (<>
@@ -1080,7 +1081,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
       {/* the bar's room: the open paper, less the grid's council when it stands at the right. The bar folds into
           icons as the room narrows (2026-11-17, Josh: "the bottom bar should collapse as the panel on the right is
           coming in"): shell.css, @container hud */}
-      <div className="hud-room" style={{ left: insets.left, right: insets.right + (councilBoard ? ui.councilW : 0) }}>
+      <div className="hud-room" style={{ left: insets.left, right: insets.right + (councilBoard ? ui.councilW : 0), bottom: insets.bottom }}>
       <motion.div
         className={`hud${councilBoard ? " is-aside" : ""}`}
         layout="position"

@@ -38,6 +38,7 @@ export const READ_TOOLS = new Set([
   "pipeline_status",
   "huddle_transcript",
   "replay_timeline", // a recorded session's timeline; reads only
+  "read_timeline", // a grid's timeline (timeline.ts); reads only
   "slack_read",
   "set_plan", // shows the session's plan; writes nothing to the board
   "find_images",

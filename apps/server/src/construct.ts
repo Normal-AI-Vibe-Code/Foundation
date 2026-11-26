@@ -291,7 +291,8 @@ export async function layOut(
     try {
       if (it.ref?.startsWith("media:")) {
         const o = boardMaps(doc).objects.get(it.ref.slice(6));
-        const fileId = o?.kind === "media" ? /\/files\/(f_[a-z0-9]+)/.exec(o.src)?.[1] : undefined;
+        // pictures only: a voice or video note, or a video, is not laid out as an image (an old card with no `media` is a picture)
+        const fileId = o?.kind === "media" && (o.media ?? "image") === "image" ? /\/files\/(f_[a-z0-9]+)/.exec(o.src)?.[1] : undefined;
         const file = fileId && canSeeFile(ctx.userId, fileId) ? one<FileRow>("select * from files where id = ?", fileId) : undefined;
         if (file) placed.push({ kind: "image", file, ...(await pixelSize(file)), title: it.title ?? file.name, caption: it.caption, at: file.created_at });
         else skipped.push(`${it.ref} (not a stored image)`);

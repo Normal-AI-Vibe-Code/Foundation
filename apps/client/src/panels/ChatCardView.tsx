@@ -30,7 +30,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence } from "motion/react";
 import { chatHandle, chatTitle, type ChatChannelView } from "@foundation/protocol";
 import { updatePanel, type PanelMeta } from "../state/store";
-import { toast, useUi } from "../state/ui";
+import { getUi, toast, useUi } from "../state/ui";
+import { BareGlyph } from "../components/NoteView";
 import { putInUse } from "../lib/cardUse";
 import { goChat } from "../lib/place";
 import { useWhereabouts } from "../lib/whereabouts";
@@ -78,6 +79,30 @@ import "../chat/chat.css";
 import "./chat-card.css";
 
 const FACES = 5;
+
+// ---------------------------------------------------------------- no background
+
+/**
+ * The chat card's paper, off and on (2026-11-25, Josh: "the chat window should also have a feature to make the
+ * background invisible"): the note's button, glyph and words (NoteView), in the card's bar; `bare` is kept on
+ * the card, for everyone on the grid. Not offered to a viewer (it writes the board).
+ */
+export function ChatBareButton({ panel }: { panel: PanelMeta }) {
+  if (getUi().role === "viewer") return null;
+  return (
+    <button
+      type="button"
+      className={"icon-btn note-bare-btn" + (panel.bare ? " is-on" : "")}
+      aria-pressed={!!panel.bare}
+      aria-label="No background"
+      data-tip={panel.bare ? "Show the background" : "Hide the background"}
+      data-chat-card-bare
+      onClick={() => updatePanel(panel.id, { bare: !panel.bare })}
+    >
+      <BareGlyph off={!!panel.bare} />
+    </button>
+  );
+}
 
 // ---------------------------------------------------------------- the card on a grid
 
@@ -132,7 +157,7 @@ export function ChatCardBody({ panel }: { panel: PanelMeta }) {
   else body = <ChatCardNotice kind="waiting" title={s.status === "offline" ? "Offline" : "Opening the conversation…"} line={s.status === "offline" ? s.why : ""} />;
 
   return (
-    <div ref={host} className={`chat-card is-${state}${ui.engaged === panel.id ? " is-in-use" : ""}`} data-chat-card={panel.channel ?? ""} data-chat-card-state={state} data-chat-drop-zone={state === "open" ? "on" : "off"}>
+    <div ref={host} className={`chat-card is-${state}${ui.engaged === panel.id ? " is-in-use" : ""}${panel.bare ? " is-bare" : ""}`} data-chat-card={panel.channel ?? ""} data-chat-card-state={state} data-chat-drop-zone={state === "open" ? "on" : "off"}>
       {body}
     </div>
   );
@@ -239,12 +264,12 @@ export function ChatCardFrame({ head, dock, note, timeline, thread, foot, quiet 
       {note}
       <div className="chat-card-main">
         {timeline}
+        {/* who is typing rides the timeline's foot, over it, only while someone is: no fine print under the field */}
+        {quiet}
         <AnimatePresence>{thread}</AnimatePresence>
       </div>
-      <div className="chat-card-foot">
-        {foot}
-        {quiet}
-      </div>
+      {/* the field is the card's foot, divided from the conversation by a line (2026-11-26, Josh) */}
+      <div className="chat-card-foot">{foot}</div>
     </>
   );
 }
@@ -502,8 +527,8 @@ export function ChatConversation({
         </div>
       }
       quiet={
-        <div className="chat-card-quiet" aria-live="polite">
-          {typingWords(null) ?? (!voice && s.remote ? <span data-chat-card-novoice>Voice needs Foundation's own server: this conversation is on {CHAT_SERVER_NAME}.</span> : null)}
+        <div className={`chat-card-quiet${typingWords(null) ? " is-on" : ""}`} aria-live="polite">
+          {typingWords(null)}
         </div>
       }
     />

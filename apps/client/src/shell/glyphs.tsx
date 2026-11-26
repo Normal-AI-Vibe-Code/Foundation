@@ -60,6 +60,16 @@ export function MicGlyph({ size = 16 }: { size?: number }) {
   );
 }
 
+/** a video camera: a video note (notes/NoteRecorder.tsx) */
+export function CameraGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <rect x="1.8" y="4.2" width="8.8" height="7.6" rx="1.6" />
+      <path d="M10.6 7.2l3.6-2v5.6l-3.6-2" />
+    </svg>
+  );
+}
+
 export function SendGlyph({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
@@ -455,6 +465,16 @@ export function FindGlyph({ size = 16 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
       <circle cx="7" cy="7" r="4.4" />
       <path d="M10.3 10.3l3.5 3.5" />
+    </svg>
+  );
+}
+
+/** the timeline (2026-11-25, Josh: "a time icon in the section and grid header"): a clock, its ring and two hands */
+export function TimeGlyph({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden {...S}>
+      <circle cx="8" cy="8" r="5.6" />
+      <path d="M8 4.9V8l2.2 1.4" />
     </svg>
   );
 }

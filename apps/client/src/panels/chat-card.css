@@ -25,6 +25,41 @@
   pointer-events: none;
 }
 
+/* ---------- no background (PanelDoc.bare; the sheet button in its bar, as a note has) ----------
+   2026-11-25, Josh: "the chat window should also have a feature to make the background invisible". Every layer
+   of paper goes (the card's fill, edge and shadow, the body's and the inner's ground, the conversation's void):
+   the conversation stands on the section itself. As a bare note does, it shows a dashed hairline where it is
+   under the pointer, while it's written in and while it's carried, and wears the ring alone when chosen. What
+   you read and type keeps its own ground: the composer is raised paper either way, a locked or elsewhere well
+   keeps its abyss, the picker's field its well. The faces' cut-out takes the section's paper instead of the
+   void, and a thread opened over the timeline is a raised sheet, so the timeline doesn't show through it.
+   Only a card on a grid: the right panel's pinned conversation (.chat-pinned) is never bare. */
+.frame-card.panel-card.kind-chat.is-bare {
+  background: transparent;
+  border-style: dashed;
+  border-color: transparent;
+  box-shadow: none;
+}
+.frame-anchor:is(:hover, .is-hover, .dragging, :focus-within) .frame-card.panel-card.kind-chat.is-bare {
+  border-color: var(--line-strong);
+}
+.frame-card.panel-card.kind-chat.is-bare.ctx-active {
+  box-shadow: 0 0 0 2.5px var(--select);
+}
+.panel-card.kind-chat.is-bare :is(.frame-body, .panel-inner),
+.chat-card.is-bare {
+  background: transparent;
+}
+.chat-card.is-bare {
+  --chat-card-cut: var(--color-raise);
+}
+.chat-card.is-bare .chat-card-main > .chat-thread {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+  box-shadow: var(--shadow-sheet);
+}
+
 /* ---------- the head: what it is, who is here, voice, unread, open ---------- */
 
 .chat-card-head {
@@ -69,7 +104,7 @@
   display: inline-grid;
   margin-left: -4px;
   border-radius: var(--radius-pill);
-  box-shadow: 0 0 0 2px var(--color-void);
+  box-shadow: 0 0 0 2px var(--chat-card-cut, var(--color-void));
   opacity: 0.5;
   transition: opacity var(--dur-quick) var(--ease-out-soft);
 }
@@ -79,7 +114,7 @@
 .chat-card-face.is-here {
   opacity: 1;
   box-shadow:
-    0 0 0 1.5px var(--color-void),
+    0 0 0 1.5px var(--chat-card-cut, var(--color-void)),
     0 0 0 3px var(--color-ok);
 }
 /* an agent is a figure on its violet line, never a disc: no ring; at work here it is whole */
@@ -121,18 +156,49 @@
   height: 40px;
   padding-left: var(--space-4);
 }
+/* The field is the card's foot (2026-11-26, Josh: "the text box for chat shouldn't be rendered as a rounded
+   [box] inside the box, simply divide the chat area from the input with a line"): one hairline over it, no box of
+   its own, no ring of its own (the card's selection ring is the one outline), and no fine print under it. */
 .chat-card-foot {
   flex: none;
-  padding: var(--space-1) var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
 }
+.chat-card-foot .chat-compose {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.chat-card-foot .chat-compose:focus-within {
+  border-color: transparent;
+  box-shadow: none;
+}
+.chat-card-foot .chat-compose:has(.chat-compose-field:focus-visible) {
+  outline: none;
+}
+.chat-card-foot .chat-compose.is-drop {
+  box-shadow: inset 0 0 0 2px var(--color-pulse);
+}
+/* someone typing: a quiet line over the timeline's foot, only while they are */
 .chat-card-quiet {
-  min-height: 18px;
-  padding: 2px var(--space-1) var(--space-1);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  padding: 2px var(--space-4) 3px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--color-dim);
   font-size: var(--text-11);
+  background: linear-gradient(to top, var(--color-abyss) 60%, transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+}
+.chat-card-quiet.is-on {
+  opacity: 1;
 }
 /* the call, docked under the head while you're in it or listening: at most the card's upper part */
 .chat-card > .hdock {

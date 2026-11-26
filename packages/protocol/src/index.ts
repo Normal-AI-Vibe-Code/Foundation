@@ -18,6 +18,7 @@ export * from "./characters.ts";
 export * from "./collections.ts";
 export * from "./chat.ts";
 export * from "./replay.ts";
+export * from "./timeline.ts";
 export * from "./avatars.ts";
 export * from "./localdev.ts";
 export * from "./flows.ts";
@@ -211,9 +212,17 @@ export interface MediaDoc extends ObjectBaseDoc {
   w: number;
   h: number;
   src: string;
-  media: "image" | "video";
+  /** "audio" (2026-11-25) is a voice note, or a sound file put on the grid: it has no picture, only its player */
+  media: "image" | "video" | "audio";
   autoplay: boolean;
   muted: boolean;
+  /**
+   * A voice or video note (2026-11-25): recorded here by a person and left to be played back, not a file
+   * that was put on the grid. `by` is who recorded it (their user id and name, as the recorder knew them),
+   * `ms` how long it runs, `peaks` a voice note's loudness (0..1, about 48 steps) for its drawn wave. The
+   * clip itself is an ordinary archived file (`fileId`, also what `src` points at).
+   */
+  note?: { by: string; byName: string; at: number; ms: number; fileId: string; mime: string; peaks?: number[] };
   /**
    * Images only: shown inverted on a dark ground (night), for a dark drawing
    * or logo on a clear background that would vanish there. Day shows it as it is.
@@ -286,6 +295,11 @@ export interface PanelDoc extends ObjectBaseDoc {
    * card instead of looking the id up on the wrong server.
    */
   chatServer?: string;
+  /**
+   * A "chat" card with no paper behind it (2026-11-25), as a note has (NoteDoc.bare): the conversation
+   * stands on the section itself. Kept on the card, for everyone on the grid.
+   */
+  bare?: boolean;
   /**
    * Only on boards older than schema 6. A huddle's live state lives in the
    * board's `huddles` map, written by the server alone, so a person moving

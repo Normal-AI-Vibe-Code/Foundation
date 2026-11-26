@@ -591,7 +591,7 @@ test("3 · a section's menu: the council, Add and Live side by side, the grid's 
   expect(l.x).toBeGreaterThan(a.x + a.width - 1);
   expect(a.y).toBeGreaterThan((await box(first)).y + 20);
   const texts = async (c: Locator) => (await c.locator(".menu-item").allInnerTexts()).map((t) => t.replace(/^\S+\s+/, "").trim());
-  expect(await texts(cols.nth(0))).toEqual(["Note", "Table", "Map", "Image, video or file…", "App or web page…"]);
+  expect(await texts(cols.nth(0))).toEqual(["Note", "Voice or video note…", "Table", "Map", "Image, video or file…", "App or web page…"]);
   expect(await texts(cols.nth(1))).toEqual(["Agents card", "Huddle", "ChatForm channel", "Slack channel", "Machine", "Full operating system / WildOS VM", "Kubernetes cluster", "Character: 3D", "Character: mesh avatar", "Collection", "Character pipeline", "All agents on this grid"]);
 
   // the grid's own actions: a row of icons along the bottom, no words, each named on roll-over
@@ -654,7 +654,11 @@ test("3 · a section's menu: the council, Add and Live side by side, the grid's 
   await ada.keyboard.press("ArrowDown");
   expect(await focused()).toBe("Note");
   await ada.keyboard.press("ArrowDown");
+  expect(await focused()).toBe("Voice or video note…");
+  await ada.keyboard.press("ArrowDown");
   expect(await focused()).toBe("Table");
+  // back up a row, so the move right lands beside the second row, as it did before the voice note was added
+  await ada.keyboard.press("ArrowUp");
   await ada.keyboard.press("ArrowRight");
   expect(await focused()).toBe("Huddle");
   await ada.keyboard.press("ArrowUp");

@@ -11,10 +11,18 @@
  *     keep it); Remove takes the card off, and the character leaves the
  *     board's map, the server's roster and this browser's roster without a
  *     reload; what it drew stays in the archive. A viewer has no ✕.
- *  2. The hover bar makes room: the card's content moves down 38 px, the
- *     card's box, its neighbours, its section, its ports and its resize corner
- *     stay put; a note's last line stays in the card; a live app's document is
- *     neither reloaded nor resized; the editor isn't pushed twice.
+ *  2. A note's bar rises (2026-11-25, Josh: "the menus for notes should be
+ *     about 20% larger, and should actually animate up, not moving the text
+ *     down, keep it steady, same with the chat window"): 36 tall, above the
+ *     card's top edge, drawn over the section's header for a note in the top
+ *     row, reachable by the pointer from the card; the note doesn't move by a
+ *     pixel on hover, while it's written in (its toolbar, 40 tall, hangs under
+ *     the card, whole, and the words keep their padding and scroll) or as its
+ *     markdown. Every other card's bar still makes room: a live app's content
+ *     moves down 38 px, its document neither reloaded nor resized, and a
+ *     chapter card gets shorter from the top.
+ *  2b. A chat card's bar rises the same way, and its paper comes off and back
+ *     (`bare`, the note's button) with every layer of it.
  *  3. Alt-wheel (since 2026-11-17; it was Ctrl-wheel for a day) scrolls through a card with more in it than fits (a note, a
  *     character, a design chapter) and leaves the grid alone; at the end it
  *     holds, then zooms after a beat; over a short card or the paper it zooms;
@@ -32,7 +40,11 @@ import { mkdirSync } from "node:fs";
 import { CLIENT, FRAME, person, settle, waitLive } from "./helpers";
 
 const SHOTS = "../../docs/evidence/2026-11-16_card-chrome";
+const RISE_SHOTS = "../../docs/evidence/2026-11-25_menus-rise";
+/** how far a card that makes room for its bar moves its content */
 const PUSH = 38;
+/** a risen bar's height, and the air between it and the card (App.css .bar-rise) */
+const RISE = { h: 36 };
 
 type Obj = { id: string; name: string; sectionId: string; panel?: string };
 type Store = { getState(): { notes: Record<string, Obj>; panels: Record<string, Obj>; sections: Record<string, { id: string; name: string }> }; setState(p: object): void };
@@ -85,6 +97,7 @@ const leave = async (p: Page) => {
 
 test.beforeAll(async ({ browser }) => {
   mkdirSync(SHOTS, { recursive: true });
+  mkdirSync(RISE_SHOTS, { recursive: true });
   const a = await person(browser, "Ada Test", "ada@normal.dev");
   ada = a.page;
   ctx = a.context;
@@ -96,6 +109,8 @@ test.beforeAll(async ({ browser }) => {
   await tool("add_section", { name: "Apps" });
   await tool("add_note", { section: "Apps", title: "Beside", markdown: "A note, so the app is a card and not the section's app." });
   await tool("add_panel", { section: "Apps", panel: "app", name: "Live", url: FRAME });
+  await tool("add_section", { name: "Chat" });
+  await tool("add_note", { section: "Chat", title: "Beside chat", markdown: "A note, so the chat is a card and not the section's own." });
   // a character, on this board: a card in "Characters · Animals"
   const taro = await ctx.request.post(`${CLIENT}/api/boards/${board}/characters`, { data: { name: "Taro", set: "animals", form: "mesh", identity: "A plump red shiba in a soft gouache style.", refs: [], height: 0.6 } });
   expect(taro.ok(), await taro.text()).toBe(true);
@@ -108,9 +123,17 @@ test.beforeAll(async ({ browser }) => {
     const s = f.getState();
     const sec = Object.values(s.sections).find((x) => x.name === "Notes")!;
     const id = "pnl_design_chrome";
-    f.setState({ panels: { ...s.panels, [id]: { id, sectionId: sec.id, name: "Design · cards", panel: "design", source: "cards", x: 0, y: 0, w: 520, h: 420, float: false, bornAt: Date.now(), ports: [] } } });
+    // and a chat card, not yet given a conversation (its picker): the rising bar and the paper that comes off
+    const chat = "pnl_chat_chrome";
+    f.setState({
+      panels: {
+        ...s.panels,
+        [id]: { id, sectionId: sec.id, name: "Design · cards", panel: "design", source: "cards", x: 0, y: 0, w: 520, h: 420, float: false, bornAt: Date.now(), ports: [] },
+        [chat]: { id: chat, sectionId: Object.values(s.sections).find((x) => x.name === "Chat")!.id, name: "Talk", panel: "chat", x: 0, y: 0, w: 400, h: 480, float: false, bornAt: Date.now(), ports: [] },
+      },
+    });
   });
-  for (const n of ["Long", "Short", "Beside", "Live", "Taro", "Design · cards"]) {
+  for (const n of ["Long", "Short", "Beside", "Live", "Taro", "Design · cards", "Talk"]) {
     await expect.poll(() => find(ada, n), { message: `the card “${n}”` }).not.toBeNull();
     ids[n] = (await find(ada, n))!;
   }
@@ -195,47 +218,97 @@ test("1 · removing a character asks first; removed, it leaves the board, the ro
   await kai.context.close();
 });
 
-test("2 · the hover bar makes room: the content moves down, and nothing else moves", async () => {
+const sel = (id: string, inner: string) => `.obj-slot[data-obj-id="${id}"] ${inner}`;
+/** is what's drawn at (x, y) part of this card's own bar, or toolbar (not under the section's header, a neighbour, or clipped away) */
+const drawnAt = (p: Page, x: number, y: number, id: string, what: string) =>
+  p.evaluate(([x, y, id, what]) => !!document.elementFromPoint(x, y)?.closest(`.obj-slot[data-obj-id="${id}"] ${what}`), [x, y, id, what] as const);
+
+test("2 · a note's bar is its box grown up and the note holds still; its toolbar the box grown down; every other card's bar still makes room", async () => {
   await frame(ada, ids.Long);
   const s = slot(ada, ids.Long);
   const k = await scaleOf(ada, ids.Long);
-  const sel = (id: string, inner: string) => `.obj-slot[data-obj-id="${id}"] ${inner}`;
   const read = async () => ({
     card: await rect(ada, sel(ids.Long, ".frame-card")),
     inner: await rect(ada, sel(ids.Long, ".note-inner")),
     body: await rect(ada, sel(ids.Long, ".frame-body")),
+    first: await rect(ada, sel(ids.Long, ".note-rendered > :first-child")),
     corner: await rect(ada, sel(ids.Long, ".map-resize")),
     other: await rect(ada, sel(ids.Short, ".frame-card")),
     section: await rect(ada, ".section-card:has(.obj-slot[data-obj-id='" + ids.Long + "'])"),
   });
   const rest = await read();
   near(rest.inner.y, rest.body.y);
+  await expect(s.locator(".frame-anchor")).toHaveClass(/bar-rise/);
   await expect(s.locator(".frame-header")).toHaveCSS("opacity", "0");
-  await ada.screenshot({ path: `${SHOTS}/02_note-at-rest-night.png` });
+  await ada.screenshot({ path: `${RISE_SHOTS}/01_note-at-rest-night.png` });
 
   await hover(ada, ids.Long);
   await expect(s.locator(".frame-header")).toHaveCSS("opacity", "1");
+  // not a pixel of the card moved: its box, its body, its words, its corner, the card beside it, the section
   const on = await read();
-  // the content is 38 px lower (at the card's scale) and the bar sits in the room it left
-  near(on.inner.y - rest.inner.y, PUSH * k, 1);
+  for (const key of Object.keys(rest) as (keyof typeof rest)[]) expect(on[key], key).toEqual(rest[key]);
+  // the bar is the box grown up (2026-11-26): 36 tall (at the card's scale), flush on the card's top edge (its foot on
+  // the card's border), the card's own width
   const bar = await rect(ada, sel(ids.Long, ".frame-header"));
-  expect(bar.bottom).toBeLessThanOrEqual(on.inner.y + 0.5);
-  // a note gets shorter from the top: its last line is still inside the card
-  near(on.inner.bottom, rest.inner.bottom, 1);
-  // nothing else moved: the card's box, its resize corner, the card beside it, the section
-  for (const key of ["card", "body", "corner", "other", "section"] as const) expect(on[key], key).toEqual(rest[key]);
-  await ada.screenshot({ path: `${SHOTS}/03_note-bar-makes-room-night.png` });
+  near(bar.h, RISE.h * k, 1);
+  near(bar.bottom, on.card.y + 1 * k, 1.5);
+  near(bar.w, on.card.w, 1);
+  // the note is in its section's top row: the bar is drawn over the section's header, whole (top to bottom)
+  for (const fy of [0.15, 0.5, 0.85]) expect(await drawnAt(ada, bar.x + bar.w / 2, bar.y + bar.h * fy, ids.Long, ".frame-header"), `the bar at ${fy} of its height`).toBe(true);
+  await ada.screenshot({ path: `${RISE_SHOTS}/02_note-bar-risen-night.png` });
 
-  // it goes back when the pointer leaves
+  // the pointer goes up from the note to its bar (no gap to cross): the bar stays, and takes the pointer
+  const title = await rect(ada, sel(ids.Long, ".frame-header .frame-title"));
+  await ada.mouse.move(title.x + title.w / 2, title.y + title.h / 2, { steps: 12 });
+  await settle(ada, 450);
+  await expect(s.locator(".frame-header")).toHaveCSS("opacity", "1");
+  expect(await drawnAt(ada, title.x + title.w / 2, title.y + title.h / 2, ids.Long, ".frame-title")).toBe(true);
+  // (picked up by its bar, a note moves: e2e/pointer.spec.ts 1b)
+
+  // it goes back when the pointer leaves, and the note still hasn't moved
   await leave(ada);
   await expect(s.locator(".frame-header")).toHaveCSS("opacity", "0");
-  near((await read()).inner.y, rest.inner.y);
+  const gone = await read();
+  for (const key of Object.keys(rest) as (keyof typeof rest)[]) expect(gone[key], key).toEqual(rest[key]);
 
-  // writing: the bar is up (focus), the editor is pushed once: its first line sits 38 + 14 below the card's top
+  // writing: the bar is up (focus) and the toolbar is the box grown down; the words keep their padding and scroll
   await frame(ada, ids.Short);
   const w = slot(ada, ids.Short);
   const kw = await scaleOf(ada, ids.Short);
-  // the note turned to its markdown (the Markdown button in its bar)
+  const text = w.locator(".note-rendered");
+  const words = async () => ({
+    box: await rect(ada, sel(ids.Short, ".note-rendered")),
+    first: await rect(ada, sel(ids.Short, ".note-rendered > :first-child")),
+    pad: await text.evaluate((el) => getComputedStyle(el).padding),
+    top: await text.evaluate((el) => el.scrollTop),
+  });
+  const still = await words();
+  await hover(ada, ids.Short);
+  await text.click();
+  await expect(text).toHaveClass(/is-writing/);
+  const toolbar = w.locator(".rich-bar");
+  await expect(toolbar).toBeVisible();
+  await settle(ada, 500);
+  expect(await words()).toEqual(still);
+  const card = await rect(ada, sel(ids.Short, ".frame-card"));
+  const tb = await rect(ada, sel(ids.Short, ".rich-bar"));
+  // at least 40 tall (a narrow note's takes a second row), flush on the card's foot, the card's width
+  expect(tb.h).toBeGreaterThanOrEqual(40 * kw - 1);
+  near(tb.y, card.bottom - 1 * kw, 1.5);
+  near(tb.w, card.w, 1.5);
+  // drawn whole: its top, its middle and its foot are the toolbar's own (not under the next section, not clipped)
+  for (const fy of [0.15, 0.5, 0.85]) expect(await drawnAt(ada, tb.x + tb.w / 2, tb.y + tb.h * fy, ids.Short, ".rich-bar"), `the toolbar at ${fy} of its height`).toBe(true);
+  await expect(w.locator(".frame-header")).toHaveCSS("opacity", "1");
+  await ada.screenshot({ path: `${RISE_SHOTS}/03_note-writing-toolbar-under-night.png` });
+  // a press on its buttons keeps the caret in the words (it is part of the box)
+  await toolbar.locator('[aria-label="Bold"]').click();
+  await expect(text).toHaveClass(/is-writing/);
+  await ada.keyboard.press("Escape");
+  await expect(w.locator(".rich-bar")).toHaveCount(0);
+  await leave(ada);
+  expect(await words()).toEqual(still);
+
+  // the note as its markdown: the editor isn't pushed either: its first line sits 14 below the card's top
   await w.locator(".note-rendered").hover();
   await w.locator(".note-md-btn").click();
   await expect(w.locator(".cm-content")).toBeVisible({ timeout: 10_000 });
@@ -243,11 +316,21 @@ test("2 · the hover bar makes room: the content moves down, and nothing else mo
   await expect(w.locator(".frame-header")).toHaveCSS("opacity", "1");
   const line = await rect(ada, sel(ids.Short, ".cm-line"));
   const cardNow = await rect(ada, sel(ids.Short, ".frame-card"));
-  near(line.y - cardNow.y, (PUSH + 14 + 1) * kw, 2.5); // + the card's 1 px border
-  await ada.screenshot({ path: `${SHOTS}/03b_writing-pushed-once-night.png` });
+  near(line.y - cardNow.y, (14 + 1) * kw, 2.5); // + the card's 1 px border
+  await ada.screenshot({ path: `${RISE_SHOTS}/04_note-markdown-holds-still-night.png` });
   await ada.keyboard.press("Escape");
   await ada.mouse.click(30, 450);
   await settle(ada, 600);
+
+  // every other card still makes room: a chapter of the design language gets shorter from the top, 38 px
+  await frame(ada, ids["Design · cards"]);
+  const kd = await scaleOf(ada, ids["Design · cards"]);
+  const d0 = await rect(ada, sel(ids["Design · cards"], ".panel-inner"));
+  await hover(ada, ids["Design · cards"]);
+  const d1 = await rect(ada, sel(ids["Design · cards"], ".panel-inner"));
+  near(d1.y - d0.y, PUSH * kd, 1);
+  near(d1.bottom, d0.bottom, 1);
+  await leave(ada);
 
   // a live app: its frame slides down, and its document is neither reloaded nor resized
   await frame(ada, ids.Live);
@@ -271,6 +354,81 @@ test("2 · the hover bar makes room: the content moves down, and nothing else mo
   const clip = await slot(ada, ids.Live).locator(".frame-body").evaluate((el) => getComputedStyle(el).overflow);
   expect(clip).toBe("hidden");
   await ada.screenshot({ path: `${SHOTS}/04_app-bar-makes-room-night.png` });
+  await leave(ada);
+});
+
+test("2b · a chat card's bar rises the same way, and its paper comes off and back with every layer of it", async () => {
+  const id = ids.Talk;
+  const s = slot(ada, id);
+  await frame(ada, id);
+  const k = await scaleOf(ada, id);
+  const read = async () => ({ card: await rect(ada, sel(id, ".frame-card")), chat: await rect(ada, sel(id, ".chat-card")), inner: await rect(ada, sel(id, ".panel-inner")) });
+  // the camera and the section's fit settle first (a loaded machine is slower than frame()'s pause)
+  let rest = await read();
+  await expect
+    .poll(async () => {
+      await settle(ada, 250);
+      const now = await read();
+      const same = JSON.stringify(now) === JSON.stringify(rest);
+      rest = now;
+      return same;
+    }, { timeout: 10_000 })
+    .toBe(true);
+  await hover(ada, id);
+  await expect(s.locator(".frame-header")).toHaveCSS("opacity", "1");
+  expect(await read()).toEqual(rest);
+  const bar = await rect(ada, sel(id, ".frame-header"));
+  near(bar.h, RISE.h * k, 1);
+  expect(bar.bottom).toBeLessThanOrEqual(rest.card.y + 0.5);
+  await ada.screenshot({ path: `${RISE_SHOTS}/05_chat-bar-risen-night.png` });
+
+  // the note's button, words and glyph: Hide the background
+  const btn = s.locator("[data-chat-card-bare]");
+  await expect(btn).toHaveAttribute("data-tip", "Hide the background");
+  await expect(btn).toHaveAttribute("aria-pressed", "false");
+  const paper = () =>
+    s.evaluate((slotEl) => {
+      const bg = (q: string) => getComputedStyle(slotEl.querySelector(q)!).backgroundColor;
+      const card = getComputedStyle(slotEl.querySelector(".frame-card")!);
+      return { card: bg(".frame-card"), body: bg(".frame-body"), inner: bg(".panel-inner"), chat: bg(".chat-card"), shadow: card.boxShadow };
+    });
+  const clear = "rgba(0, 0, 0, 0)";
+  const withPaper = await paper();
+  expect(withPaper.chat).not.toBe(clear);
+  await btn.click();
+  await expect(btn).toHaveAttribute("aria-pressed", "true");
+  await expect(btn).toHaveAttribute("data-tip", "Show the background");
+  await expect.poll(() => ada.evaluate((i) => (window as unknown as { __foundation: { getState(): { panels: Record<string, { bare?: boolean }> } } }).__foundation.getState().panels[i].bare, id)).toBe(true);
+  await expect(s.locator(".frame-card")).toHaveClass(/is-bare/);
+  await expect(s.locator(".chat-card")).toHaveClass(/is-bare/);
+  const bare = await paper();
+  const { shadow, ...layers } = bare;
+  expect(layers, "every layer of paper is gone").toEqual({ card: clear, body: clear, inner: clear, chat: clear });
+  // no shadow: chosen (the press on its bar chose it), it wears the ring alone
+  void shadow;
+  // (the card's shadow eases out over 0.3 s, so it is waited for)
+  await expect
+    .poll(async () => {
+      const sh = (await paper()).shadow;
+      return sh === "none" || / 0px 0px 0px 2.5px$/.test(sh) ? "ok" : sh;
+    })
+    .toBe("ok");
+  // nothing moved for it either
+  expect(await read()).toEqual(rest);
+  await ada.screenshot({ path: `${RISE_SHOTS}/06_chat-bare-hovered-night.png` });
+  // (the button keeps the focus, and focus inside shows the edge too: a press on the paper lets go of it)
+  await ada.mouse.click(30, 450);
+  await leave(ada);
+  // at rest its edge is clear (dashed and transparent): only the section's paper is under it
+  expect(await s.locator(".frame-card").evaluate((el) => getComputedStyle(el).borderTopColor)).toBe(clear);
+  await ada.screenshot({ path: `${RISE_SHOTS}/07_chat-bare-at-rest-night.png` });
+
+  // and back
+  await hover(ada, id);
+  await btn.click();
+  await expect(btn).toHaveAttribute("aria-pressed", "false");
+  await expect(s.locator(".frame-card")).not.toHaveClass(/is-bare/);
+  expect({ ...(await paper()), shadow: "" }).toEqual({ ...withPaper, shadow: "" });
   await leave(ada);
 });
 
@@ -403,6 +561,9 @@ test("4 · scroll bars are a 2 px light line, 1 px in from the edge: clear at re
   const pane = slot(ada, ids.Long).locator(".note-rendered");
   const thumb = () =>
     pane.evaluate((el) => {
+      // Chromium answers a scroll bar part from the style it last worked out for this element: restyle it first, or a
+      // hover that changes nothing else on the card (a note no longer moves under its bar) reads as the rest state
+      (el as HTMLElement).style.setProperty("--probe", String(performance.now()));
       const t = getComputedStyle(el, "::-webkit-scrollbar-thumb");
       const b = getComputedStyle(el, "::-webkit-scrollbar");
       return { color: t.backgroundColor, left: t.borderLeftWidth, right: t.borderRightWidth, top: t.borderTopWidth, bottom: t.borderBottomWidth, radius: t.borderTopLeftRadius, clip: t.backgroundClip, strip: b.width, gutter: (el as HTMLElement).offsetWidth - el.clientWidth };
@@ -484,6 +645,7 @@ test("5 · the resize corner: nothing at rest, a gleam on the corner while the p
 });
 
 test("day and night: the board's cards and #/design", async ({ browser }) => {
+  test.setTimeout(300_000); // two schemes, the board and #/design in each, and the close-ups
   for (const scheme of ["light", "dark"] as const) {
     const tone = scheme === "light" ? "day" : "night";
     const c = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme });
@@ -499,8 +661,33 @@ test("day and night: the board's cards and #/design", async ({ browser }) => {
     await p.keyboard.up("Alt");
     await settle(p, 500);
     await p.screenshot({ path: `${SHOTS}/10_note-hovered-${tone}.png` });
+    await p.screenshot({ path: `${RISE_SHOTS}/10_note-bar-risen-${tone}.png` });
     const card = (await slot(p, ids.Long).locator(".frame-card").first().boundingBox())!;
     await p.screenshot({ path: `${SHOTS}/11_corner-and-scroll-line-${tone}.png`, clip: { x: card.x + card.width - 150, y: card.y + card.height - 150, width: 180, height: 180 } });
+    // writing: the bar above, the toolbar under
+    await frame(p, ids.Short);
+    await hover(p, ids.Short);
+    await slot(p, ids.Short).locator(".note-rendered").click();
+    await expect(slot(p, ids.Short).locator(".rich-bar")).toBeVisible();
+    await settle(p, 500);
+    await p.screenshot({ path: `${RISE_SHOTS}/11_note-writing-${tone}.png` });
+    await p.keyboard.press("Escape");
+    await p.mouse.click(30, 450);
+    // the chat card: its bar risen, then without its paper
+    await frame(p, ids.Talk);
+    await hover(p, ids.Talk);
+    await settle(p, 300);
+    await p.screenshot({ path: `${RISE_SHOTS}/12_chat-bar-risen-${tone}.png` });
+    await slot(p, ids.Talk).locator("[data-chat-card-bare]").click();
+    await expect(slot(p, ids.Talk).locator(".frame-card")).toHaveClass(/is-bare/);
+    await settle(p, 400);
+    await p.screenshot({ path: `${RISE_SHOTS}/13_chat-bare-hovered-${tone}.png` });
+    await leave(p);
+    await p.screenshot({ path: `${RISE_SHOTS}/14_chat-bare-at-rest-${tone}.png` });
+    await hover(p, ids.Talk);
+    await slot(p, ids.Talk).locator("[data-chat-card-bare]").click();
+    await expect(slot(p, ids.Talk).locator(".frame-card")).not.toHaveClass(/is-bare/);
+    await leave(p);
     const kumo = await find(p, "Kumo");
     if (kumo) {
       await frame(p, kumo);
@@ -515,19 +702,41 @@ test("day and night: the board's cards and #/design", async ({ browser }) => {
     await p.goto("/#/design");
     const demo = p.locator("[data-card-chrome]");
     await demo.scrollIntoViewIfNeeded();
-    await expect(demo.locator(".frame-anchor")).toHaveCount(4);
-    // the specimens wear the real classes: the held one has made room, the resting one hasn't
-    const tops = await demo.locator(".note-inner").evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().y - el.closest(".frame-card")!.getBoundingClientRect().y)));
-    expect(tops).toEqual([1, 1, PUSH + 1]);
+    // four notes (live, at rest, the bar up, writing), two chat cards (with and without paper), a card that makes room
+    await expect(demo.locator(".frame-anchor")).toHaveCount(7);
+    await expect(demo.locator(".frame-anchor.bar-rise")).toHaveCount(6);
+    // the specimens wear the real classes: no note has moved for its bar; the card that makes room has
+    expect(await demo.locator(".note-inner").evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().y - el.closest(".frame-card")!.getBoundingClientRect().y)))).toEqual([1, 1, 1, 1]);
+    expect(await demo.locator(".frame-anchor:not(.bar-rise) .panel-inner").evaluate((el) => Math.round(el.getBoundingClientRect().y - el.closest(".frame-card")!.getBoundingClientRect().y))).toBe(PUSH + 1);
+    // the bar risen above the card, and the toolbar under it
+    const held = demo.locator(".frame-anchor.is-hover").first();
+    const [hb, hc] = [(await held.locator(".frame-header").boundingBox())!, (await held.locator(".frame-card").boundingBox())!];
+    near(hb.height, RISE.h, 0.75);
+    expect(hb.y + hb.height).toBeLessThanOrEqual(hc.y);
+    const tb = (await demo.locator(".rich-bar-slot.is-under .rich-bar").boundingBox())!;
+    near(tb.height, 40, 0.75);
     await settle(p, 500);
     await demo.screenshot({ path: `${SHOTS}/20_design-${tone}.png` });
-    // the live one: the pointer on it
+    await demo.screenshot({ path: `${RISE_SHOTS}/20_design-${tone}.png` });
+    // the live one: the pointer on it, and the note still where it was
     const live = demo.locator(".frame-anchor").first();
     await live.hover();
     await settle(p, 600);
-    expect(await live.locator(".note-inner").evaluate((el) => Math.round(el.getBoundingClientRect().y - el.closest(".frame-card")!.getBoundingClientRect().y))).toBe(PUSH + 1);
+    expect(await live.locator(".note-inner").evaluate((el) => Math.round(el.getBoundingClientRect().y - el.closest(".frame-card")!.getBoundingClientRect().y))).toBe(1);
+    await expect(live.locator(".frame-header")).toHaveCSS("opacity", "1");
     await expect(live.locator(".map-resize")).toHaveCSS("opacity", "1");
     await demo.screenshot({ path: `${SHOTS}/21_design-live-hovered-${tone}.png` });
+    // the note on its own chapter: the bar risen with its two buttons, the toolbar under the writing note
+    const notes = p.locator(".adapt-row.note-demo");
+    if (await notes.count()) {
+      await notes.scrollIntoViewIfNeeded();
+      await settle(p, 300);
+      await notes.screenshot({ path: `${RISE_SHOTS}/22_design-note-${tone}.png` });
+    }
+    const chats = demo.locator(".is-chat-demo");
+    await chats.first().scrollIntoViewIfNeeded();
+    await settle(p, 300);
+    for (let i = 0; i < 2; i++) await chats.nth(i).screenshot({ path: `${RISE_SHOTS}/23_design-chat-${i ? "bare" : "paper"}-${tone}.png` });
     await c.close();
 
     // close up (3×): the corner with the pointer on the card, then under the pointer; and the scroll line

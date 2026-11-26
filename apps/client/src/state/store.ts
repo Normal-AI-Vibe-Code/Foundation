@@ -11,7 +11,7 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { isHostable, type HuddleState, type LinkDoc, type NoteSize, type PanelDoc, type TableFeed } from "@foundation/protocol";
+import { isHostable, type HuddleState, type LinkDoc, type MediaDoc, type NoteSize, type PanelDoc, type TableFeed } from "@foundation/protocol";
 import { workbook } from "../engine/workbook";
 
 let idCounter = 0;
@@ -69,11 +69,14 @@ export interface MediaMeta extends ObjectBase {
   w: number;
   h: number;
   src: string; // object URL (session-lifetime)
-  media: "image" | "video";
+  /** "audio": a voice note or a sound, drawn as its player (no picture) */
+  media: "image" | "video" | "audio";
   autoplay: boolean; // video only
   muted: boolean; // video only
   /** image only: inverted on a dark ground (protocol MediaDoc.invert) */
   invert?: boolean;
+  /** a voice or video note recorded here (protocol MediaDoc.note; notes/recorder.ts) */
+  note?: MediaDoc["note"];
 }
 
 /** apps, links, files, machines, agents, connectors and asks — see @foundation/protocol */
@@ -1955,7 +1958,7 @@ export function resizeNote(id: string, w: number, h: number) {
 export function addMedia(
   sectionId: string,
   src: string,
-  media: "image" | "video",
+  media: "image" | "video" | "audio",
   name: string,
   w: number,
   h: number,
@@ -1978,6 +1981,42 @@ export function addMedia(
     media,
     autoplay: true,
     muted: true,
+    float: false,
+    bornAt: Date.now(),
+  };
+  set({
+    media: { ...state.media, [meta.id]: meta },
+    ...unhostFor(sectionId),
+    activeSectionId: sectionId,
+    ...(opts.focus === false ? {} : { snapRequest: { kind: "object" as const, id: meta.id, nonce: Math.random() } }),
+  });
+  return meta;
+}
+
+/**
+ * A voice or video note, once its clip has landed (notes/NoteRecorder.tsx): one change that already carries
+ * `note` and the shared `/files/<id>` src (never a blob: URL), so everyone, and the timeline, sees it whole.
+ * It never plays by itself, and plays with its sound.
+ */
+export function addMediaNote(
+  sectionId: string,
+  card: { media: "audio" | "video"; name: string; w: number; h: number; note: NonNullable<MediaMeta["note"]> },
+  opts: { focus?: boolean } = {},
+): MediaMeta {
+  sectionId = leafSection(sectionId);
+  const meta: MediaMeta = {
+    id: uid("media"),
+    sectionId,
+    name: card.name,
+    x: 0,
+    y: 0,
+    w: card.w,
+    h: card.h,
+    src: `/files/${card.note.fileId}`,
+    media: card.media,
+    autoplay: false,
+    muted: false,
+    note: card.note,
     float: false,
     bornAt: Date.now(),
   };

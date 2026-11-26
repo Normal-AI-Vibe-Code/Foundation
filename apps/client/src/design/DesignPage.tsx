@@ -169,6 +169,8 @@ import { UploaderDemo } from "./UploaderDemo";
 import { UsabilityDemo } from "./UsabilityDemo";
 import { AgentSetupDemo } from "./AgentSetupDemo";
 import { CadFeedDemo } from "./CadFeedDemo";
+import { MediaNotesDemo } from "./MediaNotesDemo";
+import { TimelineDemo } from "../timeline/TimelineDesign";
 
 const SURFACES = ["void", "abyss", "panel", "raise"];
 const INKS = ["frost", "mist", "dim"];
@@ -189,8 +191,8 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   foundations: ["The mark", "Surfaces", "Ink & accents", "Usability & contrast", "Themes", "Type", "Shape"],
   controls: ["Controls", "Key labels", "Panels that adapt"],
   motion: ["Motion", "Effects"],
-  floor: ["The floor", "Chrome on call", "Server switch", "Signing in an app", "Desktop updates"],
-  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Progressive cached images", "Note", "Pictures and links from elsewhere", "Writing together"],
+  floor: ["The floor", "Chrome on call", "Timeline", "Server switch", "Signing in an app", "Desktop updates"],
+  cards: ["Using a card", "A card's menu, pinned and minimized", "Adding files", "Progressive cached images", "Note", "Voice and video notes", "Pictures and links from elsewhere", "Writing together"],
   search: ["Out of search, into the hand"],
   live: ["Huddles and Slack", "The Slack board"],
   chat: ["ChatForm"],
@@ -1506,6 +1508,10 @@ function DesignSections() {
         <NoteDemo />
       </Section>
 
+      <Section title="Voice and video notes" note={`2026-11-25, Josh: "where you can leave a short video note for someone to play back." A section's microphone (its tools, next to the note), its right-click menu and ${keys("mod+K")} (Voice note, Video note) open the recorder: raised paper off the section's top-right, drawn on the screen, 300 wide. Voice or Video, then Record: the microphone (and camera) opens only then, and every track stops when the recording stops, is discarded or the recorder closes. While it records, the state colour (red by day, orange at night) breathes on a dot, a meter or the mirrored camera shows it's live, the time counts up in tabular figures to the cap (5 minutes of voice, 2 of video), and the last ten seconds count down in the waiting colour. Review: play it back, Leave it here (the one blue action), Record again, Discard. It uploads, then the card is put down whole (never a placeholder). An upload that fails keeps the clip, with Try again; closing over a clip asks first. A viewer has no microphone. A voice note is a player on paper, 320 × 100 (240 to 560 wide; its height is its own): play, the wave from its 48 steps with what's played in ink (press or drag to go there; arrows step 5 s), elapsed / total, who and when, and 1× · 1.5× · 2×. A video note is the clip at its own shape (320 on its long side) over its first frame, a round play button, who / when / how long under it; it never plays by itself and plays with its sound, in place or full screen. Both are picked up anywhere, and ask before they go: the clip stays in the archive.`}>
+        <MediaNotesDemo />
+      </Section>
+
       <Section title="Pictures and links from elsewhere" note="Text an agent, a tool, Slack, a README or another app wrote is drawn as markdown, and what it points at stays put until a person chooses. A picture from any address but Foundation's own files (or one written into the text) is a dashed pill on raised paper: Image from and its host in ink, and Load image, which loads that one picture, this time; nothing is remembered. A link says where it really goes: its host in code type, dim 11, beside the words (unless the words already name it), and it opens in a new tab that can't reach back. Only web addresses become links.">
         <ElsewhereDemo />
       </Section>
@@ -1524,6 +1530,10 @@ function DesignSections() {
 
       <Section title="Desktop updates" note="The desktop app checks its signed feed a few seconds after it opens and puts this card up under the top bar, on glass, when a new version is ready: Update and restart is the one blue action, Later hides it until the next launch, Skip this version until a newer one. Nothing downloads until a person presses Update. The bar fills on the compositor; the mark's panels settle while it works. After the restart it says what changed, once. Settings → Updates shows the same card inline on paper, with Check for updates. Shown at 260, 400 and 560 px.">
         <UpdateDemo />
+      </Section>
+
+      <Section title="Timeline" note="2026-11-25, Josh: “a time icon in the section and grid header.” Every grid has a timeline, and every section its part. A clock in the grid's tab beside ⓘ (H, or ⌘K Timeline) opens the band along the grid's foot, on the floor: a hairline above, the paper under it, and it takes its height from the grid as a pane takes its width (framing fits above it; the bottom bar and the grid's council stand on it); it rises from the foot on --dur-pane. It opens on the smallest range that holds the grid's history, fitted to it: a young grid's marks spread across the bar, the unknown before keeping began at most 12 %. The transport (play, 1× 2× 4× where 1× plays the range in a minute, the moment in words in tabular figures, Back to now, the range: Hour, Day, Week, All, close), then six lanes, named: People in their colours, Agents in violet, Behind the scenes hollow violet under them, Changes as ink ticks (removals dim), Chat, Voice and video as round and square marks; a lane with nothing in range folds to a line; the changes' density is the track's texture; before keeping began is hatched behind a dashed edge that says History begins. One pulse playhead through all lanes; hover a mark for who, what and when; press it to go there and frame what it names. The moment sits in a 300 px column at the right (the nearest line marked in the pulse tint, what is withheld its own quiet line, notes play in place); under 900 px it and the lane names fold away and the nearest line rides the transport. While the playhead is off now every section draws its cards as they were, for you only, with a glass banner under the top bar and Back to now (Esc); keys that write stand down. A section's clock (beside its name, always there, and among its tools with the council) opens a slim bar along its foot over its body: its own range and playhead, two condensed rows; scrubbing it takes only that section back (a 2 px pulse ring) and, with the band open, detaches it: its playhead shows on the band as a named marker and Follow the grid joins them again.">
+        <TimelineDemo />
       </Section>
 
       <Section title="Server switch" note="Bottom right, wherever the app can point at another server (the desktop app, or a page on another site's server), over the sign-in page too: a glass pill with a dot for whether the server this app uses answers (green), is starting or being checked (amber, breathing) or can't be reached (red), and its address. Pressed, it opens upward into both ways to have a server, on paper: This computer, where Start the server is the one blue action (the desktop app runs Foundation's server from a checkout; once it answers, the app uses it and reloads), and a remote server by address, where Connect reloads onto it to sign in. The one in use is ringed and tagged. A server that won't start says why in its own words, as an error card. Esc or a press outside puts it away. The call chip and the upload tray move up while it's there. Signed in (2026-11-20), the panel first says which server this is: This computer, Another computer on your network or A hosted Foundation, with its address, version, what it serves (grids, files and ChatForm: conversations are kept on it), since when it's up, who's here, and its data folder to an admin; then On your network, a switch only an admin at the server's computer can press, with the addresses to copy, the page, Invite someone (a code and a link, once, for 15 minutes) and who is signed in from other computers, each with Sign out; the honest notes (plain http, huddles' camera and microphone) in dim; and the two ways to change server fold under Use another server while this one answers. ChatForm's strip ends in a dim note saying which server it is on; pressed, this panel opens.">
@@ -1973,22 +1983,23 @@ function NoteDemo() {
   const md = "# Launch plan\n\nShip the **desktop app** this week, _signed_ and <u>notarised</u>.\n\n- Sign the build\n- ~~Email the list~~ post in #launch\n\n> Nothing ships on a Friday.";
   const html = renderMarkdown(md);
   const box = (writing: boolean) => (
-    <div className="frame-card note-card oncall-static" style={{ position: "relative", width: 400, height: 300 }}>
+    // writing (2026-11-25): the toolbar hangs under the card's foot, outside it, so the words keep their place
+    <div className="frame-card note-card oncall-static" style={{ position: "relative", width: 400, height: 300, marginBottom: writing ? "calc(var(--space-7) + var(--space-3))" : undefined }}>
       <div className="note-inner" style={{ height: 300 }}>
         <div className={`note-rendered rich-text${writing ? " is-writing" : ""}`} dangerouslySetInnerHTML={{ __html: html }} />
-        {writing && (
-          <div className="rich-bar-slot">
-            <RichToolbar marks={{ bold: true, italic: false, underline: false, strike: false, ul: false, ol: false, quote: false, style: "p" }} size="m" />
-          </div>
-        )}
       </div>
+      {writing && (
+        <div className="rich-bar-slot is-under">
+          <RichToolbar marks={{ bold: true, italic: false, underline: false, strike: false, ul: false, ol: false, quote: false, style: "p" }} size="m" />
+        </div>
+      )}
     </div>
   );
-  /** a note with its bar showing: which of its two buttons is on */
+  /** a note with its bar showing (risen above the card, 2026-11-25): which of its two buttons is on */
   const barred = (on: "markdown" | "bare", body: React.ReactNode, size = "m") => (
-    <div className="frame-anchor chrome-bar oncall-static is-hover" style={{ width: 400 }}>
+    <div className="frame-anchor chrome-bar bar-rise oncall-static is-hover" style={{ width: 400, marginTop: "var(--space-6)" }}>
       <div className={`frame-card note-card${on === "bare" ? " is-bare" : ""}`}>
-        <div className="frame-header" style={{ height: 30 }}>
+        <div className="frame-header">
           <div className="grip mini">
             <span />
             <span />

@@ -49,7 +49,8 @@ import {
 import { cadLinked, type CadFeed } from "@foundation/protocol";
 import { editBoard, getBoard, listBoards } from "./boards.ts";
 import { canSeeBoard } from "./members.ts";
-import type { UserInfo } from "@foundation/protocol";
+import type { MediaDoc, UserInfo } from "@foundation/protocol";
+import { moveNoteFile, readMediaCard, withMediaNotes } from "./medianotes.ts";
 import { one } from "./db.ts";
 import { searchAll } from "./search.ts";
 import { checkRepo, discoverRepo, parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
@@ -73,7 +74,9 @@ import { describeIo, ensureMachinePorts, watchMachine } from "./machineio.ts";
 import { writeDigest } from "./digest.ts";
 import { flowformCall, flowformTools } from "./flowformlink.ts";
 import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTarget, setDoing, setPlan, stepTarget, travel, type CrewMember } from "./crew.ts";
-import { audit, callScope, type AuditInput, type CallScope, type Door } from "./audit.ts";
+import { actorScope, audit, callScope, type AuditInput, type CallScope, type Door, type ScopeActor } from "./audit.ts";
+import { noteLeftBy, recordToolCall, sectionRef, timelineText as gridTimelineText } from "./timeline.ts";
+import { markPrivate } from "./crew.ts";
 import { contentRefusal, decide, EgressHeld, heldSentence, sendsFor, type Send, type SendKind } from "./egress.ts";
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
@@ -334,7 +337,11 @@ export const TOOLS: BoardTool[] = [
     name: "read_board",
     description: "Read the whole board as an outline: sections, every card (notes, tables, apps, files, agents, asks) with ids, and the connections between app ports. Start here.",
     schema: z.object({}),
-    run: (ctx) => describeBoard(getBoard(ctx.boardId).doc),
+    run: (ctx) => {
+      const doc = getBoard(ctx.boardId).doc;
+      // a voice or video note reads as what it is: who, when, how long, its file (medianotes.ts)
+      return withMediaNotes(describeBoard(doc), boardMaps(doc).objects.values(), (card) => noteLeftBy(ctx.boardId, card));
+    },
   }),
   def({
     name: "read_card",
@@ -346,6 +353,7 @@ export const TOOLS: BoardTool[] = [
       if (!o) throw new HttpError(404, `No card ${id} on this board`);
       if (o.kind === "note") return { id, kind: "note", name: o.name ?? "", section: o.sectionId, markdown: noteTextOf(doc, o) };
       if (o.kind === "table") return { id, kind: "table", name: o.name ?? "", section: o.sectionId, cells: tableCellsOf(doc, id) };
+      if (o.kind === "media") return readMediaCard(o as unknown as MediaDoc, noteLeftBy(ctx.boardId, id));
       return { ...o };
     },
   }),
@@ -681,7 +689,12 @@ export const TOOLS: BoardTool[] = [
       const moved = { ...card } as typeof card & { src?: string; fileId?: string; sourceTableId?: string | null };
       if (card.kind === "media") {
         const m = /^\/files\/([^/?#]+)/.exec(card.src);
-        if (m) moved.src = card.src.replace(m[1], shareFileWith(m[1], to_board, ctx.userId));
+        if (m) {
+          const there = shareFileWith(m[1], to_board, ctx.userId);
+          moved.src = card.src.replace(m[1], there);
+          // a voice or video note names its file too
+          if (card.note) (moved as MediaDoc).note = moveNoteFile(card, m[1], there).note;
+        }
       }
       if (card.kind === "panel" && card.fileId) moved.fileId = shareFileWith(card.fileId, to_board, ctx.userId);
       if (card.kind === "map") moved.sourceTableId = null; // its table stays behind
@@ -1474,6 +1487,23 @@ export const TOOLS: BoardTool[] = [
     },
   }),
   def({
+    name: "read_timeline",
+    description:
+      "Read this grid's timeline (or one section's, with the sections inside it): who was on it, what was added, removed, moved, renamed or edited and by whom, agents' runs and what they did behind the scenes, commands asked for in machines, voice and video notes left, asks and answers, and what was said in conversations on the grid that you may read. One line per thing, oldest first, with its time (UTC). `hours`: how far back from now (default 24). Reads only.",
+    schema: z.object({ section: z.string().optional().describe("a section's name or id; leave out for the whole grid"), hours: z.number().min(0.05).max(24 * 400).optional(), limit: z.number().int().min(1).max(500).optional() }),
+    run: (ctx, i) => {
+      // the caller's own access: the person behind it (an agent works for one), or the service token's agent
+      const u = ctx.userId === "agent" ? ({ id: "agent", email: "agent@foundation.local", name: "Foundation Agent", color: "#7c3aed", role: "member" } as UserInfo) : userById(ctx.userId);
+      if (!u || !canSeeBoard(u, ctx.boardId) || !one("select 1 from boards where id = ?", ctx.boardId)) return `No grid “${ctx.boardId}” that this caller can see.`;
+      const to = Date.now();
+      const out = gridTimelineText(u, ctx.boardId, { section: sectionRef(ctx.boardId, i.section), from: to - (i.hours ?? 24) * 3600_000, to, limit: i.limit ?? 200 });
+      // a conversation's words, or an answer that is the asker's alone, are beyond the grid: the run's reasoning stops showing (crew.ts PRIVATE_READS' rule)
+      const member = crewMember(ctx.crew);
+      if (out.words && member) markPrivate(member);
+      return out.text;
+    },
+  }),
+  def({
     name: "add_replay",
     description:
       "Put a recorded huddle session's clock card on this grid: a small card with the session's transport; scrubbing it redraws its section as it was at that moment, for the person scrubbing only (nothing on the grid changes). It goes in the given section, else the section the session was held over, else the grid's first. Asked twice for the same section, it adds one.",
@@ -1742,6 +1772,19 @@ function actorOf(ctx: ToolCtx): Pick<AuditInput, "actor_kind" | "actor_id" | "ac
   return { actor_kind: "agent", actor_id: member ? member.id : `agent:${ctx.userId}`, actor_name: ctx.actor, for_person: ctx.userId === "agent" ? null : ctx.userId };
 }
 
+/** the same, as the timeline names it (timeline.ts, audit.ts actorScope): an agent by its crew id and name, with whom it works for */
+function scopeActorOf(ctx: ToolCtx): ScopeActor {
+  // the name is the session's: a person's account, a crew member's server-given name, or "<person>'s agent". The
+  // label a caller gave itself (mcp.ts ?as=, a route's own word) is kept only as a claim beside it
+  if (ctx.person) return { kind: "person", id: ctx.userId, name: userName(ctx.userId) ?? ctx.actor };
+  const member = crewMember(ctx.crew);
+  if (member) return { kind: "agent", id: member.id, name: member.name, for: member.userName, forId: member.userId };
+  if (ctx.userId === "agent") return { kind: "agent", id: "agent", name: "Foundation Agent", ...(ctx.actor !== "Foundation Agent" ? { claim: ctx.actor } : {}) };
+  const forName = userName(ctx.userId);
+  const name = `${forName ?? "Someone"}'s agent`;
+  return { kind: "agent", id: `agent:${ctx.userId}`, name, ...(forName ? { for: forName } : {}), forId: ctx.userId, ...(ctx.actor !== name ? { claim: ctx.actor } : {}) };
+}
+
 /**
  * The identifier a call acts on, for the audit log. Never content: only something that exists in
  * Foundation under that id (a card or section on the board, a file, a board), a repository's
@@ -1785,8 +1828,11 @@ function targetOf(boardId: string, name: string, input: unknown): string | null 
 /** Run a tool with idempotency on request_id and input validation; every call is recorded (audit.ts). */
 export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Promise<unknown> {
   const door: Door = ctx.door ?? (ctx.person ? "http" : "agent-run");
+  // what it acts on, worked out once (the audit rows and the timeline's line share it)
+  let tgt: string | null | undefined;
+  const target = () => (tgt === undefined ? (tgt = targetOf(ctx.boardId, name, rawInput)) : tgt);
   const rec = (r: Partial<AuditInput> & Pick<AuditInput, "decision">) =>
-    audit({ ...actorOf(ctx), board_id: ctx.boardId, door, action: /^[a-z_]{1,40}$/.test(name) ? name : "(not a tool)", target: targetOf(ctx.boardId, name, rawInput), args: rawInput ?? {}, ...r });
+    audit({ ...actorOf(ctx), board_id: ctx.boardId, door, action: /^[a-z_]{1,40}$/.test(name) ? name : "(not a tool)", target: target(), args: rawInput ?? {}, ...r });
   const tool = toolByName(name);
   if (!tool) {
     rec({ decision: "refused", reason: "no such tool", result: "error" });
@@ -1849,21 +1895,32 @@ export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Pr
     if (tool.write) await travel(member, stepTarget(ctx.boardId, name, input), doing);
     else setDoing(member, doing);
   }
+  // who this call is, for the timeline: the board writes it makes are theirs, and an agent's call is a line Behind the scenes
+  const actor = scopeActorOf(ctx);
+  const ran = (ok: boolean, result?: unknown) => {
+    if (ctx.person) return; // a person's own call is their edits, in Changes
+    // the card it acted on: what it named, or else what it made (a result's id, checked against the board in timeline.ts)
+    const made = result && typeof result === "object" && typeof (result as { id?: unknown }).id === "string" ? (result as { id: string }).id : null;
+    recordToolCall({ board: ctx.boardId, tool: name, ok, actor, read: READ_TOOLS.has(name), target: target(), made, requestKey: key, ...(name === "run_code" ? { codeLines: String((parsed.data as { code?: string }).code ?? "").split("\n").length } : {}) });
+  };
   let out: unknown;
   try {
-    out = await callScope.run(scope, () => tool.run(ctx, parsed.data));
+    out = await callScope.run(scope, () => actorScope.run(actor, () => tool.run(ctx, parsed.data)));
   } catch (e) {
     // a network seam held a service this call wasn't allowed to reach: nothing left, and the agent is told so
     if (e instanceof EgressHeld) {
       recW({ decision: "asked", provenance: "external", service: e.service, reason: "held at the network seam" });
+      ran(false);
       return e.message;
     }
     // the error's words may carry what was asked: only that it was refused, or failed, is kept
     const refused = e instanceof HttpError && e.status === 403;
     recW({ decision: refused ? "refused" : "allowed", reason: refused ? "refused by the tool" : null, approved_by: approved(), result: "error" });
+    ran(false);
     throw e;
   }
   recW(scope.asked ? { decision: "asked", reason: scope.asked } : { decision: "allowed", approved_by: approved(), result: "ok" });
+  ran(!scope.asked, out);
   // what a partial tool couldn't reach is said beside what it found
   if (heldNote) out = typeof out === "string" ? `${out}\n\n${heldNote}` : out && typeof out === "object" && !Array.isArray(out) ? { ...(out as object), not_sent: heldNote } : out;
   if (key && !(out && typeof out === "object" && NO_REPLAY.has(out))) {

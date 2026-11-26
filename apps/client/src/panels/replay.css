@@ -400,25 +400,42 @@
   height: 100%;
   overflow: hidden;
   border-radius: var(--radius-card);
-  border: 1px solid var(--color-line-strong);
-  background: var(--color-panel);
+  /* the live card's paper (App.css .frame-card), so the past reads as the same grid */
+  border: 1px solid var(--line-strong);
+  background: var(--paper-raised);
   color: var(--color-mist);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--shadow-card);
 }
 .rp-card.is-note {
   align-items: stretch;
   justify-content: stretch;
   padding: var(--space-4);
 }
-.rp-note-text {
-  white-space: pre-wrap;
-  font: 400 var(--text-16) / 1.5 var(--font-sans);
-  color: var(--color-frost);
+/* a note as it was: the live note's card, size and formatted text (App.css .note-card, .note-inner, .note-rendered), read-only */
+.rp-past-note {
+  width: 100%;
+  height: 100%;
   overflow: hidden;
+}
+.rp-past-note-inner {
+  height: 100%;
+}
+.rp-past-note-text {
+  overflow: hidden;
+  cursor: default;
+}
+.rp-past-note.is-bare {
+  border-color: transparent;
+}
+/* a picture as it was rests bare, as it does live (DESIGN.md Media card): no paper, edge or shadow */
+.rp-card.is-media:has(> img) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .rp-card.is-table {
   flex-direction: column;
@@ -438,11 +455,21 @@
   padding: 4px 8px;
   border-right: 1px solid var(--color-line);
   border-bottom: 1px solid var(--color-line);
-  font: 400 var(--text-12) / 1.6 var(--font-grid);
+  font: 500 var(--text-12) / 1.6 var(--font-sans);
+  color: var(--color-frost);
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   min-height: 28px;
+}
+.rp-cells .rp-cells-head,
+.rp-cells .rp-cells-num,
+.rp-cells .rp-cells-corner {
+  min-height: 20px;
+  padding: 2px 4px;
+  color: var(--color-dim);
+  font-size: var(--text-11);
+  text-align: center;
 }
 .rp-card.is-media img {
   width: 100%;

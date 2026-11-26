@@ -17,7 +17,8 @@
  * (shell/WindowControls.tsx), all on the one line.
  */
 
-import { SunGlyph } from "./glyphs";
+import { SunGlyph, TimeGlyph } from "./glyphs";
+import { GRID, toggleGridTimeline, useTimeline } from "../timeline/model";
 import { ToolButtons } from "./Tools";
 import { goToday } from "../lib/place";
 import { ShibaDot, useNotices } from "../today/notices";
@@ -134,6 +135,7 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
 
   const spacesOpen = ui.pane && ui.paneView === "spaces";
   const infoOpen = ui.pane && ui.paneView === "info";
+  const timelineOpen = !!useTimeline(GRID);
 
   return (
     <header className="top-bar">
@@ -251,6 +253,21 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
                     data-kbd={keys("mod+I")}
                   >
                     <InfoGlyph />
+                  </button>
+                )}
+                {/* the grid's timeline (2026-11-25): beside ⓘ, the same size; H */}
+                {on && place.kind === "grid" && (kind === "grid" || kind === "deck") && (
+                  <button
+                    type="button"
+                    className={`tab-info tab-time${timelineOpen ? " is-on" : ""}`}
+                    onClick={toggleGridTimeline}
+                    aria-label={timelineOpen ? "Close this grid's timeline" : "This grid's timeline"}
+                    aria-pressed={timelineOpen}
+                    data-tip="This grid's timeline"
+                    data-kbd="H"
+                    data-tab-time
+                  >
+                    <TimeGlyph size={14} />
                   </button>
                 )}
                 {tabs.length > 1 && (

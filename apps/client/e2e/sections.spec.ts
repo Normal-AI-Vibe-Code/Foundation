@@ -26,7 +26,11 @@ async function expectClean(label: string) {
 async function tool(section: string, label: string) {
   const box = await sectionBox(page, section);
   await page.mouse.move(box.x + 40, box.y + 6);
-  await page.locator(`.section-card[data-section-id="${box.id}"] [aria-label="${label}"]`).click();
+  const btn = page.locator(`.section-card[data-section-id="${box.id}"] [aria-label="${label}"]`);
+  // on a narrow section the layout tools fold into one button (SectionView's .sec-layout): open it first
+  const more = page.locator(`.section-card[data-section-id="${box.id}"] .sec-layout-more`);
+  if (!(await btn.isVisible()) && (await more.isVisible())) await more.click();
+  await btn.click();
   await settle(page, 1200);
 }
 
