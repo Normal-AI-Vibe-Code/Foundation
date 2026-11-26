@@ -322,3 +322,42 @@
 .chat-card-demo-slot.is-short {
   height: 260px;
 }
+
+/* ---------- pinned in the right panel (chat/PinnedChat.tsx) ---------- */
+
+.chat-pinned {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+/* the panel is its own place: no in-use ring (that is a card's, on a grid) */
+.chat-pinned.is-in-use::after {
+  content: none;
+}
+.chat-pin-picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.chat-card-row.is-current {
+  background: var(--color-agent-dim);
+}
+.chat-card-row .chat-count {
+  margin-left: auto;
+}
+/* something from the grid held over a conversation: it rings, and says what letting go does */
+[data-chat-drop-zone].is-carry-target,
+[data-chat-drop-zone].is-hit-target {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: -2px;
+}
+/* a message's gutter is its handle: pulled out onto a grid it becomes a note */
+.chat-msg-gutter[draggable="true"] {
+  cursor: grab;
+}
+.chat-chip.is-place .chat-chip-thumb {
+  display: grid;
+  place-items: center;
+  color: var(--color-mist);
+}

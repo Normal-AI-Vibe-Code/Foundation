@@ -15,6 +15,8 @@
  * - **past an edge of the board**: a new section opens along that whole side;
  * - **another space's tab** (or its row in the spaces pane): it moves to that
  *   board, into a section named for where it came from (server: send_to_board);
+ * - **a conversation** (ChatForm's, the one pinned in the right panel, a chat card): the card stays and goes
+ *   into that conversation's composer, a picture as itself and anything else as a link (chat/chatDrop.ts);
  * - anywhere else (a pane, the top bar): it flies back to where it was.
  *
  * Coming back over its own section puts it back under the pointer as before.
@@ -39,6 +41,7 @@ import { toWorld } from "../state/camera";
 import { api } from "./api";
 import { activeBoard } from "../sync/board";
 import { toast } from "../state/ui";
+import { cardDropItems, chatZoneAt, dropOnChat } from "../chat/chatDrop";
 
 type Target =
   | { kind: "home" }
@@ -46,6 +49,7 @@ type Target =
   | { kind: "cell"; c: number; r: number }
   | { kind: "edge"; edge: BoardEdge }
   | { kind: "board"; id: string; name: string; el: HTMLElement }
+  | { kind: "chat"; el: HTMLElement }
   | { kind: "none" };
 
 /** how far the held card leans into its motion, at most (degrees): a little physicality, not a ton */
@@ -132,11 +136,11 @@ export function startCarry(id: string, anchor: HTMLElement, card: HTMLElement, c
   };
 
   const show = (t: Target) => {
-    const same = JSON.stringify({ ...t, el: undefined }) === JSON.stringify({ ...target, el: undefined });
+    const same = JSON.stringify({ ...t, el: undefined }) === JSON.stringify({ ...target, el: undefined }) && ("el" in t ? t.el : null) === ("el" in target ? target.el : null);
     if (same) return;
     document.querySelectorAll(".is-carry-target").forEach((el) => el.classList.remove("is-carry-target"));
     if (t.kind === "section") document.querySelector(`[data-section-id="${CSS.escape(t.id)}"]`)?.classList.add("is-carry-target");
-    if (t.kind === "board") t.el.classList.add("is-carry-target");
+    if (t.kind === "board" || t.kind === "chat") t.el.classList.add("is-carry-target");
     setSectionDragTarget(
       t.kind === "cell"
         ? { sectionId: id, c: t.c, r: t.r, label: "New section here" }
@@ -151,6 +155,9 @@ export function startCarry(id: string, anchor: HTMLElement, card: HTMLElement, c
 
   const targetAt = (cx: number, cy: number): Target => {
     const top = document.elementFromPoint(cx, cy) as HTMLElement | null;
+    // a conversation takes it (not the chat card being carried itself)
+    const zone = chatZoneAt(top);
+    if (zone && !anchor.contains(zone)) return { kind: "chat", el: zone };
     const tab = top?.closest<HTMLElement>("[data-space-drop]");
     if (tab) {
       const bid = tab.dataset.spaceDrop!;
@@ -261,6 +268,12 @@ export function startCarry(id: string, anchor: HTMLElement, card: HTMLElement, c
           void sendToBoard(id, t.id, t.name).then((ok) => {
             if (!ok) anchor.classList.remove("is-carried");
           });
+          return true;
+        }
+        case "chat": {
+          // shared, not moved: it goes into the conversation's composer and the card flies home
+          if (!dropOnChat(t.el, cardDropItems(id))) toast("That conversation can't take it", "warn");
+          flyHome();
           return true;
         }
         default:

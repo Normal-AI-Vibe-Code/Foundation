@@ -35,6 +35,7 @@ import {
 import { SectionView } from "./SectionView";
 import { WireLayer } from "./WireLayer";
 import { camera, FAR_ZOOM, publishCamera, publishPointer } from "../state/camera";
+import { publishGoal } from "../lib/viewAhead";
 import { isNight, onNight } from "@foundation/ui";
 import { floorInsets, getUi, setUi, toggleSearch, toggleSession, useUi } from "../state/ui";
 import { TalkButton } from "../shell/Talk";
@@ -197,6 +198,7 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
       bg.uniforms.scale = zoom.value;
     }
     publishCamera(camera.x.value, camera.y.value, zoom.value, containerRef.current);
+    publishGoal(camera.x.goal, camera.y.goal, zoom.goal);
     markCamera(containerRef.current, zoom.value);
   }, [camera, zoom]);
 

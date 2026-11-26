@@ -12,6 +12,7 @@
  *  - `system`, `huddle`, `link` and `draft` messages are drawn as what they are.
  */
 
+import { CHAT_MESSAGE_MIME, type DraggedMessage } from "./chatDrop";
 import { memo, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { ChatFile, ChatHuddleState, ChatMessage } from "@foundation/protocol";
@@ -98,7 +99,18 @@ export const MessageView = memo(function MessageView({ message: m, continued, me
       data-seq={m.seq}
       data-author={m.author.name}
     >
-      <div className="chat-msg-gutter">
+      {/* the gutter is the message's handle: dragged onto a grid it lands as a note, its pictures with it (chat/chatDrop.ts) */}
+      <div
+        className="chat-msg-gutter"
+        draggable={!removed}
+        onDragStart={(e) => {
+          const d: DraggedMessage = { author: m.author.name, text: m.text, at: m.createdAt, channel: m.channel, files: m.files.map((f) => ({ name: f.name, mime: f.mime, src: `/files/${f.id}` })) };
+          e.dataTransfer.setData(CHAT_MESSAGE_MIME, JSON.stringify(d));
+          e.dataTransfer.setData("text/plain", `${m.author.name}: ${m.text}`);
+          e.dataTransfer.effectAllowed = "copy";
+        }}
+        data-tip={removed ? undefined : "Drag onto the grid to keep it as a note"}
+      >
         {continued ? (
           <time className="chat-msg-gutter-time" dateTime={new Date(m.createdAt).toISOString()} title={fullTime(m.createdAt)}>
             {timeOf(m.createdAt)}

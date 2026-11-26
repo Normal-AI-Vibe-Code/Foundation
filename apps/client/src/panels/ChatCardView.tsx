@@ -73,6 +73,7 @@ import { AgentFigure } from "../chat/AgentFigure";
 import { ChannelHuddleButton, ChannelHuddleDock } from "../chat/HuddleCard";
 import { ChatMark, IconLock, IconPlus } from "../chat/Icons";
 import type { MessageActions } from "../chat/Message";
+import { PinRightButton } from "../chat/PinRightButton";
 import "../chat/chat.css";
 import "./chat-card.css";
 
@@ -105,7 +106,17 @@ export function ChatCardBody({ panel }: { panel: PanelMeta }) {
   const state = chatCardState({ channel: panel.channel, cardServer: panel.chatServer, hereServer: CHAT_SERVER, status: s.status, loaded: s.loaded, has: !!channel, asked });
   const viewer = ui.role === "viewer";
   let body: ReactNode;
-  if (state === "open" && channel) body = <LiveCard panel={panel} channel={channel} s={s} live={live} inUse={ui.engaged === panel.id} />;
+  if (state === "open" && channel)
+    body = (
+      <ChatConversation
+        channel={channel}
+        s={s}
+        live={live}
+        inUse={ui.engaged === panel.id}
+        onUse={() => putInUse(panel.id)}
+        headActions={<PinRightButton channel={channel.id} />}
+      />
+    );
   else if (state === "unpicked") body = <Picker panel={panel} s={s} viewer={viewer} />;
   else if (state === "elsewhere") body = <ChatCardNotice kind="elsewhere" {...elsewhereWords(panel.chatServer, CHAT_SERVER)} />;
   else if (state === "locked") body = <ChatCardNotice kind="locked" {...lockedWords(viewer)} />;
@@ -121,7 +132,7 @@ export function ChatCardBody({ panel }: { panel: PanelMeta }) {
   else body = <ChatCardNotice kind="waiting" title={s.status === "offline" ? "Offline" : "Opening the conversation…"} line={s.status === "offline" ? s.why : ""} />;
 
   return (
-    <div ref={host} className={`chat-card is-${state}${ui.engaged === panel.id ? " is-in-use" : ""}`} data-chat-card={panel.channel ?? ""} data-chat-card-state={state}>
+    <div ref={host} className={`chat-card is-${state}${ui.engaged === panel.id ? " is-in-use" : ""}`} data-chat-card={panel.channel ?? ""} data-chat-card-state={state} data-chat-drop-zone={state === "open" ? "on" : "off"}>
       {body}
     </div>
   );
@@ -168,9 +179,11 @@ export interface ChatCardHeadProps {
   onOpen?(): void;
   /** agents' stills, for the design page (no roster there) */
   agentStill?: { src: string; role?: string; cut?: boolean };
+  /** more buttons, before Open in ChatForm (pin to the right panel; the panel's own switch and unpin) */
+  actions?: ReactNode;
 }
 
-export function ChatCardHead({ channel, meId, online, who, unread = 0, mentions = 0, huddle, onOpen, agentStill }: ChatCardHeadProps) {
+export function ChatCardHead({ channel, meId, online, who, unread = 0, mentions = 0, huddle, onOpen, agentStill, actions }: ChatCardHeadProps) {
   const title = chatTitle(channel, meId);
   const named = channel.kind === "open" || channel.kind === "private";
   const words = peopleWords(who);
@@ -205,6 +218,7 @@ export function ChatCardHead({ channel, meId, online, who, unread = 0, mentions 
         </span>
       )}
       {huddle}
+      {actions}
       {onOpen && (
         <button type="button" className="chat-head-btn" onClick={onOpen} data-tip="Open in ChatForm" aria-label="Open in ChatForm" data-chat-card-open>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -237,7 +251,26 @@ export function ChatCardFrame({ head, dock, note, timeline, thread, foot, quiet 
 
 // ---------------------------------------------------------------- the conversation, live
 
-function LiveCard({ panel, channel, s, live, inUse }: { panel: PanelMeta; channel: ChatChannelView; s: ChatState; live: boolean; inUse: boolean }) {
+/**
+ * A conversation, live: the head, the timeline (a thread over it) and the composer. A chat card on a grid is one;
+ * the right panel's pinned conversation is another (chat/PinnedChat.tsx). `inUse`: it has the wheel and reading it
+ * marks it read; `onUse`: what puts it in use (a card's caret, a reply).
+ */
+export function ChatConversation({
+  channel,
+  s,
+  live,
+  inUse,
+  onUse,
+  headActions,
+}: {
+  channel: ChatChannelView;
+  s: ChatState;
+  live: boolean;
+  inUse: boolean;
+  onUse?(): void;
+  headActions?: ReactNode;
+}) {
   const id = channel.id;
   const boardId = activeBoard()?.boardId ?? "";
   const account = s.remote ? s.account : (activeBoard()?.user ?? null);
@@ -305,7 +338,7 @@ function LiveCard({ panel, channel, s, live, inUse }: { panel: PanelMeta; channe
   const actions: MessageActions = useMemo(
     () => ({
       react: (m, e, on) => void react(m, e, on).catch(fail),
-      reply: (m) => (putInUse(panel.id), setThreadId(m.id)),
+      reply: (m) => (onUse?.(), setThreadId(m.id)),
       pin: chatCan(s.remote, s.features, "pins") ? (m, on) => void pin(m, on).catch(fail) : undefined,
       copyLink: (m) => {
         const url = `${window.location.origin}${window.location.pathname}#/chat/chat/${restOf({ channel: m.channel, at: m.seq })}`;
@@ -328,7 +361,7 @@ function LiveCard({ panel, channel, s, live, inUse }: { panel: PanelMeta; channe
       remove: (m) => void removeMessage(m).catch(fail),
       openPlace: (m) => m.place && window.dispatchEvent(new CustomEvent("foundation:board", { detail: m.place.board })),
     }),
-    [panel.id, s.remote, s.features], // eslint-disable-line react-hooks/exhaustive-deps
+    [onUse, s.remote, s.features], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const items = useMemo(() => (tl ? layoutTimeline(tl.messages, { readSeq: ruleSeq, meId, pending: s.pending.filter((p) => p.channel === id && !p.root) }) : []), [tl, ruleSeq, meId, s.pending, id]);
@@ -355,7 +388,7 @@ function LiveCard({ panel, channel, s, live, inUse }: { panel: PanelMeta; channe
   const noFiles = can("files") ? undefined : `${CHAT_SERVER_NAME || "This chat server"} doesn't take files yet.`;
   const placeholder = named ? `Message #${title}${channel.me ? "" : " (sending joins it)"}` : `Message ${title}`;
   const voice = can("huddles");
-  const use = () => putInUse(panel.id);
+  const use = () => onUse?.();
 
   return (
     <ChatCardFrame
@@ -368,6 +401,7 @@ function LiveCard({ panel, channel, s, live, inUse }: { panel: PanelMeta; channe
           unread={inUse ? 0 : channel.unread}
           mentions={channel.me?.mentions ?? 0}
           huddle={voice ? <ChannelHuddleButton channel={channel} /> : undefined}
+          actions={headActions}
           onOpen={() => goChat("chat", restOf({ channel: id }))}
         />
       }
@@ -437,7 +471,7 @@ function LiveCard({ panel, channel, s, live, inUse }: { panel: PanelMeta; channe
                 audience={channel}
                 compact
                 autoFocus
-                onSend={(text, files) => send(id, text, files, threadId)}
+                onSend={(text, files, place) => send(id, text, files, threadId, place)}
                 onTyping={() => sayTyping(id, threadId)}
                 onEditLast={editLast(threadId)}
               />
@@ -461,7 +495,7 @@ function LiveCard({ panel, channel, s, live, inUse }: { panel: PanelMeta; channe
             audience={channel}
             compact
             autoFocus={false}
-            onSend={(text, files) => send(id, text, files, null)}
+            onSend={(text, files, place) => send(id, text, files, null, place)}
             onTyping={() => sayTyping(id, null)}
             onEditLast={editLast(null)}
           />

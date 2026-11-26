@@ -25,6 +25,8 @@ export interface PendingMessage {
   text: string;
   /** archive file ids, and what to draw for them while they go */
   files: Array<{ id: string; name: string; mime: string; size: number }>;
+  /** a card on a grid this links to (a message of type "link") */
+  place?: { board: string; boardName?: string; section?: string; object?: string; label: string };
   createdAt: number;
   state: "sending" | "failed";
   error?: string;
@@ -477,4 +479,9 @@ export function restOf(r: Partial<ChatRest>): string {
   if (r.view) return r.view;
   if (!r.channel) return "";
   return [encodeURIComponent(r.channel), r.thread ? `thread/${encodeURIComponent(r.thread)}` : "", r.at != null ? `at/${r.at}` : ""].filter(Boolean).join("/");
+}
+
+/** a link to a grid's card, in words, where the chat server can't carry the link (one of its own: chat/chatDrop.ts) */
+export function placeWords(place: { label: string; boardName?: string }): string {
+  return `🔗 ${place.label}${place.boardName ? ` · ${place.boardName}` : ""}`;
 }

@@ -84,7 +84,7 @@ export interface UiState {
 }
 
 /** the built-in tools, at the top bar's right end (shell/Tools.tsx) */
-export type ToolId = "terminal" | "browser" | "files" | "changes" | "t3";
+export type ToolId = "chat" | "terminal" | "browser" | "files" | "changes" | "t3";
 
 export const TOP_BAR = 44;
 export const WIDTHS = {

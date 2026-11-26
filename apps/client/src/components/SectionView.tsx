@@ -1,4 +1,7 @@
 import { keys } from "../lib/keys";
+import { CHAT_MESSAGE_MIME, noteFromMessage, type DraggedMessage } from "../chat/chatDrop";
+import { CHAT_REMOTE } from "../chat/server";
+import { fetchFile } from "../lib/api";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { SectionCouncilChip } from "../characters/SectionCouncilChip";
 import { LocalSectionChip } from "../panels/LocalView";
@@ -295,6 +298,12 @@ export const SectionView = memo(function SectionView({
     (e: React.DragEvent) => {
       e.preventDefault();
       setDropping(false);
+      // a message pulled out of a conversation (chat/chatDrop.ts): a note with who said it, and its pictures
+      const said = e.dataTransfer.getData(CHAT_MESSAGE_MIME);
+      if (said) {
+        void dropMessage(section.id, said);
+        return;
+      }
       // folders too: walked and laid out as a group (the entries must be read during the event)
       void ingestDrop(section.id, e.dataTransfer);
     },
@@ -857,4 +866,33 @@ function colName(col: number): string {
     n = Math.floor(n / 26) - 1;
   } while (n >= 0);
   return s;
+}
+
+/** a message dragged out of ChatForm, put down in a section: a note, and its files from Foundation's own archive */
+async function dropMessage(sectionId: string, raw: string) {
+  let m: DraggedMessage;
+  try {
+    m = JSON.parse(raw) as DraggedMessage;
+  } catch {
+    return;
+  }
+  const n = noteFromMessage(m);
+  const others = CHAT_REMOTE ? m.files.map((f) => f.name) : [];
+  const body = [`**${n.title}**`, n.body, others.length ? others.map((x) => `📎 ${x}`).join("\n") : ""].filter(Boolean).join("\n\n");
+  if (n.body || others.length || !m.files.length) addNote(sectionId, body);
+  if (CHAT_REMOTE || !m.files.length) return;
+  const files = await Promise.all(
+    m.files.map(async (f) => {
+      try {
+        const res = await fetchFile(f.src);
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return new File([blob], f.name, { type: f.mime || blob.type });
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const got = files.filter((f): f is File => !!f);
+  if (got.length) void ingest(sectionId, got);
 }

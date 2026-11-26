@@ -58,8 +58,12 @@ import { BrowserGlyph, ChangesGlyph, ExpandGlyph, FilesGlyph, T3Glyph, TerminalG
 import { openAppTab } from "../lib/grids";
 import { frameAllow, frameFor } from "../panels/frameSandbox";
 import { useFrameContext } from "../lib/frames";
+import { ChatMark } from "../chat/Icons";
+import { PinnedChat } from "../chat/PinnedChat";
+import { ChatToolButton } from "../chat/ChatButton";
 
 export const TOOLS: Array<{ id: ToolId; name: string; tip: string; glyph: ReactNode }> = [
+  { id: "chat", name: "ChatForm", tip: "ChatForm: a conversation pinned beside your work", glyph: <ChatMark size={16} /> },
   { id: "terminal", name: "Terminal", tip: "Terminal: a shell on the server's computer (admins)", glyph: <TerminalGlyph /> },
   { id: "browser", name: "Browser", tip: "Browser: a page, here, and onto the grid", glyph: <BrowserGlyph /> },
   { id: "files", name: "Files", tip: "Files: this grid's, and this computer's folders", glyph: <FilesGlyph /> },
@@ -73,7 +77,7 @@ export function ToolButtons() {
   const { t3 } = useAvailable();
   return (
     <div className="tool-buttons" role="group" aria-label="Tools">
-      {TOOLS.map((t) => (
+      {TOOLS.map((t) => t.id === "chat" ? <ChatToolButton key={t.id} on={ui.tool === "chat"} /> : (
         <button
           key={t.id}
           type="button"
@@ -118,7 +122,7 @@ export function ToolPane() {
       </nav>
       {seen.map((id) => (
         <div key={id} className="tool-body" hidden={id !== ui.tool} data-tool-body={id}>
-          {id === "terminal" ? <TerminalTool shown={id === ui.tool} /> : id === "browser" ? <BrowserTool /> : id === "files" ? <FilesTool /> : id === "changes" ? <ChangesTool /> : <T3Tool shown={id === ui.tool} />}
+          {id === "chat" ? <PinnedChat shown={id === ui.tool} /> : id === "terminal" ? <TerminalTool shown={id === ui.tool} /> : id === "browser" ? <BrowserTool /> : id === "files" ? <FilesTool /> : id === "changes" ? <ChangesTool /> : <T3Tool shown={id === ui.tool} />}
         </div>
       ))}
     </aside>

@@ -30,10 +30,11 @@ import { camera, onCamera, toWorld } from "../state/camera";
 import { sectionAtWorld } from "../state/store";
 import { clip, unclip } from "../state/clipboard";
 import { toast } from "../state/ui";
+import { chatZoneAt, dropOnChat, hitDropItems } from "../chat/chatDrop";
 import { glyphOf, needsFetch, placeHit, resolveHit } from "./hits";
 import { PAPER, STACK_SHOWN, deal, fan, grabPoint, leanToward, pictureSize, trail } from "./pickupMath";
 
-type Over = { kind: "grid"; sectionId: string | null } | { kind: "clipboard"; el: HTMLElement } | { kind: "none" };
+type Over = { kind: "grid"; sectionId: string | null } | { kind: "clipboard"; el: HTMLElement } | { kind: "chat"; el: HTMLElement } | { kind: "none" };
 
 export interface Pickup {
   move(x: number, y: number): void;
@@ -99,6 +100,9 @@ function overAt(x: number, y: number): Over {
   const top = document.elementFromPoint(x, y) as HTMLElement | null;
   const board = top?.closest<HTMLElement>(".clipboard");
   if (board) return { kind: "clipboard", el: board };
+  // a conversation (chat/chatDrop.ts): what's held goes into its composer
+  const zone = chatZoneAt(top);
+  if (zone) return { kind: "chat", el: zone };
   const vp = document.querySelector<HTMLElement>(".grid-viewport");
   if (!top || !vp || !vp.contains(top) || top.closest(".floor-pane, .top-bar")) return { kind: "none" };
   const r = vp.getBoundingClientRect();
@@ -109,7 +113,7 @@ function overAt(x: number, y: number): Over {
 function ring(over: Over) {
   document.querySelectorAll(".is-hit-target").forEach((el) => el.classList.remove("is-hit-target"));
   if (over.kind === "grid" && over.sectionId) document.querySelector(`[data-section-id="${CSS.escape(over.sectionId)}"]`)?.classList.add("is-hit-target");
-  if (over.kind === "clipboard") over.el.classList.add("is-hit-target");
+  if (over.kind === "clipboard" || over.kind === "chat") over.el.classList.add("is-hit-target");
 }
 
 /**
@@ -211,7 +215,7 @@ export function pickUp(hits: SearchHit[], from: HTMLElement, press: { x: number;
       lastT = now;
       root.style.setProperty("--lean", `${lean.toFixed(2)}deg`);
       const o = overAt(x, y);
-      if (o.kind !== over.kind || (o.kind === "grid" && over.kind === "grid" && o.sectionId !== over.sectionId)) ring(o);
+      if (o.kind !== over.kind || (o.kind === "grid" && over.kind === "grid" && o.sectionId !== over.sectionId) || (o.kind === "chat" && over.kind === "chat" && o.el !== over.el)) ring(o);
       over = o;
       root.classList.toggle("is-over", o.kind === "grid");
       root.classList.toggle("is-clip", o.kind === "clipboard");
@@ -221,6 +225,11 @@ export function pickUp(hits: SearchHit[], from: HTMLElement, press: { x: number;
       const o = overAt(x, y);
       letGo();
       root.style.setProperty("--lean", "0deg");
+      if (o.kind === "chat") {
+        // shared into the conversation's composer; the result goes back to its row
+        if (!dropOnChat(o.el, hits.flatMap(hitDropItems))) toast("That conversation can't take it", "warn");
+        return flyBack();
+      }
       if (o.kind === "clipboard") {
         if (opts.fromClipboard) return flyBack();
         const fresh = hits.filter((h) => clip(h)).length;

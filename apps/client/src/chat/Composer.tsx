@@ -20,6 +20,8 @@ import { EmojiPicker } from "./EmojiPicker";
 import { AttachFrom } from "./AttachFrom";
 import { matchEmoji } from "./emoji";
 import { applyCompletion, applyFormat, bytes, findTrigger, matchChannels, matchMentions, readDraft, writeDraft, type Format, type MentionOption, type Trigger } from "./logic";
+import { CHAT_DROP, type ChatDropItem, type ChatPlace } from "./chatDrop";
+import { fetchFile } from "../lib/api";
 import { IconClip, IconCode, IconHash, IconLink, IconList, IconLock, IconQuote, IconReact, IconSend } from "./Icons";
 
 export interface ComposerHandle {
@@ -43,7 +45,8 @@ export interface ComposerProps {
   agents: ChatAgentRef[];
   channels: ChatChannelView[];
   meId?: string;
-  onSend(text: string, files: SentFile[]): void;
+  /** `place`: a card from the grid put down on the conversation (chat/chatDrop.ts), sent as a link to it */
+  onSend(text: string, files: SentFile[], place?: ChatPlace): void;
   onTyping?(): void;
   /** ↑ in an empty field: edit my last message (true when there was one) */
   onEditLast?(): boolean;
@@ -89,6 +92,9 @@ let chipN = 0;
 export function Composer(p: ComposerProps) {
   const [text, setText] = useState(() => p.initial ?? readDraft(storage(), p.channel, p.root));
   const [chips, setChips] = useState<Chip[]>(p.initialChips ?? []);
+  /** a card from the grid, to be sent as a link to it (one at a time) */
+  const [place, setPlace] = useState<ChatPlace | null>(null);
+  const root = useRef<HTMLDivElement>(null);
   const [trigger, setTrigger] = useState<Trigger | null>(null);
   const [pick, setPick] = useState(0);
   const [emoji, setEmoji] = useState(false);
@@ -106,6 +112,7 @@ export function Composer(p: ComposerProps) {
     draftFor.current = { channel: p.channel, root: p.root };
     setText(readDraft(storage(), p.channel, p.root));
     setChips([]);
+    setPlace(null);
     setTrigger(null);
     setAsk(null);
     if (p.autoFocus !== false) requestAnimationFrame(() => field.current?.focus());
@@ -153,6 +160,36 @@ export function Composer(p: ComposerProps) {
   };
 
   useImperativeHandle(p.ref, () => ({ addFiles, focus: () => field.current?.focus() }));
+
+  // something from the grid put down on this conversation (chat/chatDrop.ts): a picture comes as itself, a card as a
+  // link to it, words as words. It's a draft: nothing goes until the person sends it
+  const take = useRef<(items: ChatDropItem[]) => void>(() => {});
+  take.current = (items) => {
+    if (p.disabled) return toast(p.disabled);
+    for (const it of items) {
+      if (it.kind === "text") insert((text && !/\s$/.test(text) ? " " : "") + it.text);
+      else if (it.kind === "place") setPlace(it.place);
+      else if (p.noFiles) {
+        if (it.place) setPlace(it.place);
+      } else {
+        void fetchFile(it.src)
+          .then(async (res) => {
+            if (!res.ok) throw new Error(`${res.status}`);
+            const blob = await res.blob();
+            addFiles([new File([blob], it.name, { type: blob.type || "application/octet-stream" })]);
+          })
+          .catch(() => (it.place ? setPlace(it.place) : toast(`${it.name} couldn't be read`, "bad")));
+      }
+    }
+    field.current?.focus();
+  };
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const on = (e: Event) => take.current((e as CustomEvent<ChatDropItem[]>).detail ?? []);
+    el.addEventListener(CHAT_DROP, on);
+    return () => el.removeEventListener(CHAT_DROP, on);
+  }, []);
 
   const options = useMemo((): Array<{ key: string; label: string; detail?: string; insert: string; lead: React.ReactNode }> => {
     if (!trigger) return [];
@@ -213,7 +250,7 @@ export function Composer(p: ComposerProps) {
 
   const busy = chips.some((c) => !c.id && !c.error);
   const ready = chips.filter((c) => c.id);
-  const can = !p.disabled && !busy && (text.trim().length > 0 || ready.length > 0);
+  const can = !p.disabled && !busy && (text.trim().length > 0 || ready.length > 0 || place !== null);
 
   const sendNow = (sure = false) => {
     if (!can) return;
@@ -223,16 +260,19 @@ export function Composer(p: ComposerProps) {
     p.onSend(
       text.trim(),
       ready.map((c) => ({ id: c.id!, name: c.name, mime: c.mime, size: c.size })),
+      place ?? undefined,
     );
     chips.forEach((c) => c.thumb && URL.revokeObjectURL(c.thumb));
     setText("");
     setChips([]);
+    setPlace(null);
     setTrigger(null);
     writeDraft(storage(), p.channel, "", p.root);
   };
 
   return (
     <div
+      ref={root}
       className={`chat-compose${drag ? " is-drop" : ""}${p.disabled ? " is-disabled" : ""}${p.compact ? " is-compact" : ""}`}
       onDragOver={(e) => {
         if (p.disabled || !e.dataTransfer.types.includes("Files")) return;
@@ -302,6 +342,22 @@ export function Composer(p: ComposerProps) {
           >
             Keep editing
           </button>
+        </div>
+      )}
+      {place && (
+        <div className="chat-chips">
+          <div className="chat-chip is-done is-place" data-chip-place={place.object ?? place.board}>
+            <span className="chat-chip-thumb is-file" aria-hidden>
+              <PlaceGlyph />
+            </span>
+            <span className="chat-chip-text">
+              <span className="chat-chip-name" title={place.label}>{place.label}</span>
+              <span className="chat-chip-meta">{place.boardName ? `On ${place.boardName}` : "A card on the grid"}</span>
+            </span>
+            <button type="button" className="chat-chip-x" onClick={() => setPlace(null)} aria-label={`Remove the link to ${place.label}`} data-tip="Remove">
+              ✕
+            </button>
+          </div>
         </div>
       )}
       {chips.length > 0 && (
@@ -484,5 +540,15 @@ function ToolBtn({ tip, kbd, onClick, children, on, label }: { tip: string; kbd?
     <button type="button" className={`chat-tool${on ? " is-on" : ""}`} onMouseDown={(e) => e.preventDefault()} onClick={onClick} data-tip={tip} data-kbd={kbd} aria-label={label ?? tip}>
       {children}
     </button>
+  );
+}
+
+/** a card on a grid: a square with a corner turned */
+function PlaceGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" aria-hidden>
+      <rect x="2" y="2" width="12" height="12" rx="2.5" />
+      <path d="M5 6.5h6M5 9.5h4" strokeLinecap="round" />
+    </svg>
   );
 }

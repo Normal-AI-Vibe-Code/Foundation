@@ -21,7 +21,6 @@ import { SunGlyph } from "./glyphs";
 import { ToolButtons } from "./Tools";
 import { goToday } from "../lib/place";
 import { ShibaDot, useNotices } from "../today/notices";
-import { ChatButton } from "../chat/ChatButton";
 import { NotificationBell } from "../chat/Bell";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { keys } from "../lib/keys";
@@ -153,8 +152,6 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
             </span>
           )}
         </button>
-        {/* ChatForm, right after Today and of its family, with what's waiting on you there (chat/ChatButton.tsx) */}
-        <ChatButton on={place.kind === "chat"} />
         {/* what was said to me: mentions and direct messages, with a count and a panel (chat/Bell.tsx) */}
         <NotificationBell />
         <button

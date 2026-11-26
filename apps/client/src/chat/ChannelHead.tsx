@@ -5,6 +5,7 @@
  * ⋯ (export as JSON or Markdown, leave, archive — which asks first).
  */
 
+import { PinRightButton } from "./PinRightButton";
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
 import { chatTitle, type ChatChannelView, type ChatMessage, type ChatParty } from "@foundation/protocol";
@@ -202,6 +203,8 @@ export function ChannelHead(p: ChannelHeadProps) {
           </AnimatePresence>
         </div>
       )}
+      {/* pin it in the right panel, beside the grid (chat/pinRight.ts) */}
+      <PinRightButton channel={c.id} />
       {c.me && p.onStar && (
         <button type="button" className={`chat-head-btn${c.me.starred ? " is-star" : ""}`} onClick={() => p.onStar?.(!c.me!.starred)} data-tip={c.me.starred ? "Unstar" : "Star: keep it at the top"} aria-pressed={c.me.starred} aria-label="Star">
           <IconStar on={c.me.starred} />

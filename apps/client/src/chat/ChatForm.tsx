@@ -473,6 +473,7 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
     main = (
       <div
         className="chat-main"
+        data-chat-drop-zone={disabled ? "off" : "on"}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("Files") && !disabled && !noFiles) e.preventDefault();
         }}
@@ -556,7 +557,7 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
             noAttachFrom={s.remote}
             audience={channel}
             autoFocus
-            onSend={(text, files) => send(channel.id, text, files, null)}
+            onSend={(text, files, place) => send(channel.id, text, files, null, place)}
             onTyping={() => sayTyping(channel.id, null)}
             onEditLast={editLast(null)}
           />
@@ -603,7 +604,7 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
                 audience={channel}
                 compact
                 autoFocus
-                onSend={(text, files) => send(channel.id, text, files, route.thread)}
+                onSend={(text, files, place) => send(channel.id, text, files, route.thread, place)}
                 onTyping={() => sayTyping(channel.id, route.thread)}
                 onEditLast={editLast(route.thread)}
               />

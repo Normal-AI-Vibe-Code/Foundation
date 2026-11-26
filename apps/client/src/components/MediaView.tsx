@@ -15,6 +15,7 @@ import { fetchFile } from "../lib/api";
 import { camera, FAR_ZOOM, onCamera } from "../state/camera";
 import { useCalmAdmit } from "../lib/calm";
 import { arrivalStep } from "../lib/arrival";
+import { aheadScale, cameraCalm, CALM_MS, watchAhead } from "../lib/viewAhead";
 import {
   isLocalDataUrl,
   peekCachedImage,
@@ -248,6 +249,17 @@ function useNear(ref: React.RefObject<HTMLElement | null>, on = true, enterMs = 
   return near;
 }
 
+/** in the view the camera is heading for (lib/viewAhead.ts) */
+function useAhead(ref: React.RefObject<HTMLElement | null>, on: boolean) {
+  const [ahead, setAhead] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !on) return;
+    return watchAhead(el, setAhead);
+  }, [ref, on]);
+  return ahead;
+}
+
 /**
  * Progressive, cached, viewport-prioritized image loading for grid MediaView cards:
  *  - Reads synchronously from L1 on render 1 (zero flash on remount or board switch).
@@ -258,8 +270,13 @@ function useNear(ref: React.RefObject<HTMLElement | null>, on = true, enterMs = 
  */
 function useProgressiveMedia(src: string | null, name: string, cardW: number, ref: React.RefObject<HTMLElement | null>) {
   const bypass = Boolean(src) && (isLodDisabled() || isSkippableImage(src!, name) || isLocalDataUrl(src!));
-  const near = useNear(ref, Boolean(src) && !bypass, 0, 0, "100% 100%");
-  const visible = useNear(ref, Boolean(src) && !bypass, 0, 0, "0px");
+  const watching = Boolean(src) && !bypass;
+  // near: within a screen of the view now, or in the view the camera is heading for (lib/viewAhead.ts), so a zoom
+  // out starts the cards it is about to show as it begins, not as they arrive
+  const nearNow = useNear(ref, watching, 0, 0, "100% 100%");
+  const ahead = useAhead(ref, watching);
+  const near = nearNow || ahead;
+  const visible = useNear(ref, watching, 0, 0, "0px");
   const [shed, setShed] = useState(false);
   const [level, setLevel] = useState<number>(LOD_WIDTHS[0]);
   const [fallbackFailed, setFallbackFailed] = useState(false);
@@ -281,16 +298,30 @@ function useProgressiveMedia(src: string | null, name: string, cardW: number, re
     if (!el || !src || bypass) return;
     const section = el.closest(".section-content") ? (el.closest<HTMLElement>("[data-section-id]")?.dataset.sectionId ?? null) : null;
     let timer = 0;
+    let lastUp = 0;
     let cur = LOD_WIDTHS[0];
-    const want = () => nextLevel(cur, cardW * drawnScale(camera.scale, section) * (window.devicePixelRatio || 1));
+    // a zoom in loads the level for where it lands (the goal's scale), as it starts; a zoom out keeps the level it
+    // has until the camera is calm, so pictures never swap down mid-gesture (each swap is a decode and a new texture)
+    const want = () => nextLevel(cur, cardW * drawnScale(aheadScale(), section) * (window.devicePixelRatio || 1));
     const apply = () => {
-      cur = want();
+      const w = want();
+      if (w < cur && !cameraCalm()) {
+        timer = window.setTimeout(apply, CALM_MS);
+        return;
+      }
+      cur = w;
+      lastUp = performance.now();
       setLevel(cur);
     };
-    apply();
+    cur = want();
+    setLevel(cur);
     const off = onCamera(() => {
+      const w = want();
+      if (w === cur) return;
       clearTimeout(timer);
-      if (want() !== cur) timer = window.setTimeout(apply, 160);
+      // up: at most one step per 120 ms while the zoom goes on; down: once the camera is calm
+      if (w > cur) timer = window.setTimeout(apply, Math.max(0, 120 - (performance.now() - lastUp)));
+      else timer = window.setTimeout(apply, CALM_MS);
     });
     const offFit = section ? subscribe(() => want() !== cur && apply()) : () => {};
     return () => {
@@ -399,9 +430,16 @@ function useProgressiveMedia(src: string | null, name: string, cardW: number, re
   const displayEntry =
     src && !bypass && shed && baseEntry ? (peekShedImage(src, baseEntry.tier) ?? baseEntry) : baseEntry;
 
+  // A 64 px copy is a blurred stand-in only while a cold picture waits for its first real level. Drawn small (its
+  // level is 64) or shed off screen, it is the picture: blurring it then was the flicker of a zoom out, and
+  // focusing it again the flicker of the zoom back in
+  const seenSharp = useRef(false);
+  if (displayEntry && (displayEntry.tier !== 64 || targetTier === 64)) seenSharp.current = true;
+  const isPreview = displayEntry?.tier === 64 && targetTier !== 64 && !shed && !seenSharp.current;
+
   return {
     url: displayEntry?.url,
-    isPreview: displayEntry?.tier === 64,
+    isPreview,
     instantSharp: Boolean(syncEntry && syncEntry.tier !== 64),
     alpha: baseEntry?.alpha ?? syncEntry?.alpha ?? null,
     fallbackOriginal: bypass || fallbackFailed,

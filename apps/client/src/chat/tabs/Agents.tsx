@@ -422,7 +422,7 @@ function Conversation({ user, channelId, agent }: { user: UserInfo; channelId: s
           meId={meId}
           disabled={channel.archivedAt ? "This conversation is archived" : undefined}
           autoFocus
-          onSend={(text, files) => send(channelId, text, files, null)}
+          onSend={(text, files, place) => send(channelId, text, files, null, place)}
           onTyping={() => sayTyping(channelId, null)}
         />
         <div className="chat-typing" aria-live="polite">

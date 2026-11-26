@@ -20,6 +20,7 @@
  *    device is there, `features` what that server has, and the status is *signin* until someone signs in.
  */
 
+import { placeWords } from "./logic";
 import { useSyncExternalStore } from "react";
 import {
   CHAT_TYPING_MS,
@@ -700,8 +701,13 @@ export async function loadThread(channel: string, root: string, force = false) {
 // ---------------------------------------------------------------- writing
 
 /** say it: drawn at once as pending, then the server's message in its place */
-export function send(channel: string, text: string, files: PendingMessage["files"] = [], root: string | null = null) {
-  const p: PendingMessage = { requestId: requestId(), channel, root, text, files, createdAt: Date.now(), state: "sending" };
+export function send(channel: string, text: string, files: PendingMessage["files"] = [], root: string | null = null, place?: PendingMessage["place"]) {
+  // a chat server of its own carries no links to a grid: the words say where instead (chat/chatDrop.ts)
+  if (place && state.remote) {
+    text = [text, placeWords(place)].filter(Boolean).join("\n");
+    place = undefined;
+  }
+  const p: PendingMessage = { requestId: requestId(), channel, root, text, files, createdAt: Date.now(), state: "sending", ...(place ? { place } : {}) };
   set((s) => ({ pending: [...s.pending, p] }));
   void post(p);
   return p.requestId;
@@ -711,7 +717,7 @@ async function post(p: PendingMessage) {
   try {
     const { message } = await api<{ message: ChatMessage }>(`/api/chat/channels/${enc(p.channel)}/messages`, {
       method: "POST",
-      json: { text: p.text, files: p.files.map((f) => f.id), root: p.root, request_id: p.requestId },
+      json: { text: p.text, files: p.files.map((f) => f.id), root: p.root, request_id: p.requestId, ...(p.place ? { place: p.place } : {}) },
     });
     land(message, p.requestId);
     // posting to an open channel joins it: the list row needs my membership
