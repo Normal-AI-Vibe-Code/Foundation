@@ -15,6 +15,8 @@ import { ObjectFrame } from "./ObjectFrame";
 import type { CaretSource, NoteEditorHandle } from "./noteEditor";
 import { countRender } from "../state/renders";
 import { RichNote } from "./RichText";
+import { useNotePage } from "../notes/noteSync";
+import { openGrid, useGrids } from "../lib/grids";
 
 interface Props {
   note: NoteMeta;
@@ -70,6 +72,10 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
   const [source, setSource] = useState(false);
   const carets = useNoteCarets(note.id, note.text);
   const canWrite = getUi().role !== "viewer";
+  // a card showing a note page (docs/notes.md): the words are the page's, under the page's own role
+  const pageRow = useGrids().find((b) => b.id === note.ref);
+  const page = useNotePage(note.ref);
+  const pageReadOnly = !pageRow || pageRow.role === "viewer" || page?.status === "locked";
   useEffect(() => {
     warmNoteEditor();
   }, []);
@@ -87,7 +93,12 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
           <BareGlyph off={!!note.bare} />
         </button>
       )}
-      <button
+      {note.ref && pageRow && (
+        <button className="icon-btn note-open-btn" aria-label={`Open ${pageRow.name}`} data-tip="Open the page" onClick={() => openGrid(note.ref!)}>
+          <PageGlyph />
+        </button>
+      )}
+      {!note.ref && <button
         className={"icon-btn note-md-btn" + (source ? " is-on" : "")}
         aria-pressed={source}
         aria-label="Markdown"
@@ -96,14 +107,14 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
         onClick={() => setSource((s) => !s)}
       >
         <MarkdownGlyph />
-      </button>
+      </button>}
     </>
   );
 
   return (
     <ObjectFrame
       id={note.id}
-      title={note.name}
+      title={note.ref ? (pageRow?.name ?? note.name) : note.name}
       pos={pos}
       width={note.w}
       float={note.float}
@@ -114,7 +125,7 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
       onRemove={() => removeNote(note.id)}
       headerExtras={bar}
       bodyClass="note-body"
-      cardClass={"note-card" + (note.bare ? " is-bare" : "")}
+      cardClass={"note-card" + (note.bare ? " is-bare" : "") + (note.ref ? " is-page" : "")}
       // its bar rises above it and the words hold still (2026-11-25)
       barRise
     >
@@ -131,7 +142,18 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
             ))}
           </div>
         )}
-        {source ? (
+        {note.ref ? (
+          page?.status === "locked" ? (
+            <div className="note-locked" role="note">
+              A note page you can't open: it's members-only, or it isn't there any more.
+            </div>
+          ) : (
+            <>
+              {!pageRow && page?.status === "live" && <div className="note-page-gone">This note page was archived. Its words are kept, read-only.</div>}
+              <RichNote note={note} words={{ text: page?.text ?? "", write: (md) => page?.write(md), readOnly: pageReadOnly }} page={note.ref} />
+            </>
+          )
+        ) : source ? (
           <NoteWriter noteId={note.id} text={note.text} readOnly={!canWrite} onDone={() => setSource(false)} />
         ) : (
           <RichNote note={note} />
@@ -142,6 +164,16 @@ export const NoteView = memo(function NoteView({ note, pos, isActive, getScale }
 });
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round", strokeLinejoin: "round" } as const;
+
+/** a note page: a sheet with its corner turned, and lines */
+export function PageGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden {...stroke}>
+      <path d="M3.5 1.8h4.6l2.4 2.4v8H3.5z" />
+      <path d="M8 1.8v2.5h2.5M5.3 7h3.4M5.3 9.3h3.4" />
+    </svg>
+  );
+}
 
 /** the Markdown mark: an M and an arrow down, in a frame */
 export function MarkdownGlyph() {

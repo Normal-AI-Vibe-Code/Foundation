@@ -38,6 +38,7 @@ import {
   type LinkDoc,
   type NoteDoc,
   NOTE_SIZES,
+  NOTE_BODY,
   putNote,
   setNoteText,
   setTableCells,
@@ -51,6 +52,7 @@ import { editBoard, getBoard, listBoards } from "./boards.ts";
 import { canSeeBoard } from "./members.ts";
 import type { MediaDoc, UserInfo } from "@foundation/protocol";
 import { moveNoteFile, readMediaCard, withMediaNotes } from "./medianotes.ts";
+import { archiveNotePage, cleanTitle, isArchivedNote, makeNotePage, notePage, notePageText, requireNotePage } from "./notes.ts";
 import { one } from "./db.ts";
 import { searchAll } from "./search.ts";
 import { checkRepo, discoverRepo, parseRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
@@ -242,6 +244,32 @@ function sectionOrCreate(doc: Y.Doc, section?: string) {
  * instead (what "Show as a card" does). A real crew turn hooked a connector up
  * first, then added a table and two notes that nobody could see (2026-11-07).
  */
+/** can the person this call is for see the note page `id` (a members-only page answers only to its members) */
+function canSeeNote(ctx: ToolCtx, id: string): boolean {
+  const u = userById(ctx.userId) ?? (ctx.userId === "agent" ? ({ id: "agent", role: "member" } as UserInfo) : null);
+  return !!u && canSeeBoard(u, id);
+}
+
+/** a card on this grid showing the note page `ref` (in `section`, else the first); one per section */
+function putNoteCard(ctx: ToolCtx, ref: string, name: string, section?: string): NoteDoc {
+  return editBoard(ctx.boardId, "agent", (doc) => {
+    const sec = cardSection(doc, section);
+    const m = boardMaps(doc);
+    const had = [...m.objects.values()].find((o) => o.kind === "note" && o.ref === ref && o.sectionId === sec.id) as NoteDoc | undefined;
+    if (had) return had;
+    const card: NoteDoc = { id: uid("note"), kind: "note", sectionId: sec.id, name, ref, x: 0, y: 0, float: false, bornAt: Date.now(), w: 420, h: 320, ...(madeBy(ctx) ? { createdBy: madeBy(ctx) } : {}) };
+    m.objects.set(card.id, card);
+    return card;
+  });
+}
+
+/** a card showing a note page, read: the page's words for someone who can see it, else only that it is a page they can't open */
+function readRefNote(ctx: ToolCtx, id: string, name: string, section: string, ref: string) {
+  if (!canSeeNote(ctx, ref)) return { id, kind: "note", name, section, note_page: ref, markdown: null, locked: "a note page this person can't open" };
+  if (isArchivedNote(ref)) return { id, kind: "note", name, section, note_page: ref, markdown: null, archived: true };
+  return { id, kind: "note", name, section, note_page: ref, markdown: notePageText(ref) };
+}
+
 function cardSection(doc: Y.Doc, section?: string) {
   const sec = sectionOrCreate(doc, section);
   if (!sec.host) return sec;
@@ -352,6 +380,7 @@ export const TOOLS: BoardTool[] = [
       const doc = getBoard(ctx.boardId).doc;
       const o = boardMaps(doc).objects.get(id) as ({ id: string; kind: string; name?: string; text?: string; sectionId?: string } & Record<string, unknown>) | undefined;
       if (!o) throw new HttpError(404, `No card ${id} on this board`);
+      if (o.kind === "note" && typeof o.ref === "string") return readRefNote(ctx, id, o.name ?? "", o.sectionId ?? "", o.ref);
       if (o.kind === "note") return { id, kind: "note", name: o.name ?? "", section: o.sectionId, markdown: noteTextOf(doc, o) };
       if (o.kind === "table") return { id, kind: "table", name: o.name ?? "", section: o.sectionId, cells: tableCellsOf(doc, id) };
       if (o.kind === "media") return readMediaCard(o as unknown as MediaDoc, noteLeftBy(ctx.boardId, id));
@@ -576,6 +605,7 @@ export const TOOLS: BoardTool[] = [
           next.sectionId = sec.id;
           next.float = false;
         }
+        if (markdown !== undefined && o.kind === "note" && o.ref) throw new HttpError(400, `This card shows the note page “${o.ref}”: write its words with update_card on that board (board "${o.ref}", id "${NOTE_BODY}")`);
         if (markdown !== undefined && o.kind === "note") {
           setNoteText(doc, id, markdown); // the smallest edit: someone typing in it keeps their words
           delete next.text;
@@ -1543,6 +1573,74 @@ export const TOOLS: BoardTool[] = [
       // the log names the conversation only as the board does
       if (out.added) touch(ctx, out.card.id, ch.kind === "open" ? `put ${name} on the grid` : "put a conversation on the grid");
       return { id: out.card.id, section: out.card.sectionId, channel: ch.id };
+    },
+  }),
+  // ---------- note pages (docs/notes.md) ----------
+  def({
+    name: "add_note_page",
+    description:
+      "Make a note page: a note of its own, listed in the side pane's Notes (inside the note page `parent`, when given), that opens full size and can stand on any grid. Its words are markdown, read and edited by people as blocks (headings, lists, to-dos `- [ ]`, toggles, callouts `> [!NOTE]`, code, links). With place: true it is also put on this grid as a card (in `section`, else the first); the card and the page are one note, so an edit in either shows in both. Returns the page's id: write its words later with update_card on board <id>, id \"body\".",
+    schema: z.object({ title: z.string(), markdown: z.string().optional(), parent: z.string().optional().describe("a note page's id to put it inside"), place: z.boolean().optional(), section: z.string().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      // the page it goes inside gets a line for it: a write to that page, so someone who only reads it can't
+      if (i.parent) {
+        requireNotePage(i.parent);
+        if (!canSeeNote(ctx, i.parent)) throw new HttpError(404, `No note page ${i.parent}`);
+        if (!canWrite(ctx.userId, i.parent)) throw new HttpError(403, `View only: you can read the note page “${i.parent}” but not add to it`);
+      }
+      const page = makeNotePage({ title: i.title, markdown: i.markdown, parent: i.parent ?? null });
+      const card = i.place ? putNoteCard(ctx, page.id, page.name, i.section) : null;
+      touch(ctx, card?.id, `made the note page “${page.name}”`);
+      return { id: page.id, name: page.name, ...(card ? { card: card.id, section: card.sectionId } : {}) };
+    },
+  }),
+  def({
+    name: "place_note",
+    description: "Put a note page on this grid as a card (in `section`, else the grid's first). The card shows the page's words, live: it is the same note, not a copy. Someone who can see the grid but not the page sees a locked card. Asked twice for the same section, it adds one.",
+    schema: z.object({ note: z.string().describe("the note page's id"), section: z.string().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      const row = notePage(i.note);
+      if (!row || !canSeeNote(ctx, i.note)) throw new HttpError(404, `No note page ${i.note}`);
+      const card = putNoteCard(ctx, row.id, row.name, i.section);
+      touch(ctx, card.id, `put the note “${row.name}” on the grid`);
+      return { id: card.id, section: card.sectionId, note: row.id };
+    },
+  }),
+  def({
+    name: "make_note_page",
+    description: "Make a note on this grid a note page: its words move to a page of their own in the side pane's Notes, and the card stays where it is, showing that page. Returns the page's id.",
+    schema: z.object({ id: z.string().describe("the note card's id"), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      const doc = getBoard(ctx.boardId).doc;
+      const o = boardMaps(doc).objects.get(i.id);
+      if (!o || o.kind !== "note") throw new HttpError(404, `No note ${i.id} on this board`);
+      if (o.ref) return { id: o.ref, card: o.id, already: true };
+      const page = makeNotePage({ title: cleanTitle(o.name) || undefined, markdown: noteTextOf(doc, o) });
+      editBoard(ctx.boardId, "agent", (d) => {
+        const m = boardMaps(d);
+        const now = m.objects.get(i.id) as NoteDoc | undefined;
+        if (!now) return;
+        const { text: _old, ...card } = now;
+        m.objects.set(i.id, { ...card, ref: page.id });
+        m.noteText.delete(i.id);
+      });
+      touch(ctx, i.id, `made “${page.name}” a note page`);
+      return { id: page.id, card: i.id };
+    },
+  }),
+  def({
+    name: "archive_note_page",
+    description: "Archive a note page (run on the page's own board): it leaves the side pane, the pages inside it move up to where it was, and cards showing it say it was archived. Nothing is deleted: its words stay with the page. Requires confirm: true.",
+    schema: z.object({ confirm: z.boolean(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, i) => {
+      requireNotePage(ctx.boardId);
+      if (!i.confirm) return "not archived: pass confirm: true after checking with the person";
+      archiveNotePage(ctx.boardId);
+      return { archived: ctx.boardId };
     },
   }),
   def({

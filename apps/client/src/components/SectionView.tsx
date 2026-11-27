@@ -67,7 +67,9 @@ import { SectionRewind } from "../panels/ReplayView";
 import { TimelinePast } from "../timeline/TimelinePast";
 import { SectionClock, SectionTimeline } from "../timeline/SectionTimeline";
 import { NoteRecorderHost, NoteTool } from "../notes/NoteRecorder";
-import { setUi } from "../state/ui";
+import { setUi, toast } from "../state/ui";
+import { activeBoard } from "../sync/board";
+import { NOTE_PAGE_MIME, placeNote } from "../notes/noteSync";
 import { openContextMenu } from "./ContextMenu";
 import { sectionMenuItems } from "./sectionMenu";
 import { cardMenuItems } from "./cardMenu";
@@ -305,6 +307,13 @@ export const SectionView = memo(function SectionView({
       const said = e.dataTransfer.getData(CHAT_MESSAGE_MIME);
       if (said) {
         void dropMessage(section.id, said);
+        return;
+      }
+      // a note page from the side menu's Notes (docs/notes.md): a card here showing it, the same note
+      const page = e.dataTransfer.getData(NOTE_PAGE_MIME);
+      if (page) {
+        const board = activeBoard()?.boardId;
+        if (board) void placeNote(board, page, section.id).then((err) => err && toast(err, "bad"));
         return;
       }
       // folders too: walked and laid out as a group (the entries must be read during the event)

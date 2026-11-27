@@ -17,11 +17,13 @@ import { api } from "./api";
  * what a grid's canvas is: sections and cards, a deck of slides (a grid whose sections are the slides), a web page,
  * or an app opened as a tab of its own (2026-11-18: T3, Vision, anything that was a tool or a card and was expanded)
  */
-export type SpaceKind = "grid" | "deck" | "page" | "app";
-export const KIND_GLYPH: Record<SpaceKind, string> = { grid: "▦", deck: "▶", page: "◳", app: "◈" };
-export const KIND_NAME: Record<SpaceKind, string> = { grid: "Grid", deck: "Presentation", page: "Web page", app: "App" };
+export type SpaceKind = "grid" | "deck" | "page" | "app" | "note";
+export const KIND_GLYPH: Record<SpaceKind, string> = { grid: "▦", deck: "▶", page: "◳", app: "◈", note: "▤" };
+export const KIND_NAME: Record<SpaceKind, string> = { grid: "Grid", deck: "Presentation", page: "Web page", app: "App", note: "Note" };
 /** a space with no grid to look at: its canvas is a page (it holds no grids, and has no sections to count) */
-export const isPageKind = (k?: SpaceKind) => k === "page" || k === "app";
+export const isPageKind = (k?: SpaceKind) => k === "page" || k === "app" || k === "note";
+/** a note page (docs/notes.md): listed under Notes in the side menu, nested in other notes, never in All Grids */
+export const isNoteKind = (k?: SpaceKind) => k === "note";
 
 export interface BoardRow {
   id: string;

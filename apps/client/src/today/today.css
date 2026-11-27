@@ -1054,3 +1054,56 @@ a.today-chip:not(:disabled):active {
 }
 
 /* the window's own buttons (minimize, maximize, close) wear the room theme too: tokens.css and shell.css */
+
+/* ---- Notifications (2026-11-26): what was said to you, each a press from where it was said (today/TodayNotices.tsx).
+   The rows are Today's own; a chat row wears its author's face in the glyph's place, one not seen yet the accent's dot
+   on its pill. On tokens only. ---- */
+.today-notices h2 .today-notices-act {
+  margin-left: auto;
+}
+.today-notices-act {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-mist);
+  font: 600 var(--text-12) / 1.4 var(--font-sans);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+@media (hover: hover) {
+  .today-notices-act:hover {
+    color: var(--color-frost);
+    text-decoration: underline;
+  }
+}
+.today-notices-act:focus-visible {
+  outline: 2px solid var(--color-over-room);
+  outline-offset: 2px;
+  border-radius: var(--radius-paper);
+}
+.today-notices-act.is-foot {
+  align-self: flex-start;
+  margin: var(--space-1) 0 0 var(--space-3);
+}
+.today-glyph.is-face {
+  background: transparent;
+}
+.today-notice .today-row-board {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.today-notice-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+}
+.today-notice.is-unseen .today-row-title {
+  color: var(--color-frost);
+}
+.today-notice:not(.is-unseen) .today-row-title {
+  font-weight: 500;
+}

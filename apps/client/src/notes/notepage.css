@@ -1,0 +1,84 @@
+/* A note page full size (notes/NotePage.tsx; docs/notes.md): a column of words on the floor's own paper,
+   its title over it, the pages it sits inside and its actions above. Tokens only. */
+
+.note-page {
+  position: absolute;
+  z-index: 4;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-void);
+  container-type: inline-size;
+}
+.note-page-col {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) 96px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 100%;
+}
+.note-page-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--h-pill);
+}
+.note-page-path { display: flex; flex-wrap: wrap; gap: var(--space-1); min-width: 0; flex: 1; }
+.note-page-crumb {
+  border: 0;
+  background: transparent;
+  color: var(--color-mist);
+  font: inherit;
+  font-size: var(--text-12);
+  padding: 2px 6px;
+  border-radius: var(--radius-paper);
+  cursor: pointer;
+}
+.note-page-crumb:hover { color: var(--ink); background-color: color-mix(in srgb, var(--color-frost) 6%, transparent); }
+.note-page-crumb + .note-page-crumb::before { content: "›"; margin-right: 6px; color: var(--color-dim); }
+.note-page-acts { display: flex; gap: var(--space-2); flex: none; }
+.note-page-acts .f-pill.is-quiet { color: var(--color-mist); }
+.note-page-title {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-32);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: var(--space-2) 18px 0;
+  outline: none;
+}
+.note-page-title::placeholder { color: var(--ink-faint); }
+.note-page-title:focus-visible { box-shadow: inset 0 -2px 0 var(--color-pulse); }
+.note-page-body { flex: 1; min-height: 60vh; }
+.note-page-body .note-rendered { height: auto; min-height: 60vh; overflow: visible; font-size: calc(15px * var(--note-scale, 1)); padding: var(--space-3) 18px; }
+.note-page-body .note-rendered h1 { font-size: calc(26px * var(--note-scale, 1)); }
+.note-page-body .note-rendered h2 { font-size: calc(20px * var(--note-scale, 1)); }
+.note-page-body .note-rendered h3 { font-size: calc(16px * var(--note-scale, 1)); }
+.note-page-body .note-rendered p,
+.note-page-body .note-rendered ul,
+.note-page-body .note-rendered ol,
+.note-page-body .note-rendered .md-callout { max-width: none; }
+.note-page-wait { padding: var(--space-4) 18px; color: var(--color-mist); }
+
+@container (max-width: 560px) {
+  .note-page-col { padding: var(--space-4) var(--space-3) 80px; }
+  .note-page-head { flex-wrap: wrap; }
+  .note-page-title { font-size: var(--text-24); }
+}
+
+/* the page is the box: the words draw no ring of their own, and the toolbar rides the window's foot while you write */
+.note-inner.note-page-body { overflow: visible; }
+.note-page-body .rich-text:focus-visible,
+.note-page-body .rich-text.is-writing { box-shadow: none; overflow: visible; }
+.note-page-body .rich-bar-slot {
+  position: sticky;
+  left: auto;
+  right: auto;
+  bottom: var(--space-4);
+  margin-top: var(--space-2);
+  z-index: 5;
+}

@@ -329,7 +329,10 @@ export interface FocusItem {
   board: string;
   boardName: string;
   objectId?: string;
-  /** opens the place on the board (or the file) */
+  /** the section it sits in on the grid (a note's, a stage's): "in Rim drive" */
+  sectionId?: string;
+  sectionName?: string;
+  /** opens the place on the board (or the file); a chat item opens its channel at the message (`#/chat/chat/<channel>[/thread/<root>]/at/<seq>`) */
   href: string;
   at: number;
   tone?: "warn" | "bad" | "agent";
@@ -423,6 +426,10 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
   for (const b of boards) {
     const doc = getBoard(b.id).doc;
     const m = boardMaps(doc);
+    const sectionOf = (id: string | null | undefined) => {
+      const sec = id ? m.sections.get(id) : undefined;
+      return sec ? { sectionId: sec.id, sectionName: sec.name } : {};
+    };
     for (const o of m.objects.values()) {
       if (o.kind === "note") {
         const text = noteTextOf(doc, o);
@@ -436,6 +443,7 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
           board: b.id,
           boardName: b.name,
           objectId: o.id,
+          ...sectionOf(o.sectionId),
           href: link(b.id, o.id),
           at: o.bornAt ?? b.updated_at,
         });
@@ -449,6 +457,7 @@ export function focusFor(user: UserInfo, now = Date.now()): FocusItem[] {
           board: b.id,
           boardName: b.name,
           objectId: o.id,
+          ...sectionOf(o.sectionId),
           href: link(b.id, o.id),
           at: o.bornAt ?? b.updated_at,
           tone: "warn",

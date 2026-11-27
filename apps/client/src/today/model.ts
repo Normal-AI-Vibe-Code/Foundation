@@ -11,12 +11,16 @@ import { api, ApiError, streamAgent } from "../lib/api";
 
 export interface FocusItem {
   id: string;
-  kind: "ask" | "goal" | "mention" | "stage" | "file" | "changes" | "related";
+  /** "message": ChatForm, one per conversation with something for them (href opens it at the message) */
+  kind: "ask" | "goal" | "mention" | "message" | "stage" | "file" | "changes" | "related";
   title: string;
   why: string;
   board: string;
   boardName: string;
   objectId?: string;
+  /** the section it sits in on the grid */
+  sectionId?: string;
+  sectionName?: string;
   href: string;
   at: number;
   tone?: "warn" | "bad" | "agent";

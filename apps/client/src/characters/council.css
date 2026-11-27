@@ -501,38 +501,28 @@
   color: var(--color-bad);
 }
 
-/* ---------- the line to an agent: a row of the same bar (2026-11-24, second pass, Josh: "one unified bar") ----------
-   Pressed, the bar keeps its head row (and, at work, what it's doing and its buttons) and gains the line as its last
-   row: centred over the head, growing upward and outward from where it stood (the head keeps its old size, so nothing
-   beside it moves); opaque paper in any room (.f-paper), over the stage and every figure, never a second box */
-.council-bar.is-saying {
+/* ---------- the line to an agent: a pill under its bar (2026-11-26, Josh: "don't love the box … just show the pill") ----------
+   Pressed, the bar stays as it is (its mark, name and marks where they were) and the line is a pill of its own right
+   under it: the two centred over the head, growing upward and outward from where the bar stood (the head keeps its old
+   size, so nothing beside it moves). No box around them; the pill is opaque paper in any room (.f-paper), over the
+   stage and every figure */
+.council-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.council-bar-wrap.is-saying {
   position: absolute;
   z-index: 9;
   left: 50%;
   bottom: 0;
   width: max(100%, 304px);
-  max-width: none;
   translate: -50% 0;
-  border-radius: var(--radius-pane);
-  box-shadow:
-    var(--shadow-lift),
-    0 0 0 1px var(--color-line-strong);
-}
-.council-bar.is-saying.is-working {
-  box-shadow:
-    var(--shadow-lift),
-    0 0 0 1.5px var(--crew);
-}
-.council-bar.is-saying::after {
-  display: none;
-}
-.council-bar.is-saying .council-bar-who {
-  height: 34px;
-  padding: var(--space-2) var(--space-3) 0 var(--space-2);
+  gap: var(--space-2);
 }
 .council-bar-say {
-  /* 2026-11-25 (Josh: not enough padding): the line sits in the bar with room around it, not against its edges */
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  width: 100%;
   animation: council-say-in var(--dur-quick) var(--ease-out-soft) both;
 }
 @keyframes council-say-in {
@@ -545,12 +535,15 @@
   height: 38px;
   padding: 0 var(--space-2) 0 var(--space-4);
   background: var(--color-raise);
-  box-shadow: inset 0 0 0 1px var(--color-line-strong);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 1px var(--color-line-strong);
 }
 .council-bar-say .council-say:focus-within {
   box-shadow:
-    inset 0 0 0 2px var(--color-agent),
-    0 0 0 3px var(--color-agent-dim);
+    var(--shadow-lift),
+    0 0 0 2px var(--color-agent),
+    0 0 0 5px var(--color-agent-dim);
 }
 .council-tools-say .council-say {
   height: 40px;
@@ -881,19 +874,14 @@
   background: var(--color-agent-dim);
   color: var(--color-agent);
 }
-/* the line to all of them: its own opaque box over the stage (it was inside the buttons' blurred box, under the canvas) */
+/* the line to all of them: a pill of its own over the stage, opaque, with no box around it (2026-11-26) */
 .council-tools-say {
   position: absolute;
   z-index: 9;
   top: calc(100% + var(--space-3));
   right: var(--space-4);
   width: 340px;
-  padding: var(--space-3);
-  border-radius: var(--radius-pane);
-  background: var(--color-raise);
-  box-shadow:
-    var(--shadow-lift),
-    0 0 0 1px var(--color-line);
+  border-radius: var(--radius-pill);
   pointer-events: auto;
   transform-origin: top right;
   animation: council-say-in var(--dur-quick) var(--ease-out-soft) both;

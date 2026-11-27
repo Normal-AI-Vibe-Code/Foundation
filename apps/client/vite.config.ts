@@ -1,12 +1,23 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 import { CSP_HEADER, cspString, framedBySelf } from "./csp";
 
 // the version this client is built as: what it tells a server that names a minimum (src/lib/version.ts)
 const version: string = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version;
+
+// where in the release history this client is built from: the last v* tag, commits since, the commit
+// (settings/history.ts parseDescribe). Null outside a git checkout.
+function describe(): string | null {
+  try {
+    return execFileSync("git", ["describe", "--tags", "--match", "v*", "--long", "--always"], { cwd: fileURLToPath(new URL(".", import.meta.url)), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || null;
+  } catch {
+    return null;
+  }
+}
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -51,7 +62,7 @@ function contentSecurityPolicy(servers: string[]): Plugin {
 export default defineConfig(async ({ mode }) => ({
   plugins: [react(), contentSecurityPolicy([server, loadEnv(mode, fileURLToPath(new URL(".", import.meta.url)), "VITE_").VITE_FOUNDATION_SERVER ?? ""])],
   // the proxied server is Foundation too: a frame never shows it (src/lib/frames.ts)
-  define: { __FOUNDATION_VERSION__: JSON.stringify(version), __FOUNDATION_PROXY_TARGET__: JSON.stringify(server) },
+  define: { __FOUNDATION_VERSION__: JSON.stringify(version), __FOUNDATION_DESCRIBE__: JSON.stringify(describe()),__FOUNDATION_PROXY_TARGET__: JSON.stringify(server) },
   clearScreen: false,
   server: {
     // FOUNDATION_CLIENT_PORT moves it (scripts/dev-orphans-check.mjs runs the whole launcher above 15000)

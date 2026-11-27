@@ -31,7 +31,7 @@ import { TopBar } from "./TopBar";
 import { SessionView, TouchedRings } from "./SessionView";
 import { SearchPane } from "./SearchPane";
 import { AgentsPane } from "./AgentsPane";
-import { talkTyping, toggleTalk } from "./Talk";
+import { toggleTalk } from "./Talk";
 import { Present } from "./Present";
 import { RepoDrawer } from "./RepoDrawer";
 import { HuddlePip } from "./HuddlePip";
@@ -47,6 +47,7 @@ import { AppCanvas } from "./AppCanvas";
 export { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "../lib/grids";
 import { SpaceInfo } from "./SpaceInfo";
 import { PageCanvas } from "./PageCanvas";
+import { GridNoteFull, NotePage } from "../notes/NotePage";
 import { api } from "../lib/api";
 import { ingest } from "../lib/ingest";
 import { holdsKeys } from "../lib/keysHeld";
@@ -162,6 +163,8 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
   }, [board?.boardId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const switchBoard = (id: string) => {
+    // a grid note open full size belongs to its own grid
+    if (getUi().noteOpen && getUi().noteOpen!.board !== id) setUi({ noteOpen: null });
     goGrid();
     localStorage.setItem("foundation-board", id);
     const url = new URL(window.location.href);
@@ -251,7 +254,7 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
       } else if (e.key === "Escape" && getUi().engaged) {
         e.stopPropagation();
         setUi({ engaged: null });
-      } else if (!mod && !inChat && !typing(e) && !talkTyping() && !getUi().command && !getUi().presenting) {
+      } else if (!mod && !inChat && !typing(e) && !getUi().command && !getUi().presenting) {
         if (e.key === "v" || e.key === "V") toggleTalk();
         else if (e.key === "p" || e.key === "P") setUi({ presenting: true });
         // H: this grid's timeline (timeline/), on a grid
@@ -320,6 +323,8 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
       <MainWrap id="main-content" className="shell-main" tabIndex={-1}>
         <GridViewport boardName={space?.name ?? (systemGrid === "plan" ? "The plan" : systemGrid === "design" ? "Design language" : undefined)} />
         {onGrid && space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
+        {onGrid && space?.kind === "note" && !ui.presenting && <NotePage space={space} onRename={(name) => void updateSpace(space.id, { name })} />}
+        {onGrid && space && !isPageKind(space.kind) && ui.noteOpen?.board === space.id && !ui.presenting && <GridNoteFull board={space.id} noteId={ui.noteOpen.note} gridName={space.name} />}
         {onGrid && space?.kind === "app" && !ui.presenting && <AppCanvas space={space} />}
         {place.kind === "today" && !ui.presenting && <Today user={user} />}
         {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}

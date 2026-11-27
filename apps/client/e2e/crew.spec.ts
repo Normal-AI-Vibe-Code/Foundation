@@ -139,12 +139,13 @@ test("hold Space: the sheet rises and listens; a pan stands it down; a tap types
   await ada.mouse.up();
   await ada.keyboard.up("Space");
   await expect(ada.locator(".talk-sheet")).toHaveCount(0);
-  // a quick tap types instead
+  // a quick tap types instead: in the bar's Ask pill, and no sheet rises
   await ada.keyboard.press("Space");
-  await expect(ada.locator('.talk-sheet[data-mode="typing"] .talk-field')).toBeFocused();
+  await expect(ada.locator("[data-hud-ask-text]")).toBeFocused();
+  await expect(ada.locator(".talk-sheet")).toHaveCount(0);
   await ada.screenshot({ path: `${SHOTS}/01_tap-space-types.png` });
   await ada.keyboard.press("Escape");
-  await expect(ada.locator(".talk-sheet")).toHaveCount(0);
+  await expect(ada.locator("[data-hud-ask-text]")).not.toBeFocused();
 });
 
 test("asked aloud, an agent goes to work in the open: Kai sees its cursor reach the section before each card lands", async () => {

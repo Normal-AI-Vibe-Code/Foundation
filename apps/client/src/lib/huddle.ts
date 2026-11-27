@@ -39,6 +39,7 @@ import { useSyncExternalStore } from "react";
 import type { HuddleLine, HuddleWire } from "@foundation/protocol";
 import { api, openSocket, uploadFile } from "./api";
 import { withWebmDuration } from "../utils/webmDuration";
+import { loadChoice, openLocal, openOne, saveChoice, type DeviceKind, type DeviceState } from "./media";
 
 export interface PeerView {
   id: string;
@@ -69,6 +70,9 @@ export interface RoomView {
   local: MediaStream | null;
   muted: boolean;
   camOff: boolean;
+  /** what my microphone and camera are doing (the device chip) */
+  mic: DeviceState;
+  cam: DeviceState;
   peers: PeerView[];
   captions: Array<{ id: string; name: string; text: string }>;
   lines: HuddleLine[];
@@ -145,6 +149,10 @@ export class HuddleRoom {
   private screenSenders = new Map<string, RTCRtpSender[]>();
   private signals: Promise<void> = Promise.resolve();
   private closed = false;
+  /** the stream peers receive my tracks on: one id for the whole call, so a track added later joins the same stream on their side */
+  private sendStream: MediaStream | null = null;
+  /** a track whose device went away: its senders still hold it, so the next one replaces it */
+  private lost: Partial<Record<DeviceKind, MediaStreamTrack>> = {};
   meta: HuddleMeta;
 
   constructor(
@@ -161,6 +169,8 @@ export class HuddleRoom {
       local: null,
       muted: false,
       camOff: false,
+      mic: { state: "off" },
+      cam: { state: "off" },
       peers: [],
       captions: [],
       lines: [],
@@ -199,17 +209,23 @@ export class HuddleRoom {
 
   async start(opts: { recording?: boolean } = {}) {
     if (this.sending) {
-      try {
-        const local = fakeCam ? this.fakeStream() : await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 360 }, frameRate: { ideal: 24 } }, audio: { echoCancellation: true, noiseSuppression: true } });
-        if (this.closed) {
-          for (const t of local.getTracks()) t.stop();
-          return;
-        }
-        this.emit({ local });
-      } catch (e) {
-        this.emit({ status: "error", error: cameraError(e) });
+      // each device on its own: a missing or refused camera never costs the microphone, and the
+      // call goes ahead with whatever works (the device chip says what didn't, and asks again)
+      let tracks: MediaStreamTrack[];
+      let mic: DeviceState;
+      let cam: DeviceState;
+      if (fakeCam) {
+        tracks = this.fakeStream().getTracks();
+        mic = { state: "on", label: "Test tone" };
+        cam = { state: "on", label: "Test camera" };
+      } else ({ tracks, mic, cam } = await openLocal({ mic: true, cam: true }));
+      if (this.closed) {
+        for (const t of tracks) t.stop();
         return;
       }
+      this.sendStream = new MediaStream(tracks);
+      for (const t of tracks) this.watchTrack(t.kind === "audio" ? "mic" : "cam", t);
+      this.emit({ local: new MediaStream(tracks), mic, cam, muted: mic.state !== "on", camOff: cam.state !== "on" });
     }
     // the transcript so far (the live session, if there is one)
     api<{ sessions: Array<{ ended_at: number | null; lines: HuddleLine[] }> }>(`/api/huddles/${this.huddleId}?board=${encodeURIComponent(this.board)}`)
@@ -253,6 +269,7 @@ export class HuddleRoom {
     this.hush();
     for (const p of this.peers.values()) p.pc?.close();
     this.peers.clear();
+    for (const t of this.sendStream?.getTracks() ?? []) t.stop();
     for (const t of this.view.local?.getTracks() ?? []) t.stop();
     for (const t of this.view.screen?.getTracks() ?? []) t.stop();
     this.stopFake?.();
@@ -381,7 +398,8 @@ export class HuddleRoom {
       if (pc.connectionState === "failed") pc.restartIce();
       this.emit();
     };
-    for (const t of this.view.local?.getTracks() ?? []) pc.addTrack(t, this.view.local!);
+    const send = this.sendStream;
+    if (send) for (const t of send.getTracks()) pc.addTrack(t, send);
     // a screen I'm sharing reaches whoever arrives later too
     const scr = this.view.screen;
     if (scr) this.screenSenders.set(p.id, scr.getTracks().map((t) => pc.addTrack(t, scr)));
@@ -417,6 +435,8 @@ export class HuddleRoom {
   // ---------- controls ----------
 
   setMuted(muted: boolean) {
+    // unmuting with no microphone yet: ask for one (a person's press)
+    if (!muted && !this.sendStream?.getAudioTracks().length) return void this.retryDevice("mic");
     for (const t of this.view.local?.getAudioTracks() ?? []) t.enabled = !muted;
     this.emit({ muted });
     this.send({ t: "state", sending: this.sending, muted, camOff: this.view.camOff });
@@ -425,9 +445,80 @@ export class HuddleRoom {
   }
 
   setCamOff(camOff: boolean) {
+    if (!camOff && !this.sendStream?.getVideoTracks().length) return void this.retryDevice("cam");
     for (const t of this.view.local?.getVideoTracks() ?? []) t.enabled = !camOff;
     this.emit({ camOff });
     this.send({ t: "state", sending: this.sending, muted: this.view.muted, camOff });
+  }
+
+  // ---------- devices ----------
+
+  /** use another microphone or camera: the new one replaces the old for everyone, no renegotiation */
+  async useDevice(kind: DeviceKind, deviceId: string) {
+    if (!this.sending || fakeCam) return;
+    saveChoice({ [kind]: deviceId });
+    const { track, state } = await openOne(kind, deviceId, true);
+    if (this.closed) return void track?.stop();
+    if (!track) return this.emit({ [kind]: state });
+    this.attach(kind, track);
+  }
+
+  /** ask for a device again (after it was blocked, busy or missing, or to turn it on): a person's press */
+  async retryDevice(kind: DeviceKind) {
+    if (!this.sending || fakeCam) return;
+    const { track, state } = await openOne(kind, loadChoice()[kind]);
+    if (this.closed) return void track?.stop();
+    if (!track) return this.emit({ [kind]: state });
+    this.attach(kind, track, true);
+  }
+
+  private attach(kind: DeviceKind, track: MediaStreamTrack, turnOn = false) {
+    const send = (this.sendStream ??= new MediaStream());
+    const old = (kind === "mic" ? send.getAudioTracks() : send.getVideoTracks())[0];
+    const prev = old ?? this.lost[kind];
+    delete this.lost[kind];
+    const muted = kind === "mic" && turnOn ? false : this.view.muted;
+    const camOff = kind === "cam" && turnOn ? false : this.view.camOff;
+    track.enabled = kind === "mic" ? !muted : !camOff;
+    for (const p of this.peers.values()) {
+      if (!p.pc || p.pc.connectionState === "closed") continue;
+      const sender = prev ? p.pc.getSenders().find((x) => x.track === prev) : undefined;
+      if (sender) void sender.replaceTrack(track).catch((e) => console.warn("huddle: replace track", e));
+      else p.pc.addTrack(track, send);
+    }
+    if (old) {
+      send.removeTrack(old);
+      old.onended = null;
+      old.stop();
+    }
+    send.addTrack(track);
+    this.watchTrack(kind, track);
+    const changed = muted !== this.view.muted || camOff !== this.view.camOff;
+    this.emit({ local: new MediaStream(send.getTracks()), [kind]: { state: "on", label: track.label, deviceId: track.getSettings().deviceId }, muted, camOff });
+    if (changed) this.send({ t: "state", sending: this.sending, muted, camOff });
+    if (kind === "mic" && !muted) this.startSpeech();
+    // a recording of the old tracks ends with them; the next part starts on the new ones
+    const r = this.recorders.get("camera");
+    if (r) {
+      this.recorders.delete("camera");
+      if (r.rec.state !== "inactive") r.rec.stop();
+      this.startRecorder("camera");
+    } else if (this.view.recording && !this.view.noRec) this.startRecorder("camera");
+  }
+
+  /** a device unplugged (or taken by the system): say so, and keep its senders for the next one */
+  private watchTrack(kind: DeviceKind, track: MediaStreamTrack) {
+    track.onended = () => {
+      if (this.closed || !this.sendStream?.getTracks().includes(track)) return;
+      this.sendStream.removeTrack(track);
+      this.lost[kind] = track;
+      const patch: Partial<RoomView> = { local: new MediaStream(this.sendStream.getTracks()), [kind]: { state: "none", message: `The ${kind === "mic" ? "microphone" : "camera"} was disconnected. Pick another, or plug it back in and press Ask again.` } };
+      if (kind === "mic") patch.muted = true;
+      else patch.camOff = true;
+      this.emit(patch);
+      this.send({ t: "state", sending: this.sending, muted: this.view.muted, camOff: this.view.camOff });
+      if (kind === "mic") this.stopSpeech();
+    };
   }
 
   /** ask everyone in the room to record themselves (or stop) */
@@ -660,7 +751,7 @@ export class HuddleRoom {
 
   private startRecorder(kind: Recorder["kind"]) {
     const stream = kind === "camera" ? this.view.local : this.view.screen;
-    if (this.view.noRec || this.recorders.has(kind) || !stream || typeof MediaRecorder === "undefined") return;
+    if (this.view.noRec || this.recorders.has(kind) || !stream?.getTracks().length || typeof MediaRecorder === "undefined") return;
     const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
     const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: kind === "screen" ? 1_200_000 : 700_000 });
     // t0 is the monotonic clock at start; start to stop is the recording's length
@@ -775,15 +866,6 @@ export class HuddleRoom {
   }
 }
 
-function cameraError(e: unknown): string {
-  const name = (e as DOMException)?.name;
-  if (name === "NotAllowedError") return "Camera and mic are blocked — allow them for Foundation in the browser, then join again";
-  if (name === "NotFoundError") return "No camera or mic found";
-  if (name === "NotReadableError") return "The camera is busy in another app";
-  if (!navigator.mediaDevices) return "This window can't reach a camera (it needs https or localhost)";
-  return (e as Error)?.message ?? "Couldn't start the camera";
-}
-
 // ---------- the one room you're in ----------
 
 let joined: HuddleRoom | null = null;
@@ -840,6 +922,8 @@ const closedView: RoomView = {
   local: null,
   muted: false,
   camOff: false,
+  mic: { state: "off" },
+  cam: { state: "off" },
   peers: [],
   captions: [],
   lines: [],

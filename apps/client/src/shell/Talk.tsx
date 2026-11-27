@@ -1,32 +1,35 @@
 /**
- * Talk to the crew: **hold Space** anywhere on the board and a sheet rises
- * from the bottom, listening. Your mic's level moves in it (so you know it
- * hears you) and your words show as they're heard; **let go to send**. A
- * quick **tap of Space** opens it for typing instead. Esc drops it.
+ * Ask this grid's agents, from the bottom bar (2026-11-26, Josh): the **Ask pill** is a line to type into, and what
+ * you write goes to every agent on the grid at once (with none on it, the server's own agent takes it). A quick
+ * **tap of Space** puts the caret in it.
+ *
+ * Aloud: **hold Space** anywhere on the board and a sheet rises from the bottom, listening. Your mic's level moves
+ * in it (so you know it hears you) and your words show as they're heard; **let go to send**. Esc drops it. Nothing
+ * is up over the bar until then: there is no box to type into but the pill.
  *
  * Space still pans: press the pointer while holding it and the sheet stands
  * down before it has heard anything (it waits 240 ms before it listens).
  * V and the HUD's mic pill open it too (press again to send).
  *
- * What you say goes to a new agent of the crew, with its own name and
- * cursor, without opening a tab, so the board stays in view while you watch
- * it work; several can run at once. If an agent session tab is showing, it
- * goes there instead. The sheet lists the crew at work: what each is doing,
+ * What you say goes the same way as what you type: to the grid's agents, each with its own name and cursor,
+ * without opening a tab, so the board stays in view while you watch them work. If an agent session tab is
+ * showing, what you say aloud goes there instead. The sheet lists the crew at work: what each is doing,
  * Stop, and Open (its session).
  */
 
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { listen, voiceAvailable, type Listening } from "../lib/voice";
-import { askCrew, crewAsk, sayToAgent, stopSession, titleOf, useRecentCrewAsks, useSession } from "../state/sessions";
-import { getUi, openSession, toast } from "../state/ui";
-import { holdsKeys } from "../lib/keysHeld";
+import { crewAsk, sayToAgent, stopSession, titleOf, useRecentCrewAsks, useSession } from "../state/sessions";
+import { getUi, openSession, toast, useUi } from "../state/ui";
 import { crewPeers, followCrew, followingCrew, type CrewPeer } from "./Crew";
 import { stopAllOnBoard } from "./CommandBar";
 import { useBoardTick } from "./Presence";
-import { useCrewOnCouncil } from "../characters/Council";
+import { sayToCouncil, useCouncilSeats, useCrewOnCouncil, type CouncilSeat } from "../characters/Council";
+import type { CouncilScope } from "../lib/councilOpen";
+import { SendGlyph } from "./glyphs";
 
-type Mode = "idle" | "listening" | "typing";
+type Mode = "idle" | "listening";
 let mode: Mode = "idle";
 let heard = "";
 let session: Listening | null = null;
@@ -41,54 +44,47 @@ export function talking() {
   return mode === "listening";
 }
 
-/** the sheet is open for typing: the board's one-key shortcuts stand down (Shell) */
-export function talkTyping() {
-  return mode === "typing";
-}
-
-/**
- * Keys typed in the moment between a tap of Space and the field taking focus
- * belong to the field, not the board (an "a" there toggled the agent layer).
- * Registered at import, so it runs before the shell's own capture listener.
- */
-let early = "";
-function holdEarlyKeys(e: KeyboardEvent) {
-  // a key typed into a machine's shell or desktop is the machine's, even with the sheet open (lib/keysHeld.ts)
-  if (mode !== "typing" || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1 || holdsKeys(e.target)) return;
-  const field = document.querySelector<HTMLTextAreaElement>(".talk-field");
-  if (field && document.activeElement === field) return;
-  e.preventDefault();
-  e.stopImmediatePropagation();
-  early += e.key;
-  if (field) takeEarlyKeys(field);
-}
-function takeEarlyKeys(field: HTMLTextAreaElement) {
-  field.focus();
-  if (!early) return;
-  field.value += early;
-  field.setSelectionRange(field.value.length, field.value.length);
-  early = "";
-}
-if (typeof window !== "undefined") window.addEventListener("keydown", holdEarlyKeys, true);
-
 function setMode(m: Mode, words = "") {
-  // opening for typing starts empty: a sheet reopened while it was still closing keeps its old field
-  if (m === "typing" && mode !== "typing") {
-    early = "";
-    document.querySelectorAll<HTMLTextAreaElement>(".talk-field").forEach((f) => (f.value = ""));
-  }
   mode = m;
   heard = words;
   emit();
 }
 
-/** where words go: the agent session on screen if one is, else a new crew agent */
+const GRID: CouncilScope = { kind: "board" };
+/** the grid's agents as the bar last saw them (HudAsk keeps it): what's said aloud goes to the same ones */
+let gridSeats: CouncilSeat[] = [];
+
+/** who a line from the bar goes to: every agent on the grid that can be reached (none on it: the server's own agent) */
+export function askTargets(seats: CouncilSeat[]): { to: CouncilSeat[]; none: boolean } {
+  const to = seats.filter((s) => !s.offline);
+  return { to, none: seats.length > 0 && to.length === 0 };
+}
+
+/** ask every agent on this grid at once; false when there are agents and none of them is connected */
+export function askGrid(text: string, seats: CouncilSeat[] = gridSeats): boolean {
+  const t = text.trim();
+  if (!t) return false;
+  const { to, none } = askTargets(seats);
+  if (none) {
+    toast("None of this grid's agents is connected. Open the agents panel to see why.", "warn");
+    return false;
+  }
+  sayToCouncil(GRID, t, to, true, null);
+  return true;
+}
+
+/** where spoken words go: the agent session on screen if one is, else every agent on the grid */
 function send(text: string) {
   const t = text.trim();
   if (!t) return;
   const ui = getUi();
   if (ui.sessions.some((x) => x.id === ui.session && x.kind === "agent")) sayToAgent(t);
-  else askCrew(t);
+  else askGrid(t);
+}
+
+/** put the caret in the bar's Ask pill (a tap of Space; no recogniser to talk to) */
+function focusAsk() {
+  document.querySelector<HTMLInputElement>("[data-hud-ask-text]")?.focus();
 }
 
 /** start listening, or (when already listening) finish and send */
@@ -101,7 +97,7 @@ function startListening() {
   if (session) return;
   if (!voiceAvailable()) {
     // no recogniser here: type instead, and say why
-    setMode("typing");
+    focusAsk();
     toast("Voice needs speech recognition (Chrome, Edge, Safari). Type instead.", "warn");
     return;
   }
@@ -131,11 +127,6 @@ export function cancelTalk() {
   setMode("idle");
 }
 
-function openTyping() {
-  if (session) return;
-  setMode("typing");
-}
-
 function useTalk() {
   useSyncExternalStore(
     (f) => {
@@ -152,7 +143,7 @@ const typingTarget = (t: EventTarget | null) => {
   return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
 };
 
-/** hold Space to talk (release sends), tap Space to type; a pointer pressed meanwhile means it was a pan */
+/** hold Space to talk (release sends), tap Space to type in the Ask pill; a pointer pressed meanwhile means it was a pan */
 function useSpaceToTalk() {
   useEffect(() => {
     let held = false;
@@ -162,7 +153,6 @@ function useSpaceToTalk() {
     const blocked = () => getUi().command || getUi().presenting;
     const down = (e: KeyboardEvent) => {
       if (e.code !== "Space" || e.repeat || e.metaKey || e.ctrlKey || e.altKey || typingTarget(e.target) || blocked()) return;
-      if (mode === "typing") return;
       if (mode === "listening") return; // V started it: Space doesn't stop it
       held = true;
       panned = false;
@@ -179,7 +169,7 @@ function useSpaceToTalk() {
       timer = null;
       if (panned) return;
       if (mode === "listening" && session) session.stop(); // let go: what was heard is sent
-      else if (performance.now() - downAt < 240) openTyping();
+      else if (performance.now() - downAt < 240 && !session) focusAsk(); // a tap: type in the bar's Ask pill
     };
     const pointer = () => {
       if (!held) return;
@@ -303,9 +293,9 @@ export function TalkButton() {
         ref={btnRef}
         type="button"
         className={`hud-talk f-glass${m === "listening" ? " is-on" : ""}`}
-        onClick={() => (m === "typing" ? cancelTalk() : toggleTalk())}
-        aria-label={m === "listening" ? "Send voice prompt" : m === "typing" ? "Close crew prompt" : "Talk to the crew"}
-        data-tip={m === "listening" ? "Send · Esc drops it" : "Talk to the crew"}
+        onClick={toggleTalk}
+        aria-label={m === "listening" ? "Send voice prompt" : "Talk to this grid's agents"}
+        data-tip={m === "listening" ? "Send · Esc drops it" : "Talk to this grid's agents"}
         data-kbd={m === "listening" ? "V" : "hold Space"}
         aria-pressed={m === "listening"}
       >
@@ -322,14 +312,14 @@ export function TalkButton() {
             className={`talk-sheet f-glass${open ? " is-open" : " is-roster"}`}
             role={open ? "dialog" : "region"}
             aria-modal={open ? "true" : undefined}
-            aria-label={open ? (m === "listening" ? "Voice prompt for the crew" : "Ask the crew") : "Agents at work"}
+            aria-label={open ? "Voice prompt for this grid's agents" : "Agents at work"}
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.99, transition: { duration: 0.14 } }}
             transition={{ type: "spring", stiffness: 280, damping: 26 }}
             data-mode={m}
           >
-            {open && <TalkInput mode={m} words={words} />}
+            {open && <TalkInput words={words} />}
             {listed.length > 0 && (
               <ul className="crew-roster" aria-label="The crew at work">
                 {mineWorking > 1 && (
@@ -368,28 +358,12 @@ export function TalkButton() {
             )}
             {open && (
               <div className="talk-hints">
-                {m === "listening" ? (
-                  <>
-                    <span>
-                      Let go of <span className="f-kbd">Space</span> to send
-                    </span>
-                    <span>
-                      <span className="f-kbd">Esc</span> drops it
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      <span className="f-kbd">↵</span> sends
-                    </span>
-                    <span>
-                      Hold <span className="f-kbd">Space</span> on the grid to talk
-                    </span>
-                    <span>
-                      <span className="f-kbd">Esc</span> closes
-                    </span>
-                  </>
-                )}
+                <span>
+                  Let go of <span className="f-kbd">Space</span> to send
+                </span>
+                <span>
+                  <span className="f-kbd">Esc</span> drops it
+                </span>
               </div>
             )}
           </motion.div>
@@ -399,47 +373,75 @@ export function TalkButton() {
   );
 }
 
-function TalkInput({ mode: m, words }: { mode: Mode; words: string }) {
+/** the sheet's one line while it listens: the mic's level and the words as they're heard */
+function TalkInput({ words }: { words: string }) {
   const bars = [useRef<HTMLSpanElement>(null), useRef<HTMLSpanElement>(null), useRef<HTMLSpanElement>(null), useRef<HTMLSpanElement>(null), useRef<HTMLSpanElement>(null)];
-  useMicLevel(m === "listening", bars);
-  const field = useRef<HTMLTextAreaElement>(null);
-  // focus in the same commit (not a frame later), and take anything typed before it
-  useLayoutEffect(() => {
-    if (m === "typing" && field.current) takeEarlyKeys(field.current);
-  }, [m]);
-  useEffect(() => {
-    if (m !== "typing") early = "";
-  }, [m]);
+  useMicLevel(true, bars);
   const onSession = getUi().sessions.some((x) => x.id === getUi().session && x.kind === "agent");
   return (
     <div className="talk-input">
-      <span className={`talk-level${m === "listening" ? " is-on" : ""}`} aria-hidden>
+      <span className="talk-level is-on" aria-hidden>
         {bars.map((b, i) => (
           <span key={i} ref={b} style={{ animationDelay: `${i * 90}ms` }} />
         ))}
       </span>
-      {m === "listening" ? (
-        <p className={`talk-heard${words ? "" : " is-empty"}`} role="status" aria-live="polite">
-          {words || (onSession ? "Listening… for this session" : "Listening… say what the crew should do")}
-        </p>
-      ) : (
-        <textarea
-          ref={field}
-          className="talk-field"
-          rows={1}
-          aria-label={onSession ? "Message for this session" : "Ask the crew"}
-          placeholder={onSession ? "Tell this session…" : "Ask the crew: make a section for…, hook up FactoryForm…"}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              const t = e.currentTarget.value;
-              cancelTalk();
-              send(t);
-            }
-          }}
-        />
-      )}
+      <p className={`talk-heard${words ? "" : " is-empty"}`} role="status" aria-live="polite">
+        {words || (onSession ? "Listening… for this session" : "Listening… say what this grid's agents should do")}
+      </p>
     </div>
+  );
+}
+
+/**
+ * The bar's Ask pill (2026-11-26, Josh): a line to type into, and Enter sends it to every agent on this grid at
+ * once. With no agent on the grid the server's own takes it. A viewer has no line: a viewer can't write a board.
+ */
+export function HudAsk() {
+  const ui = useUi();
+  const { seats } = useCouncilSeats(GRID);
+  const [text, setText] = useState("");
+  useEffect(() => {
+    gridSeats = seats;
+  }, [seats]);
+  if (ui.role === "viewer") return null;
+  const { to, none } = askTargets(seats);
+  const whom = none ? "this grid's agents" : to.length > 1 ? `all ${to.length} agents` : to.length ? to[0].name : "an agent";
+  const tip = none ? "None of this grid's agents is connected" : to.length > 1 ? `Ask all ${to.length} agents on this grid at once` : to.length ? `Ask ${to[0].name}, this grid's agent` : "Ask an agent to work on this grid";
+  return (
+    <form
+      className="hud-ask-pill f-glass"
+      data-hud-ask={to.length}
+      data-tip={tip}
+      data-kbd="Space"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (askGrid(text, seats)) setText("");
+      }}
+    >
+      <span className="hud-glyph" aria-hidden>
+        ✦
+      </span>
+      <input
+        className="hud-ask-text"
+        data-hud-ask-text
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={`Ask ${whom}…`}
+        aria-label={tip}
+        autoComplete="off"
+        onKeyDown={(e) => {
+          // Esc clears the line first, then gives the keys back to the grid
+          if (e.key !== "Escape") return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (text) setText("");
+          else e.currentTarget.blur();
+        }}
+      />
+      <button type="submit" className="hud-ask-send" disabled={!text.trim()} aria-label={`Send to ${whom}`}>
+        <SendGlyph size={14} />
+      </button>
+    </form>
   );
 }
 

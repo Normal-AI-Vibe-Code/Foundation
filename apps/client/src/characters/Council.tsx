@@ -563,7 +563,8 @@ type BarSeat = Pick<CouncilSeat, "name" | "provider" | "where" | "offline" | "wh
 /**
  * Over each head, one bar (2026-11-24, Josh: "one unified bar above the agent's head"): its model's mark, its name in full,
  * where it runs and how it stands. While it works the same bar says what it is doing, alive, with Follow, and Open and
- * Stop for the one who asked. Opaque paper, never glass.
+ * Stop for the one who asked. Opaque paper, never glass. Pressed, the line to it is a pill under the bar, with no box
+ * around the two (2026-11-26).
  */
 export function SeatBar({ seat, onAbout, say, onLeave }: { seat: BarSeat; onAbout?: () => void; say?: React.ReactNode; onLeave?: () => void }) {
   const following = useFollowing();
@@ -576,14 +577,14 @@ export function SeatBar({ seat, onAbout, say, onLeave }: { seat: BarSeat; onAbou
   const state = seat.offline ? `not connected${seat.why ? ` (${seat.why})` : ""}` : seat.pending ? "starting" : SEAT_STATUS[seat.status];
   return (
     <div
-      className={`council-bar f-paper${working ? " is-working" : ""}${seat.pending ? " is-pending" : ""}${say ? " is-saying" : ""}`}
-      data-council-bar
+      className={`council-bar-wrap${say ? " is-saying" : ""}`}
       onBlur={(e) => {
-        // the field is put away when focus leaves the bar with nothing in it
+        // the field is put away when focus leaves the bar and its line with nothing in it
         if (!say || e.currentTarget.contains(e.relatedTarget as Node | null)) return;
         if (!e.currentTarget.querySelector("input")?.value) onLeave?.();
       }}
     >
+     <div className={`council-bar f-paper${working ? " is-working" : ""}${seat.pending ? " is-pending" : ""}`} data-council-bar>
       <button type="button" className="council-bar-who" onClick={onAbout} aria-label={`${seat.name}: ${state}. Open its details`}>
         <ProviderMark provider={seat.provider} size={18} />
         <b className="council-mark-name" data-council-name data-tip={working && seat.doing ? `${seat.name} · ${seat.doing}` : seat.name}>
@@ -631,8 +632,10 @@ export function SeatBar({ seat, onAbout, say, onLeave }: { seat: BarSeat; onAbou
           </span>
         </>
       )}
-      {/* pressed (2026-11-24, Josh: one bar): the line to it is the bar's last row; its name and marks stay above it */}
-      {say && <div className="council-bar-say">{say}</div>}
+     </div>
+      {/* pressed (2026-11-26, Josh: no box around it): the bar stays as it is, its name and marks where they were, and the
+          line to it is a pill of its own right under the bar */}
+      {say && <div className="council-bar-say f-paper">{say}</div>}
     </div>
   );
 }
@@ -1018,7 +1021,7 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
       if (e.key !== "Escape") return;
       const t = e.target as HTMLElement | null;
       // Esc in a line clears the line first, as everywhere; in the line over a head, it then puts the line away
-      if (t?.closest(".council-say") && ((t as HTMLInputElement).value || t.closest(".council-bar"))) return;
+      if (t?.closest(".council-say") && ((t as HTMLInputElement).value || t.closest(".council-bar-wrap"))) return;
       // Esc closes the council and nothing else: the grid's own Esc (step up a level, reframe) waits for the next press
       e.stopPropagation();
       closeCouncil();

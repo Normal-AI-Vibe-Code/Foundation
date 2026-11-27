@@ -1,0 +1,745 @@
+{
+  "about": "Every Foundation release, newest first, written by `node scripts/release.mjs history` from the v* tags (and by each CI build, with itself on top). The app's Changes panel shows it.",
+  "releases": [
+    {
+      "version": "0.3.56",
+      "date": "2026-11-26T21:56:31-10:00",
+      "sha": "4a8ecee",
+      "title": "Note pages: one Note primitive in the side menu and on the grid, written in blocks",
+      "changes": [
+        "Note pages: one Note primitive in the side menu and on the grid, written in blocks",
+        "Today lists what was said to you, and the bell sits right against Today"
+      ]
+    },
+    {
+      "version": "0.3.55",
+      "date": "2026-11-26T16:12:30-10:00",
+      "sha": "b441816",
+      "title": "A huddle joins with whatever devices work; a device chip to see and choose them",
+      "changes": [
+        "A huddle joins with whatever devices work; a device chip to see and choose them",
+        "ChatForm link previews keep their picture: the server fetches og:image and archives it",
+        "The bar's Ask pill asks every agent on the grid; the council and the agents panel as icons beside it; a bare pill under a council agent"
+      ]
+    },
+    {
+      "version": "0.3.54",
+      "date": "2026-11-26T14:41:10-10:00",
+      "sha": "6581e8b",
+      "title": "The grid behind the grid: the agents' work trail, after agenttrail",
+      "changes": [
+        "The grid behind the grid: the agents' work trail, after agenttrail"
+      ]
+    },
+    {
+      "version": "0.3.53",
+      "date": "2026-11-26T12:54:38-10:00",
+      "sha": "b824efd",
+      "title": "Cards resize by their edges; the format bar keeps to one line with More",
+      "changes": [
+        "Cards resize by their edges; the format bar keeps to one line with More"
+      ]
+    },
+    {
+      "version": "0.3.52",
+      "date": "2026-11-26T12:47:09-10:00",
+      "sha": "21c04a7",
+      "title": "ChatForm's pill at the top right is its mark and a count; the channel list folds to icons",
+      "changes": [
+        "ChatForm's pill at the top right is its mark and a count; the channel list folds to icons",
+        "Plan: issue numbers for the cards the sync created (timeline-live is #254)"
+      ]
+    },
+    {
+      "version": "0.3.51",
+      "date": "2026-11-26T01:57:47-10:00",
+      "sha": "9ecc626",
+      "title": "The timeline live and whole; a note and a chat card as one box",
+      "changes": [
+        "The timeline live and whole; a note and a chat card as one box"
+      ]
+    },
+    {
+      "version": "0.3.50",
+      "date": "2026-11-26T00:17:53-10:00",
+      "sha": "241c555",
+      "title": "The timeline of every grid and section, voice and video notes, menus that rise, a chat card without its paper",
+      "changes": [
+        "The timeline of every grid and section, voice and video notes, menus that rise, a chat card without its paper"
+      ]
+    },
+    {
+      "version": "0.3.49",
+      "date": "2026-11-25T19:33:32-10:00",
+      "sha": "8efa8a4",
+      "title": "Zooming out without the flicker; ChatForm at the top right with a pinned conversation; drag between the grid and chat",
+      "changes": [
+        "Zooming out without the flicker; ChatForm at the top right with a pinned conversation; drag between the grid and chat",
+        "Plan: the council-trace-cad card is issue #249; issue numbers for the cards the sync created"
+      ]
+    },
+    {
+      "version": "0.3.48",
+      "date": "2026-11-25T15:32:48-10:00",
+      "sha": "e3b451a",
+      "title": "A run's trace on the council, the silhouette that adds, and CAD cards fed by an app",
+      "changes": [
+        "A run's trace on the council, the silhouette that adds, and CAD cards fed by an app"
+      ]
+    },
+    {
+      "version": "0.3.47",
+      "date": "2026-11-25T14:39:03-10:00",
+      "sha": "27dc9d2",
+      "title": "Merge the checkout's shell fixes: the open tab, the browser's start, the narrow tools menu, Settings as a sun, chat times",
+      "changes": [
+        "Merge the checkout's shell fixes: the open tab, the browser's start, the narrow tools menu, Settings as a sun, chat times",
+        "The open tab opens into the grid again, the browser starts on its button, a narrow tools menu fits, Settings is a sun, chat times clear the words"
+      ]
+    },
+    {
+      "version": "0.3.46",
+      "date": "2026-11-25T13:14:01-10:00",
+      "sha": "0d0ee28",
+      "title": "SPEC, plan and evidence: what was brought together on 2026-11-25, and what wasn't checked",
+      "changes": [
+        "SPEC, plan and evidence: what was brought together on 2026-11-25, and what wasn't checked",
+        "ChatForm on the chat server grows up: files, link cards, pins, mentions and a bell; one sign-in; a channel as a card; characters rest on a still",
+        "Merge the Rune branch: motion by rule, the two-leaf mark, a link's real host, and a link press that reaches Rune",
+        "Merge main into the edges branch: one note, error cards, undo and flows meet ChatForm's second round, the Rust chat server, the usability pass and the council",
+        "Flows checked in a real browser, on #/design, and in the docs; a remote resize no longer wipes cells that came with it",
+        "Ports and wires say what flows: a port's card opens on top, a wire carries a sample and the far card's state, and a wire can be disconnected",
+        "Wires carry data on the server: a wired connector puts its system's list on its port, a table takes a wire through a lens, and taking the wire off stops the flow",
+        "A message's reaction picker opens over the timeline and the composer, held inside the conversation's column",
+        "One note: what the pointer checks showed, said plainly",
+        "Plan: the media-and-undo card is issue #242",
+        "PartForm opens in the built-in browser; a page card takes a click, not the wheel or the keys",
+        "Plan: the one-note card is issue 243",
+        "The section header: its shape on the left, folding to one button; the rest grouped on the right",
+        "Images and video are picked up anywhere, full screen sits at their top right, and the grid has undo and redo",
+        "The grid resizes only from the lines between sections, and the wheel just zooms",
+        "One note: the text box and the markdown note are the same card",
+        "The tabs start on the menu's edge, and a full strip lists what it cuts off",
+        "The app's error lines are error cards: sign-in, chat, machines, settings, the panes and a session's transcript",
+        "A failed server start is a small error card: its code, Copy, a cross, and the way out of a reserved port",
+        "Under Rune a press on a link's letters reaches Rune: its accessibility mirror no longer takes the pointer",
+        "Rune's notes show a link's real host, as the web's do; the link press that still fails is held as a known failure",
+        "Rune's motion goes by rule (panes and other boards land); the mark is Josh's two leaves, the icon fills its tile"
+      ]
+    },
+    {
+      "version": "0.3.45",
+      "date": "2026-11-24T20:36:38-10:00",
+      "sha": "938abb6",
+      "title": "The council at work, three kinds of Claude with T3 as its own, and code mode",
+      "changes": [
+        "The council at work, three kinds of Claude with T3 as its own, and code mode"
+      ]
+    },
+    {
+      "version": "0.3.44",
+      "date": "2026-11-24T18:59:22-10:00",
+      "sha": "bb357f8",
+      "title": "The desktop app's ChatForm defaults to the team's chat server on Vercel, and Settings remembers servers",
+      "changes": [
+        "The desktop app's ChatForm defaults to the team's chat server on Vercel, and Settings remembers servers"
+      ]
+    },
+    {
+      "version": "0.3.43",
+      "date": "2026-11-24T18:53:00-10:00",
+      "sha": "0f520b5",
+      "title": "PartForm opens in the built-in browser; a page card takes a click, not the wheel or the keys",
+      "changes": [
+        "PartForm opens in the built-in browser; a page card takes a click, not the wheel or the keys"
+      ]
+    },
+    {
+      "version": "0.3.42",
+      "date": "2026-11-24T18:28:43-10:00",
+      "sha": "c3025b0",
+      "title": "ChatForm's server reads a database Vercel connected with a prefix (CHATFORM_DATABASE_PREFIX)",
+      "changes": [
+        "ChatForm's server reads a database Vercel connected with a prefix (CHATFORM_DATABASE_PREFIX)",
+        "The Mac: Character studio at 40–60 fps in WebKit, pictures cached between launches, top-left on the panel line (§0.16)"
+      ]
+    },
+    {
+      "version": "0.3.40",
+      "date": "2026-11-22T21:05:33-10:00",
+      "sha": "0748dcb",
+      "title": "Fix chat-server test userinfo literal tripping check-security CI gate",
+      "changes": [
+        "Fix chat-server test userinfo literal tripping check-security CI gate",
+        "Whole-app usability pass (§0.15): CommandBar legibility, E2E verification, Day/Night evidence, DESIGN/SPEC/plan updates",
+        "Merge commit '0c2b7ad'; commit 'c1dbe98'; commit '2297257'; commit 'be8c9c9'",
+        "Usability pass for ChatForm, Settings, Login, Privacy, and Rune",
+        "Wrap root app in MotionConfig reducedMotion='user' and sync document.title",
+        "Shell, overlays & navigation usability pass",
+        "Usability pass for grid, panels, and Today view",
+        "Sync TS color tokens with tokens.css and use pure black/white media outline",
+        "Usability pass: WCAG 2.2 AA tokens, focus/a11y primitives, reduced-motion springs, and ratchet tests",
+        "ChatForm in the app points at a chat server: its own sign-in, the setting, and the Rust server's app sign-in",
+        "Merge pull request #4 from joshleong/feat/edges-places-flowform",
+        "Merge pull request #3 from joshleong/main"
+      ]
+    },
+    {
+      "version": "0.3.37",
+      "date": "2026-11-21T17:31:12-10:00",
+      "sha": "097e83a",
+      "title": "#/design is a library: a left menu of chapters, search, and specimens no longer cropped",
+      "changes": [
+        "#/design is a library: a left menu of chapters, search, and specimens no longer cropped"
+      ]
+    },
+    {
+      "version": "0.3.36",
+      "date": "2026-11-21T17:19:25-10:00",
+      "sha": "7cd980d",
+      "title": "ChatForm's Rust server: no password in a database URL, even a local test one (check-security); the test Postgres runs without one, bound to this computer",
+      "changes": [
+        "ChatForm's Rust server: no password in a database URL, even a local test one (check-security); the test Postgres runs without one, bound to this computer",
+        "ChatForm's server in Rust, for Vercel: accounts, channels, messages and the live socket on Postgres",
+        "SPEC and plan: the council's silhouettes and who is where in Review, with what wasn't checked",
+        "Who is where: the people and agents on each grid, on its row in the side menu and on ChatForm's people",
+        "The council's silhouettes: three close together until an agent joins, then one to add another",
+        "Merge main into ChatForm's second round: the office switch and the hosted server side by side",
+        "ChatForm, second round: chats in the side menu, agents as figures on a line, an Inbox that connects, a live Slack bridge, and the server on your network",
+        "Progressive cached images (server LOD + L1/L2 cache) and hosted ChatForm readiness",
+        "Native VMs run on real QEMU on this host: install, WHPX, and the e2e against a blank disc",
+        "Evidence: the native VM setup screens, day and night, from this host",
+        "Evidence: ChatForm in the installed desktop app 0.3.24, on the real data"
+      ]
+    },
+    {
+      "version": "0.3.34",
+      "date": "2026-11-20T17:34:29-10:00",
+      "sha": "14bfb33",
+      "title": "The server panel opens in the side menu above Settings, on the menu's paper; Today's window controls are white",
+      "changes": [
+        "The server panel opens in the side menu above Settings, on the menu's paper; Today's window controls are white",
+        "Under Rune a press on a link's letters reaches Rune: its accessibility mirror no longer takes the pointer",
+        "Rune's notes show a link's real host, as the web's do; the link press that still fails is held as a known failure",
+        "Rune's motion goes by rule (panes and other boards land); the mark is Josh's two leaves, the icon fills its tile",
+        "Evidence: ChatForm in the installed desktop app 0.3.24, on the real data"
+      ]
+    },
+    {
+      "version": "0.3.33",
+      "date": "2026-11-20T15:13:48-10:00",
+      "sha": "2be7970",
+      "title": "Merge feat/edges-places-flowform (Today's white text boxes, the tools, the hosting VM script) into main",
+      "changes": [
+        "Merge feat/edges-places-flowform (Today's white text boxes, the tools, the hosting VM script) into main",
+        "Today's text boxes in white; the terminal starts on its button; the browser opens on HyperForm; folders approved in the Files panel",
+        "Server: SQL statements are compiled once; the change log is kept until HEAD moves",
+        "Hosting: a cloud VM is the choice; a script that readies an Ubuntu VM for it"
+      ]
+    },
+    {
+      "version": "0.3.32",
+      "date": "2026-11-20T12:40:49-10:00",
+      "sha": "2f325f2",
+      "title": "Desktop releases build for macOS too: Apple silicon beside Windows, one feed for both",
+      "changes": [
+        "Desktop releases build for macOS too: Apple silicon beside Windows, one feed for both"
+      ]
+    },
+    {
+      "version": "0.3.31",
+      "date": "2026-11-20T12:16:00-10:00",
+      "sha": "f21192a",
+      "title": "Plan: hosted sign-in and deploy are in Review on GitHub (sync time)",
+      "changes": [
+        "Plan: hosted sign-in and deploy are in Review on GitHub (sync time)",
+        "A hosted Foundation: its own Google sign-in, the web client served by the server, and a container to deploy"
+      ]
+    },
+    {
+      "version": "0.3.30",
+      "date": "2026-11-20T11:46:34-10:00",
+      "sha": "0b028b3",
+      "title": "This computer groups a project under one spelling of its folder; a failed socket test no longer holds the release",
+      "changes": [
+        "This computer groups a project under one spelling of its folder; a failed socket test no longer holds the release",
+        "Merge main (This computer, native VMs, the browser sign-in press) into feat/edges-places-flowform",
+        "Plan: This computer is issue #234",
+        "This computer: a grid of the projects being built on this machine",
+        "Foundation Improvements",
+        "Plan: the hosted cards are issues #223–#230",
+        "Plan: a hosted Foundation for company-wide chat (a milestone and seven cards)",
+        "Merge main (ChatForm; HyperForm's apps on Today) into feat/edges-places-flowform"
+      ]
+    },
+    {
+      "version": "0.3.27",
+      "date": "2026-11-19T22:19:50-10:00",
+      "sha": "c8c2f84",
+      "title": "A desktop sign-in's \"This is me\" press is accepted from a real browser",
+      "changes": [
+        "A desktop sign-in's \"This is me\" press is accepted from a real browser",
+        "Home push",
+        "Plan: the desktop check is done and the security pass is pushed"
+      ]
+    },
+    {
+      "version": "0.3.25",
+      "date": "2026-11-19T18:45:56-10:00",
+      "sha": "f3ea7f2",
+      "title": "Merge feat/edges-places-flowform (the window's buttons in the room theme, Settings' full-width row, Foundation's avatars and the uploader, Features) into main",
+      "changes": [
+        "Merge feat/edges-places-flowform (the window's buttons in the room theme, Settings' full-width row, Foundation's avatars and the uploader, Features) into main",
+        "The window's buttons wear the room theme; Settings' row is washed across the whole band",
+        "Merge main (the security pass; themes, the browser, sheets) into feat/edges-places-flowform",
+        "Features",
+        "Foundation's avatars: what an upload would take out of main shows before it's pressed; the manifest keeps its date",
+        "Foundation's avatars: an uploader on the studio's left that characters are wired into, by card or by section, and that uploads them to main by a press or a timer",
+        "Every Foundation gets the characters: the starter set is brought in at boot, and a newer set's new ones reach installs that already have a studio"
+      ]
+    },
+    {
+      "version": "0.3.24",
+      "date": "2026-11-19T18:29:42-10:00",
+      "sha": "6a6a0cc",
+      "title": "Merge main (HyperForm's apps on Today) into ChatForm",
+      "changes": [
+        "Merge main (HyperForm's apps on Today) into ChatForm",
+        "Merge main (the security pass; themes, the browser, sheets) into ChatForm",
+        "Plan: ChatForm's seven build cards are in Review (pushed to the issues)",
+        "Plan: ChatForm's seven build cards moved to Review",
+        "ChatForm on a scratch copy: node scripts/chatform-demo.mjs (server :14411, page :15431, an empty temp data folder)",
+        "ChatForm: replay and the clock; CAD and Vision files in a channel; the spec, the design rows and the plan",
+        "ChatForm: Slack's history, the bridges, agents that answer, and huddles in channels",
+        "ChatForm, the place: a button beside Today, four tabs, the sidebar, the timeline, the composer and threads",
+        "ChatForm core: channels, DMs, threads, reactions, files, search and unread on the server",
+        "Plan: ChatForm's nine cards are issues #196–#204",
+        "ChatForm: the contract, the architecture and the plan"
+      ]
+    },
+    {
+      "version": "0.3.23",
+      "date": "2026-11-19T18:12:29-10:00",
+      "sha": "4d59f73",
+      "title": "Merge pull request #222 from joshleong/claude/hyperform-integration-app-links-461b14",
+      "changes": [
+        "Merge pull request #222 from joshleong/claude/hyperform-integration-app-links-461b14",
+        "Today's apps from HyperForm's dashboard: MetalForm, Form Gantt, Form Chess, Airform; PartForm and DeployForm said as they are",
+        "HyperForm's apps on Today, opened in Foundation as live pages with kept pictures"
+      ]
+    },
+    {
+      "version": "0.3.22",
+      "date": "2026-11-19T14:15:13-10:00",
+      "sha": "116ad83",
+      "title": "Merge main (the security pass) into themes, the browser, sheets",
+      "changes": [
+        "Merge main (the security pass) into themes, the browser, sheets",
+        "SPEC, plan: a section a person adds keeps starting with a pinned table (Josh, 2026-11-19)",
+        "Themes by what's in focus, a real built-in browser, a release page, sheets and a card's menu"
+      ]
+    },
+    {
+      "version": "0.3.21",
+      "date": "2026-11-18T20:24:58-10:00",
+      "sha": "71bed0d",
+      "title": "SECURITY.md says what rules 6 and 7 are now that they are built, and the limit of rule 7",
+      "changes": [
+        "SECURITY.md says what rules 6 and 7 are now that they are built, and the limit of rule 7",
+        "The #/design agents check fails on a refused sign-in with its reason, not later on a missing demo",
+        "The machine pipes check looks for the pipes in the card's Ins & outs view",
+        "The Chrome extension check's own setup says it comes from Foundation's page, as a person's browser would",
+        "scripts/characters-expressions.mjs ends by itself instead of calling process.exit, so Node on Windows no longer aborts after its work is done",
+        "The tools check signs its member in before the terminal opens, and checks that dev sign-in is refused while it is open",
+        "The Vision hand-off check reads the Run card as it is now: the job's target and goal, a question before Run, and a refused stale press",
+        "SECURITY.md lists what the pass closed, each with its commit, and says a push to main is a release",
+        "Ignore agents' scratch checkouts under .claude/worktrees/",
+        "The check reads open items only where security status is written, and the whole repository now passes it",
+        "Evidence for the review fixes: the confirm page, day and night, and the checks",
+        "Today's own-file picture check uses a file id of the shape Foundation makes",
+        "The audit log records who pressed Run on a job by their id",
+        "A proxy address that carries a sign-in reaches a program only when its caller names it",
+        "Sign-in: no page elsewhere signs a browser in, and dev sign-in waits for every shell here",
+        "An agent can't borrow another board's sending allowance by naming it",
+        "The desktop window's origin is trusted only by a server the desktop app started",
+        "The security check does what SECURITY.md says: unpushed commits, every way to start code, waivers by line, open items in general terms",
+        "The pinned rea-agents is fetched from the registry it was checked against, with no npm sign-in",
+        "A picture in rendered text loads on sight only from a file's exact address",
+        "The board agent's Claude Code has no built-in tools",
+        "An app tool's allowance belongs to the board it was given on, and is checked where the call goes",
+        "Building or re-reading the Slack board is a person's press",
+        "A job runs what a person saw, on a folder a person approved",
+        "An app's sign-in in the browser hands a session only to the app whose code the person checked and pressed for",
+        "With nothing allowed, an agent's search makes no call to Slack at all, not even to learn whose token it is",
+        "SPEC and SECURITY say the audit log and explicit sending outside are built, and what stays open",
+        "Agents send to an external service only where a person allowed it on that board",
+        "Every tool call, person-gate refusal and press is recorded in an append-only audit log",
+        "A web site in a frame keeps its own origin; only an unknown address on this computer runs without one",
+        "SPEC and SECURITY say what the smaller findings closed and what stays open; the evidence is kept",
+        "The client's pages carry a Content Security Policy, report-only for now",
+        "Frames never show Foundation itself, are always sandboxed, and keep their origin only for a saved app or T3",
+        "Today's picture test says what the renderer now does with a web picture",
+        "Pictures from elsewhere in rendered text wait for a person's press; links show their real host",
+        "Reading Slack stays tied to the board, and the Slack user token serves only its owner",
+        "A viewer's agent token is shown to reach only what the viewer reaches",
+        "Running a job needs someone who can edit its board",
+        "The example settings leave dev sign-in off",
+        "SPEC says what the hardening slice closed and what stays open; its checks are kept",
+        "The board agent runs with Foundation's tools only: strict MCP config, no setting sources",
+        "Sending to Slack as a person needs the person; a channel read that can start an agent is a person's press",
+        "A members-only board's files, pictures and settings stay its members'; roles and transcripts need a person",
+        "Asking this computer's model server is a person's form, and only an exact loopback origin is asked",
+        "Repo reads stay inside a repository's name, and can be kept to named owners",
+        "Only our own pages may use the session cookie, and the server answers only to its own names",
+        "A machine's terminal and desktop take input only from a person; agents' desktop leave is server-only",
+        "Uploaded files can't run as the app: only passive types show in place, the rest download, all sandboxed",
+        "Casey continues a thread only with the person who started it, and keeps message text and errors out of logs and Slack",
+        "The Slack agent runs with its own tools only: no shell, no files, no bypassed permission checks",
+        "Public docs keep the design; detailed findings move off the public repository; docs/SECURITY.md sets the rules",
+        "The security check allows one file to start processes; two environment readers waived with reasons",
+        "Every program the server starts goes through one door, with an environment from the allowlist",
+        "App tools go through a person: only a saved app's address is dialled, and each tool needs a press on first use",
+        "A security check for the gate: secrets, unpinned runtime code, inherited environments, open gaps in public docs",
+        "Ignore .private/: where detailed open security findings are kept, off the public repo",
+        "Plan: slice 1 of ADR-001 is merged; its card waits in Review for one real agent turn",
+        "Programs Foundation starts get no keys, a pinned REA, and a folder outside data/ (ADR-001 G13)",
+        "The person gate is real: dev sign-in off unless asked for, and five routes refuse an agent's token",
+        "Plan: the Working together slices from ADR-001; slice 1 (the person gate) is in Review"
+      ],
+      "more": 1
+    },
+    {
+      "version": "0.3.20",
+      "date": "2026-11-17T16:55:22-10:00",
+      "sha": "cbb3277",
+      "title": "The server pill moves into Settings' band, to its right, and gets smaller",
+      "changes": [
+        "The server pill moves into Settings' band, to its right, and gets smaller"
+      ]
+    },
+    {
+      "version": "0.3.19",
+      "date": "2026-11-17T14:43:22-10:00",
+      "sha": "f9ea795",
+      "title": "Company goals: the evidence and the Web Store images, remade on the new Today (the room, the panel, Todos)",
+      "changes": [
+        "Company goals: the evidence and the Web Store images, remade on the new Today (the room, the panel, Todos)",
+        "The company's goals open Today and every Chrome new tab"
+      ]
+    },
+    {
+      "version": "0.3.18",
+      "date": "2026-11-17T10:44:47-10:00",
+      "sha": "ccab7a1",
+      "title": "Every Foundation gets the characters: the starter set is brought in at boot, and a newer set's new ones reach installs that already have a studio",
+      "changes": [
+        "Every Foundation gets the characters: the starter set is brought in at boot, and a newer set's new ones reach installs that already have a studio"
+      ]
+    },
+    {
+      "version": "0.3.17",
+      "date": "2026-11-17T09:47:07-10:00",
+      "sha": "631a233",
+      "title": "Kiri 0.2.1: the pin moves up, the engine in WSL moves with it",
+      "changes": [
+        "Kiri 0.2.1: the pin moves up, the engine in WSL moves with it"
+      ]
+    },
+    {
+      "version": "0.3.16",
+      "date": "2026-11-16T22:04:57-10:00",
+      "sha": "7055966",
+      "title": "Councils of their own, seats with names (the same agent twice), the white line, the bar that folds, a machine's Ins & outs",
+      "changes": [
+        "Councils of their own, seats with names (the same agent twice), the white line, the bar that folds, a machine's Ins & outs",
+        "Plan: the live server is restarted; Add a desktop on box-a70f is the person's press"
+      ]
+    },
+    {
+      "version": "0.3.15",
+      "date": "2026-11-16T20:56:48-10:00",
+      "sha": "f039b9e",
+      "title": "A machine's tools, its own window, Ctrl+scroll as zoom, the wells redrawn, and Restart for a server the app adopted",
+      "changes": [
+        "A machine's tools, its own window, Ctrl+scroll as zoom, the wells redrawn, and Restart for a server the app adopted"
+      ]
+    },
+    {
+      "version": "0.3.14",
+      "date": "2026-11-16T20:07:30-10:00",
+      "sha": "2f83514",
+      "title": "Today in the top bar's left corner, before the side menu's fold",
+      "changes": [
+        "Today in the top bar's left corner, before the side menu's fold",
+        "Merge collections: gather a pipeline's pictures and characters, lay them out in a section, drag copies out",
+        "Collections: gather a pipeline's pictures and characters, lay them out in a section, drag copies out"
+      ]
+    },
+    {
+      "version": "0.3.13",
+      "date": "2026-11-16T19:42:11-10:00",
+      "sha": "66439ed",
+      "title": "The bottom bar holds the top right; the top right is the built-in tools; councils at the right; day/night always reaches the paper",
+      "changes": [
+        "The bottom bar holds the top right; the top right is the built-in tools; councils at the right; day/night always reaches the paper"
+      ]
+    },
+    {
+      "version": "0.3.12",
+      "date": "2026-11-16T18:57:49-10:00",
+      "sha": "cdd7853",
+      "title": "Today in the top bar's right end, tabs as full-height lines, the grids pill outlined; Today's room stays put in a narrow window",
+      "changes": [
+        "Today in the top bar's right end, tabs as full-height lines, the grids pill outlined; Today's room stays put in a narrow window"
+      ]
+    },
+    {
+      "version": "0.3.11",
+      "date": "2026-11-16T18:09:06-10:00",
+      "sha": "b1d054b",
+      "title": "SPEC, DESIGN and the plan for 2026-11-17; the search button's test selector; the Claude key preset listed last",
+      "changes": [
+        "SPEC, DESIGN and the plan for 2026-11-17; the search button's test selector; the Claude key preset listed last",
+        "Merge the character studio: the card as a sheet with its own editor, an expressions stage, the pipeline as nodes with Generate",
+        "Character studio: the runbook, evidence and notes for the sheet, expressions and the nodes",
+        "Character studio: the card as a sheet, an expressions stage, the pipeline as nodes that generate",
+        "The ✕'s press area follows how small its own card is drawn (zoom times the section's fit)",
+        "A card's ✕ keeps a 26 px press on the screen at any zoom",
+        "Merge the machines fixes: Add a desktop says why when it can't and can be stopped; the in-use ring is inside the well",
+        "Evidence and notes for the machines fixes",
+        "Machines: the in-use ring is the well's, and a press that can't work says why on the card",
+        "Merge pointer rules: what a left press grabs, Ctrl zooms and Alt scrolls a card with a hint, the section menu in columns with an icon row",
+        "Evidence and notes for the pointer rules",
+        "The pointer: a left press grabs only a handle, Alt-wheel scrolls a card, the section menu in three bands",
+        "Machines: Add a desktop says why when it can't, and an install can be stopped",
+        "Merge sub-grids: a section becomes a grid of its own, previewed where it was, with a link when it moves",
+        "Evidence and notes for sub-grids",
+        "Sub-grids, client: Open as its own grid makes a real grid; its card previews it and says where it went",
+        "The council stands on an edge; agents are connected by guided ways; the menu, tabs and search redrawn; Today behind every panel",
+        "Sub-grids, server: a section becomes a grid of its own; a grid that moves leaves its card behind"
+      ]
+    },
+    {
+      "version": "0.3.10",
+      "date": "2026-11-16T15:38:27-10:00",
+      "sha": "4562d26",
+      "title": "Merge the card chrome: removal asks, the bar makes room, Ctrl-wheel through a card, a 2 px scroll line, a resize gleam",
+      "changes": [
+        "Merge the card chrome: removal asks, the bar makes room, Ctrl-wheel through a card, a 2 px scroll line, a resize gleam",
+        "Evidence and notes for the card chrome",
+        "Card chrome: removal asks, the bar makes room, Ctrl-wheel through a card, a 2 px scroll line, a resize gleam",
+        "Characters: a character goes with its card",
+        "Ten more mesh avatars: Sage from the torso up, two fox-faced shibas, the abstract set, three shapes",
+        "DESIGN, SPEC and plan for Today in white, the band, adding agents and the pipeline",
+        "The Character studio's pipeline row, approval on characters, and checks for the band and the add flow",
+        "Today in white over the Shiba, the council as a band, adding an agent step by step"
+      ]
+    },
+    {
+      "version": "0.3.9",
+      "date": "2026-11-15T22:04:05-10:00",
+      "sha": "3fd587d",
+      "title": "Merge the machines work: typing, the desktop, agents using it, pipes",
+      "changes": [
+        "Merge the machines work: typing, the desktop, agents using it, pipes",
+        "Evidence and notes for machines you can type into, see, hand to an agent and pipe through",
+        "Machines: the desktop, agents using it with a person's leave, and pipes in and out",
+        "Typing into a machine: a click keeps the caret, and the app's shortcuts stand down",
+        "The animal set as mesh avatars; stills cut from their ground; SPEC, plan and wording",
+        "Checks and the design contract for the one interface; a port answers through its wire",
+        "One interface: Today and Settings inside the shell, grids of grids, a council of assigned agents"
+      ]
+    },
+    {
+      "version": "0.3.8",
+      "date": "2026-11-15T17:36:48-10:00",
+      "sha": "b5b5c20",
+      "title": "A starter set: the eleven characters come with every install",
+      "changes": [
+        "A starter set: the eleven characters come with every install"
+      ]
+    },
+    {
+      "version": "0.3.7",
+      "date": "2026-11-14T19:37:52-10:00",
+      "sha": "3bdb894",
+      "title": "The anime set on the council: five mesh avatars; portraits on a grey ground",
+      "changes": [
+        "The anime set on the council: five mesh avatars; portraits on a grey ground",
+        "The council: agents as characters, and a Character studio board that makes them"
+      ]
+    },
+    {
+      "version": "0.3.6",
+      "date": "2026-11-14T13:47:03-10:00",
+      "sha": "9e28109",
+      "title": "Merge the July grid prototype (Normal-AI-Vibe-Code/Foundation main) into history",
+      "changes": [
+        "Merge the July grid prototype (Normal-AI-Vibe-Code/Foundation main) into history",
+        "Merge the built-in server into main, as the server switch's Built in",
+        "The desktop installer, run: the installed app starts its server and leaves nothing",
+        "The desktop app starts its own server",
+        "Merge pull request #2 from joshleong/feat/grid-interactions-and-persistence",
+        "Push Changes",
+        "Add multi-select/merge, cross-section drag, media ingest, and local persistence"
+      ]
+    },
+    {
+      "version": "0.3.5",
+      "date": "2026-11-13T19:55:25-10:00",
+      "sha": "7c94304",
+      "title": "Merge feat/edges-places-flowform into main: agents in sections, the text box, a fuller right-click menu, the Rune renderer",
+      "changes": [
+        "Merge feat/edges-places-flowform into main: agents in sections, the text box, a fuller right-click menu, the Rune renderer",
+        "Agents in the section, a text box, and a fuller right-click menu",
+        "Desktop releases build themselves on every push to main",
+        "Rune: the paper, Hanken Grotesk, markdown notes, frame times, and the desktop build",
+        "Rune: section tools, rename, drag, menu and remove; a note's bar and resize",
+        "An agent asked through T3 reads and writes the board",
+        "Ask one of this computer's agents from a section; Kimi and DeepSeek, cloud and local",
+        "Rune: web content stays live as islands, and tables are drawn at rest",
+        "Slack app: linked to the Foundation app, manifest as synced with App Settings",
+        "Plan: issue numbers for rune-renderer (#128), rune-web-islands (#129), rune-sections-parity (#130) and rune-type-paper-desktop (#131)",
+        "A second renderer: Rune draws the board beside the web renderer",
+        "Foundation's own T3 instance, and this computer's agents in the pane",
+        "Plan: sign-in inside a machine is decided (#122): both ways, the subscription first, each its own Claude instance",
+        "An agent group on every section, and the agents pane",
+        "The Slack board: a section per channel, live, kept by agents"
+      ]
+    },
+    {
+      "version": "0.3.4",
+      "date": "2026-11-13T19:51:58-10:00",
+      "sha": "cee1a16",
+      "title": "Start a machine from a section's tools and from ⌘K, not only its right-click menu",
+      "changes": [
+        "Start a machine from a section's tools and from ⌘K, not only its right-click menu",
+        "Server switch: checked on the installed app, updated to 0.3.3 by CI's release"
+      ]
+    },
+    {
+      "version": "0.3.3",
+      "date": "2026-11-13T18:59:11-10:00",
+      "sha": "ff91f39",
+      "title": "A server switch, bottom right: start this computer's server, or connect to a remote one",
+      "changes": [
+        "A server switch, bottom right: start this computer's server, or connect to a remote one"
+      ]
+    },
+    {
+      "version": "0.3.2",
+      "date": "2026-11-13T17:26:10-10:00",
+      "sha": "ece9f76",
+      "title": "Foundation for Chrome builds and tests on Windows; CI's actions on Node 24",
+      "changes": [
+        "Foundation for Chrome builds and tests on Windows; CI's actions on Node 24",
+        "Desktop releases build themselves on every push to main",
+        "Plan: 13 issues opened on GitHub join the board (#120-#132); the Chrome, app address and Data Room cards name SPEC §6 #17-#19",
+        "Merge feat/edges-places-flowform into main: spaces, places, the Flowform link and files, heavy boards at 60 fps, sections as grids, with Today, the Shiba and Foundation for Chrome",
+        "The update feed lives on the org repo",
+        "Plan: issue numbers for publish-first-release, search-pickup-clipboard (#117), flowform-files-in-search (#118) and min-client-version (#119)",
+        "Out of search into the hand, a clipboard, Flowform's files in the one search, and a minimum client version",
+        "Foundation for Chrome, ready for the Web Store: release build, admin policy, listing, privacy page",
+        "Plan: Today's eight cards on GitHub (#108-#115), and 17 issues opened there join the board",
+        "Merge origin/main (0.3.0: the crew, machines, the plan board) with Today and the Shiba",
+        "Plan: issue numbers for heavy-board-perf (#105), cards-never-take-wheel (#106), server-picture-levels (#107) and flowform-file-bytes (#104)",
+        "Heavy boards hold 60 fps; no card takes the wheel; Ctrl-click to use, Ctrl+Enter full screen",
+        "Today and the Shiba: home before the boards, and Foundation for Chrome",
+        "Flowform file downloads work against production",
+        "Flowform file downloads: keep the person's Flowform session, for downloads only",
+        "Flowform rooms and files, live through the link",
+        "Plan: issue number for sections-are-grids",
+        "Sections are grids within themselves: open one full-screen as its own grid",
+        "UI Updates",
+        "Plan: issue numbers from plan:push (#91-#102)",
+        "Carry cards between sections and boards; night in greys; images rest bare",
+        "Flowform link: register afresh for every connection",
+        "The app icon is the white mark on a glass squircle, not a blue tile",
+        "The app icon is the white mark on a federal-blue tile",
+        "The icon is Josh's four panels on a grid, in place of the masonry F",
+        "Spaces: the e2e suite passes on the new shell (40 passed, 2 skipped)",
+        "Spaces: tabs are spaces, filed by recent or project folder; a space's own pane; Ask in the bottom bar; quiet scroll bars",
+        "The frameless window is checked on Windows; a stuck port 1430 and the way round it",
+        "The top bar is the window's title bar; the orb top right; pan with the middle or right button",
+        "Panel edges as a hairline; places; a read-only Flowform link; why nothing connected",
+        "The plan after tonight: 46 done, 41 open, in step with GitHub",
+        "#/design: the crew stills' captions sit under them; a demo clears its caption"
+      ]
+    },
+    {
+      "version": "0.3.0",
+      "date": "2026-11-08T19:39:44-10:00",
+      "sha": "4cfa104",
+      "title": "0.3.0 notes: also tonight (desktop updates, the icon, CodeMirror notes, document search, adding files, agents' commands, helpers, the transport, lighter renders)",
+      "changes": [
+        "0.3.0 notes: also tonight (desktop updates, the icon, CodeMirror notes, document search, adding files, agents' commands, helpers, the transport, lighter renders)",
+        "A machine's terminal selects what the pointer drags over, at any zoom",
+        "Release notes: issue forms, the tighter sandbox, Services on a narrow window",
+        "Live pages from our own origin can't lift their sandbox",
+        "Merge origin/main: the polish batch, reconciled with tonight's branches",
+        "Settings → Services lines up, and stacks on a narrow window",
+        "renders.spec types into the CodeMirror note editor",
+        "DESIGN: the plan board's sync and new-card controls; release notes in Settings",
+        "GitHub issue forms that join the plan: Bug, Plan, Needs a person",
+        "SPEC and release notes for tonight; the side pane links What's new",
+        "Merge perf/narrow-subscribers: board-wide layers render only their slice; live pages gate on the drawn scale",
+        "Merge fix: #/design's update demo keeps its closing tags beside the tray demos",
+        "SPEC, plan and evidence: narrowed subscribers and the drawn-scale gate",
+        "Live pages gate on the scale they're drawn at: zoom x the section's fit",
+        "Narrow the board-wide store subscribers: a keystroke or drag renders only its card and section",
+        "Merge feat/files-search: search inside documents; paste, folder drop and one upload tray",
+        "Maps only the server writes can't be written from a sync socket",
+        "Release notes: docs/blog/<version>.md, and Settings → Releases",
+        "Opening a section: wires travel with the card instead of jumping",
+        "A channel's new huddle is made on the server, then invited: no 400 ms wait",
+        "Files search and adding: SPEC, DESIGN, plan card, evidence; a test for the time limit",
+        "Test: a person in the desktop app (an app bearer) acts as the person at the tool door",
+        "Merge feat/crew-next: activity says who did what, machine_run approved per command, helpers see each other's work",
+        "SPEC, DESIGN, plan: the crew, next (activity roles, machine_run, crew_work)",
+        "Merge feat/overnight-2026-11-08: Settings → Updates on the Services column",
+        "Settings → Updates sits under Services on its column (not centred under the plan board)",
+        "Merge feat/overnight-2026-11-08: desktop updates, the masonry icon, the port check, huddle invites",
+        "Desktop updates, checked on a real install; the card over sign-in, in day",
+        "Crew helpers see the lead's plan and each other's work",
+        "Adding files: paste onto the board, drop whole folders, one upload tray; snippets lead with the match",
+        "Merge feat/codemirror-notes: notes in CodeMirror bound to their Y.Text",
+        "Merge feat/ws-ticket: a header-capable transport for pages on another origin",
+        "Notes in CodeMirror: y-codemirror on the note's Y.Text, so two people in one word keep both words",
+        "The activity log says who did it, as who they are",
+        "ws-ticket: a header-capable transport, so the app can use a server on another site",
+        "Wires: landings stay on their edge at both ends; pipelines leave room to turn",
+        "Search: GitHub hits are our repos, and no dots left spinning",
+        "machine_run: agents run commands in a machine a person started, approved per command",
+        "The plan syncs with GitHub from Settings; cards say what they mean",
+        "Desktop: the port must be free on both 127.0.0.1 and ::1",
+        "Inviting a channel to a new huddle no longer sleeps 400 ms",
+        "DESIGN: the update card and the mark; the card sits between ⌘K and the toast",
+        "npm run release: bump, build signed installers and the feed, publish",
+        "Search inside PDFs, Word, PowerPoint, Excel and OpenDocument files",
+        "Desktop updates: a signed feed, a card, one press",
+        "Activity says who really did what: people vs named agents, and people's grid edits",
+        "A new icon: an F laid in masonry",
+        "Release evidence: 0.2.0 built and smoke-tested on Windows"
+      ]
+    },
+    {
+      "version": "0.2.0",
+      "date": "2026-11-08T15:43:51-10:00",
+      "sha": "441b6ad",
+      "title": "Merge fix/shortcut-labels: keys say ⌘ on a Mac, Ctrl on Windows and Linux",
+      "changes": [
+        "Merge fix/shortcut-labels: keys say ⌘ on a Mac, Ctrl on Windows and Linux",
+        "The plan is on GitHub: 81 issues, one per card",
+        "Board and SPEC: the daily digest (merged); two issues it surfaced",
+        "Daily digest: once a day, a note on the company board saying what changed",
+        "Board: the machine card's hover-bar overlap is a design call, with options",
+        "Evidence notes for the night's polish",
+        "Evidence: the plan board after the night's work, day and night",
+        "Board: the fitted-frames card says what's known and what isn't",
+        "Board, SPEC, DESIGN: machine pages follow their machine; huddle state in its own map (schema 6) (both merged)",
+        "Agents point: point_at a table cell or a port, with a laser on the spot",
+        "Huddle state off the card: schema 6, a `huddles` map only the server writes"
+      ]
+    }
+  ]
+}

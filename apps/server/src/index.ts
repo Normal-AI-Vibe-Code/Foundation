@@ -16,7 +16,9 @@ import { shutdownLocalVms } from "./localvms.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
 import { AGENT_TOKEN_DAYS, chatSessionFor, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleSignIn, googleStart, hashToken, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
-import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
+import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, isBoardOpen, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
+import { gridNotesFor, makeNotePage, renameNoteBody } from "./notes.ts";
+import { backfillNoteIndex } from "./noteindex.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
@@ -290,6 +292,13 @@ r.get("/api/boards", (req) => {
   const hidden = hiddenBoards(u);
   return { boards: listBoards().filter((b) => !hidden.has(b.id)).map((b) => ({ ...b, role: boardRole(u.id, b.id) })) };
 });
+/**
+ * Every grid's notes, for the side menu's Notes (noteindex.ts; docs/notes.md): grid by grid, only the grids this
+ * person can see. A card showing a note page they can't see (or one archived) is left out. Reads nothing else.
+ */
+r.get("/api/notes", (req) => {
+  return { grids: gridNotesFor(requireUser(req)) };
+});
 r.get("/api/boards/:id/epoch", (req) => {
   requireBoard(requireUser(req), req.params.id);
   return { epoch: boardEpoch(req.params.id) };
@@ -337,6 +346,17 @@ r.post("/api/boards", async (req) => {
   const url = kind === "page" || (kind === "app" && !app) ? cleanPageUrl(body.url) : null;
   if (kind === "page" && !url) throw new HttpError(400, "A web page needs an address (http or https)");
   if (kind === "app" && !app && !url) throw new HttpError(400, "An app needs an address (http or https), or to be one Foundation knows");
+  // a note page (docs/notes.md): its row, its body, and inside the note page `parent` (which this person must be able to write)
+  if (kind === "note") {
+    const u = requireUser(req);
+    const parent = body.parent ? String(body.parent) : null;
+    if (parent) {
+      requireBoard(u, parent);
+      requireWriter(u, parent);
+    }
+    const made = makeNotePage({ title: body.name, parent, link: (body as { link?: unknown }).link !== false, origin: "system" });
+    return { id: made.id };
+  }
   if (kind === "app") {
     // an app has one tab: opening it again goes to the one there is
     const there = listBoards().find((b) => b.kind === "app" && (app ? b.app === app : !b.app && b.url === url));
@@ -393,6 +413,7 @@ r.post("/api/boards/:id", async (req) => {
     patch.url = url;
   }
   updateBoardRow(id, patch);
+  if (patch.name) renameNoteBody(id, patch.name);
   // a grid of grids: put it inside another (which must be one this person can write too), or back at the top
   if (body.parent !== undefined) {
     const parent = body.parent === null || body.parent === "" ? null : String(body.parent);
@@ -1526,6 +1547,8 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 reindexFilesIfNeeded();
+// the side menu's Notes: boards not opened since the notes index began are read once, after the server is up
+setTimeout(() => backfillNoteIndex(isBoardOpen), 1500).unref?.();
 watchFactoryForm();
 // the Vision loop: bring back what hand-off threads export, and ask the reviewers once they have
 setInterval(() => {

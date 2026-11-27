@@ -8,6 +8,8 @@ import { MenuBody } from "../components/ContextMenu";
 import type { MenuItem } from "../components/menuLayout";
 import { ReleaseCard } from "../settings/ReleasePage";
 import type { ReleasePost } from "../settings/releases";
+import { ReleaseHistory, ReleaseNow } from "../settings/ReleaseHistory";
+import { standing, type HistoryRelease } from "../settings/history";
 
 const SCOPE: Record<ThemeId, string> = { paper: "f-paper", day: "f-day", night: "f-night", room: "f-room" };
 
@@ -51,6 +53,31 @@ export function ReleasePageDemo({ post }: { post: ReleasePost }) {
         <div className="f-room">
           <ReleaseCard post={post} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** the Changes panel's Releases face: an installed release, and a checkout ahead of one, over the real history */
+export function ReleaseHistoryDemo({ releases, posts }: { releases: HistoryRelease[]; posts: ReleasePost[] }) {
+  const recent = releases.slice(0, 24);
+  const installed = standing(recent[0]?.version ?? "0.0.0", null, recent);
+  const checkout = standing("0.3.0", { tag: recent[1]?.version ?? null, ahead: 2, sha: "1234567" }, recent);
+  return (
+    <div className="release-demo" data-history-demo>
+      <div className="release-demo-face tool-changes" style={{ containerType: "inline-size" }}>
+        <ReleaseNow st={installed} posts={posts} unreleased={[]} />
+        <ReleaseHistory releases={recent} posts={posts} running={installed.version} />
+      </div>
+      <div className="release-demo-face tool-changes" style={{ containerType: "inline-size" }}>
+        <ReleaseNow
+          st={checkout}
+          posts={posts}
+          unreleased={[
+            { hash: "aaaaaaa", subject: "The updates panel keeps the whole release history, with this app's version set large" },
+            { hash: "bbbbbbb", subject: "Fix the history's day strip at phone width" },
+          ]}
+        />
       </div>
     </div>
   );

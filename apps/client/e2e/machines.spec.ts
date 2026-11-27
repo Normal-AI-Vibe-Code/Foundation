@@ -421,7 +421,7 @@ test("Ctrl+C, pipes, a desktop, and an agent using it with a person's leave", as
     // ---- the crew: a named agent with its cursor on the card ----
     await page.mouse.click(20, 450);
     await page.keyboard.press("Space");
-    await expect(page.locator('.talk-sheet[data-mode="typing"] .talk-field')).toBeFocused();
+    await expect(page.locator("[data-hud-ask-text]")).toBeFocused();
     await page.keyboard.type(`use the desktop of “${name}”`);
     await page.keyboard.press("Enter");
     await expect(page.locator(".crew-cursor").first()).toBeVisible({ timeout: 20_000 });

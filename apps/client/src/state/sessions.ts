@@ -176,7 +176,7 @@ async function followHelper(session: string, runId: string, name: string) {
 }
 
 /**
- * Ask the crew (the voice sheet): a new agent, with its own name and cursor,
+ * Ask the crew (the bar's Ask pill and the voice sheet, through the council): a new agent, with its own name and cursor,
  * in a session of its own that runs without opening a tab, so the board
  * stays in view while you watch it work. Several can run at once.
  */

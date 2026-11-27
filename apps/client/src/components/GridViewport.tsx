@@ -37,10 +37,10 @@ import { WireLayer } from "./WireLayer";
 import { camera, FAR_ZOOM, publishCamera, publishPointer } from "../state/camera";
 import { publishGoal } from "../lib/viewAhead";
 import { isNight, onNight } from "@foundation/ui";
-import { floorInsets, getUi, setUi, toggleSearch, toggleSession, useUi } from "../state/ui";
-import { TalkButton } from "../shell/Talk";
+import { floorInsets, getUi, setUi, toggleSearch, useUi } from "../state/ui";
+import { HudAsk, TalkButton } from "../shell/Talk";
 import { SearchPop } from "../shell/SearchPane";
-import { PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
+import { PanelGlyph, PresentGlyph, SearchGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { useOnLocalGrid } from "../panels/LocalView";
 import { ComputerGlyph } from "../shell/glyphs";
@@ -1117,21 +1117,20 @@ export function GridViewport({ boardName }: { boardName?: string } = {}) {
             <span className="hud-icon-text">{COMMANDS_GLYPH}</span>
           </button>
         </div>
-        <button className={`hud-icon hud-council f-glass${councilBoard ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-pressed={councilBoard} aria-label="Council" data-tip={onLocal ? "Council: this grid's agents. The grid is read from this computer, where its sessions run" : "Council: this grid's agents, as characters. Talk to them, add more"} data-council-open>
-          <CouncilGlyph />
-          {onLocal && (
-            <span className="council-local-badge" aria-hidden>
-              <ComputerGlyph size={10} />
-            </span>
-          )}
-        </button>
-        <div className={`hud-ask-pill f-glass${ui.session ? " is-on" : ""}`}>
-          <button className={`hud-ask${ui.session ? " is-on" : ""}`} onClick={toggleSession} aria-pressed={!!ui.session} data-tip={ui.session ? "Put the conversation away" : "Ask the agent: a conversation beside the canvas"} data-kbd={keys("mod+J")}>
-            <span className="hud-glyph">✦</span>
-            <span className="hud-label">Ask</span>
+        {/* 2026-11-26 (Josh): Ask is a line to every agent on this grid; beside it, two icons on one pill: the council
+            (the agents as characters) and the panel on the right with all of them */}
+        <HudAsk />
+        <div className="hud-icons hud-agents f-glass" role="group" aria-label="This grid's agents">
+          <button className={`hud-icon hud-council${councilBoard ? " is-on" : ""}`} onClick={() => toggleCouncil({ kind: "board" })} aria-pressed={councilBoard} aria-label="Council" data-tip={onLocal ? "Council: this grid's agents. The grid is read from this computer, where its sessions run" : "Council: this grid's agents, as characters. Talk to them, add more"} data-council-open>
+            <CouncilGlyph />
+            {onLocal && (
+              <span className="council-local-badge" aria-hidden>
+                <ComputerGlyph size={10} />
+              </span>
+            )}
           </button>
-          <button className={`hud-ask-gear${ui.agents ? " is-on" : ""}`} onClick={() => setUi({ agents: !ui.agents })} aria-pressed={ui.agents} aria-label="Agents: settings" data-tip="Agents: who's on this grid, add one, what runs in the background" data-hud-agents>
-            <SlidersGlyph size={15} />
+          <button className={`hud-icon hud-agents-open${ui.agents ? " is-on" : ""}`} onClick={() => setUi({ agents: !ui.agents })} aria-pressed={ui.agents} aria-label="All agents: the panel on the right" data-tip="All agents: who's on this grid, add one, what runs in the background" data-hud-agents>
+            <PanelGlyph size={15} />
           </button>
         </div>
       </motion.div>

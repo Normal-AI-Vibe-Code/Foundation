@@ -1739,7 +1739,7 @@ body.is-carrying * {
   margin: 0 auto 0 var(--space-5);
 }
 /* narrower than the whole bar: the words go, the icons stay (search, talk and Ask keep their glyphs and their tips) */
-@container hud (max-width: 700px) {
+@container hud (max-width: 910px) {
   .hud .hud-label,
   .hud .hud-search .f-kbd,
   .hud .hud-talk .f-kbd {
@@ -1749,20 +1749,23 @@ body.is-carrying * {
     min-width: 0;
     padding: 0 var(--space-4);
   }
-  .hud .hud-ask {
-    padding: 0 var(--space-3) 0 var(--space-4);
+  .hud .hud-ask-text {
+    width: 124px;
   }
 }
-/* narrower still: the zoom and the renderer's mark go too (the keys still zoom) */
-@container hud (max-width: 470px) {
+/* narrower still: the zoom and the renderer's mark go too (the keys still zoom), and Ask's line is a short one */
+@container hud (max-width: 620px) {
   .hud .hud-zoom,
   .hud .rune-mark {
     display: none;
   }
+  .hud .hud-ask-text {
+    width: 64px;
+  }
 }
-/* and at the last: present and commands (P and the command key still work) */
-@container hud (max-width: 380px) {
-  .hud .hud-icons {
+/* and at the last: present and commands (P and the command key still work); the agents' two icons stay */
+@container hud (max-width: 424px) {
+  .hud .hud-icons:not(.hud-agents) {
     display: none;
   }
 }
@@ -1795,50 +1798,67 @@ body.is-carrying * {
 .hud-icon-text {
   font: 500 var(--text-14) / 1 var(--font-sans);
 }
-/* the council: its own round button, next to Ask */
-.hud-icon.hud-council {
-  width: 36px;
-  height: 36px;
-  color: var(--color-agent);
-}
-.hud-icon.hud-council.is-on {
-  box-shadow:
-    0 0 0 1.5px var(--color-agent),
-    0 0 0 6px var(--color-agent-dim);
-}
-/* Ask and, at the pill's end, the agents' settings */
+/* Ask (2026-11-26, Josh): a pill to type into, and the line goes to every agent on this grid (shell/Talk.tsx HudAsk) */
 .hud-ask-pill {
   height: 36px;
   display: inline-flex;
   align-items: center;
+  gap: var(--space-3);
+  padding: 0 4px 0 var(--space-4);
   border-radius: var(--radius-pill);
-  padding-right: 4px;
+  color: var(--color-agent);
+  cursor: text;
 }
-.hud-ask-pill .hud-ask {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.hud-ask-pill.is-on {
+.hud-ask-pill:focus-within {
   box-shadow:
     0 0 0 1.5px var(--color-agent),
     0 0 0 6px var(--color-agent-dim);
 }
-.hud-ask-gear {
+.hud-ask-text {
+  width: 210px;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1 var(--font-sans);
+}
+.hud-ask-text::placeholder {
+  color: var(--color-mist);
+}
+.hud-ask-send {
+  flex: none;
   width: 28px;
   height: 28px;
   display: inline-grid;
   place-items: center;
-  margin-left: 2px;
   border: 0;
-  border-left: 1px solid var(--color-line);
-  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--color-mist);
+  color: var(--color-agent);
   cursor: pointer;
 }
-.hud-ask-gear:hover,
-.hud-ask-gear.is-on {
+.hud-ask-send:disabled {
+  color: var(--color-dim);
+  opacity: 0.6;
+  cursor: default;
+}
+@media (hover: hover) {
+  .hud-ask-send:hover:not(:disabled) {
+    background: var(--color-agent-dim);
+  }
+}
+/* beside Ask, two icons on one pill: the council (the agents as characters) and the panel with all of them */
+.hud-agents .hud-icon {
+  position: relative;
+}
+.hud-agents .hud-council {
+  color: var(--color-agent);
+}
+.hud-agents .hud-icon.is-on {
+  background: var(--color-agent-dim);
   color: var(--color-agent);
 }
 .hud-search.is-on {
@@ -6136,7 +6156,7 @@ html[data-theme="room"] .tool-frame.is-themed {
   outline-offset: -2px;
 }
 
-:is(.hud-ask, .hud-ask-gear, .hud-council, .hud-talk, .top-btn.is-agent):focus-visible {
+:is(.hud-ask-send, .hud-agents .hud-icon, .hud-talk, .top-btn.is-agent):focus-visible {
   outline: 2px solid var(--color-agent);
   outline-offset: 2px;
 }

@@ -51,9 +51,14 @@ import { Draggable } from "./SearchPane";
 import { Clipboard } from "./Clipboard";
 import { glyphOf } from "../lib/hits";
 import { useBoardTick } from "./Presence";
-import { POSTS, RUNNING } from "../settings/SettingsPage";
+import { HISTORY, POSTS, RUNNING, STANDING } from "../settings/SettingsPage";
+import { ReleaseHistory, ReleaseNow } from "../settings/ReleaseHistory";
+import { releaseAt, sinceRelease } from "../settings/history";
 import { releaseKind } from "../settings/releases";
 import { ReleaseCard, ReleaseKindGlyph } from "../settings/ReleasePage";
+
+/** the commit a release was cut from → its version: the Code face marks where releases were cut */
+const RELEASE_AT = releaseAt(HISTORY);
 import { BrowserGlyph, ChangesGlyph, ExpandGlyph, FilesGlyph, T3Glyph, TerminalGlyph } from "./glyphs";
 import { openAppTab } from "../lib/grids";
 import { frameAllow, frameFor } from "../panels/frameSandbox";
@@ -447,7 +452,8 @@ function ChangesTool() {
   const [open, setOpen] = useState<string | null>(null);
   const board = useBoardTick();
   useEffect(() => {
-    if (face !== "code" || log) return;
+    // the Code face, and the Releases face of a checkout (its commits not released yet)
+    if (log || !(face === "code" || (face === "releases" && STANDING.kind === "checkout"))) return;
     void api<NonNullable<typeof log>>("/api/changelog?n=80")
       .then(setLog)
       .catch((e: Error) => setLog({ available: false, commits: [], why: e.message }));
@@ -462,6 +468,10 @@ function ChangesTool() {
           </button>
         ))}
         {face === "code" && log?.branch && <span className="tool-note is-inline">on {log.branch}</span>}
+        <span className="history-faces-version" data-tip={STANDING.kind === "checkout" ? `${STANDING.ahead} commits past ${STANDING.version}` : "this app's version"}>
+          {STANDING.version}
+          {STANDING.kind === "checkout" ? "+" : ""}
+        </span>
       </div>
       <div className="tool-scroll">
         {face === "code" &&
@@ -482,6 +492,11 @@ function ChangesTool() {
                         {day} <span>{log.commits.filter((x) => dayOf(x.at) === day).length}</span>
                       </div>
                     )}
+                    {RELEASE_AT(c.hash) && (
+                      <div className="history-cut" data-release-cut={RELEASE_AT(c.hash)}>
+                        <span className="history-pill">{RELEASE_AT(c.hash)}</span> released from here
+                      </div>
+                    )}
                     <button className="tool-log-head has-kind" onClick={() => setOpen(open === c.hash ? null : c.hash)} aria-expanded={open === c.hash}>
                       <span className="tool-log-kind">
                         <ReleaseKindGlyph kind={releaseKind(c.subject)} size={14} />
@@ -497,7 +512,15 @@ function ChangesTool() {
               })}
             </ol>
           ))}
-        {face === "releases" && (POSTS.length === 0 ? <p className="tool-note">No release notes yet: they go in docs/blog/&lt;version&gt;.md.</p> : POSTS.map((p) => <ReleaseCard key={p.version} post={p} running={p.version === RUNNING} />))}
+        {face === "releases" &&
+          (HISTORY.length === 0 ? (
+            POSTS.length === 0 ? <p className="tool-note">No release notes yet: they go in docs/blog/&lt;version&gt;.md.</p> : POSTS.map((p) => <ReleaseCard key={p.version} post={p} running={p.version === RUNNING} />)
+          ) : (
+            <>
+              <ReleaseNow st={STANDING} posts={POSTS} unreleased={STANDING.kind !== "checkout" ? [] : log === null ? null : sinceRelease(log.commits, STANDING.release?.sha)} />
+              <ReleaseHistory releases={HISTORY} posts={POSTS} running={STANDING.kind === "release" ? STANDING.version : ""} />
+            </>
+          ))}
         {face === "grid" &&
           (activity.length === 0 ? (
             <p className="tool-note">Nothing has happened on this grid yet.</p>

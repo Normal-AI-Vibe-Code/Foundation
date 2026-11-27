@@ -19,6 +19,7 @@ import type { WebSocket } from "ws";
 import { appendSection, boardMaps, describeBoard, logActivity, noteTextOf, tableCellsOf, uid, type ObjectDoc, type PanelDoc } from "@foundation/protocol";
 import { all, db, indexDoc, one, run, unindexDoc } from "./db.ts";
 import { actorScope } from "./audit.ts";
+import { indexNotes } from "./noteindex.ts";
 
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
@@ -58,8 +59,10 @@ export function onBoardOpen(fn: (board: Board) => void) {
  * what a space's canvas is: the grid, a deck of slides (a grid whose sections are the slides), a web page,
  * or an app opened as a tab of its own (T3, Vision, anything that was a card or a tool and was expanded)
  */
-export type SpaceKind = "grid" | "deck" | "page" | "app";
-export const SPACE_KINDS: SpaceKind[] = ["grid", "deck", "page", "app"];
+export type SpaceKind = "grid" | "deck" | "page" | "app" | "note";
+export const SPACE_KINDS: SpaceKind[] = ["grid", "deck", "page", "app", "note"];
+/** a note page (docs/notes.md): its board holds one note, and it nests only inside another note page */
+export const isNoteKind = (k: SpaceKind | null | undefined) => k === "note";
 /** a space with no grid to look at: its canvas is a page */
 export const isPageKind = (k: SpaceKind) => k === "page" || k === "app";
 /** the look a grid pins for itself; anything else is paper, which follows the orb */
@@ -86,7 +89,7 @@ export interface BoardRow {
 }
 
 export function listBoards(): BoardRow[] {
-  return all<Omit<BoardRow, "kind"> & { kind: string | null }>("select id, name, updated_at, kind, folder, url, parent, theme, app from boards order by updated_at desc").map((b) => ({
+  return all<Omit<BoardRow, "kind"> & { kind: string | null }>("select id, name, updated_at, kind, folder, url, parent, theme, app from boards where archived_at is null order by updated_at desc").map((b) => ({
     ...b,
     kind: SPACE_KINDS.includes(b.kind as SpaceKind) ? (b.kind as SpaceKind) : "grid",
     theme: cleanTheme(b.theme),
@@ -240,7 +243,12 @@ function indexBoard(board: Board) {
   // only what this board indexed: a card moved to another grid keeps its id, and that grid's entry stays
   for (const ref of indexedRefs.get(board.id) ?? []) if (!seen.has(ref)) unindexDoc("board", ref, board.id);
   indexedRefs.set(board.id, seen);
+  // the side menu's Notes: every grid's notes, by grid and section (noteindex.ts)
+  indexNotes(board.id, board.doc);
 }
+
+/** is this board open in memory (its own updates keep its indexes) */
+export const isBoardOpen = (id: string) => boards.has(id);
 
 function objectText(o: ObjectDoc, note: string | undefined, cells?: Record<string, string>): string {
   switch (o.kind) {
@@ -556,6 +564,8 @@ export function setBoardParent(id: string, parent: string | null): { ok: true } 
   if (parent !== null) {
     const p = rows.get(parent);
     if (!p) return { error: "No such grid to put it in" };
+    // note pages nest in note pages, and nothing else (docs/notes.md)
+    if (isNoteKind(me.kind) !== isNoteKind(p.kind)) return { error: isNoteKind(me.kind) ? "A note goes inside another note" : "A note holds only notes" };
     if (isPageKind(p.kind)) return { error: p.kind === "app" ? "An app can't hold grids" : "A web page can't hold grids" };
     for (let at: string | null = parent, n = 0; at && n < 64; at = rows.get(at)?.parent ?? null, n++) {
       if (at === id) return { error: parent === id ? "A grid can't go inside itself" : `${p.name} is inside ${me.name} already` };
@@ -563,6 +573,8 @@ export function setBoardParent(id: string, parent: string | null): { ok: true } 
   }
   if (me.parent === parent) return { ok: true };
   run("update boards set parent = ? where id = ?", parent, id);
+  // a note page in a note page: no section stands for it, no card is left behind (its parent's words hold a page line: notes.ts)
+  if (isNoteKind(me.kind)) return { ok: true };
   if (me.parent && rows.has(me.parent)) leaveLink(me.parent, id, me.name, parent ? `inside ${rows.get(parent)!.name}` : "at the top of All Grids");
   if (parent) {
     // back where a card for it was left: that card is its link again

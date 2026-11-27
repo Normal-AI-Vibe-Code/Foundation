@@ -146,6 +146,17 @@ async function oneBar(seat: Locator) {
       off: bar ? Math.abs(bar.left + bar.width / 2 - (crop.left + crop.width / 2)) : 99,
       says: el.querySelectorAll("[data-council-say]").length,
       saysInBar: el.querySelectorAll(".council-bar [data-council-say]").length,
+      // the line is a pill of its own right under the bar (2026-11-26), with no box around the two
+      sayUnderBar: (() => {
+        const say = el.querySelector("[data-council-say]")?.getBoundingClientRect();
+        return !!bar && !!say && say.top >= bar.bottom - 1 && say.top - bar.bottom <= 12;
+      })(),
+      boxed: (() => {
+        const wrap = el.querySelector(".council-bar-wrap");
+        if (!wrap) return true;
+        const cs = getComputedStyle(wrap);
+        return cs.boxShadow !== "none" || cs.backgroundColor !== "rgba(0, 0, 0, 0)";
+      })(),
       barAboveHead: bar ? bar.bottom <= crop.top + 1 : false,
     };
   });
@@ -452,15 +463,15 @@ test("the grid's council stands on the window's bottom edge, no panel; with nobo
   // nothing to type into until it's pressed: rolling over only lifts it
   await seat.locator(".council-crop").hover();
   await expect(seat.locator("[data-council-say]")).toHaveCount(0);
-  // pressed: the bar over its head becomes the line to it, with the mic and ✕, above the head (not under the figure)
+  // pressed: the line to it shows under the bar over its head, with the mic and ✕, above the head (not under the figure)
   await seat.locator(".council-figure").click({ position: { x: 40, y: 40 } });
   await expect(seat.locator("[data-council-say] input")).toBeFocused();
   await expect(seat.locator("[data-council-mic]")).toBeVisible();
   await expect(seat.locator("[data-council-say-close]")).toBeVisible();
   await settle(ada, 400);
-  // one bar (2026-11-24, second pass): the line is a row of the bar over its head, its name and marks still there
+  // one bar, its name and marks still there, and the line a pill of its own under it: no box around the two (2026-11-26)
   const pressed = await oneBar(seat);
-  expect(pressed, JSON.stringify(pressed)).toMatchObject({ bars: 1, says: 1, saysInBar: 1, barAboveHead: true });
+  expect(pressed, JSON.stringify(pressed)).toMatchObject({ bars: 1, says: 1, saysInBar: 0, sayUnderBar: true, boxed: false, barAboveHead: true });
   // and no other line to type into anywhere on the council (the line to all of them is put away)
   await expect(council.locator("[data-council-say]")).toHaveCount(1);
   expect(pressed.off).toBeLessThanOrEqual(2);
@@ -638,7 +649,7 @@ test("an agent at work stands in the council on its cursor's colour, wearing a c
   await seat.locator(".council-figure").click({ position: { x: 40, y: 40 } });
   await expect(seat.locator("[data-council-say] input")).toBeFocused();
   const workingPressed = await oneBar(seat);
-  expect(workingPressed, JSON.stringify(workingPressed)).toMatchObject({ bars: 1, says: 1, saysInBar: 1, barAboveHead: true });
+  expect(workingPressed, JSON.stringify(workingPressed)).toMatchObject({ bars: 1, says: 1, saysInBar: 0, sayUnderBar: true, boxed: false, barAboveHead: true });
   // and no other line to type into anywhere on the council (the line to all of them is put away)
   await expect(council.locator("[data-council-say]")).toHaveCount(1);
   expect(workingPressed.off).toBeLessThanOrEqual(2);
@@ -686,16 +697,17 @@ test("an agent at work stands in the council on its cursor's colour, wearing a c
   await kai.context().close();
 });
 
-test("a person's own ask from the voice sheet opens the grid's council by itself, and its work shows over the agent's head, not in the strip", async () => {
+test("a person's own ask from the bar's Ask pill opens the grid's council by itself, and its work shows over the agent's head, not in the strip", async () => {
   await ada.locator("body").press("Escape");
   await expect(ada.locator(".council")).toHaveCount(0);
   // this one by night, in a short window: the run card must still end above the window's bottom edge
   await ada.setViewportSize({ width: 1280, height: 700 });
   await look(ada, true);
-  // a tap of Space opens the sheet for typing
+  // a tap of Space puts the caret in the bar's Ask pill (no sheet rises): the line goes to the grid's agents
   await ada.locator("body").press("Space");
-  const field = ada.locator(".talk-field");
-  await expect(field).toBeVisible();
+  const field = ada.locator("[data-hud-ask-text]");
+  await expect(field).toBeFocused();
+  await expect(ada.locator(".talk-sheet")).toHaveCount(0);
   await field.fill("make a section called “Yard” with the parts");
   await field.press("Enter");
   const council = ada.locator(".council-place.is-board .council");
@@ -713,7 +725,7 @@ test("a person's own ask from the voice sheet opens the grid's council by itself
   await ada.screenshot({ path: `${NEW}/06_voice-ask-opens-the-council-night-1280x700.png` });
   await seat.locator(".council-figure").click({ position: { x: 40, y: 40 } });
   await expect(seat.locator("[data-council-say] input")).toBeFocused();
-  expect(await oneBar(seat)).toMatchObject({ bars: 1, says: 1, saysInBar: 1, barAboveHead: true });
+  expect(await oneBar(seat)).toMatchObject({ bars: 1, says: 1, saysInBar: 0, sayUnderBar: true, boxed: false, barAboveHead: true });
   // and no other line to type into anywhere on the council (the line to all of them is put away)
   await expect(council.locator("[data-council-say]")).toHaveCount(1);
   await settle(ada, 250);
@@ -816,7 +828,7 @@ await council.locator("[data-council-all]").click();
   const fit = await figuresFit(council);
   expect(fit.bad, JSON.stringify(fit.figs)).toEqual([]);
   const sectionBar = await oneBar(seat);
-  expect(sectionBar, JSON.stringify(sectionBar)).toMatchObject({ bars: 1, says: 1, saysInBar: 1, barAboveHead: true });
+  expect(sectionBar, JSON.stringify(sectionBar)).toMatchObject({ bars: 1, says: 1, saysInBar: 0, sayUnderBar: true, boxed: false, barAboveHead: true });
   // and no other line to type into anywhere on the council (the line to all of them is put away)
   await expect(council.locator("[data-council-say]")).toHaveCount(1);
   expect(sectionBar.off).toBeLessThanOrEqual(2);
@@ -875,7 +887,7 @@ test("#/design shows the council and the agent's pane, day and night", async ({ 
     await expectLineOnTop(demo.locator("[data-design-council-say] .council-seat").first(), `design, ${scheme}`);
     // the pressed demo: one bar, its name and marks over the line
     const hotSeat = demo.locator("[data-design-council-say] .council-seat").first();
-    expect(await oneBar(hotSeat)).toMatchObject({ bars: 1, says: 1, saysInBar: 1 });
+    expect(await oneBar(hotSeat)).toMatchObject({ bars: 1, says: 1, saysInBar: 0, sayUnderBar: true, boxed: false });
     await expect(demo.locator("[data-design-council-say] [data-council-eye]")).toHaveCount(2);
     await expect(hotSeat.locator("[data-council-bar] [data-council-name]")).toBeVisible();
     // each part in view on its own (an element taller than the window isn't painted past it): nothing clipped
@@ -894,7 +906,7 @@ test("#/design shows the council and the agent's pane, day and night", async ({ 
       // its top and bottom inside the window: the shot holds all of it
       const box = (await part.boundingBox())!;
       expect(box.y, `${name} top`).toBeGreaterThanOrEqual(0);
-      expect(box.y + box.height, `${name} bottom`).toBeLessThanOrEqual(900);
+      expect(box.y + box.height, `${name} bottom`).toBeLessThanOrEqual(900.5); // half a pixel: where the scroll lands, not a cut
       await part.screenshot({ path: `${NEW}/09${name}-${when}.png` });
     }
     // the run cards on the page: none cut inside (their last line within them)

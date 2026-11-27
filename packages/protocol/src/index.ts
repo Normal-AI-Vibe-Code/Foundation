@@ -204,7 +204,18 @@ export interface NoteDoc extends ObjectBaseDoc {
   size?: NoteSize;
   /** no paper behind it: the words stand on the section itself */
   bare?: boolean;
+  /**
+   * A note page shown here (2026-11-26, docs/notes.md): the id of a space of kind "note", whose board holds
+   * the words (its NOTE_BODY note). The card keeps where it sits and how it looks; it has no words of its
+   * own, so an edit on the grid or in the side pane is one edit to one text. Absent: the note lives on this
+   * grid (every note made before note pages).
+   */
+  ref?: string;
 }
+/** the one note on a note page's own board: the page's words */
+export const NOTE_BODY = "body";
+/** a page line in a note's markdown: `[Title](note:<id>)` alone on its line */
+export const NOTE_LINK = /^\[([^\]]*)\]\(note:([A-Za-z0-9_-]{1,80})\)$/;
 /** a note's text sizes, smallest first */
 export const NOTE_SIZES = ["s", "m", "l", "xl", "xxl"] as const;
 export type NoteSize = (typeof NOTE_SIZES)[number];
@@ -1099,6 +1110,9 @@ export function logActivity(doc: Y.Doc, entry: Omit<ActivityEntry, "at">) {
 export function describeBoard(doc: Y.Doc): string {
   const m = boardMaps(doc);
   const lines: string[] = [];
+  // a note page's board (docs/notes.md): no sections, one note, its words
+  const body = m.objects.get(NOTE_BODY);
+  if (body?.kind === "note" && !m.sections.size) return `## Note page "${body.name}" (its words are the card "${NOTE_BODY}"; update_card writes them)\n${noteTextOf(doc, body).slice(0, 2000)}`;
   const all = [...m.sections.values()];
   for (const s of all) {
     const host = s.host ? m.objects.get(s.host) : undefined;
@@ -1115,6 +1129,8 @@ export function describeBoard(doc: Y.Doc): string {
         const ports = o.ports.map((p) => `${p.dir}:${p.name}`).join(",");
         lines.push(`- ${o.panel} "${o.name}" (${o.id}) ${extra}${ports ? ` ports[${ports}]` : ""}`);
         if (o.text) lines.push(`  ${o.text.slice(0, 240).replace(/\n/g, " ")}`);
+      } else if (o.kind === "note" && o.ref) {
+        lines.push(`- note "${o.name}" (${o.id}): shows the note page "${o.ref}" (its words are that page's; read_card reads them)`);
       } else if (o.kind === "note") {
         lines.push(`- note "${o.name}" (${o.id}): ${noteTextOf(doc, o).slice(0, 240).replace(/\n/g, " ")}`);
       } else if (o.kind === "table") {

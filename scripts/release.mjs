@@ -269,6 +269,59 @@ export function ciNotes(version, subjects, date) {
   return `---\nversion: ${version}\ndate: ${date}\ntitle: ${title}\n---\n\n${lines.join("\n")}\n`;
 }
 
+// ------------------------------------------------------------------ history
+// docs/releases.json: every published version (its tag), when, from which commit, and what changed in it (the
+// commits since the version before). The app bundles it, so the Changes panel shows the whole history offline,
+// not only the hand-written posts. `node scripts/release.mjs history` writes it from the tags; `ci build` writes
+// it again with the version it is building on top, so each build knows itself and everything before it.
+
+const HISTORY = join(root, "docs/releases.json");
+
+/** a commit subject worth showing in the history: not a plan sync, a merge or a version bump */
+export const shownSubject = (s) => !!s && !/^Plan: synced/.test(s) && !/^Merge (remote-tracking )?branch /.test(s) && !/^Foundation \d+\.\d+\.\d+$/.test(s);
+
+/** 0.3.10 after 0.3.9 */
+export function cmpVersion(a, b) {
+  const pa = a.split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
+  const pb = b.split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  return 0;
+}
+
+/** one version's entry: titled by its newest change (as its CI release is), its changes newest first */
+export function historyEntry(version, date, sha, subjects, max = 60) {
+  const kept = subjects.map((s) => s.replace(/\s+/g, " ").trim()).filter(shownSubject);
+  return { version, date, sha: sha.slice(0, 7), title: kept[0] ?? "Small fixes", changes: kept.slice(0, max), ...(kept.length > max ? { more: kept.length - max } : {}) };
+}
+
+/** the versions as the file holds them: newest first, each once */
+export function historyFile(entries) {
+  const seen = new Set();
+  const releases = entries.filter((e) => !seen.has(e.version) && seen.add(e.version)).sort((a, b) => cmpVersion(b.version, a.version));
+  return { about: "Every Foundation release, newest first, written by `node scripts/release.mjs history` from the v* tags (and by each CI build, with itself on top). The app's Changes panel shows it.", releases };
+}
+
+/** the entries from the repo's v* tags, and, for a build, the version being built at `head` */
+function historyFromGit(head) {
+  const tags = git("tag", "--list", "v*", "--sort=v:refname").split("\n").filter((t) => /^v\d+\.\d+\.\d+$/.test(t));
+  const points = tags.map((t) => ({ version: t.slice(1), rev: t }));
+  if (head && !tags.includes(`v${head.version}`)) points.push({ version: head.version, rev: head.sha });
+  const out = [];
+  for (let i = 0; i < points.length; i++) {
+    const { version, rev } = points[i];
+    const [sha, date] = git("log", "-1", "--format=%H%x1f%cI", `${rev}^{commit}`).split("\x1f");
+    const range = i === 0 ? ["-15", rev] : [`${points[i - 1].rev}..${rev}`];
+    out.push(historyEntry(version, date, sha, git("log", "--format=%s", ...range).split("\n")));
+  }
+  return historyFile(out);
+}
+
+function writeHistory(head) {
+  const file = historyFromGit(head);
+  writeFileSync(HISTORY, JSON.stringify(file, null, 2) + "\n");
+  console.log(`  docs/releases.json: ${file.releases.length} releases, the newest ${file.releases[0]?.version ?? "none"}`);
+}
+
 const gh = (argv) => spawnSync("gh", argv, { cwd: root, encoding: "utf8" });
 
 /** the version this CI run publishes */
@@ -290,6 +343,7 @@ function ciBuild() {
     const date = new Date().toISOString().slice(0, 10);
     writeFileSync(join(root, "docs/blog", `${version}.md`), ciNotes(version, subjects, date));
   }
+  writeHistory({ version, sha });
   stamp(version);
   console.log(`\n  CI build v${version} from ${sha.slice(0, 7)} (run ${runNumber}, ${process.platform}-${process.arch})\n`);
   build();
@@ -342,6 +396,7 @@ if (/release\.mjs$/.test(process.argv[1] ?? "")) {
   else if (cmd === "publish") publish();
   else if (cmd === "ci" && args[0] === "build") ciBuild();
   else if (cmd === "ci" && args[0] === "publish") ciPublish(args.slice(2).map((d) => resolve(d)));
+  else if (cmd === "history") writeHistory(null);
   else if (cmd === "notes") console.log(JSON.stringify(readNotes(args[0] ?? currentVersion()), null, 2));
   else die("usage: npm run release -- bump <x.y.z> | build | publish [--replace] | notes [version] | ci build <run> | ci publish <run> <dir>...");
 }

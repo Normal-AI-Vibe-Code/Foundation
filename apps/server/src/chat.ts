@@ -56,7 +56,7 @@ import {
   type UserInfo,
 } from "@foundation/protocol";
 import { all, db, indexDoc, one, run, unindexDoc } from "./db.ts";
-import { setChatFileRule } from "./files.ts";
+import { setChatFileRule, storeFile } from "./files.ts";
 import { HttpError, readJson, type Req, type Router } from "./http.ts";
 import { isPerson, requireUser } from "./auth.ts";
 import { canSeeBoard } from "./members.ts";
@@ -1154,38 +1154,68 @@ function safeLookup(hostname: string, options: { all?: boolean; family?: number 
   });
 }
 
-function getOnce(url: URL, deadline: number): Promise<{ status: number; location?: string; type: string; body: string }> {
+interface Fetched {
+  status: number;
+  location?: string;
+  type: string;
+  body: Buffer;
+}
+interface FetchWant {
+  accept: string;
+  /** the content types kept; anything else is an empty body */
+  type: (t: string) => boolean;
+  max: number;
+  /** past `max`: keep what came (a page's head is enough) or nothing (a picture cut short is no picture) */
+  over: "cut" | "drop";
+}
+const PAGE: FetchWant = { accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1", type: (t) => /html/i.test(t), max: PREVIEW_MAX_BYTES, over: "cut" };
+const PICTURE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
+const PICTURE_MAX_BYTES = 5 * 1024 * 1024;
+const PICTURE: FetchWant = {
+  accept: "image/png,image/jpeg,image/gif,image/webp,image/avif;q=0.9",
+  type: (t) => PICTURE_TYPES.has(t.split(";")[0].trim().toLowerCase()),
+  max: PICTURE_MAX_BYTES,
+  over: "drop",
+};
+
+function getOnce(url: URL, deadline: number, want: FetchWant = PAGE): Promise<Fetched> {
   return new Promise((resolve, reject) => {
     const host = url.hostname.replace(/^\[|\]$/g, "");
     if (isIP(host) && !addressAllowed(host)) return reject(new Error("not a public address"));
     const mod = url.protocol === "https:" ? https : http;
+    const empty = Buffer.alloc(0);
     const req = mod.get(
       url,
-      { lookup: safeLookup as never, headers: { "user-agent": "ChatForm link preview", accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1" } },
+      { lookup: safeLookup as never, headers: { "user-agent": "ChatForm link preview", accept: want.accept } },
       (res) => {
         const status = res.statusCode ?? 0;
         const type = String(res.headers["content-type"] ?? "");
         if (status >= 300 && status < 400) {
           res.resume();
-          return resolve({ status, location: res.headers.location, type, body: "" });
+          return resolve({ status, location: res.headers.location, type, body: empty });
         }
-        if (status !== 200 || !/html/i.test(type)) {
+        if (status !== 200 || !want.type(type)) {
           res.destroy();
-          return resolve({ status, type, body: "" });
+          return resolve({ status, type, body: empty });
         }
         const chunks: Buffer[] = [];
         let size = 0;
-        const done = () => resolve({ status, type, body: Buffer.concat(chunks).toString("utf8") });
+        let settled = false;
+        const done = (body = Buffer.concat(chunks)) => {
+          if (settled) return;
+          settled = true;
+          resolve({ status, type, body });
+        };
         res.on("data", (c: Buffer) => {
           size += c.length;
           chunks.push(c);
-          if (size >= PREVIEW_MAX_BYTES) {
+          if (size >= want.max) {
             res.destroy();
-            done();
+            done(want.over === "cut" ? Buffer.concat(chunks) : empty);
           }
         });
-        res.on("end", done);
-        res.on("error", () => done());
+        res.on("end", () => done());
+        res.on("error", () => done(want.over === "cut" ? Buffer.concat(chunks) : empty));
       },
     );
     const timer = setTimeout(() => req.destroy(new Error("timed out")), Math.max(1, deadline - Date.now()));
@@ -1257,11 +1287,59 @@ export async function linkPreview(raw: string): Promise<ChatLinkPreview | null> 
       url = new URL(res.location, url);
       continue;
     }
-    if (res.status !== 200 || !res.body) return null;
-    const p = parseOpenGraph(res.body, url);
+    if (res.status !== 200 || !res.body.length) return null;
+    const p = parseOpenGraph(res.body.toString("utf8"), url);
     return p ? { ...p, url: raw } : null;
   }
   return null;
+}
+
+/**
+ * Fetch a preview's picture through the same guard as its page (http(s), public addresses at every hop, 3 s),
+ * a png, jpeg, gif, webp or avif of 5 MB at most. Null when it isn't one.
+ */
+export async function previewPicture(raw: string): Promise<{ body: Buffer; mime: string; name: string } | null> {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const deadline = Date.now() + PREVIEW_TIMEOUT_MS;
+  for (let hop = 0; hop < 4; hop++) {
+    if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return null;
+    const res = await getOnce(url, deadline, PICTURE);
+    if (res.status >= 300 && res.status < 400 && res.location) {
+      url = new URL(res.location, url);
+      continue;
+    }
+    if (res.status !== 200 || !res.body.length) return null;
+    const mime = res.type.split(";")[0].trim().toLowerCase();
+    const last = url.pathname.split("/").pop() || "";
+    let plain = last;
+    try {
+      plain = decodeURIComponent(last);
+    } catch {
+      /* kept as it came */
+    }
+    const base = plain.replace(/[^\w.-]+/g, "_").slice(0, 80);
+    return { body: res.body, mime, name: base || `preview.${mime.split("/")[1]}` };
+  }
+  return null;
+}
+
+/**
+ * Keep a preview's picture in the archive, carried by its message, so viewers read it from Foundation (`/files/…`,
+ * only those who can see the message) and the other site never sees them. A picture that can't be kept is dropped.
+ */
+async function keepPreviewPicture(p: ChatLinkPreview, m: ChatMessage): Promise<ChatLinkPreview> {
+  if (!p.image || p.image.startsWith("/files/")) return p;
+  const { image: _remote, ...rest } = p;
+  const got = await previewPicture(p.image).catch(() => null);
+  if (!got) return rest;
+  const f = await storeFile(got.body, { name: got.name, mime: got.mime, boardId: CHAT_BOARD, userId: m.author.kind === "person" ? m.author.id : "chat-preview", about: `link preview of ${p.url}` });
+  run("insert or ignore into chat_files (file_id, message_id, channel_id) values (?, ?, ?)", f.id, m.id, m.channel);
+  return { ...rest, image: `/files/${f.id}` };
 }
 
 /** the first three http(s) links of a text, outside code */
@@ -1280,7 +1358,7 @@ function queuePreviews(m: ChatMessage) {
   if (!previewsOn()) return;
   const urls = linksIn(m.text);
   if (!urls.length) return;
-  void Promise.all(urls.map((u) => linkPreview(u).catch(() => null))).then((got) => {
+  void Promise.all(urls.map((u) => linkPreview(u).then((p) => (p ? keepPreviewPicture(p, m) : null)).catch(() => null))).then((got) => {
     const previews = got.filter((p): p is ChatLinkPreview => Boolean(p));
     if (!previews.length) return;
     const now = messageRow(m.id);
@@ -1478,6 +1556,21 @@ export function unreadsFor(user: UserInfo): { total: number; mentions: number; c
   return { total, mentions, channels };
 }
 
+/** where a message is, as ChatForm's own link: its channel, its thread when it's a reply, at the message (flashed) */
+export function chatHref(channelId: string, at?: { seq: number; root_id: string | null } | null) {
+  const c = encodeURIComponent(channelId);
+  if (!at) return `#/chat/chat/${c}`;
+  return `#/chat/chat/${c}${at.root_id ? `/thread/${encodeURIComponent(at.root_id)}` : ""}/at/${at.seq}`;
+}
+const firstUnread = (channelId: string, readSeq: number) =>
+  one<{ seq: number; root_id: string | null }>("select seq, root_id from chat_messages where channel_id = ? and seq > ? and deleted_at is null and type not in ('system', 'draft') order by seq limit 1", channelId, readSeq);
+const lastMentionOf = (channelId: string, userId: string) =>
+  one<{ seq: number; root_id: string | null }>(
+    `select seq, root_id from chat_messages where channel_id = ? and deleted_at is null and type not in ('system', 'draft')
+      and (mentions_json like ? escape '!' or mentions_json like '%"channel"%' or mentions_json like '%"here"%') order by seq desc limit 1`,
+    channelId, `%"${userId.replace(/[!%_]/g, (x) => `!${x}`)}"%`,
+  );
+
 /** Today's focus (today.ts): kind "message", one per channel with mentions of them, or a dm or group with unread */
 export function chatFocus(user: UserInfo, now = Date.now()) {
   const rows = all<MemberRow & { kind: ChatChannelKind; last_seq: number; last_post_at: number; last_text: string | null; archived_at: number | null }>(
@@ -1504,7 +1597,7 @@ export function chatFocus(user: UserInfo, now = Date.now()) {
       why: `${direct ? `${n} new from ${label}` : `${n} mention${n === 1 ? "" : "s"} in ${label}`} · ${when}`,
       board: CHAT_BOARD,
       boardName: "ChatForm",
-      href: `#/chat/chat/${r.channel_id}`,
+      href: chatHref(r.channel_id, direct ? firstUnread(r.channel_id, r.read_seq) : lastMentionOf(r.channel_id, user.id)),
       at: r.last_post_at,
       ...(lastAuthor?.kind === "agent" ? { tone: "agent" as const } : {}),
     });

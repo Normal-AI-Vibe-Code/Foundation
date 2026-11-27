@@ -36,7 +36,7 @@ import type { UpdatePhase } from "../update/updater";
 import { NightOrb } from "../shell/NightOrb";
 import { InfoGlyph } from "../shell/TopBar";
 import { WindowControls } from "../shell/WindowControls";
-import { SunGlyph, MicGlyph, PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
+import { SunGlyph, MicGlyph, PanelGlyph, PresentGlyph, SearchGlyph, SendGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { TrailSpecimen } from "../trail/TrailGrid";
 import type { TrailLane } from "../trail/model";
@@ -47,6 +47,10 @@ import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } fro
 import { tunnelGeometry } from "../shell/wireGeometry";
 import { AppChip, AppRow, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
 import type { CompanyApp, CompanyGoal, FocusItem, Goal, Mood } from "../today/model";
+import { IS_NOTICE } from "../today/Today";
+import { NoticeList, todayNotices } from "../today/TodayNotices";
+import { BellButton } from "../chat/Bell";
+import type { Notice, Seen } from "../chat/notifyLogic";
 
 const NOW = Date.now();
 const SAMPLE_COMPANY: CompanyGoal[] = [
@@ -57,10 +61,26 @@ const SAMPLE_FOCUS: FocusItem[] = [
   { id: "goal:cg1", kind: "goal", title: "Fly the PTHP demonstrator", why: "A company goal you carry · 45% · due 24 Dec", board: "company", boardName: "Form Industries", href: "#", at: NOW },
   { id: "ask:a", kind: "ask", title: "Upload the latest stator STEP", why: "Kai asked you for CAD · 1 d overdue", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW, tone: "bad" },
   { id: "stage:s", kind: "stage", title: "03 · CAD", why: "You own this stage · 2 to tick", board: "company", boardName: "Form Industries", href: "#", at: NOW, tone: "warn" },
-  { id: "mention:m", kind: "mention", title: "@Ada can you sign off the bearing loads before Friday?", why: "You're tagged in a note on Rim drive", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW },
+  { id: "mention:m", kind: "mention", title: "@Ada can you sign off the bearing loads before Friday?", why: "You're tagged in a note on Rim drive", board: "rim-drive", boardName: "Rim drive", objectId: "note_m", sectionId: "sec_b", sectionName: "Bearings", href: "#", at: NOW - 3 * 3600e3 },
   { id: "changes:c", kind: "changes", title: "6 changes on Form Industries", why: "Foundation Agent, Kai · latest: laid out 4 images", board: "company", boardName: "Form Industries", href: "#", at: NOW, tone: "agent" },
   { id: "related:r", kind: "related", title: "Winding thermal model", why: "Matches “thermal”, from your work", board: "motors", boardName: "Motors", href: "#", at: 0 },
 ];
+/** what was said to Ada in ChatForm, as the bell's list has it: a mention (not seen), a DM (not seen), an agent's @channel (seen) */
+const SAMPLE_PARTY = {
+  kai: { kind: "person" as const, id: "u_kai", name: "Kai Moreno", color: "var(--viz-3)" },
+  mei: { kind: "person" as const, id: "u_mei", name: "Mei Tan", color: "var(--viz-5)" },
+  wren: { kind: "agent" as const, id: "Wren", name: "Wren", via: "claude" as const, forName: "Kai Moreno" },
+};
+const sampleMsg = (id: string, author: Notice["message"]["author"], minsAgo: number, text: string, channel: string, seq: number, root: string | null = null): Notice["message"] => ({
+  id, channel, seq, author, type: "text", text, root, createdAt: NOW - minsAgo * 60_000, editedAt: null, deletedAt: null, files: [], reactions: [], replyCount: 0, lastReplyAt: null, pinned: false, mentions: [],
+});
+const SAMPLE_NOTICES: Notice[] = [
+  { id: "n1", why: "mention", channel: { id: "ch_rim", name: "rim-drive", kind: "open" }, message: sampleMsg("n1", SAMPLE_PARTY.kai, 4, "@ada the stator STEP is the old rev, can you re-export before Mei quotes it?", "ch_rim", 41, "m_root") },
+  { id: "n2", why: "direct", channel: { id: "ch_mei", name: "Mei Tan", kind: "dm" }, message: sampleMsg("n2", SAMPLE_PARTY.mei, 38, "Quote's in for the bearings. Shall I confirm it today?", "ch_mei", 12) },
+  { id: "n3", why: "everyone", channel: { id: "ch_gen", name: "general", kind: "open" }, message: sampleMsg("n3", SAMPLE_PARTY.wren, 300, "@channel the flow report for rev C is on the grid.", "ch_gen", 88) },
+];
+const SAMPLE_SEEN: Seen = { allAt: 0, ids: ["n3"] };
+
 const SAMPLE_GOALS: Goal[] = [
   { id: "g1", title: "Freeze the rim-drive CAD for the PTHP build", detail: "Stator and bearings signed off", status: "active", progress: 0.6, dueAt: NOW + 8 * 864e5, board: null, objectId: null, source: "foundation" },
   { id: "g2", title: "Onboard Kai to FactoryForm work orders", detail: "", status: "done", progress: 1, dueAt: null, board: null, objectId: null, source: "foundation" },
@@ -101,11 +121,17 @@ function TodayDemo() {
             <GoalRow key={g.id} goal={g} onDone={() => {}} />
           ))}
         </section>
+        {/* what was said to you (2026-11-26): ChatForm's mentions and DMs, and a note that tags you on a grid; each a
+            press from where it was said. Unseen rows carry the accent's dot; the empty state below */}
+        <NoticeList rows={todayNotices({ notices: SAMPLE_NOTICES, seen: SAMPLE_SEEN, focus: SAMPLE_FOCUS })} unseen={2} now={NOW} onOpen={() => {}} onAll={() => {}} onSeeAll={() => {}} />
+        <div data-design-notices-empty>
+          <NoticeList rows={[]} unseen={0} />
+        </div>
         <section className="today-group">
           <h2 className="f-eyebrow">
-            Todos <span className="today-count">8</span>
+            Todos <span className="today-count">7</span>
           </h2>
-          {SAMPLE_FOCUS.map((f, i) => (
+          {SAMPLE_FOCUS.filter((f) => !IS_NOTICE(f)).map((f, i) => (
             <FocusRow key={f.id} item={f} pointed={i === 2} />
           ))}
           {SAMPLE_GOALS.map((g, i) => (
@@ -128,8 +154,8 @@ function TodayDemo() {
     </div>
   );
 }
-import { CardMenuDemo, ReleasePageDemo, ThemesDemo } from "./ThemeDemos";
-import { PlanBoard, ReleasesTab, type NewCardInput, type SyncState } from "../settings/SettingsPage";
+import { CardMenuDemo, ReleaseHistoryDemo, ReleasePageDemo, ThemesDemo } from "./ThemeDemos";
+import { HISTORY, POSTS, PlanBoard, ReleasesTab, type NewCardInput, type SyncState } from "../settings/SettingsPage";
 import type { ReleasePost } from "../settings/releases";
 import { syncSentence } from "../settings/plan";
 import type { Plan } from "../settings/plan";
@@ -138,7 +164,9 @@ import { SlackMarkView } from "../components/SlackMark";
 import { SectionCrewView, type CrewFace } from "../components/SectionCrew";
 import { SectionAgentsChipView, SectionAgentsView } from "../components/SectionAgents";
 import { RichToolbar } from "../components/RichText";
-import { BareGlyph, MarkdownGlyph } from "../components/NoteView";
+import { BareGlyph, MarkdownGlyph, PageGlyph } from "../components/NoteView";
+import { rankBlocks, renderNote } from "../notes/blocks";
+import "../notes/blocks.css";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
 import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
 import { MachineTools } from "../panels/MachineTools";
@@ -888,21 +916,24 @@ function DesignSections() {
                 <span className="hud-icon-text">{COMMANDS_GLYPH}</span>
               </span>
             </div>
-            <button className="hud-icon hud-council f-glass">
-              <CouncilGlyph />
-            </button>
-            <div className="hud-ask-pill f-glass">
-              <button className="hud-ask">
-                <span className="hud-glyph">✦</span>
-                <span className="hud-label">Ask</span>
+            <div className="hud-ask-pill f-glass" data-design-hud-ask>
+              <span className="hud-glyph">✦</span>
+              <input className="hud-ask-text" placeholder="Ask all 3 agents…" readOnly />
+              <button className="hud-ask-send" disabled aria-label="Send">
+                <SendGlyph size={14} />
               </button>
-              <span className="hud-ask-gear">
-                <SlidersGlyph size={15} />
+            </div>
+            <div className="hud-icons hud-agents f-glass">
+              <span className="hud-icon hud-council">
+                <CouncilGlyph />
+              </span>
+              <span className="hud-icon">
+                <PanelGlyph size={15} />
               </span>
             </div>
           </div>
         </div>
-        <div className="floor-demo-caption">The bottom bar · search opens over its pill (the pin moves it to the right) · when the grid's council stands at the bottom right, the bar steps to the bottom left</div>
+        <div className="floor-demo-caption">The bottom bar · search opens over its pill (the pin moves it to the right) · Ask is a line to every agent on the grid (a tap of Space puts the caret in it); beside it, the council and the panel with all the agents · when the grid's council stands at the bottom right, the bar steps to the bottom left</div>
       </Section>
 
       <Section title="Chrome on call" note="The grid runs edge to edge. Everything else waits to be called: search is a small pill at the bottom, a card's bar drops in on hover, and an image's icons slide out from behind it.">
@@ -914,10 +945,6 @@ function DesignSections() {
                 <span className="hud-label">Search</span>
                 <span className="f-kbd">{keys("mod+F")}</span>
               </button>
-              <button className="hud-ask f-glass">
-                <span className="hud-glyph">✦</span>
-                <span className="hud-label">Ask</span>
-              </button>
               <button className="hud-talk f-glass">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
                   <rect x="5.5" y="1.5" width="5" height="9" rx="2.5" />
@@ -927,7 +954,7 @@ function DesignSections() {
               </button>
               <button className="hud-zoom f-glass">64%</button>
             </div>
-            <div className="effect-label">The search pill, talk (hold Space: what you say goes to the crew) and the zoom</div>
+            <div className="effect-label">The search pill, talk (hold Space: what you say goes to the grid's agents) and the zoom</div>
           </div>
           <div className="oncall-cell">
             <div className="oncall-talking">
@@ -1258,14 +1285,14 @@ function DesignSections() {
 
       <Section
         title="Today and the Shiba"
-        note="Home, before the boards. Vision's ethereal shiba fills the room and is the agent's face: warm paper at rest, lilac while it listens, frosted blue while it thinks, dusk while it speaks. Its words are set at 40 (the one size above 32). The day sits beside it on glass: focus rows by kind (overdue red, owned amber, agent violet), goals with a blue bar, and the company apps as chips in the top bar (dashed when not linked). What the Shiba talks about wears the violet ring."
+        note="Home, before the boards. Vision's ethereal shiba fills the room and is the agent's face: warm paper at rest, lilac while it listens, frosted blue while it thinks, dusk while it speaks. Its words are set at 40 (the one size above 32). The day sits beside it on glass: focus rows by kind (overdue red, owned amber, agent violet), goals with a blue bar, and the company apps as chips in the top bar (dashed when not linked). What the Shiba talks about wears the violet ring. Notifications (2026-11-26) list what was said to you, newest first: a ChatForm mention or DM with its author's face, a note that tags you on a grid with @ and its section; each row is a link to where it happened, one not seen yet bold with the accent's dot on its pill, and Mark all read is the bell's."
       >
         <TodayDemo />
       </Section>
 
       <Section
         title="Today's row, what the Shiba says, adding an agent"
-        note="Today's row in the side menu is a pill: the Shiba at 18 px (two soft lights turning in a disc, CSS only), the word, and a badge when something waits on you. Over the Shiba's room everything is white: an answer's prose, its plan as a card, and anything long and literal folded to one line that opens on the right. Adding an agent is four steps on one sheet in the agents panel: who, connect, avatar, add; the open step is ringed violet, a settled one ticks green, a waiting one steps back."
+        note="Today in the top bar's corner is a pill: the Shiba at 16 px (two soft lights turning in a disc, CSS only), the word, and a badge when something waits on you; the bell sits right against it, one pair (2026-11-26), with its own count of what was said to you. Over the Shiba's room everything is white: an answer's prose, its plan as a card, and anything long and literal folded to one line that opens on the right. Adding an agent is four steps on one sheet in the agents panel: who, connect, avatar, add; the open step is ringed violet, a settled one ticks green, a waiting one steps back."
       >
         <TodayPartsDemo />
       </Section>
@@ -1513,6 +1540,10 @@ function DesignSections() {
         <NoteDemo />
       </Section>
 
+      <Section title="Note pages and blocks" note={`2026-11-26 (docs/notes.md): a note is also a page of its own. The side menu's Notes lists them as a tree (a note inside a note, ＋ makes one inside); one opens full size on the floor's paper: the pages it sits inside, its title in display 32 (renaming it renames it everywhere), Put on a grid, People and activity, Archive (asks first; nothing is deleted). Dragged from Notes onto a section, or put there from the page, it is a card on that grid: the same note, not a copy, with Open the page (the sheet) in its bar; an edit in either place is in both, live. A grid's own note becomes a page from its card's menu (Make it a page). The words are written in blocks: a slash (/) at a word's start opens the block menu at the caret (raised paper, pane radius, 264 wide: a glyph tile, the name, a hint, its markdown shortcut; the picked row is the pulse tint; recent ones first), and markdown at a block's start turns it (# ## ### - 1. [] > >> ! \`\`\` ---). To-dos are a box in the item's gutter (the pulse, ticked; the words go quiet and struck), Tab and ${keys("shift+Tab")} take an item a level in or out, a callout is a box of its kind's state colour (note pulse, tip ok, important agent, warning warn, caution bad), a toggle folds what's under it from an arrow in its gutter, a page inside is a row with its sheet, a link card shows its host and opens on a press (nothing loads on sight). The handle (six dots, dim) sits beside the block under the pointer: drag it (a pulse line shows where it lands) or press it for Turn into, Duplicate, Move up and down, Delete. Kept as markdown: - [ ], > [!NOTE], <details>, [Title](note:id).`}>
+        <NotePagesDemo />
+      </Section>
+
       <Section title="Voice and video notes" note={`2026-11-25, Josh: "where you can leave a short video note for someone to play back." A section's microphone (its tools, next to the note), its right-click menu and ${keys("mod+K")} (Voice note, Video note) open the recorder: raised paper off the section's top-right, drawn on the screen, 300 wide. Voice or Video, then Record: the microphone (and camera) opens only then, and every track stops when the recording stops, is discarded or the recorder closes. While it records, the state colour (red by day, orange at night) breathes on a dot, a meter or the mirrored camera shows it's live, the time counts up in tabular figures to the cap (5 minutes of voice, 2 of video), and the last ten seconds count down in the waiting colour. Review: play it back, Leave it here (the one blue action), Record again, Discard. It uploads, then the card is put down whole (never a placeholder). An upload that fails keeps the clip, with Try again; closing over a clip asks first. A viewer has no microphone. A voice note is a player on paper, 320 × 100 (240 to 560 wide; its height is its own): play, the wave from its 48 steps with what's played in ink (press or drag to go there; arrows step 5 s), elapsed / total, who and when, and 1× · 1.5× · 2×. A video note is the clip at its own shape (320 on its long side) over its first frame, a round play button, who / when / how long under it; it never plays by itself and plays with its sound, in place or full screen. Both are picked up anywhere, and ask before they go: the clip stays in the archive.`}>
         <MediaNotesDemo />
       </Section>
@@ -1570,6 +1601,10 @@ function DesignSections() {
 
       <Section title="Release page" note="The Changes tool's first face, and what heads a post in Settings → Releases: a release drawn from its own post. A cover (the mark in pulse, the version in display 300/32, the date, THIS APP on the one running) on a wash of the accent and the agent tint over the panel well; the title in display 20/600; the post's opening paragraph as the description (mist 13/1.55); one bar cut in proportion to the post's parts in the data colours, with the counts (changes · fixes) in dim tabular 11; then each part as a tile on raised paper: its icon on a 14 % wash of its colour, its name 13/600, how many things it lists, and one sentence in mist 12. A tile opens the full notes at its part. On tokens only: white over the room on Today, ink on paper elsewhere.">
         <ReleasePageDemo post={DEMO_POSTS[0]} />
+      </Section>
+
+      <Section title="Release history" note="The Changes panel's Releases face (2026-11-27): this app first, then every release Foundation has had (docs/releases.json, from the v* tags; each CI build writes itself on top). The head is raised paper: the mark in pulse, an eyebrow (THIS APP, or THIS APP · FROM THE CHECKOUT), the version in display 300/40 tabular (a checkout adds +n in dim 20), released date and commit in mist 12; then What's new (or a checkout's Not released yet, then what its release changed) as rows of 13/1.4 with each change's kind glyph in dim. The faces' bar carries the version again as a code-face pill at its right, on every face. History: the tally (releases · changes · days since the first) in mist with frost numbers; the rhythm, one bar per day in pulse (a line-coloured stub on days without one); then each day's eyebrow and its releases as rows: a code pill with the version (pulse with on-fill text on the running one), the title 13/500, changes and time in dim 11, NOTES in moss where a person wrote a post. A row opens to its changes, its commit, and the post. The Code face marks the commit each release was cut from with the same pill.">
+        <ReleaseHistoryDemo releases={HISTORY} posts={POSTS} />
       </Section>
 
       <Section title="A card's menu, pinned and minimized" note="Right-click any card: its name, then Frame it, Full screen and Minimize; Pin to the section or Unpin (a table), Let it fill the section or Show as a card (an app), Float or Dock; Inputs and outputs… (the right pane: every port with its type, what is on it now in full, and each card it is wired to); Open as a tab (an app); Copy a link; Remove in the bad colour, last. A viewer gets the ones that change nothing. A table's cells keep their own menu. Pinned, a table leaves the flow and spans its section on the section's own paper: no card under it, its rules only, at the section's exact width; the flow's cards lie over it. A section a person adds starts with one. Minimized, a card is its bar alone (40 tall), always showing, with ▢ to restore.">
@@ -2052,6 +2087,104 @@ function NoteDemo() {
   );
 }
 
+/** a note page's blocks at rest, the slash menu, the handle, and a card showing a page (docs/notes.md) */
+function NotePagesDemo() {
+  const md = [
+    "## Rotor plan",
+    "",
+    "- [x] Balance the rotor",
+    "- [ ] Ask Acme for a quote",
+    "  - [ ] Check the lead time",
+    "",
+    "> [!TIP] Spin it up slowly the first time.",
+    "",
+    "> [!WARNING] Hot when it runs.",
+    "",
+    "<details open>",
+    "<summary>Specs</summary>",
+    "",
+    "- 12 V, 3 A",
+    "- 1,200 rpm",
+    "",
+    "</details>",
+    "",
+    "<details>",
+    "<summary>Folded: the test log</summary>",
+    "",
+    "Nothing here yet.",
+    "",
+    "</details>",
+    "",
+    "[Supplier calls](note:supplier-calls)",
+    "",
+    "https://example.com/datasheets/rotor-r3",
+    "",
+    "```ts",
+    "const rpm = 1200;",
+    "```",
+  ].join("\n");
+  const html = renderNote(md).replace(/>\n</g, "><");
+  const found = rankBlocks("");
+  return (
+    <div className="adapt-row note-pages-demo">
+      <div className="oncall-cell">
+        <div className="frame-card oncall-static" style={{ position: "relative", width: 440 }}>
+          <div className="note-inner">
+            <div className="note-rendered rich-text" dangerouslySetInnerHTML={{ __html: html }} />
+            <span className="note-block-handle" style={{ top: 14, left: 0, position: "absolute" }} aria-hidden>
+              <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                <circle cx="3" cy="3" r="1.1" />
+                <circle cx="7" cy="3" r="1.1" />
+                <circle cx="3" cy="7" r="1.1" />
+                <circle cx="7" cy="7" r="1.1" />
+                <circle cx="3" cy="11" r="1.1" />
+                <circle cx="7" cy="11" r="1.1" />
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div className="effect-label">The blocks at rest: to-dos (one ticked, one a level in), a tip and a warning, a toggle open and one folded, a page inside, a link card, code with its language; the handle beside the heading</div>
+      </div>
+      <div className="oncall-cell">
+        <div className="note-slash" style={{ position: "relative", zIndex: 0 }} role="listbox" aria-label="Turn into (example)">
+          {found.slice(0, 8).map((b, i) => (
+            <div key={b.id} className={"note-slash-item" + (i === 1 ? " is-picked" : "")}>
+              <span className="note-slash-glyph" data-block={b.id} aria-hidden />
+              <span className="note-slash-words">
+                <span className="note-slash-name">{b.name}</span>
+                <span className="note-slash-hint">{b.hint}</span>
+              </span>
+              {b.md && <kbd className="note-slash-md">{b.md}</kbd>}
+            </div>
+          ))}
+        </div>
+        <div className="effect-label">The slash menu: every block, its markdown shortcut beside it; the picked one is the pulse tint</div>
+      </div>
+      <div className="oncall-cell">
+        <div className="frame-card note-card is-page oncall-static" style={{ position: "relative", width: 360 }}>
+          <div className="frame-header">
+            <span className="frame-title">Rotor plan</span>
+            <div className="header-actions">
+              <span className="icon-btn note-open-btn">
+                <PageGlyph />
+              </span>
+              <span className="icon-btn">⛶</span>
+              <span className="icon-btn">✕</span>
+            </div>
+          </div>
+          <div className="note-inner" style={{ height: 160 }}>
+            <div className="note-rendered rich-text" dangerouslySetInnerHTML={{ __html: renderNote("- [x] Balance the rotor\n- [ ] Ask Acme for a quote\n\n> [!NOTE] The same note as the page: edit it here or there.").replace(/>\n</g, "><") }} />
+          </div>
+        </div>
+        <div className="note-locked" style={{ width: 360 }}>
+          A note page you can't open: it's members-only, or it isn't there any more.
+        </div>
+        <div className="effect-label">On a grid: the page as a card (Open the page in its bar), and what someone sees who can't open it</div>
+      </div>
+    </div>
+  );
+}
+
 /** the agent group above a section (one agent, one team, teams side by side, pinned and empty) and the agents pane */
 function SectionCrewDemo() {
   const face = (id: string, hue: number, doing: string, extra: Partial<CrewFace> = {}): CrewFace => ({ id, name: id, hue, status: "working", doing, askerName: "Ada Okafor", ...extra });
@@ -2271,25 +2404,6 @@ function CrewDemo() {
           </div>
         </div>
         <div className="effect-label">Holding Space: the level, the words, the crew at work</div>
-        <div className="talk-sheet f-glass is-open crew-demo-still" data-mode="typing">
-          <div className="talk-input">
-            <span className="talk-level">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span key={i} />
-              ))}
-            </span>
-            <textarea className="talk-field" rows={1} placeholder="Ask the crew: make a section for…, hook up FactoryForm…" readOnly />
-          </div>
-          <div className="talk-hints">
-            <span>
-              <span className="f-kbd">↵</span> sends
-            </span>
-            <span>
-              Hold <span className="f-kbd">Space</span> on the board to talk
-            </span>
-          </div>
-        </div>
-        <div className="effect-label">A tap of Space: typing</div>
       </div>
     </div>
   );
@@ -2438,15 +2552,22 @@ function TodayPartsDemo() {
     <div className="design-today-parts" data-design-today-parts>
       <div className="design-today-menu">
         {/* in the top bar's left corner (2026-11-17): what's waiting sits right beside the word */}
-        <button className="top-today is-on">
-          <ShibaDot size={16} />
-          Today
-          <span className="pane-badge">3</span>
-        </button>
-        <button className="top-today">
-          <ShibaDot size={16} />
-          Today
-        </button>
+        {/* Today and the bell, one pair (2026-11-26): the bell right against the word, never drifting off */}
+        <span className="top-today-pair" data-design-today-pair>
+          <button className="top-today is-on">
+            <ShibaDot size={16} />
+            Today
+            <span className="pane-badge">3</span>
+          </button>
+          <BellButton count={2} />
+        </span>
+        <span className="top-today-pair">
+          <button className="top-today">
+            <ShibaDot size={16} />
+            Today
+          </button>
+          <BellButton count={0} />
+        </span>
       </div>
       <div className="design-today-room">
         <ShibaRoom mood="speaking" maxFps={24} />
@@ -2597,8 +2718,8 @@ function CouncilDemo() {
       <div data-design-council-main style={{ display: "flow-root" }}>
         <CouncilView title="Supply" kind="section" seats={seats} ghost={others[3]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline />
       </div>
-      {/* pressed: the line to that agent is the last row of the same bar, its name and marks above it */}
-      <div className="f-eyebrow update-demo-label">Pressed: the bar over its head becomes the line to it</div>
+      {/* pressed: the bar stays as it is and the line to that agent is a pill of its own under it (2026-11-26) */}
+      <div className="f-eyebrow update-demo-label">Pressed: its bar stays, and the line to it is a pill under the bar (no box around them)</div>
       <div data-design-council-say style={{ display: "flow-root" }}>
         <CouncilView title="Supply" kind="section" seats={[seats[2]]} ghost={others[3]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onClose={() => {}} inline hot="c" />
       </div>

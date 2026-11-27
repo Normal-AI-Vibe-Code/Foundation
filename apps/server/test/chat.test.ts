@@ -332,7 +332,7 @@ test("unread, mentions (@handle, @channel, a DM), and mark unread from here", as
   assert.equal(bv.me?.starred, true);
   // a DM message is a mention for the other side, and shows on Today
   const dm = await mkChannel(C.cy, { kind: "dm", members: [bob.id] });
-  await post(C.cy, dm.id, "got a minute?");
+  const first = await post(C.cy, dm.id, "got a minute?");
   const dv = await view(C.bob).catch(() => null);
   assert.ok(dv);
   const d = await ok<{ channel: ChatChannelView }>(C.bob, "GET", `/api/chat/channels/${dm.id}`);
@@ -340,7 +340,8 @@ test("unread, mentions (@handle, @channel, a DM), and mark unread from here", as
   const focus = focusFor(bob).find((f) => f.id === `message:${dm.id}`);
   assert.ok(focus, "Today lists the DM");
   assert.equal(focus.kind, "message");
-  assert.equal(focus.href, `#/chat/chat/${dm.id}`);
+  // (2026-11-26) at the first message Bob hasn't read, not the channel's foot
+  assert.equal(focus.href, `#/chat/chat/${dm.id}/at/${first.seq}`);
 });
 
 // ---------- paging ----------
@@ -509,8 +510,18 @@ test("link previews: the SSRF guard, off under test by default, and a local stan
   for (const ip of ["8.8.8.8", "1.1.1.1", "2606:4700:4700::1111", "::ffff:8.8.8.8"]) assert.equal(chat.isPublicAddress(ip), true, `${ip} is public`);
   assert.deepEqual(chat.linksIn("see https://a.example/x, and `https://code.example` and https://b.example/y. https://c.example https://d.example"), ["https://a.example/x", "https://b.example/y", "https://c.example"]);
 
+  // a 1×1 PNG, the page's picture
+  const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  let pictureAsks = 0;
   const site = createServer((req, res) => {
     if (req.url === "/to-metadata") return res.writeHead(302, { location: "http://169.254.169.254/latest/meta-data/" }).end();
+    if (req.url === "/pic.png" || req.url === "/pic2.png") {
+      pictureAsks++;
+      return res.writeHead(200, { "content-type": "image/png" }).end(req.url === "/pic2.png" ? Buffer.concat([PNG, Buffer.from([0])]) : PNG);
+    }
+    if (req.url === "/page2") return res.writeHead(200, { "content-type": "text/html" }).end(`<meta property="og:title" content="Second"><meta property="og:image" content="/pic2.png">`);
+    if (req.url === "/pic-to-metadata") return res.writeHead(302, { location: "http://169.254.169.254/pic.png" }).end();
+    if (req.url === "/not-a-picture") return res.writeHead(200, { "content-type": "image/svg+xml" }).end("<svg/>");
     res.writeHead(200, { "content-type": "text/html" });
     res.end(`<html><head><title>Fallback</title><meta property="og:title" content="Rim drive &amp; hub"><meta property="og:description" content="The new one"><meta property="og:image" content="/pic.png"></head></html>`);
   });
@@ -536,6 +547,26 @@ test("link previews: the SSRF guard, off under test by default, and a local stan
     const changed = (await s.next((e) => e.t === "message-changed" && e.message.id === m.id && Boolean(e.message.previews), 4000)) as Extract<ChatEvent, { t: "message-changed" }>;
     assert.equal(changed.message.previews?.[0].title, "Rim drive & hub");
     s.close();
+
+    // the picture is fetched once by the server, behind the same guard, and kept in the archive: viewers read /files/…, never the site
+    await assert.rejects(chat.previewPicture(`${url}/pic-to-metadata`), /public address/, "a picture's redirect to a private address is refused");
+    assert.equal(await chat.previewPicture(`${url}/not-a-picture`), null, "only png, jpeg, gif, webp, avif");
+    const asked = pictureAsks;
+    const priv = await mkChannel(C.ada, { kind: "private", name: "preview-pictures", members: [bob.id] });
+    const sp = await listen({ cookie: C.bob });
+    const pm = await post(C.ada, priv.id, `in here: ${url}/page2`);
+    const got = (await sp.next((e) => e.t === "message-changed" && e.message.id === pm.id && Boolean(e.message.previews), 4000)) as Extract<ChatEvent, { t: "message-changed" }>;
+    sp.close();
+    const image = got.message.previews?.[0].image ?? "";
+    assert.match(image, /^\/files\/f_[0-9a-f]+$/, "the preview's picture is Foundation's own file");
+    assert.equal(pictureAsks, asked + 1, "the server asked the site for it once");
+    const fileId = image.slice("/files/".length);
+    const row = one<{ mime: string; size: number; board_id: string; archived_at: number | null }>("select mime, size, board_id, archived_at from files where id = ?", fileId)!;
+    assert.deepEqual({ ...row }, { mime: "image/png", size: PNG.length + 1, board_id: "chat", archived_at: null });
+    assert.equal(chat.canSeeChatFile(bob, fileId), true, "a member reads it");
+    assert.equal(chat.canSeeChatFile(cy, fileId), false, "a non-member doesn't");
+    assert.equal(chat.canSeeChatFile(boss, fileId), false, "nor does an admin");
+    assert.equal(chat.getMessage(pm.id)!.files.length, 0, "it isn't an attachment");
   } finally {
     delete process.env.FOUNDATION_CHAT_PREVIEWS;
     delete process.env.FOUNDATION_CHAT_PREVIEWS_LOOPBACK;
