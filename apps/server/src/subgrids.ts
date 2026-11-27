@@ -51,7 +51,7 @@ import {
 } from "@foundation/protocol";
 import { adoptChildGrid, createBoardRow, editBoard, getBoard, listBoards, moveLeftover, leftoverLinks } from "./boards.ts";
 import { moveCharacter } from "./characters.ts";
-import { run } from "./db.ts";
+import { all, run } from "./db.ts";
 import { shareFileWith } from "./files.ts";
 import { HttpError } from "./http.ts";
 import { canSeeBoard } from "./members.ts";
@@ -247,6 +247,142 @@ export function extractSection(boardId: string, sectionRef: string, by: ExtractB
     stayed: staying.map((o) => ({ id: o.id, name: o.name, kind: STAYS[(o as PanelDoc).panel] })),
     wires: { moved: wiresIn.length, dropped: wiresCut.length },
   };
+}
+
+// ---------- the undo: a grid put back into its section ----------
+
+export interface DissolveResult {
+  /** the grid that was put back (now archived: its row, history and files are kept) */
+  board: string;
+  name: string;
+  /** the section on this grid that holds its cards again */
+  section: string;
+  moved: number;
+  /** sections that came back inside the section (0: its cards went straight into it) */
+  sections: number;
+  wires: number;
+}
+
+/**
+ * Put a grid that was made from a section back into it (the undo of `extractSection`; plan
+ * *sub-grid-dissolve*). `ref` is the section that stands for the grid, or the grid's card.
+ *
+ *  - only a grid that is inside this one: a grid that moved elsewhere left a link here, not itself;
+ *  - everything comes back with its text, cells, files, wires, characters, councils and asks, and the
+ *    grids inside it are inside this one again; a grid of one section gives its cards straight to the
+ *    section, a grid of several sections becomes the section's own grid of them;
+ *  - a machine, a huddle or a pipeline stage on that grid stays on it (as everywhere), so the press is
+ *    refused in words until they are taken off; so is a section that follows a Slack channel;
+ *  - this grid is written in full first and only then is the other archived (never deleted);
+ *  - it restructures shared work, so it needs `confirm` (the tool) and a person's press (the client).
+ */
+export function dissolveGrid(boardId: string, ref: string, by: ExtractBy & { canWriteChild: (id: string) => boolean }): DissolveResult {
+  const row = listBoards().find((b) => b.id === boardId);
+  if (!row) throw new HttpError(404, "No such grid");
+  const home = getBoard(boardId).doc;
+  const src = boardMaps(home);
+  // the grid's card: named directly, or the card in the named section
+  const byCard = src.objects.get(ref);
+  const sec = byCard ? src.sections.get(byCard.sectionId) : (src.sections.get(ref) ?? findSection(home, ref));
+  if (!sec) throw new HttpError(404, `No section “${ref}” on this grid`);
+  const isGridCard = (o: ObjectDoc | undefined): o is PanelDoc => o?.kind === "panel" && o.panel === "grid" && !!o.board;
+  const card = isGridCard(byCard) ? byCard : isGridCard(sec.host ? src.objects.get(sec.host) : undefined) ? (src.objects.get(sec.host!) as PanelDoc) : [...src.objects.values()].find((o): o is PanelDoc => o.sectionId === sec.id && isGridCard(o));
+  if (!card?.board) throw new HttpError(400, `“${sec.name}” doesn't stand for a grid, so there is nothing to put back`);
+  const childId = card.board;
+  const kid = listBoards().find((b) => b.id === childId);
+  if (!kid) throw new HttpError(404, `The grid “${card.name}” isn't there any more`);
+  if (kid.parent !== boardId) throw new HttpError(400, `“${kid.name}” isn't inside this grid now (this card is a link to where it went): move it back here first`);
+  if (kid.kind !== "grid") throw new HttpError(400, `“${kid.name}” isn't a grid`);
+  if (!by.canWriteChild(childId)) throw new HttpError(403, `View only: you can read “${kid.name}” but not change it`);
+
+  const from = getBoard(childId).doc;
+  const cm = boardMaps(from);
+  const cards = [...cm.objects.values()];
+  const staying = cards.filter(stays);
+  if (staying.length) {
+    throw new HttpError(400, `${staying.map((o) => `the ${STAYS[(o as PanelDoc).panel]} “${o.name}”`).join(", ")} stay${staying.length === 1 ? "s" : ""} on “${kid.name}”, the grid ${staying.length === 1 ? "it was" : "they were"} made on. Take ${staying.length === 1 ? "it" : "them"} off first, then put the grid back`);
+  }
+  const followed = [...cm.sections.keys()].map((id) => cm.slack.get(id)).find(Boolean);
+  if (followed) throw new HttpError(400, `A section of “${kid.name}” follows #${followed.name} on Slack, and Slack keeps it on that grid`);
+
+  // the grid's sections: one alone gives its cards to the section; several become the section's own grid
+  const childSections = [...cm.sections.values()];
+  const tops = childSections.filter((s) => !s.parent);
+  const flat = tops.length === 1 && childSections.length === 1;
+  const taken = new Set(src.sections.keys());
+  const rename = new Map<string, string>();
+  for (const s of childSections) rename.set(s.id, flat ? sec.id : taken.has(s.id) ? uid("sec") : s.id);
+  const place = (id: string) => rename.get(id) ?? sec.id;
+  const back: SectionDoc[] = flat
+    ? []
+    : childSections.map((s) => {
+        const { parent, ...rest } = s;
+        return { ...rest, id: place(s.id), parent: parent ? place(parent) : sec.id, ...(s.host ? { host: s.host } : {}) };
+      });
+  const onlyHost = flat ? tops[0].host : undefined;
+
+  const ids = new Set(cards.map((o) => o.id));
+  const landed = cards.map((o) => {
+    const next = { ...o, sectionId: place(o.sectionId) } as ObjectDoc & { text?: string };
+    if (next.kind === "media") {
+      const mm = /^\/files\/([^/?#]+)/.exec(next.src);
+      if (mm) {
+        const there = shareFileWith(mm[1], boardId, by.userId);
+        next.src = next.src.replace(mm[1], there);
+        if (next.note) next.note = moveNoteFile(next, mm[1], there).note;
+      }
+    }
+    if (next.kind === "panel" && next.fileId) next.fileId = shareFileWith(next.fileId, boardId, by.userId);
+    if (next.kind === "map" && next.sourceTableId && !ids.has(next.sourceTableId)) next.sourceTableId = null;
+    delete next.text;
+    return {
+      card: next as ObjectDoc,
+      text: o.kind === "note" ? noteTextOf(from, o) : undefined,
+      cells: o.kind === "table" ? tableCellsOf(from, o.id) : undefined,
+      character: o.kind === "panel" && o.panel === "character" ? (moveCharacter(childId, boardId, o.id) ?? cm.characters.get(o.id)) : undefined,
+    };
+  });
+  const wires = [...cm.links.values()];
+  const councils: Array<[string, PostedAgent[]]> = [];
+  for (const [placeId, posted] of cm.agents.entries()) {
+    if (!Array.isArray(posted) || !posted.length) continue;
+    councils.push([placeId === GRID_PLACE ? sec.id : place(placeId), posted]);
+  }
+  const who = { who: by.name, role: by.role, ...(by.for ? { for: by.for } : {}) } as const;
+
+  editBoard(boardId, "system", (doc) => {
+    const m = boardMaps(doc);
+    for (const s of back) m.sections.set(s.id, s);
+    for (const { card: c, text, cells, character } of landed) {
+      m.objects.set(c.id, c);
+      if (text !== undefined) setNoteText(doc, c.id, text);
+      if (cells) {
+        tableCellMap(doc, c.id);
+        setTableCells(doc, c.id, cells);
+      }
+      if (character) m.characters.set(c.id, character);
+    }
+    for (const l of wires) m.links.set(l.id, { ...l } as LinkDoc);
+    for (const [p, posted] of councils) {
+      const have = m.agents.get(p) ?? [];
+      m.agents.set(p, [...have, ...posted.filter((a) => !have.some((h) => h.key === a.key && h.name === a.name))]);
+    }
+    m.objects.delete(card.id);
+    const now = m.sections.get(sec.id) ?? sec;
+    const { host: _host, grid: _grid, ...kept } = now;
+    m.sections.set(sec.id, {
+      ...kept,
+      ...(flat ? (onlyHost && ids.has(onlyHost) ? { host: onlyHost } : {}) : { grid: readTracks(from) }),
+    });
+    logActivity(doc, { ...who, text: `put the grid “${kid.name}” back into the section “${sec.name}”: ${plural(cards.length, "card")} came with it` });
+  });
+  for (const id of ids) run("update asks set board_id = ? where board_id = ? and panel_id = ? and stage_panel_id is null", boardId, childId, id);
+  for (const g of listBoards()) if (g.parent === childId) adoptChildGrid(g.id, boardId);
+  for (const r of all<{ child_id: string }>("select child_id from grid_leftovers where board_id = ?", childId)) moveLeftover(childId, boardId, r.child_id);
+  editBoard(childId, "system", (doc) => logActivity(doc, { ...who, text: `put this grid back into the section “${sec.name}” of ${row.name}; it is archived, and its history is kept` }));
+  run("update boards set archived_at = ? where id = ?", Date.now(), childId);
+
+  return { board: childId, name: kid.name, section: sec.id, moved: cards.length, sections: back.length, wires: wires.length };
 }
 
 // ---------- the preview ----------

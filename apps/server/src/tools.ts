@@ -82,7 +82,7 @@ import { markPrivate } from "./crew.ts";
 import { concurrentWork, trailStepEnd, trailStepStart } from "./worktrail.ts";
 import { contentRefusal, decide, EgressHeld, heldSentence, sendsFor, type Send, type SendKind } from "./egress.ts";
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
-import { extractSection } from "./subgrids.ts";
+import { dissolveGrid, extractSection } from "./subgrids.ts";
 import { layFlowExamples } from "./flows.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
 import { CHAT_TOOLS } from "./chattools.ts";
@@ -1737,6 +1737,26 @@ export const TOOLS: BoardTool[] = [
         name: member?.name ?? ctx.actor,
         role: !member && (ctx.person || ctx.role === "human") ? "human" : "agent",
         ...(member ? { for: member.userName } : {}),
+      });
+      if (member) aim(member, { id: out.section, kind: "section" });
+      return out;
+    },
+  }),
+  def({
+    name: "dissolve_grid",
+    description:
+      "Put a grid that was made from a section back into it (the undo of extract_section; a person presses “Put back into this grid” on the grid's card). Its cards, sections, note text, table cells, files, wires, characters and councils come back into the section; a grid of one section gives its cards to the section, a grid of several becomes the section's own grid of them. The other grid is archived (kept, never deleted). Refused while it holds a machine, a huddle or a pipeline stage, or isn't inside this grid now. Restructures shared work: pass confirm: true only after the person said so.",
+    schema: z.object({ section: z.string().describe("the section that stands for the grid (name or id), or the grid's card id"), confirm: z.boolean().optional(), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { section, confirm }) => {
+      if (!confirm) return "not put back: pass confirm: true after checking with the person";
+      const member = crewMember(ctx.crew);
+      const out = dissolveGrid(ctx.boardId, section, {
+        userId: ctx.userId,
+        name: member?.name ?? ctx.actor,
+        role: !member && (ctx.person || ctx.role === "human") ? "human" : "agent",
+        ...(member ? { for: member.userName } : {}),
+        canWriteChild: (id) => canWrite(ctx.userId, id),
       });
       if (member) aim(member, { id: out.section, kind: "section" });
       return out;

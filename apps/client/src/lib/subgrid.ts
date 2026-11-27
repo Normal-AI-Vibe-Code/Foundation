@@ -18,9 +18,11 @@ import { toast } from "../state/ui";
 /** card kinds that stay on the grid they were made on (the server's rule, said before the press) */
 const STAYS: Record<string, string> = { machine: "machine", huddle: "huddle", stage: "pipeline stage" };
 
-/** the section being asked about (one at a time), and the one being made into a grid */
+/** the section being asked about (one at a time), and the one being made into a grid (or put back) */
 let asking: string | null = null;
 let making: string | null = null;
+/** which question: make it a grid, or put the grid it stands for back into it (plan: sub-grid-dissolve) */
+let askKind: "make" | "back" = "make";
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 const subscribe = (f: () => void) => {
@@ -29,14 +31,17 @@ const subscribe = (f: () => void) => {
 };
 
 /** show (or with null, put away) the question on a section */
-export function askGrid(sectionId: string | null) {
-  if (asking === sectionId) return;
+export function askGrid(sectionId: string | null, kind: "make" | "back" = "make") {
+  if (asking === sectionId && askKind === kind) return;
   asking = sectionId;
+  askKind = kind;
   emit();
 }
-/** is this section showing the question, or being made into a grid right now */
-export function useGridAsk(sectionId: string): "ask" | "making" | null {
-  return useSyncExternalStore(subscribe, () => (making === sectionId ? "making" : asking === sectionId ? "ask" : null));
+/** is this section showing a question (to make it a grid, or to put its grid back), or doing it right now */
+export function useGridAsk(sectionId: string): "ask" | "making" | "back" | "putting" | null {
+  return useSyncExternalStore(subscribe, () =>
+    making === sectionId ? (askKind === "back" ? "putting" : "making") : asking === sectionId ? (askKind === "back" ? "back" : "ask") : null,
+  );
 }
 
 /** the grid a section stands for, when its app is a grid's card */
@@ -92,6 +97,38 @@ export async function makeSectionAGrid(sectionId: string): Promise<string | null
     return null;
   } finally {
     making = null;
+    emit();
+  }
+}
+
+interface PutBack {
+  result: { board: string; name: string; moved: number; sections: number };
+}
+
+/**
+ * The undo of making a grid: the confirmed press puts the grid's cards back into the section and the
+ * grid is archived (the server's `dissolve_grid`). A grid holding a machine, a huddle or a pipeline
+ * stage, or one that moved elsewhere, is refused in the server's words.
+ */
+export async function putGridBack(sectionId: string): Promise<boolean> {
+  const board = activeBoard()?.boardId;
+  if (!board || making) return false;
+  making = sectionId;
+  askKind = "back";
+  asking = null;
+  emit();
+  try {
+    const { result } = await api<PutBack>(`/api/boards/${encodeURIComponent(board)}/sections/${encodeURIComponent(sectionId)}/dissolve`, { method: "POST", json: { confirm: true, request_id: uid("ungrid") } });
+    window.dispatchEvent(new Event("foundation:boards"));
+    toast(`${result.name} is back in this section: ${result.moved} ${result.moved === 1 ? "card" : "cards"}${result.sections ? ` in ${result.sections} sections` : ""}`, "ok");
+    requestSnap({ kind: "section", id: sectionId });
+    return true;
+  } catch (e) {
+    toast((e as Error).message, "bad");
+    return false;
+  } finally {
+    making = null;
+    askKind = "make";
     emit();
   }
 }

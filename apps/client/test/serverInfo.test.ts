@@ -32,3 +32,17 @@ test("since when it's up, how many are here, what it serves", () => {
   assert.equal(peopleNow(4), "4 people");
   assert.equal(servesLine(["grids", "files", "chat"]), "Grids, files and ChatForm.");
 });
+
+test("the server's code older than the app's: an earlier release, or fewer commits since the same one", async () => {
+  const { serverOlder } = await import("../src/server/where.ts");
+  assert.match(serverOlder("v0.3.50-2-gaaaa1111", "v0.3.58-0-gbbbb2222")!.words, /older code than this app \(v0\.3\.50 \+2, the app is v0\.3\.58\)/);
+  assert.ok(serverOlder("v0.3.58-1-gaaaa1111", "v0.3.58-4-gbbbb2222"));
+  // the same code, newer, or side by side: nothing to say
+  assert.equal(serverOlder("v0.3.58-4-gbbbb2222", "v0.3.58-4-gbbbb2222"), null);
+  assert.equal(serverOlder("v0.3.58-4-gbbbb2222", "v0.3.58-4-gbbbb2222-dirty"), null);
+  assert.equal(serverOlder("v0.3.59-0-gcccc3333", "v0.3.58-4-gbbbb2222"), null);
+  assert.equal(serverOlder("v0.3.58-4-gcccc3333", "v0.3.58-4-gbbbb2222"), null);
+  // either doesn't say
+  assert.equal(serverOlder(null, "v0.3.58-4-gbbbb2222"), null);
+  assert.equal(serverOlder("v0.3.58-4-gbbbb2222", "bbbb2222"), null);
+});

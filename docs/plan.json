@@ -2148,8 +2148,8 @@
       "kind": "plan",
       "milestone": "polish",
       "area": "sections",
-      "status": "next",
-      "body": "There is no undo: putting a sub-grid's cards back into the section is by hand (`send_to_board`, card by card). One server move, the reverse of `extract_section`, from the grid's card.",
+      "status": "done",
+      "body": "There is no undo: putting a sub-grid's cards back into the section is by hand (`send_to_board`, card by card). One server move, the reverse of `extract_section`, from the grid's card. 2026-11-27: built. ⤓ on a grid's section (and the right-click) asks once; dissolve_grid / POST …/dissolve with confirm brings everything back and archives the grid. subgrids.test.ts (10), checked in the browser (docs/evidence/2026-11-27_sub-grid-put-back/).",
       "issue": 173
     },
     {
@@ -2158,8 +2158,8 @@
       "kind": "plan",
       "milestone": "polish",
       "area": "sections",
-      "status": "next",
-      "body": "On a section that hosts an app ⤢ is *Fill the screen*, so there is no press that makes it a grid (the tool and the route take such a section). Offer it in the menu.",
+      "status": "done",
+      "body": "On a section that hosts an app ⤢ is *Fill the screen*, so there is no press that makes it a grid (the tool and the route take such a section). Offer it in the menu. 2026-11-27: the section's shape tools and right-click offer Open as its own grid on a hosted app; made and put back in the browser.",
       "issue": 174
     },
     {
@@ -2208,8 +2208,8 @@
       "kind": "plan",
       "milestone": "ship",
       "area": "desktop",
-      "status": "next",
-      "body": "The app updates itself; a server started from a checkout runs what it was started with. Both report 0.3.0, so only a missing route gives it away, one feature at a time. Have the server report its commit and when it started; the app compares and offers the restart. 2026-11-17: part of the way there: the switch recognises and restarts a server an earlier run of the app started, and Add a desktop offers Restart the server when its route is missing. The general check (commit and start time compared) is still to do.",
+      "status": "review",
+      "body": "The app updates itself; a server started from a checkout runs what it was started with. Both report 0.3.0, so only a missing route gives it away, one feature at a time. Have the server report its commit and when it started; the app compares and offers the restart. 2026-11-17: part of the way there: the switch recognises and restarts a server an earlier run of the app started, and Add a desktop offers Restart the server when its route is missing. The general check (commit and start time compared) is still to do. 2026-11-27: the general check is built: /api/server says its build (git describe at start, or FOUNDATION_BUILD), the server panel shows it as Code and says in yellow when it is older than the app, with Restart it. Review: see it against a really older server in the desktop app; the built-in server needs CI to set FOUNDATION_BUILD.",
       "issue": 179
     },
     {
