@@ -446,6 +446,16 @@ r.post("/api/boards/:id/sections/:section/extract", async (req) => {
   const out = await runTool(httpToolCtx(req.params.id, u, isPerson(req)), "extract_section", { section: req.params.section, ...(typeof body.request_id === "string" ? { request_id: body.request_id } : {}) });
   return { result: out, board: listBoards().find((b) => b.id === (out as { board: string }).board) };
 });
+/** the undo of the above: the grid goes back into its section and is archived (subgrids.ts `dissolveGrid`); a person's confirmed press */
+r.post("/api/boards/:id/sections/:section/dissolve", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  if (!listBoards().some((b) => b.id === req.params.id)) throw new HttpError(404, "No such grid");
+  const body = await readJson<{ request_id?: string; confirm?: boolean }>(req);
+  if (body.confirm !== true) throw new HttpError(400, "Putting a grid back needs confirm: true");
+  const out = await runTool(httpToolCtx(req.params.id, u, isPerson(req)), "dissolve_grid", { section: req.params.section, confirm: true, ...(typeof body.request_id === "string" ? { request_id: body.request_id } : {}) });
+  return { result: out };
+});
 // who is on each grid this person can see, people and agents (whereabouts.ts; the chat socket's `where` keeps it current)
 r.get("/api/whereabouts", (req) => ({ boards: whereaboutsFor(requireUser(req)) }));
 r.get("/api/boards/:id/presence", (req) => {

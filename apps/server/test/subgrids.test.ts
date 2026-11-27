@@ -342,3 +342,91 @@ test("a card for a grid inside the section goes with it: that grid is inside the
   assert.deepEqual(gridCards(top).map((c) => c.board), [out.board]);
   run("select 1");
 });
+
+// ---------- put back (plan: sub-grid-dissolve) ----------
+
+test("a grid made from a section goes back into it: cards, text, cells, files, wires, characters and councils return, and the grid is archived", async () => {
+  const p = await programme("Put back");
+  // the machine has to be elsewhere for the grid to go back whole; it stays on its grid either way
+  editBoard(p.id, "test", (doc) => boardMaps(doc).objects.delete("pnl_mach"));
+  const char = createCharacter(p.id, { name: "Ada", id: ada.id, human: true }, { name: "Mo", set: "abstract", form: "mesh", identity: "A blue blob." });
+  editBoard(p.id, "test", (doc) => {
+    const m = boardMaps(doc);
+    const c = m.objects.get(char.panelId)!;
+    m.objects.set(c.id, { ...c, sectionId: p.design.id });
+  });
+  const before = { ...maps(p.id).sections.get(p.design.id)! };
+  const out = extractSection(p.id, "Design", { userId: ada.id, name: "Ada", role: "human" });
+  // more is written on the new grid before it goes back
+  editBoard(out.board, "test", (doc) => putNote(doc, { id: "note_new", kind: "note", sectionId: p.design.id, name: "Later", ...base, w: 420, h: 300, text: "written there" }));
+
+  // not without confirm
+  assert.match(String(await runTool(ctx(p.id), "dissolve_grid", { section: "Design" })), /confirm/);
+  assert.equal(row(out.board).parent, p.id);
+
+  const back = (await runTool(ctx(p.id), "dissolve_grid", { section: "Design", confirm: true, request_id: "d1" })) as { board: string; moved: number; sections: number; wires: number };
+  assert.equal(back.board, out.board);
+  assert.equal(back.moved, 8, "the seven that went and the note written there");
+  assert.equal(back.sections, 0, "a grid of one section gives its cards straight to the section");
+  assert.equal(back.wires, 1);
+
+  const m = maps(p.id);
+  const sec = m.sections.get(p.design.id)!;
+  assert.deepEqual([sec.c0, sec.r0, sec.c1, sec.r1], [before.c0, before.r0, before.c1, before.r1]);
+  assert.equal(gridCards(p.id).length, 0, "the grid's card is gone");
+  for (const id of ["note_a", "tbl_a", "media_a", "map_a", "pnl_app", "pnl_app2", "note_new", char.panelId]) assert.equal(m.objects.get(id)?.sectionId, p.design.id, id);
+  const doc = getBoard(p.id).doc;
+  assert.equal(noteTextOf(doc, m.objects.get("note_new") as never), "written there");
+  assert.deepEqual(tableCellsOf(doc, "tbl_a"), { "0,0": "Bolt", "1,0": "=2*3" });
+  assert.deepEqual([...m.links.keys()], ["lnk_in"]);
+  assert.equal(m.characters.get(char.panelId)?.name, "Mo");
+  assert.equal(one<{ board_id: string }>("select board_id from characters where id = ?", char.id)!.board_id, p.id);
+  assert.equal(postedAgentsOf(doc, p.design.id)[0]?.key, "claude", "the council is the section's again");
+  const fid = (m.objects.get("media_a") as { src: string }).src.replace("/files/", "");
+  assert.equal(one<{ board_id: string }>("select board_id from files where id = ?", fid)!.board_id, p.id, "the image's file is this grid's");
+  assert.match(m.activity.toArray().at(-1)!.text, /put the grid “Design” back into the section “Design”: 8 cards came with it/);
+
+  // the other grid is archived, never deleted
+  assert.equal(listBoards().some((b) => b.id === out.board), false);
+  assert.ok(one<{ archived_at: number }>("select archived_at from boards where id = ?", out.board)?.archived_at);
+  // the same request answers the same; a section with no grid's card says so
+  assert.deepEqual(await runTool(ctx(p.id), "dissolve_grid", { section: "Design", confirm: true, request_id: "d1" }), back);
+  await assert.rejects(() => runTool(ctx(p.id), "dissolve_grid", { section: "Design", confirm: true }), /doesn't stand for a grid/);
+});
+
+test("putting back: a grid of sections becomes the section's own grid; a machine there, a grid moved away and a viewer are refused", async () => {
+  const p = await programme("Put back 2");
+  editBoard(p.id, "test", (doc) => boardMaps(doc).objects.delete("pnl_mach"));
+  const out = extractSection(p.id, "Notes", { userId: ada.id, name: "Ada", role: "human" });
+  // the new grid grows a second section
+  const extra = editBoard(out.board, "test", (doc) => {
+    const s = appendSection(doc, "More");
+    putNote(doc, { id: "note_more", kind: "note", sectionId: s.id, name: "More", ...base, w: 420, h: 300, text: "more" });
+    return s;
+  });
+
+  // a viewer can't
+  setBoardRole(boss, p.id, ben.id, "viewer");
+  await assert.rejects(() => runTool(ctx(p.id, ben), "dissolve_grid", { section: "Notes", confirm: true }), /View only/);
+
+  // a machine made there stays there: refused in words
+  editBoard(out.board, "test", (doc) => boardMaps(doc).objects.set("pnl_m2", panel("pnl_m2", extra.id, "machine", "Rig", { machine: { name: "rig", state: "absent" } })));
+  await assert.rejects(() => runTool(ctx(p.id), "dissolve_grid", { section: "Notes", confirm: true }), /the machine “Rig” stays on “Notes”/);
+  editBoard(out.board, "test", (doc) => boardMaps(doc).objects.delete("pnl_m2"));
+
+  // moved to the top: this grid holds only a link
+  setBoardParent(out.board, null);
+  await assert.rejects(() => runTool(ctx(p.id), "dissolve_grid", { section: "Notes", confirm: true }), /isn't inside this grid now/);
+  setBoardParent(out.board, p.id);
+
+  const back = (await runTool(ctx(p.id), "dissolve_grid", { section: "Notes", confirm: true })) as { sections: number };
+  assert.equal(back.sections, 2);
+  const m = maps(p.id);
+  const notes = m.sections.get(p.notes.id)!;
+  assert.ok(notes.grid, "the section is a grid of sections now");
+  const inner = [...m.sections.values()].filter((s) => s.parent === p.notes.id);
+  assert.deepEqual(inner.map((s) => s.name).sort(), ["More", "Notes"]);
+  assert.ok(inner.every((s) => s.id !== p.notes.id), "a section that had this section's id got a new one");
+  assert.equal(m.objects.get("note_out")?.sectionId, inner.find((s) => s.name === "Notes")!.id);
+  assert.equal(m.objects.get("note_more")?.sectionId, extra.id);
+});

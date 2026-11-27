@@ -3126,6 +3126,10 @@ const NET_STATES: Array<{ label: string; props: Partial<ServerSwitchViewProps> }
     props: { current: "http://192.168.1.20:4410", info: { ...NET_ON, you: "network", canManage: false, data: undefined, address: "http://192.168.1.20:4410" }, network: NET_BASE, now: NET_NOW, desktop: false },
   },
   { label: "Use another server, unfolded", props: { info: INFO_BASE, network: NET_BASE, optionsOpen: true, now: NET_NOW } },
+  {
+    label: "The server runs older code than this app: it says so, with Restart (started here)",
+    props: { info: { ...INFO_BASE, build: "v0.3.12-2-g4f0c2a91" }, network: NET_BASE, now: NET_NOW, desktop: true, localListening: true, localOurs: true, local: "running", onRestart: () => {} },
+  },
 ];
 
 function ServerSwitchDemo() {

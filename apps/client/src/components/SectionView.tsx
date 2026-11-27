@@ -74,7 +74,7 @@ import { openContextMenu } from "./ContextMenu";
 import { sectionMenuItems } from "./sectionMenu";
 import { cardMenuItems } from "./cardMenu";
 import { countRender } from "../state/renders";
-import { askGrid, gridOfSection, makeSectionAGrid, openAsGrid, staysBehind, useGridAsk } from "../lib/subgrid";
+import { askGrid, gridOfSection, makeSectionAGrid, openAsGrid, putGridBack, staysBehind, useGridAsk } from "../lib/subgrid";
 import { openGrid } from "../lib/grids";
 
 interface Props {
@@ -521,7 +521,8 @@ export const SectionView = memo(function SectionView({
                   ? tool("Back up a level", "⤡", () => levelUp(), "", "Esc")
                   : isGrid
                     ? tool("Open its grid", "▦", () => openLevel(section.id))
-                    : !host && tool("Open as its own grid", "▦", () => openAsGrid(section.id, host))}
+                    : tool(host ? `Open as its own grid: ${host.name} goes into a grid inside this one` : "Open as its own grid", "▦", () => askGrid(section.id))}
+              {childGrid && !isOpen && tool("Put the grid back into this section", "⤓", () => askGrid(section.id, "back"))}
             </div>
           </div>
         )}
@@ -600,9 +601,36 @@ export const SectionView = memo(function SectionView({
         )}
       </AnimatePresence>
 
+      {/* put the grid back (the undo): it moves everyone's cards and archives the grid, so it asks first */}
+      <AnimatePresence>
+        {(gridAsk === "back" || gridAsk === "putting") && !mini && (
+          <motion.div
+            className="confirm-pop grid-ask"
+            role="alertdialog"
+            aria-label={`Put ${host?.name ?? section.name} back into this section?`}
+            initial={{ opacity: 0, y: -10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 400, damping: 26 }}
+          >
+            <span className="grid-ask-words">
+              Put <b>{host?.name ?? section.name}</b> back into this section? Its cards come back here and the grid is archived (its history is kept).
+            </span>
+            <motion.button className="confirm-btn primary" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} disabled={gridAsk === "putting"} onClick={() => void putGridBack(section.id)}>
+              {gridAsk === "putting" ? "Putting it back…" : "Put it back"}
+            </motion.button>
+            {gridAsk === "back" && (
+              <motion.button className="confirm-btn" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.92 }} onClick={() => askGrid(null)}>
+                Cancel
+              </motion.button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* make it a grid of its own: it moves everyone's cards, so it asks first */}
       <AnimatePresence>
-        {gridAsk && !mini && (
+        {(gridAsk === "ask" || gridAsk === "making") && !mini && (
           <motion.div
             className="confirm-pop grid-ask"
             role="alertdialog"

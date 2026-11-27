@@ -37,7 +37,8 @@ import {
   type Section,
 } from "../state/store";
 import { openAgentsPane } from "./SectionCrew";
-import { openAsGrid } from "../lib/subgrid";
+import { askGrid, gridOfSection, openAsGrid } from "../lib/subgrid";
+import { openGrid } from "../lib/grids";
 import { keepAgentsCard } from "./SectionAgents";
 import { setUi } from "../state/ui";
 import type { MenuGroup, MenuItem } from "./menuLayout";
@@ -127,7 +128,18 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
     ]),
     ...tag("grid", [
     ...(host
-      ? [{ icon: "⤢", label: "Fill the screen with it", action: () => requestSnap({ kind: "section" as const, id: section.id }) }]
+      ? [
+          { icon: "⤢", label: "Fill the screen with it", action: () => requestSnap({ kind: "section" as const, id: section.id }) },
+          // a grid's card: open it, or put it back (the undo of Open as its own grid); a hosted app's section can still become a grid
+          ...(gridOfSection(host)
+            ? [
+                { icon: "▦", label: "Open the grid", action: () => openGrid(gridOfSection(host)!) },
+                { icon: "⤓", label: "Put the grid back into this section…", action: () => askGrid(section.id, "back") },
+              ]
+            : isOpen
+              ? []
+              : [{ icon: "▦", label: "Open as its own grid", action: () => askGrid(section.id) }]),
+        ]
       : isOpen
         ? [{ icon: "⤡", label: "Back up a level", action: () => levelUp() }]
         : [{ icon: "⤢", label: isGrid ? "Open its grid" : "Open as its own grid", action: () => (isGrid ? openLevel(section.id) : openAsGrid(section.id, host)) }]),

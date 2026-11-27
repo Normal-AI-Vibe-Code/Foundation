@@ -18,6 +18,8 @@ export interface ServerInfo {
   // signed in
   address?: string;
   startedAt?: number;
+  /** the code it runs, as `git describe` says it (null: it can't tell); compared with the app's (where.ts serverOlder) */
+  build?: string | null;
   people?: number;
   chat?: { channels: number };
   network?: {
@@ -56,7 +58,7 @@ export interface NetworkSession {
   seen: number | null;
 }
 
-export { WHERE_LABEL, WHERE_NOTE, peopleNow, servesLine, upSince, whereIs, type Where } from "./where";
+export { WHERE_LABEL, WHERE_NOTE, peopleNow, servesLine, serverOlder, upSince, whereIs, type Where } from "./where";
 
 export const getServerInfo = () => api<ServerInfo>("/api/server");
 export const setNetwork = (on: boolean) => api<ServerInfo>("/api/server/network", { method: "POST", json: { on } });

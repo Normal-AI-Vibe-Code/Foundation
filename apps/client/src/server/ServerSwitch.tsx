@@ -134,7 +134,7 @@ export function ServerSwitchView(p: ServerSwitchViewProps) {
         </span>
       </header>
 
-      {p.info && <ServerAboutView info={p.info} current={p.current} now={p.now} />}
+      {p.info && <ServerAboutView info={p.info} current={p.current} now={p.now} onRestart={currentIsLocal && p.localListening && (p.localOurs || p.localAdopted) ? p.onRestart : undefined} />}
       {p.info?.network && p.network && <NetworkSectionView info={p.info} {...p.network} now={p.now} />}
       {p.info && !p.optionsOpen && (
         <button type="button" className="server-switch-more" aria-expanded={false} onClick={p.onOptions}>

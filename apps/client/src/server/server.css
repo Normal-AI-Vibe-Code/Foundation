@@ -392,6 +392,22 @@ html[data-server-switch] .huddle-pip ~ .upload-tray-place {
 .server-facts dd code {
   color: var(--color-frost);
 }
+/* the server runs older code than this app: yellow for attention, and the restart beside it */
+.server-about-older {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2);
+  border-left: 2px solid var(--color-warn);
+  font-size: var(--text-12);
+  line-height: 1.45;
+  color: var(--color-mist);
+}
+.server-about-older > span:first-child {
+  flex: 1 1 16em;
+}
 /* the two ways to change server, folded while the one in use answers */
 .server-switch-more {
   align-self: flex-start;

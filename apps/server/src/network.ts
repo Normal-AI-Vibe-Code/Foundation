@@ -44,7 +44,7 @@ import { HttpError, json, readJson, type Req, type Router } from "./http.ts";
 import { createSession, fromLoopback, hashToken, isAllowed, isPerson, isServiceToken, requirePerson, tokenFrom, upsertUser, userFromRequest, userFromSessionHash } from "./auth.ts";
 import { DESKTOP_PAGE_ORIGINS, isNetworkHost, originAllowedFor, setNetworkNames } from "./origins.ts";
 import { audit } from "./audit.ts";
-import { SERVER_VERSION } from "./clientversion.ts";
+import { SERVER_BUILD, SERVER_VERSION } from "./clientversion.ts";
 import { childOptions, spawnChild } from "./child.ts";
 
 db.exec(`
@@ -729,6 +729,8 @@ export function serverInfo(req: Req) {
   Object.assign(out, {
     address: isNetworkHost(req) ? `http://${String(req.headers.host)}` : config.publicUrl,
     startedAt,
+    // the code it runs, so the app can say when the server is older than itself (clientversion.ts SERVER_BUILD)
+    build: SERVER_BUILD,
     people: connectedPeople(),
     chat: { channels: chatChannels() },
     network: {

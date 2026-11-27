@@ -20,6 +20,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { belowMinimum, isVersion } from "@foundation/protocol";
+import { childOptions, execFileSyncChild, type ExecFileSyncOptions } from "./child.ts";
 import { config } from "./config.ts";
 import { HttpError } from "./http.ts";
 
@@ -29,6 +30,23 @@ export const SERVER_VERSION: string = (() => {
     return (JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8")) as { version?: string }).version ?? "0.0.0";
   } catch {
     return "0.0.0";
+  }
+})();
+
+/**
+ * Where in the release history this server's code is from, as `git describe` says it (`v0.3.58-4-g24521f71`),
+ * read once at start: a server started from a checkout keeps running what it was started with while the app
+ * updates itself (plan *server-older-than-app*), so the app compares this with its own and offers the restart.
+ * `FOUNDATION_BUILD` names it where there is no git (a packaged server); null when neither says.
+ */
+export const SERVER_BUILD: string | null = (() => {
+  const said = process.env.FOUNDATION_BUILD?.trim();
+  if (said) return said.slice(0, 80);
+  try {
+    const out = execFileSyncChild("git", ["describe", "--tags", "--match", "v*", "--long", "--always"], childOptions<ExecFileSyncOptions>({ extras: [] }, { cwd: join(import.meta.dirname, ".."), encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000, windowsHide: true }));
+    return String(out).trim() || null;
+  } catch {
+    return null;
   }
 })();
 

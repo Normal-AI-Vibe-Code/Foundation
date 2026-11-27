@@ -54,3 +54,27 @@ export function servesLine(serves: string[]): string {
   return `${list.charAt(0).toUpperCase()}${list.slice(1)}.`;
 }
 
+
+/** a `git describe` (`v0.3.58-4-g24521f71`): the release it's from and commits since; null when it doesn't say */
+function described(s: string | null | undefined): { tag: number[]; ahead: number; sha: string } | null {
+  const m = /^v(\d+)\.(\d+)\.(\d+)-(\d+)-g([0-9a-f]{4,40})(-dirty)?$/.exec((s ?? "").trim());
+  return m ? { tag: [Number(m[1]), Number(m[2]), Number(m[3])], ahead: Number(m[4]), sha: m[5] } : null;
+}
+
+/**
+ * Is the server's code older than this app's (plan *server-older-than-app*)? The app updates itself; a server
+ * started from a checkout runs what it was started with, and both say 0.3.0, so they're compared by where each
+ * is in the release history: an earlier release, or the same release with fewer commits since. Null when it
+ * can't be told (either doesn't say, or the two are side by side on different branches): it says nothing then.
+ */
+export function serverOlder(server: string | null | undefined, app: string | null | undefined): { words: string } | null {
+  const s = described(server);
+  const a = described(app);
+  if (!s || !a || s.sha === a.sha || a.sha.startsWith(s.sha) || s.sha.startsWith(a.sha)) return null;
+  const order = s.tag[0] - a.tag[0] || s.tag[1] - a.tag[1] || s.tag[2] - a.tag[2];
+  const name = (d: { tag: number[]; ahead: number }) => `v${d.tag.join(".")}${d.ahead ? ` +${d.ahead}` : ""}`;
+  if (order < 0 || (order === 0 && s.ahead < a.ahead)) {
+    return { words: `This server runs older code than this app (${name(s)}, the app is ${name(a)}). What's newer in the app won't work until it restarts.` };
+  }
+  return null;
+}

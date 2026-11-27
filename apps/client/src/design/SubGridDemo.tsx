@@ -65,6 +65,24 @@ export function SubGridDemo() {
           <figcaption>⤢ on a section asks once, in place</figcaption>
         </figure>
         <figure className="subgrid-demo-fig">
+          <div className="subgrid-demo-section">
+            <div className="subgrid-demo-head">
+              <span>Rim drive</span>
+              <span className="sec-rest-open" aria-hidden>
+                ⤓
+              </span>
+            </div>
+            <div className="confirm-pop grid-ask" data-design-putback>
+              <span className="grid-ask-words">
+                Put <b>Rim drive</b> back into this section? Its cards come back here and the grid is archived (its history is kept).
+              </span>
+              <button className="confirm-btn primary">Put it back</button>
+              <button className="confirm-btn">Cancel</button>
+            </div>
+          </div>
+          <figcaption>⤓ on a grid's section puts it back: the undo, asked once</figcaption>
+        </figure>
+        <figure className="subgrid-demo-fig">
           <nav className="level-bar f-glass subgrid-demo-bar" aria-label="Where you are (example)">
             <span className="level-back">
               <span aria-hidden>⤡</span>

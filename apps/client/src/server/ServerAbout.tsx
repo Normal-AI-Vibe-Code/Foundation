@@ -13,11 +13,14 @@
 import { SERVER } from "../lib/api";
 import { setUi } from "../state/ui";
 import { shortAddress } from "./model";
-import { OPEN_SERVER_PANEL, WHERE_LABEL, WHERE_NOTE, peopleNow, servesLine, upSince, useServerInfo, whereIs, type Invite, type NetworkSession, type ServerInfo, type Where } from "./info";
+import { OPEN_SERVER_PANEL, WHERE_LABEL, WHERE_NOTE, peopleNow, servesLine, serverOlder, upSince, useServerInfo, whereIs, type Invite, type NetworkSession, type ServerInfo, type Where } from "./info";
+import { CLIENT_DESCRIBE } from "../lib/version";
 import "./server.css";
 
-export function ServerAboutView({ info, current, now }: { info: ServerInfo; current: string; now?: number }) {
+export function ServerAboutView({ info, current, now, app = CLIENT_DESCRIBE, onRestart }: { info: ServerInfo; current: string; now?: number; app?: string | null; onRestart?: () => void }) {
   const where = whereIs(current, info);
+  // a server started from a checkout runs the code it started with while the app updates itself
+  const older = serverOlder(info.build, app);
   return (
     <div className="server-about" data-where={where}>
       <div className="server-switch-option-head">
@@ -46,6 +49,14 @@ export function ServerAboutView({ info, current, now }: { info: ServerInfo; curr
             <dd>{upSince(info.startedAt, now)}</dd>
           </>
         )}
+        {info.build && (
+          <>
+            <dt>Code</dt>
+            <dd>
+              <code>{info.build}</code>
+            </dd>
+          </>
+        )}
         {info.people !== undefined && (
           <>
             <dt>Here now</dt>
@@ -53,6 +64,18 @@ export function ServerAboutView({ info, current, now }: { info: ServerInfo; curr
           </>
         )}
       </dl>
+      {older && (
+        <p className="server-about-older" role="status" data-older>
+          <span>{older.words}</span>
+          {onRestart ? (
+            <button type="button" className="f-pill is-accent" onClick={onRestart}>
+              Restart it
+            </button>
+          ) : (
+            <span> Stop and start it where it runs.</span>
+          )}
+        </p>
+      )}
     </div>
   );
 }
