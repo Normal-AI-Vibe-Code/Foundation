@@ -17,6 +17,7 @@ import { isNight, setNight } from "@foundation/ui";
 import { api, logout, search } from "../lib/api";
 import { addNote, addPanel, appendSectionLocal, createTable, getState, requestSnap, startMachine, startVm, updatePanel } from "../state/store";
 import { askAgent, getUi, setUi, toast, useUi } from "../state/ui";
+import { refreshSavedApps } from "../lib/frames";
 import { activeBoard } from "../sync/board";
 import { openNoteRecorder } from "../notes/open";
 import { openGridTimeline, openSectionTimeline } from "../timeline/model";
@@ -194,6 +195,9 @@ export function CommandBar() {
       { id: "section", glyph: "▥", label: "New section", run: () => void appendSectionLocal(term && !looksLikeUrl(term) ? term : "New section") },
       { id: "upload", glyph: "⇪", label: "Upload files…", hint: "designs, CAD, PDFs, video", run: () => void window.dispatchEvent(new CustomEvent("foundation:upload")) },
       { id: "cad", glyph: "✉", label: "Ask someone for the latest CAD…", hint: "Hermes keeps following up", run: () => askAgent("Ask ") },
+      ...(getUi().role !== "viewer"
+        ? [{ id: "factory-twin", glyph: "▦", label: "Add FactoryForm's digital twin", hint: "the floor and a station twin, stations, the simulated run, CAD", run: () => void layFactoryTwin() }]
+        : []),
       { id: "pipeline", glyph: "◆", label: "Start a design pipeline…", hint: "design → CAD → simulation → release, panel by panel", run: () => askAgent("Start a design pipeline for ") },
       { id: "vision", glyph: "◈", label: "Design something with Vision…", run: () => askAgent("Brief Vision: design ") },
       { id: "stop-crew", glyph: "■", label: "Stop all my agents on this grid", hint: "the crew-wide stop, helpers too", run: () => void stopAllOnBoard() },
@@ -352,6 +356,20 @@ export function openHit(h: SearchHit) {
   if (h.source === "flowform") {
     setUi({ search: true });
     toast("Pull it out of Search onto the grid to bring it in");
+  }
+}
+
+/** FactoryForm's twin from ⌘K: a FactoryForm section is laid (or found) and the camera goes there */
+async function layFactoryTwin() {
+  try {
+    const board = activeBoard()?.boardId ?? "company";
+    const r = await api<{ result: { section: string; already?: boolean } }>(`/api/boards/${encodeURIComponent(board)}/tools/lay_factoryform_twin`, { method: "POST", json: {} });
+    // the lay saved FactoryForm's address as an app: its frames keep their own origin (frameSandbox.ts)
+    await refreshSavedApps();
+    requestSnap({ kind: "section", id: r.result.section });
+    toast(r.result.already ? "This grid already has FactoryForm's twin" : "FactoryForm's twin is here", "ok");
+  } catch (e) {
+    toast((e as Error).message, "bad");
   }
 }
 
