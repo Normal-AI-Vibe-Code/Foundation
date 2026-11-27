@@ -58,6 +58,11 @@ function Card({ state, name, glyph, rise = false, cardClass = "", extras, childr
         </div>
         {children}
         {after}
+        {/* its edges resize it too: right, bottom and (floating) left, each gleaming like the corner under the pointer */}
+        <div className="frame-edge is-e" aria-hidden />
+        <div className="frame-edge is-s" aria-hidden />
+        <div className="frame-edge is-w" aria-hidden />
+        <div className="frame-edge is-sw" aria-hidden />
         <div className="map-resize" data-tip="Resize" />
       </div>
     </div>

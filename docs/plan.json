@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-26T01:36:51.515Z",
+  "syncedAt": "2026-11-26T12:02:28.940Z",
   "columns": [
     {
       "id": "needs-you",
@@ -2578,7 +2578,18 @@
       "milestone": "company",
       "area": "grid",
       "status": "review",
-      "body": "Josh, 2026-11-25 (SPEC 0.21, docs/timeline.md). The server keeps every board change with its time (checkpoints, a budget) and one event per thing that happened, in six lanes: people, agents, behind the scenes, changes, chat, voice and video. A clock in the grid tab and beside every section name; H; a band along the foot; scrubbing draws the grid, or one section, as it was, for that person only. Checked: 21 server and 16 client tests, e2e/timeline.spec.ts 8 of 8 in real browsers, by hand on a throwaway server; an independent review found eight defects, all fixed with tests. A person checks: open a grid in the desktop app, press the clock, add and remove a note, scrub back and see it; do the same on one section. Not done: restoring from the past, a purge, hosted apps and gone sections drawn in the past, a busy-board frame trace (SPEC 7)."
+      "body": "Josh, 2026-11-25 (SPEC 0.21, docs/timeline.md). The server keeps every board change with its time (checkpoints, a budget) and one event per thing that happened, in six lanes: people, agents, behind the scenes, changes, chat, voice and video. A clock in the grid tab and beside every section name; H; a band along the foot; scrubbing draws the grid, or one section, as it was, for that person only. Checked: 21 server and 16 client tests, e2e/timeline.spec.ts 8 of 8 in real browsers, by hand on a throwaway server; an independent review found eight defects, all fixed with tests. A person checks: open a grid in the desktop app, press the clock, add and remove a note, scrub back and see it; do the same on one section. Not done: restoring from the past, a purge, hosted apps and gone sections drawn in the past, a busy-board frame trace (SPEC 7).",
+      "issue": 253
+    },
+    {
+      "id": "timeline-live",
+      "title": "The timeline, live and whole: every person's and agent's action on it within seconds, replayed exactly",
+      "kind": "bug",
+      "milestone": "company",
+      "area": "grid",
+      "status": "review",
+      "body": "Josh, 2026-11-26 (SPEC 0.22): \"None of the actions that I took, making notes, creating tables, putting in tables, moving objects around, creating audio notes, video notes, were captured by the timeline … every user interaction, every agent interaction should be able to be played back.\" An open timeline read again only every 45 s; dragging or resizing a card inside its section and the first edits of a new card were not events; an event could be stamped before the history step that held its change; event text had broken quotes. Now: the server nudges every window on the grid (socket message 2) and an open timeline reads again within 1.5 s; card.place for drags and resizes; each event stamped with its burst's time and ordered by when it was recorded; checked by replaying a person's session step by step (server) and in a real browser with the band open.",
+      "issue": 254
     },
     {
       "id": "media-notes",
@@ -2587,7 +2598,8 @@
       "milestone": "huddles",
       "area": "grid",
       "status": "review",
-      "body": "Josh, 2026-11-25 (SPEC 0.21). A microphone in a section tools, the section menu and the command bar; the device opens only on Record; review, record again, discard or leave it; a voice note is a player with its wave, a video note rests on its first frame. On the timeline in its own lane, playable after its card is gone. Checked: e2e/media-notes.spec.ts 5 of 5 with Chromium fake devices, 18 unit tests. A person checks: record a voice note and a video note in the desktop app on Windows and on a Mac, and play each from a second computer. Not done: WebKit and the Mac app unverified, no transcript, not addressed to a person."
+      "body": "Josh, 2026-11-25 (SPEC 0.21). A microphone in a section tools, the section menu and the command bar; the device opens only on Record; review, record again, discard or leave it; a voice note is a player with its wave, a video note rests on its first frame. On the timeline in its own lane, playable after its card is gone. Checked: e2e/media-notes.spec.ts 5 of 5 with Chromium fake devices, 18 unit tests. A person checks: record a voice note and a video note in the desktop app on Windows and on a Mac, and play each from a second computer. Not done: WebKit and the Mac app unverified, no transcript, not addressed to a person.",
+      "issue": 255
     },
     {
       "id": "menus-rise",
@@ -2596,7 +2608,8 @@
       "milestone": "polish",
       "area": "design",
       "status": "review",
-      "body": "Josh, 2026-11-25 (SPEC 0.21). The bar is 36 px and rises above the card; the formatting toolbar is 40 px and hangs under it; nothing in the card moves. Background on a chat card bar takes its paper away. Other cards keep the bar that makes room. Checked: e2e/card-chrome.spec.ts (rects identical before, during and after), day and night; by hand. A person checks: hover and write in a note near the top and the bottom of a section, and take a chat card background away, in the desktop app. Not done: the cost of the :has rules on a heavy board is not measured."
+      "body": "Josh, 2026-11-25 (SPEC 0.21). The bar is 36 px and rises above the card; the formatting toolbar is 40 px and hangs under it; nothing in the card moves. Background on a chat card bar takes its paper away. Other cards keep the bar that makes room. Checked: e2e/card-chrome.spec.ts (rects identical before, during and after), day and night; by hand. A person checks: hover and write in a note near the top and the bottom of a section, and take a chat card background away, in the desktop app. Not done: the cost of the :has rules on a heavy board is not measured.",
+      "issue": 256
     },
     {
       "id": "place-harness-prompt",
@@ -2605,7 +2618,8 @@
       "milestone": "crew",
       "area": "agents",
       "status": "backlog",
-      "body": "From docs/timeline.md: every place (a section, or the grid) has a meta layer: council, timeline, harness prompt, terminal. The prompt is not built; its timeline kind (prompt) is reserved. Kept by the server alone, set by a person, given to every run in that place, and recorded on the timeline when it changes."
+      "body": "From docs/timeline.md: every place (a section, or the grid) has a meta layer: council, timeline, harness prompt, terminal. The prompt is not built; its timeline kind (prompt) is reserved. Kept by the server alone, set by a person, given to every run in that place, and recorded on the timeline when it changes.",
+      "issue": 257
     },
     {
       "id": "place-terminal",
@@ -2614,7 +2628,8 @@
       "milestone": "crew",
       "area": "agents",
       "status": "backlog",
-      "body": "From docs/timeline.md. Today only a machine card commands reach the timeline (terminal). A section or grid terminal needs the rules machines already keep: a person starts it, agents ask before a command runs, and what ran is kept."
+      "body": "From docs/timeline.md. Today only a machine card commands reach the timeline (terminal). A section or grid terminal needs the rules machines already keep: a person starts it, agents ask before a command runs, and what ran is kept.",
+      "issue": 258
     },
     {
       "id": "timeline-restore",
@@ -2623,7 +2638,8 @@
       "milestone": "company",
       "area": "grid",
       "status": "backlog",
-      "body": "The timeline only looks. Restoring is a write: by a person, to the present, as a new change (never rewriting history), with confirm when it replaces something. Also here: an admin purge of a stretch of history, and a per-person opt-out of kept pointers."
+      "body": "The timeline only looks. Restoring is a write: by a person, to the present, as a new change (never rewriting history), with confirm when it replaces something. Also here: an admin purge of a stretch of history, and a per-person opt-out of kept pointers.",
+      "issue": 259
     },
     {
       "id": "timeline-past-fidelity",
@@ -2632,7 +2648,8 @@
       "milestone": "polish",
       "area": "grid",
       "status": "backlog",
-      "body": "SPEC 7. In the past a hosted app stays live, a section that has gone is only listed, a child grid is not drawn inside its card, a chat card is its mark, and maps, apps and machines are a mark and a name. Also: a frame trace of scrubbing a busy grid (PERF_GPU=1), and room for the band in Rune."
+      "body": "SPEC 7. In the past a hosted app stays live, a section that has gone is only listed, a child grid is not drawn inside its card, a chat card is its mark, and maps, apps and machines are a mark and a name. Also: a frame trace of scrubbing a busy grid (PERF_GPU=1), and room for the band in Rune.",
+      "issue": 260
     },
     {
       "id": "media-notes-mac",
@@ -2641,7 +2658,17 @@
       "milestone": "ship",
       "area": "desktop",
       "status": "needs-you",
-      "body": "src-tauri/Info.plist now says why Foundation wants the microphone and camera, which macOS requires; it has not been built or signed. A person on a Mac: install the next build, record a voice note and a video note, join a huddle. If macOS refuses, the signed app also needs entitlements for audio input and the camera."
+      "body": "src-tauri/Info.plist now says why Foundation wants the microphone and camera, which macOS requires; it has not been built or signed. A person on a Mac: install the next build, record a voice note and a video note, join a huddle. If macOS refuses, the signed app also needs entitlements for audio input and the camera.",
+      "issue": 261
+    },
+    {
+      "id": "work-trail",
+      "title": "The grid behind the grid: how the council thinks, and what T3's agents work on at once (agenttrail)",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agents",
+      "status": "review",
+      "body": "Josh, 2026-11-26 (SPEC 0.23). Every crew step (council or T3) is on the work trail with its section, card, ok and time; a T3 thread's files by name; concurrent_work tells an agent who else is at work and where. Expand on an agent's thinking, or See their work in the T3 block, opens agenttrail's map over the grid. Checked: server worktrail.test.ts, client trail.test.ts, e2e trail.spec.ts and council.spec.ts (Expand), #/design day and night. A person checks: ask two of T3's agents in one section in the desktop app (after the :4410 server restarts) and open See their work. Not done: a T3 agent's own reasoning (T3 keeps it); the trail is in memory, not persisted."
     }
   ]
 }

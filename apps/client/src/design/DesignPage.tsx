@@ -38,6 +38,8 @@ import { InfoGlyph } from "../shell/TopBar";
 import { WindowControls } from "../shell/WindowControls";
 import { SunGlyph, MicGlyph, PanelGlyph, PresentGlyph, SearchGlyph, SendGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
+import { TrailSpecimen } from "../trail/TrailGrid";
+import type { TrailLane } from "../trail/model";
 import { FitGlyph, LayoutGlyph, OsGlyph } from "../components/SectionView";
 import { ExpandGlyph } from "../components/Fullscreen";
 import { TOOLS } from "../shell/Tools";
@@ -198,7 +200,7 @@ export const CHAPTER_SECTIONS: Record<DesignChapter, string[]> = {
   chat: ["ChatForm"],
   machines: ["Machines"],
   agents: ["Running a job", "The crew", "Agents in a section", "Agents in the section"],
-  council: ["The council", "Collections", "Foundation's avatars"],
+  council: ["The council", "Behind the grid", "Collections", "Foundation's avatars"],
   today: ["Today and the Shiba", "Today's row, what the Shiba says, adding an agent"],
   own: ["Settings, and grids inside grids", "People on a hosted server", "What agents may send outside", "Plan board", "Release notes", "Release page", "Rune renderer", "This computer"],
 };
@@ -1472,6 +1474,9 @@ function DesignSections() {
       <Section title="The council" note="The agents that belong to a section, or to the whole grid, as characters standing on an edge, no panel (2026-11-24 pass). Each seat is as wide as its figure needs at 190 tall (a mesh avatar's picture is 896 × 1200, a 3D figure's frame 0.72, a still its own proportions): cut only at the edge it stands behind, never at the sides; six shrink evenly to fit the paper. Over each head, one opaque bar on raised paper with a hairline and the lift shadow: the model's mark, the name in full, a cloud or a computer, and a state dot (ok; breathing in the agent's colour at work; a pulled plug in red when it can't be reached). At work the same bar ringed in its colour says what it's doing behind three beating dots, a light running along its foot, with Follow, and Open and Stop for the one who asked. Beside the head, the run card: a chip with dots from the moment you send (Starting), then the plan (the goal, the steps, the active one breathing, done ones ticked) and the latest reasoning in dim italics; done is a ✓ chip for 2.4 s. Pressing an agent turns its bar into the line to it, opaque paper above the head in any room, and opens its pane, where the same card shows in full. Beside the agents, one silhouette asleep (closed eyes, breathing), and peeking from behind it a small one with the ＋ that adds an agent">
         <CouncilDemo />
         <CharacterStudioDemo />
+      </Section>
+      <Section title="Behind the grid" note="2026-11-26, Josh: “show how the agent council is thinking, even opening up a hidden grid … the T3 agents … visualized somewhere that you can look at to see what they are working on concurrently.” agenttrail's map (github.com/sodiumsun/agenttrail, MIT) on these tokens, opened by Expand on an agent's thinking (its pane) or See their work (the agents pane's T3 block), over the grid. The grid's sections are cards (raised paper, 300 × 104, card radius) in columns along their wires (the longest chain; five to a column, then the next), a status ring at each corner: an agent's violet arc spinning while one is in it, ok with a check once written, bad with ! when its last step there failed, a mist ring when only read. Editing / Revising / Retrying beside a small spinner when it changed in the last minute; a warn outline and Two at once when two agents write in it within two minutes. Each agent's way through is a dotted line (1 7) in its crew colour, quieter once it has finished; a handoff (one picked up where another finished, within ten minutes) is a dashed bar in the newcomer's colour with “A ⇢ B”. A T3 agent's folder is a dashed agent-tinted card of its files (a glyph by kind, + added, ~ changed, struck when removed). Run cards at the right: the face with a spinning ring at work, where it was asked, what it's doing behind beating dots, its plan, its last five steps with how long each took (bad in red). Pressing one follows it: the others dim and its chain hangs under where it stands on a dashed tether: the ask, then each thought (dashed, italic), tool (filled when it wrote, ringed when it read, red when it failed) and answer, 80 ms apart. Reasoning, a tool's arguments and its answer are the asker's alone; the rest of the grid sees the shape. Wheel zooms, drag pans; near, a section lists the cards changed in it; far, only the names.">
+        <TrailDemo />
       </Section>
 
       <Section title="Collections" note="A collection gathers what the cards wired into it make: from the Character studio's flow, a stage's wire brings the pictures drawn there (sheets, expression sheets, portraits) and Output's brings the finished characters; another collection brings what it holds. ❖ in a section's right-click menu, and Character pipeline lays the whole flow into a section with one after Output. Folded (360 × 420) it is a stack of the five newest, fanned 9 px and 2.2° apart and opening wider on roll-over on the spring; Expand opens it to 920 × 700, a grid of tiles at least 140 wide, each on raised paper with a hairline (a character's tinted violet, as an agent's work is). A tile is pressed and pulled out as a copy, lifted as a carried card is; the tile stays, at 45 %, while its copy is out. Lay out in pipes it into a section, where each thing becomes a docked card the section arranges; its output dragged onto a section does the same. On tokens only.">
@@ -3177,6 +3182,75 @@ function PeopleSectionDemo() {
   return (
     <div style={{ maxWidth: 680 }}>
       <PeopleSectionView users={users} meId="u_ada" onRole={onRole} />
+    </div>
+  );
+}
+
+
+/** the grid behind the grid, still: two of T3's agents and a council agent, one section shared, one handoff */
+function TrailDemo() {
+  const now = useMemo(() => Date.now(), []);
+  const t = (s: number) => now - s * 1000;
+  const sections = [
+    { id: "bom", name: "BOM", c0: 0, r0: 0 },
+    { id: "prices", name: "Unit prices", c0: 1, r0: 0 },
+    { id: "suppliers", name: "Suppliers", c0: 1, r0: 1 },
+    { id: "report", name: "Cost report", c0: 2, r0: 0 },
+  ];
+  const wires = [
+    { from: "bom", to: "prices" },
+    { from: "suppliers", to: "prices" },
+    { from: "prices", to: "report" },
+  ];
+  type Step = TrailLane["steps"][number];
+  const tool = (o: Partial<Step>): Step => ({ kind: "tool", at: t(30), ms: 120, tool: "add_note", label: "making a note", read: false, ok: true, section: null, card: null, ...o });
+  const lanes: TrailLane[] = [
+    {
+      crew: "kimi", name: "Kimi", hue: 1, via: "t3:kimi", kind: "t3", askerName: "Ada", mine: true, task: "Reconcile the unit prices with the supplier list", status: "working", doing: "filling “Prices”", started: t(140), ended: null, private: false,
+      home: { id: "prices", name: "Unit prices" },
+      sections: [{ id: "prices", name: "Unit prices", reads: 1, writes: 3 }, { id: "suppliers", name: "Suppliers", reads: 2, writes: 0 }],
+      cards: [{ id: "c1", name: "Prices", section: "prices", writes: 3 }],
+      steps: [
+        tool({ at: t(120), tool: "read_board", label: "reading the board", read: true, ms: 40 }),
+        tool({ at: t(110), tool: "concurrent_work", label: "seeing who else is at work", read: true, ms: 12, summary: "1 other agent is working on this grid now: Wren in “Cost report” …" }),
+        tool({ at: t(90), tool: "read_card", label: "reading “Supplier list”", read: true, section: "suppliers", ms: 60, input: { id: "Supplier list" } }),
+        tool({ at: t(70), tool: "read_card", label: "reading “Quotes”", read: true, section: "suppliers", ms: 30, ok: false, summary: "no card “Quotes” on this board" }),
+        { kind: "thought", at: t(60), tool: "", label: "thinking", read: true, ok: true, section: null, card: null, summary: "The supplier list has two prices for the hub bearing; the newer quote is the one the BOM points at, so I'll take that and note the other." },
+        tool({ at: t(40), tool: "set_cells", label: "filling “Prices”", section: "prices", card: "c1", ms: 210, input: { table: "Prices", range: "B2:B9" } }),
+        tool({ at: t(4), tool: "set_cells", label: "filling “Prices”", section: "prices", card: "c1", ms: undefined }),
+      ],
+      files: [
+        { path: "src/reconcile.ts", change: "changed", at: t(8), bytes: 2140 },
+        { path: "data/suppliers.csv", change: "added", at: t(50), bytes: 812 },
+      ],
+      thread: "th1",
+      plan: { goal: "Prices that match the supplier list", steps: [{ text: "Read the supplier list", status: "done" }, { text: "Fill the unit prices", status: "active" }, { text: "Note what didn't match", status: "pending" }] },
+    },
+    {
+      crew: "wren", name: "Wren", hue: 2, via: "claude", kind: "council", askerName: "Kai", mine: false, task: "Total the cost per assembly", status: "working", doing: "filling “Cost per assembly”", started: t(200), ended: null, private: false,
+      home: { id: "report", name: "Cost report" },
+      sections: [{ id: "prices", name: "Unit prices", reads: 1, writes: 1 }, { id: "report", name: "Cost report", reads: 0, writes: 2 }],
+      cards: [{ id: "c1", name: "Prices", section: "prices", writes: 1 }, { id: "c2", name: "Cost per assembly", section: "report", writes: 2 }],
+      steps: [
+        tool({ at: t(150), tool: "read_board", label: "reading the board", read: true }),
+        tool({ at: t(80), tool: "set_cells", label: "filling “Prices”", section: "prices", card: "c1" }),
+        tool({ at: t(20), tool: "add_table", label: "making “Cost per assembly”", section: "report", card: "c2" }),
+        tool({ at: t(6), tool: "set_cells", label: "filling “Cost per assembly”", section: "report", card: "c2" }),
+      ],
+      files: [], thread: null, plan: null,
+    },
+    {
+      crew: "tern", name: "Tern", hue: 4, via: "t3:claudeAgent", kind: "t3", askerName: "Ada", mine: true, task: "Pull the BOM out of the STEP export", status: "done", doing: "done", started: t(900), ended: t(400), private: false,
+      home: { id: "bom", name: "BOM" },
+      sections: [{ id: "bom", name: "BOM", reads: 1, writes: 2 }],
+      cards: [{ id: "c3", name: "Parts", section: "bom", writes: 2 }],
+      steps: [tool({ at: t(800), section: "bom", card: "c3", label: "making “Parts”" }), tool({ at: t(500), section: "bom", card: "c3", label: "filling “Parts”" })],
+      files: [], thread: "th2", plan: null,
+    },
+  ];
+  return (
+    <div className="live-specimen" style={{ position: "relative" }} data-design-trail>
+      <TrailSpecimen lanes={lanes} sections={sections} wires={wires} name="Rim drive" focus="kimi" now={now} />
     </div>
   );
 }

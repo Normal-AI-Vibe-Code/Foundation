@@ -264,12 +264,12 @@ export function ChatCardFrame({ head, dock, note, timeline, thread, foot, quiet 
       {note}
       <div className="chat-card-main">
         {timeline}
+        {/* who is typing rides the timeline's foot, over it, only while someone is: no fine print under the field */}
+        {quiet}
         <AnimatePresence>{thread}</AnimatePresence>
       </div>
-      <div className="chat-card-foot">
-        {foot}
-        {quiet}
-      </div>
+      {/* the field is the card's foot, divided from the conversation by a line (2026-11-26, Josh) */}
+      <div className="chat-card-foot">{foot}</div>
     </>
   );
 }
@@ -527,8 +527,8 @@ export function ChatConversation({
         </div>
       }
       quiet={
-        <div className="chat-card-quiet" aria-live="polite">
-          {typingWords(null) ?? (!voice && s.remote ? <span data-chat-card-novoice>Voice needs Foundation's own server: this conversation is on {CHAT_SERVER_NAME}.</span> : null)}
+        <div className={`chat-card-quiet${typingWords(null) ? " is-on" : ""}`} aria-live="polite">
+          {typingWords(null)}
         </div>
       }
     />

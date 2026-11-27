@@ -47,6 +47,8 @@ const QUIET = Symbol("quiet");
 const mine = (origin: unknown) => origin === LOCAL || origin === QUIET;
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
+/** the server: this grid's timeline has something new (only the time; the timeline is read again as this person) */
+const MSG_TIMELINE = 2;
 
 export type SyncStatus = "connecting" | "live" | "offline";
 
@@ -299,6 +301,8 @@ class BoardSync {
         } else if (this.ready && this.status !== "live") this.setStatus("live");
       } else if (type === MSG_AWARENESS) {
         awarenessProtocol.applyAwarenessUpdate(this.awareness, decoding.readVarUint8Array(dec), this);
+      } else if (type === MSG_TIMELINE) {
+        window.dispatchEvent(new CustomEvent("foundation:timeline", { detail: { board: this.boardId, at: decoding.readVarUint(dec) } }));
       }
     };
     ws.onclose = (ev) => {

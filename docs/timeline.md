@@ -45,9 +45,11 @@ A section that hosts a `grid` card **is** that grid: its timeline is the child g
 | People | `person.here` (a span) | awareness: a person arrives on the grid, and leaves |
 | Agents | `agent.run` (a span), `agent.seat` | a run starts and ends (`agent.ts`, T3 asks); the council changes (`posted.ts`) |
 | Behind the scenes | `agent.tool`, `agent.code`, `terminal`, `prompt` | `runTool` (every door: HTTP, MCP, the agent loop, code mode); `run_code`; a machine's commands (`machineAsks`, `agentActs`) |
-| Changes | `card.*`, `section.*`, `wire.*` | the document itself: what each burst added, removed, moved, renamed or edited, per actor |
+| Changes | `card.*`, `section.*`, `wire.*` | the document itself: what each burst added, removed, moved to another section, dragged or resized inside one (`card.place`), renamed or edited (words, cells, settings), per actor |
 | Chat | `chat.ask`, `chat.answer`, `chat.message`, `huddle` | an ask to an agent and its answer; a ChatForm message in a conversation that has a card on the grid, or sent with a place link; a huddle on the grid |
 | Voice and video | `note.audio`, `note.video` | a media card with `note` arrives in the document |
+
+**One order, the same for every reader.** An event that comes from the document is stamped with the time of the burst that keeps its change, never earlier: the board rebuilt at an event's moment always holds that event's change (tested by replaying a person's session step by step). Events at one moment keep the order the server recorded them in (the row's place), so every read and every reader sees the same sequence. A stretch of typing in one card is one `card.edit` per person until they pause a minute (`FOUNDATION_TIMELINE_EDIT_QUIET_MS`); dragging and resizing one card is one `card.place` until they leave it 20 s; every keystroke and every step of a drag is still in the history, and plays.
 
 **A new primitive** adds its kinds to `TIMELINE_KINDS` and calls `recordEvent` where its thing happens. Its cards' adds, removes and edits are already in Changes, because those come from the document, not from the primitive.
 
@@ -67,6 +69,7 @@ A section that hosts a `grid` card **is** that grid: its timeline is the child g
 - `GET /api/boards/:id/timeline?section=&from=&to=&limit=` → `TimelineSlice`: the events, a `density` of changes for the bar's texture, the sections named, when keeping began.
 - `GET /api/boards/:id/history?from=&to=` → a take's wire (`FRT1`): the board at `from`, then the changes to `to`, thinned to a few hundred steps however long the stretch (a week and an hour cost the same to scrub), and the cursors. `TakePlayer` plays it.
 - A tool, `read_timeline`, gives an agent the same slice as words (a read; `READ_TOOLS`).
+- **Live.** Whenever the server keeps a burst or records an event it nudges every window on that grid over the board's own socket (message type 2: the time, nothing else). A window with that grid's timeline open at now reads it again within 1.5 s, as the person it is, so who may read what stays the route's to say. A timeline that is looking back keeps what it has and reads again when it comes back to now. A grid this window isn't joined to (a section that is another grid) is read again every 20 s while open.
 
 ## 3. What a person sees
 
@@ -74,7 +77,7 @@ A section that hosts a `grid` card **is** that grid: its timeline is the child g
 - **The grid's timeline** is a band along the foot of the grid, on the floor (a hairline above it, the grid's paper under it): the transport (back to now, play, speed, the moment in words, the range: hour, day, week, all), then the lanes, with one playhead through all of them. Agents are violet, as everywhere. Behind-the-scenes work is drawn hollow, under the agents' own lane: it happened, and no cursor showed it.
 - **Scrubbing** shows the grid as it was: every section draws its cards from history, for this person only, with a banner that says when, and *Back to now*. People's pointers are drawn where they were, and an agent's on the card it was aimed at (what it was doing then is in its lane, not on its pointer). Nothing can be edited in the past.
 - **The moment**: beside the playhead, what was said around that time (asks, answers, messages, huddles) and the voice and video notes left then, which play there. A chat card in the past is drawn as its mark and name; what was said in it is in the moment.
-- **A section's timeline** opens from its clock: a slim bar on the section, its own range and playhead. Scrubbing it takes only that section into the past; the grid's timeline, if open, shows where the section's playhead is, and *Follow the grid* joins them again. Closing it returns the section to now. A section that is a grid opens that grid's timeline.
+- **A section's timeline** opens from its clock: a slim bar that unfolds from under the section's header (where the clock is), over the top of its body, its own range and playhead. Scrubbing it takes only that section into the past; the grid's timeline, if open, shows where the section's playhead is, and *Follow the grid* joins them again. Closing it returns the section to now. A section that is a grid opens that grid's timeline.
 
 ## 4. Voice and video notes
 

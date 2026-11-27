@@ -27,6 +27,7 @@
  * DeepSeek, to either group.
  */
 
+import { openTrail } from "../trail/state";
 import { ErrorCard } from "../components/ErrorCard";
 import { CouncilTalk } from "./CouncilTalk";
 import { AddAgent } from "./AddAgent";
@@ -565,6 +566,9 @@ export function T3BlockView({ host, viewer, admin = false, busy, section, asking
         <span className="agents-place-words">
           {state === "running" ? `T3${host?.version ? ` ${host.version}` : ""}` : state === "starting" ? "starting" : state === "error" ? "stopped" : "off"}
         </span>
+        <button className="crew-row-btn t3-trail-open" onClick={() => openTrail({})} data-tip="Behind the grid: where each agent is working, on which sections, cards and files, at the same time" data-t3-trail>
+          See their work
+        </button>
         {state === "running" && !viewer && (
           <span className="t3-head-acts">
             <button className="crew-row-btn" onClick={() => onOpen?.()} data-tip="Open T3's own page: every thread, approvals, its settings">

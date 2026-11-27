@@ -44,7 +44,7 @@ const RISE_SHOTS = "../../docs/evidence/2026-11-25_menus-rise";
 /** how far a card that makes room for its bar moves its content */
 const PUSH = 38;
 /** a risen bar's height, and the air between it and the card (App.css .bar-rise) */
-const RISE = { h: 36, gap: 4 };
+const RISE = { h: 36 };
 
 type Obj = { id: string; name: string; sectionId: string; panel?: string };
 type Store = { getState(): { notes: Record<string, Obj>; panels: Record<string, Obj>; sections: Record<string, { id: string; name: string }> }; setState(p: object): void };
@@ -223,7 +223,7 @@ const sel = (id: string, inner: string) => `.obj-slot[data-obj-id="${id}"] ${inn
 const drawnAt = (p: Page, x: number, y: number, id: string, what: string) =>
   p.evaluate(([x, y, id, what]) => !!document.elementFromPoint(x, y)?.closest(`.obj-slot[data-obj-id="${id}"] ${what}`), [x, y, id, what] as const);
 
-test("2 · a note's bar rises above it and the note holds still; its toolbar hangs under it; every other card's bar still makes room", async () => {
+test("2 · a note's bar is its box grown up and the note holds still; its toolbar the box grown down; every other card's bar still makes room", async () => {
   await frame(ada, ids.Long);
   const s = slot(ada, ids.Long);
   const k = await scaleOf(ada, ids.Long);
@@ -247,17 +247,17 @@ test("2 · a note's bar rises above it and the note holds still; its toolbar han
   // not a pixel of the card moved: its box, its body, its words, its corner, the card beside it, the section
   const on = await read();
   for (const key of Object.keys(rest) as (keyof typeof rest)[]) expect(on[key], key).toEqual(rest[key]);
-  // the bar is above the card, 36 tall (at the card's scale), 4 px clear of it, the card's own width
+  // the bar is the box grown up (2026-11-26): 36 tall (at the card's scale), flush on the card's top edge (its foot on
+  // the card's border), the card's own width
   const bar = await rect(ada, sel(ids.Long, ".frame-header"));
   near(bar.h, RISE.h * k, 1);
-  expect(bar.bottom).toBeLessThanOrEqual(on.card.y + 0.5);
-  expect(on.card.y - bar.bottom).toBeLessThan((RISE.gap + 1) * k + 0.5);
+  near(bar.bottom, on.card.y + 1 * k, 1.5);
   near(bar.w, on.card.w, 1);
   // the note is in its section's top row: the bar is drawn over the section's header, whole (top to bottom)
   for (const fy of [0.15, 0.5, 0.85]) expect(await drawnAt(ada, bar.x + bar.w / 2, bar.y + bar.h * fy, ids.Long, ".frame-header"), `the bar at ${fy} of its height`).toBe(true);
   await ada.screenshot({ path: `${RISE_SHOTS}/02_note-bar-risen-night.png` });
 
-  // the pointer goes up from the note to its bar (across the 4 px between): the bar stays, and takes the pointer
+  // the pointer goes up from the note to its bar (no gap to cross): the bar stays, and takes the pointer
   const title = await rect(ada, sel(ids.Long, ".frame-header .frame-title"));
   await ada.mouse.move(title.x + title.w / 2, title.y + title.h / 2, { steps: 12 });
   await settle(ada, 450);
@@ -271,7 +271,7 @@ test("2 · a note's bar rises above it and the note holds still; its toolbar han
   const gone = await read();
   for (const key of Object.keys(rest) as (keyof typeof rest)[]) expect(gone[key], key).toEqual(rest[key]);
 
-  // writing: the bar is up (focus) and the toolbar hangs under the card; the words keep their padding and scroll
+  // writing: the bar is up (focus) and the toolbar is the box grown down; the words keep their padding and scroll
   await frame(ada, ids.Short);
   const w = slot(ada, ids.Short);
   const kw = await scaleOf(ada, ids.Short);
@@ -292,8 +292,10 @@ test("2 · a note's bar rises above it and the note holds still; its toolbar han
   expect(await words()).toEqual(still);
   const card = await rect(ada, sel(ids.Short, ".frame-card"));
   const tb = await rect(ada, sel(ids.Short, ".rich-bar"));
-  near(tb.h, 40 * kw, 1);
-  expect(tb.y).toBeGreaterThanOrEqual(card.bottom - 0.5);
+  // at least 40 tall (a narrow note's takes a second row), flush on the card's foot, the card's width
+  expect(tb.h).toBeGreaterThanOrEqual(40 * kw - 1);
+  near(tb.y, card.bottom - 1 * kw, 1.5);
+  near(tb.w, card.w, 1.5);
   // drawn whole: its top, its middle and its foot are the toolbar's own (not under the next section, not clipped)
   for (const fy of [0.15, 0.5, 0.85]) expect(await drawnAt(ada, tb.x + tb.w / 2, tb.y + tb.h * fy, ids.Short, ".rich-bar"), `the toolbar at ${fy} of its height`).toBe(true);
   await expect(w.locator(".frame-header")).toHaveCSS("opacity", "1");

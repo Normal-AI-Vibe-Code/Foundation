@@ -33,6 +33,7 @@ import { pageIdsOk, readPagePicture } from "./pagepictures.ts";
 import { changelog } from "./changelog.ts";
 import { addT3Agent, enableT3Agent, localModels, removeT3Agent, startT3, stopT3, T3_PRESETS, t3Host, t3HostRunning, t3OpenLink, type AddAgentInput } from "./t3host.ts";
 import { askT3, stopT3Thread, t3Bindings } from "./t3threads.ts";
+import { trailLanes } from "./worktrail.ts";
 import { pollHandoffs } from "./vision.ts";
 import { boardPeople, boardRole, canWrite, requireWriter, setBoardRole } from "./roles.ts";
 import { handleUpgrade, issueTicket } from "./sockets.ts";
@@ -1264,6 +1265,14 @@ r.post("/api/t3host/threads/:id/stop", (req) => {
   const u = requirePerson(req, "Stopping an agent");
   if (u.role === "viewer") throw new HttpError(403, "Viewers can't stop agents.");
   return stopT3Thread(u, req.params.id);
+});
+// the agents' work trail (worktrail.ts): who is at work on a grid, where, on what. Reads only, for anyone who can see the grid;
+// a step's arguments, answers and reasoning reach only the person who asked
+r.get("/api/boards/:id/trail", (req) => {
+  const u = requireUser(req);
+  const id = req.params.id;
+  if (!one("select 1 from boards where id = ?", id) || !canSeeBoard(u, id)) throw new HttpError(404, "no such board");
+  return { at: Date.now(), lanes: trailLanes(id, u) };
 });
 r.get("/api/t3host/bindings", (req) => {
   requireUser(req);

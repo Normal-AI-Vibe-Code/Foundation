@@ -726,7 +726,7 @@ export const SectionView = memo(function SectionView({
         />
       )}
 
-      {/* the section's own timeline, along its foot over the body (timeline/SectionTimeline.tsx) */}
+      {/* the section's own timeline, unfolding from under its header (timeline/SectionTimeline.tsx) */}
       {!mini && <SectionTimeline sectionId={section.id} />}
 
       {/* add-section affordances on all four edges (an opened section adds beside itself, in its own grid) */}

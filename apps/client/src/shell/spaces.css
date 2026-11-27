@@ -935,9 +935,9 @@
 .top-today .pane-badge {
   margin-left: calc(-1 * var(--space-1));
 }
-/* ChatForm at the top right (2026-11-25): it heads the tools, one pill in two halves joined by a hairline: the word
-   opens the whole place, the panel half the conversation pinned in the right panel (chat/ChatButton.tsx) */
-.top-chat-split {
+/* ChatForm at the top right (2026-11-26): a pill holding the mark alone, the count beside it when something's
+   waiting; the word stays the button's name, out of sight (chat/ChatButton.tsx) */
+.top-chat-solo {
   display: inline-flex;
   align-items: center;
   height: 28px;
@@ -945,35 +945,24 @@
   border-radius: var(--radius-pill);
   box-shadow: inset 0 0 0 1px var(--color-line);
 }
-.top-chat-split .top-chat {
-  padding-right: var(--space-3);
-  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+.top-chat-solo .top-chat {
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
 }
-.top-chat-split .top-chat-panel {
-  position: relative;
-  height: 28px;
-  width: 32px;
-  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
-  border-left: 1px solid var(--color-line);
+.top-chat-solo .top-chat:has(.pane-badge) {
+  padding-right: var(--space-2);
 }
-.top-chat-split .top-chat-panel.is-on {
-  color: var(--color-frost);
-  background: var(--color-agent-dim);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-agent) 55%, var(--color-line-strong));
+.top-chat-solo .top-chat .pane-badge {
+  margin-left: 0;
 }
-.tool-btn-dot.is-unread {
-  background: var(--color-pulse);
-}
-/* a narrow window: ChatForm keeps its mark, its count and its tip */
-@media (max-width: 1080px) {
-  .top-chat-split .top-word {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
+.top-chat-solo .top-word {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 /* a place you're passing through (Settings): a pill, fully outlined, with room around it */
 .tab-pill {

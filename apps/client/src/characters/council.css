@@ -1680,3 +1680,30 @@ button.run-card:focus-visible {
     animation: none;
   }
 }
+
+/* the thinking module (2026-11-26): an agent's run under a head that expands into the grid behind the grid (trail/TrailGrid.tsx) */
+.thinking-module {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.thinking-module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.thinking-module-title {
+  font-size: var(--text-11);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-agent);
+}
+.thinking-module-open {
+  height: 24px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-12);
+  color: var(--color-agent);
+  border-color: color-mix(in srgb, var(--color-agent) 35%, var(--color-line));
+}

@@ -3069,3 +3069,115 @@
   width: 640px;
   padding: 0 var(--space-5);
 }
+
+/* ---------- the list, folded to its icons (2026-11-26, Josh: "channels should be collapsable to icons") ----------
+   56 px: each conversation its mark, its name a tip; what's waiting a dot or a count on the mark's corner; the
+   sections' heads give way to a hairline. The control at the list's top folds and unfolds it (kept on this device). */
+.chat-tab-chat:has(> .chat-sidebar.is-icons),
+.chat-tab-chat.has-thread:has(> .chat-sidebar.is-icons) {
+  grid-template-columns: 56px minmax(0, 1fr);
+}
+.chat-tab-chat.has-thread:has(> .chat-sidebar.is-icons) {
+  grid-template-columns: 56px minmax(0, 1fr) 380px;
+}
+@container chat (max-width: 1040px) {
+  .chat-tab-chat.has-thread:has(> .chat-sidebar.is-icons) {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+}
+.chat-side-top {
+  flex: none;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 var(--space-3);
+}
+.chat-sidebar.is-icons .chat-side-top {
+  justify-content: center;
+  padding: 0;
+}
+.chat-side-iconize {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-dim);
+  cursor: pointer;
+}
+/* the caret points the way it goes: in (fold) while names show, out while icons do */
+.chat-side-iconize svg {
+  transform: scaleX(-1);
+  transition: transform var(--dur-quick) var(--ease-out-soft);
+}
+.chat-sidebar.is-icons .chat-side-iconize svg {
+  transform: none;
+}
+@media (hover: hover) {
+  .chat-side-iconize:hover {
+    color: var(--color-frost);
+    background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+  }
+}
+.chat-side-iconize:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 2px;
+}
+.chat-sidebar.is-icons .chat-side-scroll {
+  padding-top: 0;
+  scrollbar-width: none;
+}
+.chat-sidebar.is-icons .chat-side-head {
+  height: auto;
+  padding: 0;
+}
+.chat-sidebar.is-icons .chat-side-head > * {
+  display: none;
+}
+.chat-sidebar.is-icons .chat-side-section {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.chat-sidebar.is-icons .chat-side-row {
+  height: 36px;
+  justify-content: center;
+  padding: 0;
+}
+.chat-sidebar.is-icons .chat-side-mark {
+  position: relative;
+  width: 24px;
+  height: 24px;
+}
+.chat-sidebar.is-icons .chat-side-name,
+.chat-sidebar.is-icons .chat-side-where,
+.chat-sidebar.is-icons .chat-side-typing,
+.chat-sidebar.is-icons .chat-side-empty {
+  display: none;
+}
+/* what's waiting: the count rides the mark's top right */
+.chat-sidebar.is-icons .chat-count {
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 4px);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: var(--text-11);
+  pointer-events: none;
+}
+/* unread with no count (a channel that only tells of mentions): a dot */
+.chat-sidebar.is-icons .chat-side-row.is-unread:not(:has(.chat-count))::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: calc(50% + 7px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-frost);
+  box-shadow: 0 0 0 2px var(--color-void);
+}

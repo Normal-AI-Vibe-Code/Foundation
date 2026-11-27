@@ -42,6 +42,17 @@ A run that says nothing for `FOUNDATION_AGENT_SILENCE_MS` (90 s) ends with an `e
 
 `doing` goes "reading the ask" → "thinking" (and "writing its answer" as words come) → a line per tool step. `thought` is written at most every 250 ms and cleared when the run ends. Claude Code is run with `--include-partial-messages --thinking-display summarized` (2.1.331; without the latter a `-p` run's thinking arrives empty); a CLI that rejects them is run again without. The API runtimes ask for `thinking: { type: "adaptive", display: "summarized" }` (4.7+/5.x), adaptive on 4.6, a budget on older models.
 
+### The work trail (2026-11-26, `worktrail.ts`)
+
+Every tool call a crew member makes (a Foundation run or a T3 thread with board tools) is recorded with:
+
+- its cursor's words;
+- the section and card it touched;
+- whether it worked, and how long it took;
+- its arguments and a line of its answer, for the asker only.
+
+A Foundation run also keeps its reasoning and its words, for the asker only. A T3 thread's folder is watched for the files it writes, by path and size. `GET /api/boards/:id/trail` gives anyone who can see the grid its shape; once a run has read beyond the grid (`PRIVATE_READS`), others see neither step words nor card or file names. `concurrent_work` (a read tool) tells an agent who else is at work on the grid, where, and on which cards and files, without their words; a T3 agent's brief asks it to call that tool before changing anything. The client draws all of this in `apps/client/src/trail/`, the grid behind the grid (SPEC §0.23).
+
 ## 3. Code mode
 
 Two tools on the one tool surface (`apps/server/src/codemode.ts`), both in `READ_TOOLS`:

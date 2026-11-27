@@ -59,6 +59,8 @@ export const READ_TOOLS = new Set([
   // so a viewer's script reads and each write inside it is refused here like any other
   "search_tools",
   "run_code",
+  // the agents at work on the grid (worktrail.ts): the grid's shape, never another run's words
+  "concurrent_work",
 ]);
 
 function accountRole(userId: string): BoardRole {

@@ -192,7 +192,7 @@ test("add then delete a card: both events, the person's, in its section; history
     assert.deepEqual(e.data, { card: "note", name: "Fillet" });
   }
   assert.ok(add.at <= rm.at);
-  assert.equal(kinds(s, "card.edit").filter((e) => e.object === card.id).length, 0, "typing right after adding is the same stretch as the add");
+  assert.equal(kinds(s, "card.edit").filter((e) => e.object === card.id).length, 0, "words written in the same burst as the card are its making, not an edit");
   assert.deepEqual(s.sections, [{ id: g.section, name: "Brackets" }]);
   assert.equal(s.density.length, 240);
   assert.ok(s.density.reduce((a, b) => a + b, 0) >= 3);
@@ -685,4 +685,66 @@ test("thinning: a long stretch is at most a few steps, and ends exactly where th
   const end = Date.now() + 1;
   assert.equal(stateOf(new TakePlayer(thin).docAt(end)), stateOf(new TakePlayer(full).docAt(end)));
   assert.equal(stateOf(new TakePlayer(thin).docAt(end)), stateOf(getBoard(g.id).doc));
+});
+
+// ---------- 2026-11-26: every interaction, live, in one order ----------
+
+test("a person's everyday work is all on the timeline, in one order, and the board at each step replays exactly; windows are nudged", async () => {
+  const g = grid("Everyday");
+  const sent: Uint8Array[] = [];
+  // a window on the grid that hears the server (the person's own socket carries their edits)
+  const listener = Object.assign(new EventEmitter(), { readyState: 1, binaryType: "", send: (d: Uint8Array) => sent.push(new Uint8Array(d)), close() {} });
+  attachConnection(g.id, listener as never, false, kai.id);
+  const p = personOn(g.id, ada);
+  const states: Array<{ kind: string; object: string; state: string }> = [];
+  const step = async (kind: string, object: string, fn: (d: Y.Doc) => void) => {
+    p.edit(fn);
+    timeline.flushTimeline();
+    states.push({ kind, object, state: stateOf(getBoard(g.id).doc) });
+    await sleep(8);
+  };
+  const n = note(g.section, "Brief");
+  await step("card.add", n.id, (d) => boardMaps(d).objects.set(n.id, n));
+  const t = { id: uid("tbl"), kind: "table", sectionId: g.section, name: "Parts", x: 400, y: 0, float: false, bornAt: Date.now(), w: 400, h: 300, cols: 2, rows: 2 } as unknown as ObjectDoc;
+  await step("card.add", t.id, (d) => boardMaps(d).objects.set(t.id, t));
+  await step("card.edit", t.id, (d) => setTableCells(d, t.id, { "0,0": "bolt", "0,1": "4" }));
+  await step("card.place", n.id, (d) => boardMaps(d).objects.set(n.id, { ...boardMaps(d).objects.get(n.id)!, x: 120, y: 80 }));
+  await step("card.place", t.id, (d) => boardMaps(d).objects.set(t.id, { ...boardMaps(d).objects.get(t.id)!, w: 520 }));
+  const other = editBoard(g.id, "system", (doc) => appendSection(doc, "Bench"));
+  await step("card.move", n.id, (d) => boardMaps(d).objects.set(n.id, { ...boardMaps(d).objects.get(n.id)!, sectionId: other.id }));
+  const v = { id: uid("media"), kind: "media", media: "video", src: "/files/f_vid", sectionId: g.section, name: "Video note", x: 0, y: 400, float: false, bornAt: Date.now(), w: 320, h: 240, note: { by: ada.id, at: Date.now(), ms: 2100, fileId: "f_vid", mime: "video/webm" } } as unknown as ObjectDoc;
+  await step("note.video", v.id, (d) => boardMaps(d).objects.set(v.id, v));
+  await step("card.remove", t.id, (d) => boardMaps(d).objects.delete(t.id));
+  await sleep(60);
+  timeline.flushTimeline();
+
+  const s = await slice(C.ada, g.id);
+  const mine = s.events.filter((e) => e.actor.id === ada.id && e.kind !== "person.here");
+  // each step is there, by Ada, in the order she did them
+  assert.deepEqual(
+    mine.map((e) => [e.kind, e.object]),
+    states.map((x) => [x.kind, x.object]),
+    JSON.stringify(mine.map((e) => e.text)),
+  );
+  assert.equal(mine.find((e) => e.kind === "card.place" && e.object === n.id)!.text, "moved “Brief”");
+  assert.equal(mine.find((e) => e.kind === "card.place" && e.object === t.id)!.text, "resized “Parts”");
+  // a second nudge of the same card within the quiet stretch is the same event
+  p.edit((d) => boardMaps(d).objects.set(n.id, { ...boardMaps(d).objects.get(n.id)!, x: 140 }));
+  timeline.flushTimeline();
+  assert.equal(kinds(await slice(C.ada, g.id), "card.place").filter((e) => e.object === n.id).length, 1);
+  // read twice, the same order
+  assert.deepEqual((await slice(C.kai, g.id)).events.map((e) => e.id), (await slice(C.kai, g.id)).events.map((e) => e.id));
+
+  // the board at each event's moment is exactly the board right after that step
+  const frames = decodeTake((await ok(C.kai, "GET", `/api/boards/${g.id}/history?from=0&to=${Date.now() + 1000}`)).bytes);
+  const player = new TakePlayer(frames, 2);
+  for (const [i, e] of mine.entries()) assert.equal(stateOf(player.docAt(e.at)), states[i].state, `the board after ${e.kind} ${e.text}`);
+
+  // the window was told, with nothing but a time: [2, at]
+  await sleep(700);
+  const nudges = sent.filter((m) => m[0] === 2);
+  assert.ok(nudges.length >= 1, "the window heard that the timeline has something new");
+  assert.ok(nudges.every((m) => m.length <= 10), "a nudge carries no content");
+  p.leave();
+  listener.emit("close");
 });

@@ -682,6 +682,18 @@ test("an agent at work stands in the council on its cursor's colour, wearing a c
   expect(await info.locator("[data-run-trace] [data-step]").count()).toBeGreaterThan(0);
   await settle(ada, 400);
   await ada.screenshot({ path: `${TRACE}/03_its-run-step-by-step-day.png` });
+  // its thinking module expands into the grid behind this one (2026-11-26): its run card, its chain under where it worked
+  await info.locator("[data-thinking-open]").click();
+  const trail = ada.locator("[data-trail]");
+  await expect(trail).toBeVisible();
+  await expect(trail.locator(`[data-trail-run="${name}"]`)).toHaveAttribute("data-trail-kind", "council", { timeout: 8000 });
+  await expect(trail.locator(`[data-trail-chain="${name}"]`)).toBeVisible();
+  await expect.poll(async () => trail.locator(`[data-trail-chain="${name}"] [data-trail-capsule]`).count()).toBeGreaterThan(0);
+  await expect(trail.locator('[data-trail-node="Supply"]')).toBeVisible();
+  await settle(ada, 900);
+  await ada.screenshot({ path: `../../docs/evidence/2026-11-26_work-trail/01_thinking-expanded-council-day.png` });
+  await ada.keyboard.press("Escape");
+  await expect(trail).toHaveCount(0);
   await kai.context().close();
 });
 

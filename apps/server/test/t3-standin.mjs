@@ -13,20 +13,42 @@ const FINISH_MS = Number(process.env.T3_STANDIN_FINISH_MS || 0);
 let builtInArgs = process.env.T3_STANDIN_LAUNCH_ARGS || "";
 // T3_STANDIN_USE_TOOLS: a started thread uses the tool file in its folder once (a note in its section), as an agent would
 const USE_TOOLS = !!process.env.T3_STANDIN_USE_TOOLS;
+// T3_STANDIN_WORK: before its note, a few steps and two files in its folder (the work trail's check), WORK_MS apart
+const WORK = !!process.env.T3_STANDIN_WORK;
+const WORK_MS = Number(process.env.T3_STANDIN_WORK_MS || "600");
 const roots = {};
 async function useTools(c) {
   try {
     const cfg = JSON.parse(readFileSync(join(roots[c.bootstrap.createThread.projectId], ".foundation-mcp.json"), "utf8")).mcpServers.foundation;
     const section = (/in the section “([^”]+)”/.exec(c.message.text) || [])[1];
     const who = (/^You are ([^,]+),/.exec(c.message.text) || [])[1];
-    const r = await fetch(cfg.url, { method: "POST", headers: { ...cfg.headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "add_note", arguments: { section, title: "Checked by " + who, markdown: "Prices match the supplier list." } } }) });
+    const call = (name, args, id) => fetch(cfg.url, { method: "POST", headers: { ...cfg.headers, "content-type": "application/json", accept: "application/json, text/event-stream" }, body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args } }) });
+    // T3_STANDIN_WORK: it works as a coding agent would first: reads the board, asks who else is at work, writes code in its folder
+    if (WORK) {
+      const folder = roots[c.bootstrap.createThread.projectId];
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      await call("read_board", {}, 10);
+      await wait(WORK_MS);
+      await call("concurrent_work", {}, 11);
+      await wait(WORK_MS);
+      mkdirSync(join(folder, "src"), { recursive: true });
+      writeFileSync(join(folder, "src", "prices.ts"), "export const unitPrices: Record<string, number> = {};\n");
+      await wait(WORK_MS);
+      mkdirSync(join(folder, "data"), { recursive: true });
+      writeFileSync(join(folder, "data", "suppliers.csv"), "part,supplier,price\n");
+      writeFileSync(join(folder, "src", "prices.ts"), "export const unitPrices: Record<string, number> = { hub: 12.4 };\n");
+      await wait(WORK_MS);
+      await call("read_card", { id: "not-a-card" }, 12);
+      await wait(WORK_MS);
+    }
+    const r = await call("add_note", { section, title: "Checked by " + who, markdown: "Prices match the supplier list." }, 1);
     writeFileSync(join(DIR, "tools-used.json"), JSON.stringify({ status: r.status, body: (await r.text()).slice(0, 400) }));
   } catch (e) {
     writeFileSync(join(DIR, "tools-used.json"), JSON.stringify({ error: String(e) }));
   }
 }
 import { createServer } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 const { WebSocketServer } = createRequire(import.meta.url)("ws");
 let line = "";
@@ -71,7 +93,8 @@ const http = createServer(async (req, res) => {
       const b = c.bootstrap?.createThread ?? threads[c.threadId] ?? {};
       upsert({ id: c.threadId, projectId: b.projectId, title: b.title, modelSelection: c.modelSelection, latestTurn: { state: "running" }, session: { status: "running", providerInstanceId: c.modelSelection.instanceId }, hasPendingApprovals: false, hasPendingUserInput: false, archivedAt: null, updatedAt: new Date().toISOString() });
       if (USE_TOOLS) setTimeout(() => void useTools(c), 1500);
-      if (FINISH_MS) setTimeout(() => threads[c.threadId] && upsert({ ...threads[c.threadId], latestTurn: { state: "completed" }, session: { status: "ready", providerInstanceId: c.modelSelection.instanceId } }), FINISH_MS);
+      // an ask that says "keep going" works until it's stopped (the work trail's check watches it at work)
+      if (FINISH_MS && !c.message.text.includes("keep going")) setTimeout(() => threads[c.threadId] && upsert({ ...threads[c.threadId], latestTurn: { state: "completed" }, session: { status: "ready", providerInstanceId: c.modelSelection.instanceId } }), FINISH_MS);
     }
     if (c.type === "thread.turn.interrupt" && threads[c.threadId]) upsert({ ...threads[c.threadId], latestTurn: { state: "interrupted" }, session: { status: "interrupted", providerInstanceId: threads[c.threadId].modelSelection.instanceId } });
     return json(200, { sequence: dispatched.length });

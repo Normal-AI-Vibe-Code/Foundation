@@ -4,8 +4,7 @@
  * signed in, so the badge is live wherever they are.
  *
  * Since 2026-11-25 (Josh: "perhaps chatform is actually a top right level tool") it heads the tools at the top
- * bar's right end, as one pill in two halves: the word opens the whole of ChatForm, and the panel at its end opens
- * the conversation pinned in the right panel (chat/pinRight.ts, chat/PinnedChat.tsx) beside whatever is open.
+ * bar's right end; since 2026-11-26 as the mark alone, its word kept as the button's name for a screen reader.
  */
 
 import { useEffect, useMemo } from "react";
@@ -15,10 +14,6 @@ import { setListFolded } from "./pins";
 import { useTellWhere } from "./gridChatWhere";
 import { chatTotals, totalsWords } from "./logic";
 import { ChatMark } from "./Icons";
-import { PinRightGlyph } from "./PinRightButton";
-import { toggleChatRight, useChatPin } from "./pinRight";
-import { CHAT_SERVER } from "./server";
-import { chatTitle } from "@foundation/protocol";
 import { placeOf } from "../lib/place";
 import { useSyncExternalStore } from "react";
 import "./chat.css";
@@ -59,28 +54,16 @@ function usePlaceKind() {
   );
 }
 
-/** the top right's ChatForm: the word opens the whole place, the panel half the pinned conversation beside it */
-export function ChatToolButton({ on }: { on: boolean }) {
+/**
+ * The top right's ChatForm (2026-11-26, Josh: "a pill with just the chatform icon and a small number icon if there
+ * are notifications"): the mark, and the count beside it when something's waiting. It opens the whole of ChatForm;
+ * a conversation goes to the right panel from its own head there (chat/PinRightButton.tsx).
+ */
+export function ChatToolButton() {
   const place = usePlaceKind();
-  const pin = useChatPin();
-  const s = useChat();
-  const pinned = pin.server === CHAT_SERVER && pin.channel ? s.channels[pin.channel] : undefined;
-  const unreadThere = !on && pinned ? pinned.unread : 0;
   return (
-    <span className="top-chat-split" data-top-chat-split>
+    <span className="top-chat-solo" data-top-chat-solo>
       <ChatButton on={place === "chat"} />
-      <button
-        type="button"
-        className={`top-btn top-chat-panel${on ? " is-on" : ""}`}
-        onClick={toggleChatRight}
-        aria-pressed={on}
-        aria-label={on ? "Close the pinned conversation" : "Open the pinned conversation"}
-        data-tip={on ? "Close the right panel" : pinned ? `In the right panel: ${pinned.kind === "open" || pinned.kind === "private" ? "#" : ""}${chatTitle(pinned, s.me?.id)}` : "Pin a conversation in the right panel"}
-        data-tool-open="chat"
-      >
-        <PinRightGlyph />
-        {unreadThere > 0 && <i className="tool-btn-dot is-unread" aria-hidden data-chat-pinned-unread={unreadThere} />}
-      </button>
     </span>
   );
 }

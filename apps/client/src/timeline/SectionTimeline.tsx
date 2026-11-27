@@ -1,6 +1,6 @@
 /**
- * A section's timeline (docs/timeline.md §3): opened from the clock in its header, a slim bar along the section's
- * foot, over its body (it never pushes the cards: a section fits its cards to its body). Its own range and
+ * A section's timeline (docs/timeline.md §3): opened from the clock in its header, a slim bar that unfolds from under
+ * the header, over the top of its body (it never pushes the cards: a section fits its cards to its body). Its own range and
  * playhead, the lanes condensed to one or two rows. Scrubbing it takes only this section into the past; while the
  * grid's band is open that detaches it (*Follow the grid* joins them again) and its playhead shows on the band.
  * Closing it returns the section to now. A section that stands for a grid opens that grid's own timeline.

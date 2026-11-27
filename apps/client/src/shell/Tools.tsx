@@ -77,7 +77,7 @@ export function ToolButtons() {
   const { t3 } = useAvailable();
   return (
     <div className="tool-buttons" role="group" aria-label="Tools">
-      {TOOLS.map((t) => t.id === "chat" ? <ChatToolButton key={t.id} on={ui.tool === "chat"} /> : (
+      {TOOLS.map((t) => t.id === "chat" ? <ChatToolButton key={t.id} /> : (
         <button
           key={t.id}
           type="button"
