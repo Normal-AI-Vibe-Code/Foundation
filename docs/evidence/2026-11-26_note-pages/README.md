@@ -8,6 +8,7 @@ One Note primitive: a note page in the side menu's Notes, open full size, and th
 | `grid-card-night.png` | Ada's grid, the same note as a card, with Kai's words in it (the page's row in Notes shows Kai is on it) |
 | `slash-menu-in-card-night.png` | the slash menu open in the grid card, `/todo` typed, To-do list first |
 | `page-day.png` | the same page by day, after the heading was dragged above the to-do by its handle |
+| `grid-note-full-night.png` | Notes listing every grid's notes under the grid and section (Listed › Motors › Torque), and that grid note open full size, its path back to the grid, written in there (the same note as its card) |
 | `design-night.jpg`, `design-day.jpg` | `#/design` → Note pages and blocks: every block at rest, the slash menu, a page card and a locked one |
 
 How it was checked:

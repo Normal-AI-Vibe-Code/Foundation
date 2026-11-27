@@ -40,6 +40,8 @@ export interface UiState {
   paneView: "spaces" | "info";
   /** how the side menu lists grids: by when this device last opened each, or all of them as a tree (grids inside grids); or the ChatForm conversations kept there (chat/SideChats.tsx) */
   spacesView: "recent" | "all" | "notes" | "chats";
+  /** a grid's own note open full size over its grid, from the side menu's Notes (notes/NotePage.tsx GridNoteFull) */
+  noteOpen: { board: string; note: string } | null;
   /** a strip the open place lays under the top bar (Settings' tabs over a grid): the grid frames itself below it */
   strip: number;
   /** the grid's council, open as a band under the top bar (characters/Council.tsx): the grid starts below it */
@@ -128,6 +130,7 @@ let ui: UiState = {
   paneW: clampW(s0.paneW, WIDTHS.pane),
   paneView: s0.paneView === "info" ? "info" : "spaces",
   spacesView: s0.spacesView === "recent" ? "recent" : s0.spacesView === "chats" ? "chats" : s0.spacesView === "notes" ? "notes" : "all",
+  noteOpen: null,
   strip: 0,
   councilH: 0,
   councilW: 0,

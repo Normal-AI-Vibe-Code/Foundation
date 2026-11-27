@@ -57,10 +57,10 @@ The note's editor stays **one formatted-text surface over markdown** (`RichNote`
 ## 4. Migration
 
 - **Nothing is rewritten.** Every existing note card keeps its words where they are; it opens in the block editor because its stored form is the same markdown. Markdown written by hand isn't rewritten until someone changes the words (`RichNote`'s rule).
-- **Grid notes are not moved into the pane by themselves.** The pane lists note pages; a grid note becomes one when a person (or an agent, `make_note_page`) asks. Moving every grid note (the daily digests, agents' notes on every grid) would flood the pane and fork every reader of `noteText`. This is the one choice that is Josh's (§5).
+- **Every grid note is listed, where it is** (Josh, 2026-11-26: "List them all, and make sure their hierarchy refers back to the grids that they are in"). Notes shows the pages first, then **On grids**: All Grids' own tree (a grid inside a grid stays inside it), kept to the grids that hold notes, each grid's notes under the section they sit in (a nested section by its path). Nothing moves: a grid note stays on its grid, and opens full size over it (`GridNoteFull`), its path the grid, then the section; "Show it on the grid" frames its card, "Make it a page" moves its words to a page. A card showing a page is listed under its grid too (the sheet) and opens the page, and a page says which grids it stands on ("On …"). The list comes from a small server index (`apps/server/src/noteindex.ts`: a row per note card, kept with the search index as a board changes; a board not opened since the index began is read once at boot from its stored updates). `GET /api/notes` answers only with the grids a person can see, and leaves out a card of a page they can't see.
 - Old clients: a `ref` card shows empty on a build without this; the page itself is a board they can open.
 
 ## 5. Josh's call
 
-1. **Grid notes in the pane**: lazily (only pages, a grid note becomes one on "Make it a page"; built) or every existing grid note listed. Built lazily; listing them all is a later migration that only adds pages.
+1. **Grid notes in the pane**: decided 2026-11-26, list them all, under their grids (§4).
 2. **A new note page is open to everyone on the server**, like a new grid; making it members-only is the space's ⓘ → People, as for any grid. A private-by-default page would be a change to how spaces are made.

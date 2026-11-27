@@ -19,6 +19,7 @@ import type { WebSocket } from "ws";
 import { appendSection, boardMaps, describeBoard, logActivity, noteTextOf, tableCellsOf, uid, type ObjectDoc, type PanelDoc } from "@foundation/protocol";
 import { all, db, indexDoc, one, run, unindexDoc } from "./db.ts";
 import { actorScope } from "./audit.ts";
+import { indexNotes } from "./noteindex.ts";
 
 const MSG_SYNC = 0;
 const MSG_AWARENESS = 1;
@@ -242,7 +243,12 @@ function indexBoard(board: Board) {
   // only what this board indexed: a card moved to another grid keeps its id, and that grid's entry stays
   for (const ref of indexedRefs.get(board.id) ?? []) if (!seen.has(ref)) unindexDoc("board", ref, board.id);
   indexedRefs.set(board.id, seen);
+  // the side menu's Notes: every grid's notes, by grid and section (noteindex.ts)
+  indexNotes(board.id, board.doc);
 }
+
+/** is this board open in memory (its own updates keep its indexes) */
+export const isBoardOpen = (id: string) => boards.has(id);
 
 function objectText(o: ObjectDoc, note: string | undefined, cells?: Record<string, string>): string {
   switch (o.kind) {

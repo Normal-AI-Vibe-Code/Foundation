@@ -186,3 +186,73 @@ test("a members-only page answers only to its members: not placed, not read thro
   // a page Kai can't see isn't one he can nest into either
   await assert.rejects(() => runTool(as(kai, "g-secret"), "add_note_page", { title: "x", parent: page.id }), /No note page/);
 });
+
+// ---------- every grid's notes, for the side menu's Notes (noteindex.ts) ----------
+
+test("every grid's notes are listed by grid and section path, kept as the board changes; a page's card is listed too", async () => {
+  const { indexNotes } = await import("../src/noteindex.ts");
+  const { gridNotesFor } = await import("../src/notes.ts");
+  const doc = grid("g-list");
+  const top = [...boardMaps(doc).sections.values()][0];
+  // a section inside the section: its path names both
+  doc.transact(() => boardMaps(doc).sections.set("sec-inner", { id: "sec-inner", name: "Rim drive", c0: 0, r0: 0, c1: 0, r1: 0, parent: top.id }));
+  const a = (await runTool(as(ada, "g-list"), "add_note", { title: "Torque", markdown: "## Torque\n\n**12 Nm** at the hub", section: "Rim drive" })) as { id: string };
+  const page = makeNotePage({ title: "Supplier calls" });
+  const placed = (await runTool(as(ada, "g-list"), "place_note", { note: page.id })) as { id: string };
+  // kept by the board's own index a beat after the edit
+  await new Promise((r) => setTimeout(r, 1100));
+  const mine = gridNotesFor(ada)["g-list"];
+  assert.ok(mine, "the grid is listed");
+  const torque = mine.find((n) => n.id === a.id)!;
+  assert.equal(torque.name, "Torque");
+  assert.equal(torque.sectionPath, `${top.name} › Rim drive`);
+  assert.equal(torque.preview, "Torque");
+  const card = mine.find((n) => n.id === placed.id)!;
+  assert.equal(card.ref, page.id);
+  // a removed note leaves the list
+  await runTool(as(ada, "g-list"), "delete_card", { id: a.id, confirm: true });
+  indexNotes("g-list", doc);
+  assert.ok(!gridNotesFor(ada)["g-list"].some((n) => n.id === a.id));
+});
+
+test("Notes lists only grids a person can see; a card of a page they can't see is left out; nothing is written", async () => {
+  const { indexNotes } = await import("../src/noteindex.ts");
+  const { gridNotesFor } = await import("../src/notes.ts");
+  const doc = grid("g-members");
+  await runTool(as(ada, "g-members"), "add_note", { title: "Board minutes", markdown: "secret" });
+  run("insert into board_members (board_id, user_id, role, source, added_at) values (?, ?, 'editor', 'test', ?)", "g-members", ada.id, Date.now());
+  indexNotes("g-members", doc);
+  assert.ok(gridNotesFor(ada)["g-members"]?.length);
+  assert.equal(gridNotesFor(kai)["g-members"], undefined, "a members-only grid Kai isn't on isn't there");
+  // a page only Ada can see, on an open grid: Kai sees the grid's other notes, not that card
+  const open = grid("g-open");
+  const secret = makeNotePage({ title: "Ada's page" });
+  run("insert into board_members (board_id, user_id, role, source, added_at) values (?, ?, 'editor', 'test', ?)", secret.id, ada.id, Date.now());
+  await runTool(as(ada, "g-open"), "place_note", { note: secret.id });
+  await runTool(as(ada, "g-open"), "add_note", { title: "Open note", markdown: "hello" });
+  const before = Y.encodeStateVector(open);
+  indexNotes("g-open", open);
+  assert.deepEqual(gridNotesFor(kai)["g-open"].map((n) => n.name), ["Open note"]);
+  assert.equal(gridNotesFor(ada)["g-open"].length, 2);
+  assert.deepEqual(Y.encodeStateVector(open), before, "listing writes nothing to the grid");
+  // note pages' own boards aren't grids here
+  assert.equal(gridNotesFor(ada)[secret.id], undefined);
+});
+
+test("a board not open since the index began is read once from its stored updates", async () => {
+  const { backfillNoteIndex } = await import("../src/noteindex.ts");
+  const { gridNotesFor } = await import("../src/notes.ts");
+  const { putNote } = await import("@foundation/protocol");
+  // a grid written before: its row and its updates in the database, never opened here
+  const d = new Y.Doc();
+  d.transact(() => {
+    appendSection(d, "Old section");
+    const sec = [...boardMaps(d).sections.values()][0];
+    putNote(d, { id: "note-old", kind: "note", sectionId: sec.id, name: "From before", x: 0, y: 0, float: false, bornAt: 1, w: 300, h: 200, text: "- [ ] kept" });
+  });
+  run("insert into boards (id, name, created_at, updated_at) values (?, ?, ?, ?)", "g-old", "Old grid", 1, 1);
+  run("insert into board_updates (board_id, update_blob, at) values (?, ?, ?)", "g-old", Y.encodeStateAsUpdate(d), 1);
+  backfillNoteIndex(() => false);
+  const old = gridNotesFor(ada)["g-old"];
+  assert.deepEqual(old?.map((n) => [n.name, n.sectionPath, n.preview]), [["From before", "Old section", "kept"]]);
+});

@@ -16,8 +16,9 @@ import { shutdownLocalVms } from "./localvms.ts";
 import { one } from "./db.ts";
 import { HttpError, json, parseCookies, readJson, Router, sse, type Req } from "./http.ts";
 import { AGENT_TOKEN_DAYS, chatSessionFor, clearSession, createSession, devSignInRefusal, GOOGLE_STATE_COOKIE, googleCallback, googleSignIn, googleStart, hashToken, isAllowed, requireUser, setSessionCookie, signIn, upsertUser, userFromRequest } from "./auth.ts";
-import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
-import { makeNotePage, renameNoteBody } from "./notes.ts";
+import { BUILT_IN_APPS, SPACE_KINDS, cleanTheme, isPageKind, boardEpoch, cleanFolder, cleanPageUrl, createBoardRow, editBoard, ensureBoardRow, getBoard, isBoardOpen, listBoards, presence, setBoardParent, updateBoardRow, type SpaceKind } from "./boards.ts";
+import { gridNotesFor, makeNotePage, renameNoteBody } from "./notes.ts";
+import { backfillNoteIndex } from "./noteindex.ts";
 import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serveFile, uploadFile } from "./files.ts";
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
@@ -290,6 +291,13 @@ r.get("/api/boards", (req) => {
   const u = requireUser(req);
   const hidden = hiddenBoards(u);
   return { boards: listBoards().filter((b) => !hidden.has(b.id)).map((b) => ({ ...b, role: boardRole(u.id, b.id) })) };
+});
+/**
+ * Every grid's notes, for the side menu's Notes (noteindex.ts; docs/notes.md): grid by grid, only the grids this
+ * person can see. A card showing a note page they can't see (or one archived) is left out. Reads nothing else.
+ */
+r.get("/api/notes", (req) => {
+  return { grids: gridNotesFor(requireUser(req)) };
 });
 r.get("/api/boards/:id/epoch", (req) => {
   requireBoard(requireUser(req), req.params.id);
@@ -1539,6 +1547,8 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 reindexFilesIfNeeded();
+// the side menu's Notes: boards not opened since the notes index began are read once, after the server is up
+setTimeout(() => backfillNoteIndex(isBoardOpen), 1500).unref?.();
 watchFactoryForm();
 // the Vision loop: bring back what hand-off threads export, and ask the reviewers once they have
 setInterval(() => {

@@ -258,3 +258,21 @@
   font-size: var(--text-13);
 }
 .note-page-gone { padding: 6px 18px; border-bottom: 1px solid var(--line); font-size: var(--text-12); }
+
+/* the side menu's Notes: every grid's notes under the grid and the section they are in (notes/GridNotesTree.tsx) */
+.side-pane .grid-notes-eyebrow { margin-top: var(--space-4); }
+.side-pane .grid-note-where {
+  padding: 6px var(--space-3) 2px calc(var(--space-4) + var(--depth, 0) * 16px + 26px);
+  color: var(--color-dim);
+  font: 500 var(--text-11) / 1.3 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.side-pane .grid-note-row .pane-row { font-weight: 400; color: var(--color-mist); }
+.side-pane .grid-note-row .pane-row.is-current { color: var(--color-frost); }
+/* a grid note open full size: its path starts with its grid */
+.note-page-crumb.is-grid { color: var(--ink); font-weight: 600; }
+.note-page-title.is-static { padding-bottom: var(--space-1); }
+.note-page-on { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); padding: 0 12px; }
+.note-page-on-label { font-size: var(--text-11); color: var(--color-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-right: var(--space-1); }

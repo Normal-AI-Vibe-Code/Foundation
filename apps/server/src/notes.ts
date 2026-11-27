@@ -14,6 +14,9 @@ import { NOTE_BODY, NOTE_LINK, boardMaps, noteTextOf, putNote, setNoteText, type
 import { createBoardRow, editBoard, getBoard, isNoteKind, listBoards, setBoardParent, type BoardRow } from "./boards.ts";
 import { one, run } from "./db.ts";
 import { HttpError } from "./http.ts";
+import { hiddenBoards } from "./members.ts";
+import { notesByGrid, type IndexedNote } from "./noteindex.ts";
+import type { UserInfo } from "@foundation/protocol";
 
 /** a page's title as kept: trimmed, one line, at most 80 characters */
 export const cleanTitle = (t: unknown) => (typeof t === "string" ? t.replace(/\s+/g, " ").trim().slice(0, 80) : "");
@@ -108,3 +111,17 @@ export function archiveNotePage(id: string) {
 
 /** was this note page archived (a card showing it says so) */
 export const isArchivedNote = (id: string) => Boolean(one<{ archived_at: number | null }>("select archived_at from boards where id = ? and kind = 'note'", id)?.archived_at);
+
+/**
+ * Every grid's notes as this person may see them (the side menu's Notes; noteindex.ts): only grids and decks
+ * they can see (a members-only grid they aren't on isn't there), not Foundation's own grids, and a card showing
+ * a note page they can't see, or one archived, left out.
+ */
+export function gridNotesFor(user: UserInfo): Record<string, IndexedNote[]> {
+  const hidden = hiddenBoards(user);
+  const rows = listBoards().filter((b) => !hidden.has(b.id));
+  const grids = rows.filter((b) => (b.kind === "grid" || b.kind === "deck") && !b.id.startsWith("foundation-")).map((b) => b.id);
+  const pages = new Set(rows.filter((b) => b.kind === "note").map((b) => b.id));
+  const by = notesByGrid(grids);
+  return Object.fromEntries(Object.entries(by).map(([g, notes]) => [g, notes.filter((n) => !n.ref || pages.has(n.ref))]));
+}

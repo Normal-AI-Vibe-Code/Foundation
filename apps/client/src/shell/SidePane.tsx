@@ -23,6 +23,7 @@ import { WIDTHS, setUi, spaceOpenedAt, toast, useUi } from "../state/ui";
 import { logout } from "../lib/api";
 import { KIND_NAME, childrenOf, isNoteKind, isPageKind, fileGrid, parentOf, wouldLoop, type BoardRow, type SpaceKind } from "../lib/grids";
 import { NOTE_PAGE_MIME } from "../notes/noteSync";
+import { GridNotesTree } from "../notes/GridNotesTree";
 import { goSettings, type Place } from "../lib/place";
 import { initials } from "./Presence";
 import { FloorEdge } from "./FloorEdge";
@@ -235,10 +236,11 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
               </section>
             ) : ui.spacesView === "notes" ? (
               <section className="pane-group" aria-label="Notes">
+                <div className="pane-eyebrow">Pages</div>
                 {childrenOf(null, notes).map((b) => row(b, 0, true))}
                 {notes.length === 0 && (
                   <div className="pane-empty is-create">
-                    <span>No notes yet. A note opens here full size, and can go on any grid.</span>
+                    <span>No pages yet. A page opens here full size, and can go on any grid.</span>
                     {!viewer && (
                       <button className="f-pill is-accent" onClick={() => onNew("note")}>
                         New note
@@ -251,6 +253,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
                     Drop here to bring it to the top
                   </div>
                 )}
+                <GridNotesTree grids={listed} current={place.kind === "grid" ? current : ""} live={ui.pane && ui.spacesView === "notes"} />
               </section>
             ) : (
             <section className="pane-group">

@@ -151,3 +151,40 @@ test("a grid's own note becomes a page from its card's menu: the card stays, sho
   await expect(a.locator(`.side-pane [data-space-drop="${page}"]`)).toBeVisible({ timeout: 8000 });
   await ada.close();
 });
+
+test("every grid's notes are in Notes under their grid and section; one opens full size, its path back to the grid, the same note as its card", async ({ browser }) => {
+  const ada = await signIn(browser, "Ada Notes", "ada-notes@normal.dev");
+  const stamp = Date.now().toString(36);
+  const gridName = `Listed ${stamp}`;
+  const grid = ((await (await ada.request.post(`${CLIENT}/api/boards`, { data: { name: gridName } })).json()) as { id: string }).id;
+  await ada.request.post(`${CLIENT}/api/boards/${grid}/tools/add_section`, { data: { name: "Motors" } });
+  const r = await ada.request.post(`${CLIENT}/api/boards/${grid}/tools/add_note`, { data: { title: `Torque ${stamp}`, section: "Motors", markdown: "**12 Nm** at the hub" } });
+  const id = ((await r.json()) as { result: { id: string } }).result.id;
+  const a = await ada.newPage();
+  await a.goto(`/?board=${grid}`);
+  await waitLive(a);
+  // listed under the grid (open, it's the open grid), under its section
+  const node = a.locator(`.side-pane [data-notes-grid="${grid}"]`);
+  await expect(node).toBeVisible({ timeout: 10_000 });
+  await expect(node.locator(".grid-note-where", { hasText: "Motors" })).toBeVisible();
+  const row = node.locator(`[data-grid-note-row="${id}"]`);
+  await expect(row).toHaveText(`¶Torque ${stamp}`);
+  // open full size: its path is the grid, then the section
+  await row.locator("button").click();
+  const full = a.locator(`.note-page.is-grid-note[data-grid-note="${id}"]`);
+  await expect(full).toBeVisible();
+  await expect(full.locator(".note-page-crumb").first()).toHaveText(gridName);
+  await expect(full.locator(".note-page-crumb").nth(1)).toHaveText("Motors");
+  // the same note: written here, it's in the card
+  await full.locator(".note-rendered").click();
+  await a.keyboard.press("Control+End");
+  await a.keyboard.type(" and checked");
+  await a.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await expect.poll(() => a.evaluate((nid) => (window as unknown as { __foundation: { getState(): { notes: Record<string, { text: string }> } } }).__foundation.getState().notes[nid]?.text, id), { timeout: 8000 }).toContain("and checked");
+  await a.screenshot({ path: `${SHOTS}/grid-note-full-night.png` });
+  // back to the grid by its path
+  await full.locator(".note-page-crumb").first().click();
+  await expect(full).toBeHidden();
+  await expect(a.locator(`.obj-slot[data-obj-id="${id}"] .note-rendered`)).toContainText("and checked");
+  await ada.close();
+});
