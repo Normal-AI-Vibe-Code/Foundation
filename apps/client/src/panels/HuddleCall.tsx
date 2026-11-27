@@ -15,6 +15,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { springs } from "@foundation/ui";
 import type { Mood } from "@foundation/protocol";
 import { leaveHuddle, type AgentSeat, type HuddleRoom, type RoomView } from "../lib/huddle";
+import { applySpeaker, onSpeaker } from "../lib/media";
+import { DeviceChip } from "./DeviceChip";
 import { api } from "../lib/api";
 import { goGrid } from "../lib/place";
 import { loadGrids, openGrid, useGrids } from "../lib/grids";
@@ -164,7 +166,26 @@ export function CallVideo({ stream, muted }: { stream: MediaStream; muted: boole
     if (!v) return;
     if (v.srcObject !== stream) v.srcObject = stream;
     void v.play().catch(() => {});
+    // a camera turned on later arrives as a new track on the same stream: show it
+    const again = () => {
+      v.srcObject = null;
+      v.srcObject = stream;
+      void v.play().catch(() => {});
+    };
+    stream.addEventListener("addtrack", again);
+    stream.addEventListener("removetrack", again);
+    return () => {
+      stream.removeEventListener("addtrack", again);
+      stream.removeEventListener("removetrack", again);
+    };
   }, [stream]);
+  // the sound plays on the speaker chosen in the device chip
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || muted) return;
+    applySpeaker(v);
+    return onSpeaker(() => ref.current && applySpeaker(ref.current));
+  }, [muted]);
   useEffect(() => {
     if (ref.current) ref.current.muted = muted;
   }, [muted]);
@@ -199,6 +220,7 @@ export function CallControls({ room, view, agentChoices = [], onPlace, extra }: 
       <button className={`huddle-ctl${view.camOff ? " is-off" : ""}`} data-tip={view.camOff ? "Camera on" : "Camera off"} aria-label={view.camOff ? "Camera on" : "Camera off"} onClick={() => room.setCamOff(!view.camOff)}>
         {view.camOff ? <CamOffGlyph /> : <CamGlyph />}
       </button>
+      <DeviceChip room={room} view={view} />
       <button
         className={`huddle-ctl${view.screen ? " is-on" : ""}`}
         data-tip={view.screen ? "Stop sharing" : view.sharing ? `${view.sharing.by} is sharing` : "Share your screen"}

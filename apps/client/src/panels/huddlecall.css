@@ -353,3 +353,87 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-pane);
 }
+
+/* ---------- the device chip: a headset with a dot, and its picker ---------- */
+
+.huddle-devices {
+  position: relative;
+}
+.huddle-devices .f-dot {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 0 2px var(--color-raise);
+}
+.huddle-devices.is-bad {
+  border-color: color-mix(in srgb, var(--color-bad) 40%, transparent);
+}
+.huddle-devices.is-warn {
+  border-color: color-mix(in srgb, var(--color-warn) 40%, transparent);
+}
+.huddle-device-pop {
+  width: 300px;
+}
+.huddle-device {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.huddle-device + .huddle-device {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+.huddle-device-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: 600 var(--text-12) / 1.2 var(--font-sans);
+  color: var(--color-frost);
+}
+.huddle-device-title i {
+  margin-left: auto;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--color-dim);
+}
+.huddle-device select {
+  height: var(--h-pill);
+  min-width: 0;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-raise);
+  color: var(--color-frost);
+  font: 400 var(--text-12) / 1 var(--font-sans);
+}
+.huddle-device-why {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.huddle-level {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-line);
+  overflow: hidden;
+}
+.huddle-level > span {
+  display: block;
+  height: 100%;
+  background: var(--color-ok);
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 60ms linear;
+}
+.huddle-level.is-muted > span {
+  background: var(--color-dim);
+}
+.huddle-device-pop.is-specimen {
+  position: relative;
+  bottom: auto;
+  left: auto;
+}

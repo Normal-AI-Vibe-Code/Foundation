@@ -8,6 +8,9 @@ import type { ChatMessage } from "@foundation/protocol";
 import type { RoomView } from "../lib/huddle";
 import { HuddleCard } from "../chat/HuddleCard";
 import { CallStage, MicGlyph, CamGlyph, ScreenGlyph } from "./HuddleCall";
+import { DeviceRow, HeadsetGlyph } from "./DeviceChip";
+
+const dev = (deviceId: string, label: string): MediaDeviceInfo => ({ deviceId, kind: "audioinput", label, groupId: "", toJSON: () => ({}) });
 import "./huddlecall.css";
 
 const NOW = Date.now();
@@ -38,6 +41,8 @@ const VIEW: RoomView = {
   local: null,
   muted: false,
   camOff: true,
+  mic: { state: "on", label: "Headset Microphone" },
+  cam: { state: "none", message: "No camera found." },
   peers: [
     { id: "p1", name: "Ada Lovelace", color: "var(--color-pulse)", sending: true, muted: false, camOff: true, noRec: false, stream: null, screen: null, state: "connected" },
     { id: "p2", name: "Kai Moreno", color: "var(--color-moss)", sending: true, muted: true, camOff: true, noRec: true, stream: null, screen: null, state: "connected" },
@@ -102,6 +107,10 @@ export function HuddleDemo() {
             <button className="huddle-ctl is-off" aria-label="Camera (design)">
               <CamGlyph />
             </button>
+            <button className="huddle-ctl huddle-devices is-warn" aria-label="Devices (design)" data-tip="Microphone: Headset Microphone · Camera: none found">
+              <HeadsetGlyph />
+              <span className="f-dot is-warn" aria-hidden />
+            </button>
             <button className="huddle-ctl is-on" aria-label="Share (design)">
               <ScreenGlyph />
             </button>
@@ -119,6 +128,24 @@ export function HuddleDemo() {
             <button className="f-pill">Take to a grid…</button>
             <button className="f-pill huddle-leave">Leave</button>
           </div>
+        </div>
+        <p className="chat-demo-cap">The device chip: connected · no camera · no microphone; and its picker</p>
+        <div className="huddle-controls" data-design-devices>
+          {(["ok", "warn", "bad"] as const).map((t) => (
+            <button key={t} className={`huddle-ctl huddle-devices is-${t}`} aria-label={`Devices ${t} (design)`}>
+              <HeadsetGlyph />
+              <span className={`f-dot is-${t}`} aria-hidden />
+            </button>
+          ))}
+        </div>
+        <div className="huddle-pop huddle-device-pop is-specimen f-glass" aria-label="Devices (design)">
+          <div className="huddle-pop-head">Devices</div>
+          <DeviceRow kind="mic" title="Microphone" state={{ state: "on", label: "Headset Microphone", deviceId: "a" }} list={[dev("a", "Headset Microphone"), dev("b", "Microphone Array (Realtek)")]} onPick={() => {}} onRetry={() => {}}>
+            <span className="huddle-level">
+              <span style={{ transform: "scaleX(0.45)" }} />
+            </span>
+          </DeviceRow>
+          <DeviceRow kind="cam" title="Camera" state={{ state: "blocked", message: "The camera is blocked for Foundation. Allow it in the browser's site settings, then press Allow." }} list={[]} onPick={() => {}} onRetry={() => {}} />
         </div>
         <p className="chat-demo-cap">On a grid, for someone not in the private conversation</p>
         <div className="huddle-locked" style={{ minHeight: 120 }}>
