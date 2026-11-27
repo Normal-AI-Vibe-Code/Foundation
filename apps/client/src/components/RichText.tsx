@@ -34,7 +34,8 @@ import { getUi, toast } from "../state/ui";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { cardMenuItems } from "./cardMenu";
 import { IS_MAC, keys } from "../lib/keys";
-import { renderMarkdown } from "../utils/markdown";
+import { renderNote } from "../notes/blocks";
+import { NoteBlocks } from "../notes/BlockUi";
 import { openExternal } from "../utils/media";
 
 // ---------- formatted text → markdown ----------
@@ -93,28 +94,56 @@ export function htmlToMarkdown(root: HTMLElement): string {
   };
   const block = (el: HTMLElement) => {
     const tag = el.tagName;
+    // the blocks a note page writes (notes/blocks.ts says what each is kept as)
+    if (el.classList.contains("md-page") && el.dataset.note) {
+      const title = (el.querySelector(".md-page-title")?.textContent ?? "").replace(/[[\]\n]/g, "").trim();
+      out.push(`[${title}](note:${el.dataset.note})`);
+      return;
+    }
+    if (el.classList.contains("md-embed") && el.dataset.url) {
+      out.push(el.dataset.url);
+      return;
+    }
+    if (el.classList.contains("md-callout")) {
+      const kind = (el.dataset.kind ?? "note").toUpperCase();
+      const lines = [...el.children].flatMap((c) => linesOf(c));
+      out.push([`> [!${kind}]${lines[0] ? ` ${lines[0]}` : ""}`, ...lines.slice(1).map((l) => `> ${l}`)].join("\n"));
+      return;
+    }
+    if (el.classList.contains("md-toggle")) {
+      const head = el.querySelector(":scope > .md-toggle-head");
+      const body = el.querySelector(":scope > .md-toggle-body") as HTMLElement | null;
+      const inner = body ? htmlToMarkdown(body) : "";
+      out.push(`<details${el.dataset.open === "true" ? " open" : ""}>\n<summary>${head ? linesOf(head).join(" ") : ""}</summary>${inner ? `\n\n${inner}\n` : ""}\n</details>`);
+      return;
+    }
     if (/^H[1-6]$/.test(tag)) {
       const lvl = Math.min(4, Number(tag[1]));
       for (const l of linesOf(el)) out.push(`${"#".repeat(lvl)} ${l}`);
     } else if (tag === "UL" || tag === "OL") {
       let i = 0;
-      const items = (list: HTMLElement) => {
+      const items = (list: HTMLElement, depth: number) => {
+        const todos = list.classList.contains("md-todos");
         for (const li of list.children) {
           if (!(li instanceof HTMLElement)) continue;
           if (li.tagName === "UL" || li.tagName === "OL") {
-            items(li);
+            items(li, depth + 1);
             continue;
           }
-          // a list inside an item: its items follow, flat
+          // a list inside an item: its items follow, a level in
           const own = li.cloneNode(true) as HTMLElement;
           own.querySelectorAll("ul, ol").forEach((x) => x.remove());
           const text = linesOf(own).join(" ");
-          if (text) out.push(tag === "OL" ? `${++i}. ${text}` : `- ${text}`);
-          li.querySelectorAll(":scope > ul, :scope > ol").forEach((x) => items(x as HTMLElement));
+          const lead = "  ".repeat(Math.min(4, depth + Number(li.dataset.indent ?? 0)));
+          const todo = todos || li.classList.contains("md-todo");
+          // an empty to-do is still a to-do (the box is there to be filled in)
+          if (todo) out.push(`${lead}- [${li.dataset.checked === "true" ? "x" : " "}] ${text}`.trimEnd());
+          else if (text) out.push(`${lead}${tag === "OL" ? `${++i}.` : "-"} ${text}`);
+          li.querySelectorAll(":scope > ul, :scope > ol").forEach((x) => items(x as HTMLElement, depth + 1));
         }
       };
       const lines = out.length;
-      items(el);
+      items(el, 0);
       // a list is one block: its items on consecutive lines
       const made = out.splice(lines);
       if (made.length) out.push(made.join("\n"));
@@ -122,7 +151,7 @@ export function htmlToMarkdown(root: HTMLElement): string {
       const lines = linesOf(el);
       if (lines.length) out.push(lines.map((l) => `> ${l}`).join("\n"));
     } else if (tag === "PRE") {
-      out.push("```\n" + (el.textContent ?? "").replace(/\n+$/, "") + "\n```");
+      out.push("```" + (el.dataset.lang ?? "") + "\n" + (el.textContent ?? "").replace(/\n+$/, "") + "\n```");
     } else if (tag === "HR") {
       out.push("---");
     } else if (tag === "TABLE") {
@@ -196,7 +225,7 @@ export function mapCaret(at: number, before: string, after: string): number {
 }
 
 /** the note's markdown as the editing surface holds it: no line breaks between blocks, so its text is only its words */
-const surfaceHtml = (md: string) => renderMarkdown(md).replace(/>\n</g, "><");
+const surfaceHtml = (md: string) => renderNote(md).replace(/>\n</g, "><");
 
 // ---------- the toolbar ----------
 
@@ -539,8 +568,13 @@ function ClearGlyph() {
 
 // ---------- the note's formatted text ----------
 
-export function RichNote({ note }: { note: NoteMeta }) {
+export function RichNote({ note, words, page }: { note: NoteMeta; /** a card showing a note page (docs/notes.md): its words are the page's, written to the page's board */ words?: { text: string; write(md: string): void; readOnly: boolean }; /** this is a note page's body (a page block made in it goes inside it) */ page?: string | null }) {
+  const text = words ? words.text : note.text;
   const el = useRef<HTMLDivElement>(null);
+  const wordsRef = useRef(words);
+  wordsRef.current = words;
+  /** the surface, once drawn, for the blocks beside it (notes/BlockUi.tsx) */
+  const [surface, setSurface] = useState<HTMLDivElement | null>(null);
   /** the markdown the surface shows: what we last wrote, or last drew */
   const shown = useRef<string | null>(null);
   /**
@@ -553,7 +587,7 @@ export function RichNote({ note }: { note: NoteMeta }) {
   const [focused, setFocused] = useState(false);
   const [marks, setMarks] = useState<Marks>(NO_MARKS);
   const [linkAsk, setLinkAsk] = useState(0);
-  const canWrite = getUi().role !== "viewer";
+  const canWrite = getUi().role !== "viewer" && !words?.readOnly;
   /** the card the toolbar is drawn into, under its foot (outside the body, which clips); none: in place, as before */
   const [card, setCard] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => setCard(el.current?.closest<HTMLElement>(".frame-card") ?? null), []);
@@ -573,16 +607,16 @@ export function RichNote({ note }: { note: NoteMeta }) {
   // draw the note's text, unless it's what the surface already holds (our own typing coming back)
   useLayoutEffect(() => {
     const host = el.current;
-    if (!host || shown.current === note.text) return;
+    if (!host || shown.current === text) return;
     const at = document.activeElement === host ? caretOffset(host) : null;
     const before = host.textContent ?? "";
-    host.innerHTML = surfaceHtml(note.text);
-    shown.current = note.text;
+    host.innerHTML = surfaceHtml(text);
+    shown.current = text;
     wrote.current = false;
     drawn.current = at !== null ? htmlToMarkdown(host) : null;
     // someone else wrote while the caret was here: it stays with the words it was among
     if (at !== null) placeCaret(host, mapCaret(at, before, host.textContent ?? ""));
-  }, [note.text]);
+  }, [text]);
 
   // a note you just made is ready to type in (it arrives on everyone else's board without taking their caret)
   useEffect(() => {
@@ -599,7 +633,8 @@ export function RichNote({ note }: { note: NoteMeta }) {
     if (!wrote.current && md === drawn.current) return;
     wrote.current = true;
     shown.current = md;
-    updateNoteText(note.id, md);
+    if (wordsRef.current) wordsRef.current.write(md);
+    else updateNoteText(note.id, md);
   }, [note.id]);
 
   useEffect(() => {
@@ -698,7 +733,10 @@ export function RichNote({ note }: { note: NoteMeta }) {
   return (
     <>
       <div
-        ref={el}
+        ref={(n) => {
+          el.current = n;
+          if (n !== surface) setSurface(n);
+        }}
         className={`note-rendered rich-text${focused ? " is-writing" : ""}`}
         onContextMenu={onContextMenu}
         contentEditable={canWrite}
@@ -743,6 +781,7 @@ export function RichNote({ note }: { note: NoteMeta }) {
           }
         }}
       />
+      <NoteBlocks surface={surface} canWrite={canWrite} commit={commit} page={page} />
       {portalTo(
         card,
         <AnimatePresence>

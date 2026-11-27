@@ -2522,6 +2522,15 @@
       "issue": 245
     },
     {
+      "id": "note-pages",
+      "title": "Note pages: a note of its own in the side menu, the same note on any grid, written in blocks",
+      "kind": "plan",
+      "milestone": "ship",
+      "area": "design",
+      "status": "review",
+      "body": "Josh, 2026-11-26 (docs/notes.md; SPEC 3 and 7). One Note primitive: a note page is a space of kind note (its board holds the note), listed in the side menu's Notes as a tree, open full size; the same page goes on any grid as a note card with ref (drag it from Notes onto a section, or Put on a grid), and an edit in either place is in both, live. A grid's own note is the same primitive and becomes a page from its card's menu. The editor has blocks: slash menu, markdown shortcuts, to-dos, nested items, callouts, toggles, code, divider, pictures, link cards, sub-pages, a handle to drag or turn a block. Kept as readable markdown. Tools add_note_page, place_note, make_note_page, archive_note_page (confirm). Checked: server notepages.test.ts (8), client note-blocks.test.ts (7), e2e note-pages.spec.ts (2: two people, grid card and page), #/design day and night; evidence docs/evidence/2026-11-26_note-pages. Josh's call: list every existing grid note in Notes, or only pages (built: only pages); a new page open to everyone or private by default (built: open, like a grid). A person checks it in the desktop app."
+    },
+    {
       "id": "data-flows",
       "title": "Wires carry data: connectors emit while wired, tables take a wire through a lens, disconnect stops it",
       "kind": "plan",

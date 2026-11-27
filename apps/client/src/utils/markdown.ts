@@ -232,3 +232,8 @@ export function renderMarkdown(src: string): string {
   if (inCode) out.push("</code></pre>");
   return out.join("\n");
 }
+
+/** one line's words as the page shows them: escaped, then the marks, links and pictures (notes/blocks.ts draws its own blocks with it) */
+export const inlineMarkdown = (raw: string): string => inline(escapeHtml(raw.replace(/\u0000/g, "")));
+/** text as the page shows it, inert */
+export const escapeText = escapeHtml;

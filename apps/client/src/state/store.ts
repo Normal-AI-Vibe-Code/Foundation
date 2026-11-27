@@ -63,6 +63,8 @@ export interface NoteMeta extends ObjectBase {
   size?: NoteSize;
   /** no paper behind it: the words stand on the section itself (protocol NoteDoc.bare) */
   bare?: boolean;
+  /** the note page this card shows (protocol NoteDoc.ref, docs/notes.md): its words are that page's, not `text` */
+  ref?: string;
 }
 
 export interface MediaMeta extends ObjectBase {

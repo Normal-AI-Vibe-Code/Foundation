@@ -17,7 +17,8 @@
 import { isHostable, pageInBrowser } from "@foundation/protocol";
 import { toggleFullscreen } from "../lib/cardUse";
 import { openDetail } from "../lib/detail";
-import { openAppTab } from "../lib/grids";
+import { openAppTab, openGrid } from "../lib/grids";
+import { makeNotePage } from "../notes/noteSync";
 import { IS_MAC, keys } from "../lib/keys";
 import { canPin, getObject, getState, hostOf, isPanel, objectsInSection, removeObject, requestSnap, setObjectFloat, setObjectFolded, setObjectPinned, setSectionHost, updatePanel, type AnyObject } from "../state/store";
 import { getUi, toast } from "../state/ui";
@@ -80,6 +81,21 @@ export function cardMenuItems(id: string): MenuItem[] | null {
   }
 
   const more: MenuItem[] = [];
+  // a note as a page of its own (docs/notes.md): a grid's note becomes one, a card showing one opens it
+  if ("text" in o && !("media" in o)) {
+    const ref = (o as { ref?: string }).ref;
+    if (ref) more.push({ icon: "▤", label: "Open the page", action: () => openGrid(ref) });
+    else if (!viewer)
+      more.push({
+        icon: "▤",
+        label: "Make it a page (in Notes)",
+        action: () => {
+          const board = activeBoard()?.boardId;
+          if (!board) return;
+          void makeNotePage(board, id).then((r) => (typeof r === "string" ? toast(r, "bad") : toast(`“${o.name}” is a page in Notes now: the card shows it, and an edit in either place shows in both`, "ok")));
+        },
+      });
+  }
   if (hasWiring(o)) more.push({ icon: "⇄", label: "Inputs and outputs…", action: () => openDetail({ kind: "ports", title: `${o.name}: inputs and outputs`, id }) });
   if (isPanel(o) && o.url && (o.panel === "app" || o.panel === "link") && !viewer)
     more.push({

@@ -164,7 +164,9 @@ import { SlackMarkView } from "../components/SlackMark";
 import { SectionCrewView, type CrewFace } from "../components/SectionCrew";
 import { SectionAgentsChipView, SectionAgentsView } from "../components/SectionAgents";
 import { RichToolbar } from "../components/RichText";
-import { BareGlyph, MarkdownGlyph } from "../components/NoteView";
+import { BareGlyph, MarkdownGlyph, PageGlyph } from "../components/NoteView";
+import { rankBlocks, renderNote } from "../notes/blocks";
+import "../notes/blocks.css";
 import { AgentRow, AgentsPaneBody, T3AddForm, T3BlockView, type AgentRowData, type AgentsPlace, type T3Host, type T3Preset } from "../shell/AgentsPane";
 import { KeysLine, MachineAskList, MachinePickerView, StartLine } from "../panels/MachineView";
 import { MachineTools } from "../panels/MachineTools";
@@ -1538,6 +1540,10 @@ function DesignSections() {
         <NoteDemo />
       </Section>
 
+      <Section title="Note pages and blocks" note={`2026-11-26 (docs/notes.md): a note is also a page of its own. The side menu's Notes lists them as a tree (a note inside a note, ＋ makes one inside); one opens full size on the floor's paper: the pages it sits inside, its title in display 32 (renaming it renames it everywhere), Put on a grid, People and activity, Archive (asks first; nothing is deleted). Dragged from Notes onto a section, or put there from the page, it is a card on that grid: the same note, not a copy, with Open the page (the sheet) in its bar; an edit in either place is in both, live. A grid's own note becomes a page from its card's menu (Make it a page). The words are written in blocks: a slash (/) at a word's start opens the block menu at the caret (raised paper, pane radius, 264 wide: a glyph tile, the name, a hint, its markdown shortcut; the picked row is the pulse tint; recent ones first), and markdown at a block's start turns it (# ## ### - 1. [] > >> ! \`\`\` ---). To-dos are a box in the item's gutter (the pulse, ticked; the words go quiet and struck), Tab and ${keys("shift+Tab")} take an item a level in or out, a callout is a box of its kind's state colour (note pulse, tip ok, important agent, warning warn, caution bad), a toggle folds what's under it from an arrow in its gutter, a page inside is a row with its sheet, a link card shows its host and opens on a press (nothing loads on sight). The handle (six dots, dim) sits beside the block under the pointer: drag it (a pulse line shows where it lands) or press it for Turn into, Duplicate, Move up and down, Delete. Kept as markdown: - [ ], > [!NOTE], <details>, [Title](note:id).`}>
+        <NotePagesDemo />
+      </Section>
+
       <Section title="Voice and video notes" note={`2026-11-25, Josh: "where you can leave a short video note for someone to play back." A section's microphone (its tools, next to the note), its right-click menu and ${keys("mod+K")} (Voice note, Video note) open the recorder: raised paper off the section's top-right, drawn on the screen, 300 wide. Voice or Video, then Record: the microphone (and camera) opens only then, and every track stops when the recording stops, is discarded or the recorder closes. While it records, the state colour (red by day, orange at night) breathes on a dot, a meter or the mirrored camera shows it's live, the time counts up in tabular figures to the cap (5 minutes of voice, 2 of video), and the last ten seconds count down in the waiting colour. Review: play it back, Leave it here (the one blue action), Record again, Discard. It uploads, then the card is put down whole (never a placeholder). An upload that fails keeps the clip, with Try again; closing over a clip asks first. A viewer has no microphone. A voice note is a player on paper, 320 × 100 (240 to 560 wide; its height is its own): play, the wave from its 48 steps with what's played in ink (press or drag to go there; arrows step 5 s), elapsed / total, who and when, and 1× · 1.5× · 2×. A video note is the clip at its own shape (320 on its long side) over its first frame, a round play button, who / when / how long under it; it never plays by itself and plays with its sound, in place or full screen. Both are picked up anywhere, and ask before they go: the clip stays in the archive.`}>
         <MediaNotesDemo />
       </Section>
@@ -2072,6 +2078,104 @@ function NoteDemo() {
       <div className="oncall-cell">
         {barred("bare", <div className="note-rendered rich-text" dangerouslySetInnerHTML={{ __html: renderMarkdown("# Launch week\n\nEverything for **0.4** lives here.") }} />, "xl")}
         <div className="effect-label">Background off, extra large: a label on the section's own paper (the dashed edge shows under the pointer)</div>
+      </div>
+    </div>
+  );
+}
+
+/** a note page's blocks at rest, the slash menu, the handle, and a card showing a page (docs/notes.md) */
+function NotePagesDemo() {
+  const md = [
+    "## Rotor plan",
+    "",
+    "- [x] Balance the rotor",
+    "- [ ] Ask Acme for a quote",
+    "  - [ ] Check the lead time",
+    "",
+    "> [!TIP] Spin it up slowly the first time.",
+    "",
+    "> [!WARNING] Hot when it runs.",
+    "",
+    "<details open>",
+    "<summary>Specs</summary>",
+    "",
+    "- 12 V, 3 A",
+    "- 1,200 rpm",
+    "",
+    "</details>",
+    "",
+    "<details>",
+    "<summary>Folded: the test log</summary>",
+    "",
+    "Nothing here yet.",
+    "",
+    "</details>",
+    "",
+    "[Supplier calls](note:supplier-calls)",
+    "",
+    "https://example.com/datasheets/rotor-r3",
+    "",
+    "```ts",
+    "const rpm = 1200;",
+    "```",
+  ].join("\n");
+  const html = renderNote(md).replace(/>\n</g, "><");
+  const found = rankBlocks("");
+  return (
+    <div className="adapt-row note-pages-demo">
+      <div className="oncall-cell">
+        <div className="frame-card oncall-static" style={{ position: "relative", width: 440 }}>
+          <div className="note-inner">
+            <div className="note-rendered rich-text" dangerouslySetInnerHTML={{ __html: html }} />
+            <span className="note-block-handle" style={{ top: 14, left: 0, position: "absolute" }} aria-hidden>
+              <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+                <circle cx="3" cy="3" r="1.1" />
+                <circle cx="7" cy="3" r="1.1" />
+                <circle cx="3" cy="7" r="1.1" />
+                <circle cx="7" cy="7" r="1.1" />
+                <circle cx="3" cy="11" r="1.1" />
+                <circle cx="7" cy="11" r="1.1" />
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div className="effect-label">The blocks at rest: to-dos (one ticked, one a level in), a tip and a warning, a toggle open and one folded, a page inside, a link card, code with its language; the handle beside the heading</div>
+      </div>
+      <div className="oncall-cell">
+        <div className="note-slash" style={{ position: "relative", zIndex: 0 }} role="listbox" aria-label="Turn into (example)">
+          {found.slice(0, 8).map((b, i) => (
+            <div key={b.id} className={"note-slash-item" + (i === 1 ? " is-picked" : "")}>
+              <span className="note-slash-glyph" data-block={b.id} aria-hidden />
+              <span className="note-slash-words">
+                <span className="note-slash-name">{b.name}</span>
+                <span className="note-slash-hint">{b.hint}</span>
+              </span>
+              {b.md && <kbd className="note-slash-md">{b.md}</kbd>}
+            </div>
+          ))}
+        </div>
+        <div className="effect-label">The slash menu: every block, its markdown shortcut beside it; the picked one is the pulse tint</div>
+      </div>
+      <div className="oncall-cell">
+        <div className="frame-card note-card is-page oncall-static" style={{ position: "relative", width: 360 }}>
+          <div className="frame-header">
+            <span className="frame-title">Rotor plan</span>
+            <div className="header-actions">
+              <span className="icon-btn note-open-btn">
+                <PageGlyph />
+              </span>
+              <span className="icon-btn">⛶</span>
+              <span className="icon-btn">✕</span>
+            </div>
+          </div>
+          <div className="note-inner" style={{ height: 160 }}>
+            <div className="note-rendered rich-text" dangerouslySetInnerHTML={{ __html: renderNote("- [x] Balance the rotor\n- [ ] Ask Acme for a quote\n\n> [!NOTE] The same note as the page: edit it here or there.").replace(/>\n</g, "><") }} />
+          </div>
+        </div>
+        <div className="note-locked" style={{ width: 360 }}>
+          A note page you can't open: it's members-only, or it isn't there any more.
+        </div>
+        <div className="effect-label">On a grid: the page as a card (Open the page in its bar), and what someone sees who can't open it</div>
       </div>
     </div>
   );

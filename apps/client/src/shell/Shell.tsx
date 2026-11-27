@@ -47,6 +47,7 @@ import { AppCanvas } from "./AppCanvas";
 export { KIND_GLYPH, KIND_NAME, type BoardRow, type SpaceKind } from "../lib/grids";
 import { SpaceInfo } from "./SpaceInfo";
 import { PageCanvas } from "./PageCanvas";
+import { NotePage } from "../notes/NotePage";
 import { api } from "../lib/api";
 import { ingest } from "../lib/ingest";
 import { holdsKeys } from "../lib/keysHeld";
@@ -319,6 +320,7 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
       <MainWrap id="main-content" className="shell-main" tabIndex={-1}>
         <GridViewport boardName={space?.name ?? (systemGrid === "plan" ? "The plan" : systemGrid === "design" ? "Design language" : undefined)} />
         {onGrid && space?.kind === "page" && !ui.presenting && <PageCanvas space={space} />}
+        {onGrid && space?.kind === "note" && !ui.presenting && <NotePage space={space} onRename={(name) => void updateSpace(space.id, { name })} />}
         {onGrid && space?.kind === "app" && !ui.presenting && <AppCanvas space={space} />}
         {place.kind === "today" && !ui.presenting && <Today user={user} />}
         {place.kind === "settings" && !ui.presenting && <SettingsSpace place={place} user={user} />}

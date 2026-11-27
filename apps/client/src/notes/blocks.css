@@ -1,0 +1,260 @@
+/* A note's blocks (notes/blocks.ts, notes/BlockUi.tsx; docs/notes.md): to-dos, nested items, callouts,
+   toggles, page lines and link cards, the handle beside a block and the slash menu. Tokens only. */
+
+/* nested items: a level is the list's own indent */
+.note-rendered li[data-indent="1"] { margin-left: calc(20px * var(--note-scale, 1)); }
+.note-rendered li[data-indent="2"] { margin-left: calc(40px * var(--note-scale, 1)); }
+.note-rendered li[data-indent="3"] { margin-left: calc(60px * var(--note-scale, 1)); }
+.note-rendered li[data-indent="4"] { margin-left: calc(80px * var(--note-scale, 1)); }
+
+/* to-dos: a box in the item's own gutter (a press there ticks it); a ticked one's words go quiet */
+.note-rendered ul.md-todos { list-style: none; margin-left: 0; padding-left: 0; }
+.note-rendered li.md-todo {
+  position: relative;
+  padding-left: calc(24px * var(--note-scale, 1));
+}
+.note-rendered li.md-todo::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: calc(0.5lh - 7px);
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius-paper);
+  background: var(--color-raise);
+  cursor: pointer;
+}
+.note-rendered li.md-todo[data-checked="true"]::before {
+  background: var(--color-pulse);
+  border-color: var(--color-pulse);
+}
+.note-rendered li.md-todo[data-checked="true"]::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: calc(0.5lh - 5px);
+  width: 4px;
+  height: 8px;
+  border: solid var(--color-on-fill);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+.note-rendered li.md-todo[data-checked="true"] { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--line-strong); }
+
+/* callouts: a box with its kind's mark; the kind's colour is a state's (DESIGN §1.2) */
+.note-rendered .md-callout {
+  --callout: var(--color-pulse);
+  position: relative;
+  margin: 8px 0;
+  padding: 8px 12px 8px 36px;
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--callout) 8%, var(--color-raise));
+  border: 1px solid color-mix(in srgb, var(--callout) 22%, transparent);
+  max-width: 68ch;
+}
+.note-rendered .md-callout > p { margin: 2px 0; }
+.note-rendered .md-callout::before {
+  position: absolute;
+  left: 12px;
+  top: 8px;
+  width: 16px;
+  font-weight: 700;
+  color: var(--callout);
+  content: "i";
+  text-align: center;
+  font-family: var(--font-display);
+}
+.note-rendered .md-callout[data-kind="tip"] { --callout: var(--color-ok); }
+.note-rendered .md-callout[data-kind="tip"]::before { content: "✓"; }
+.note-rendered .md-callout[data-kind="important"] { --callout: var(--color-agent); }
+.note-rendered .md-callout[data-kind="important"]::before { content: "!"; }
+.note-rendered .md-callout[data-kind="warning"] { --callout: var(--color-warn); }
+.note-rendered .md-callout[data-kind="warning"]::before { content: "▲"; font-size: 11px; }
+.note-rendered .md-callout[data-kind="caution"] { --callout: var(--color-bad); }
+.note-rendered .md-callout[data-kind="caution"]::before { content: "✕"; }
+
+/* toggles: an arrow in the head's gutter folds what's under it */
+.note-rendered .md-toggle { margin: 4px 0; }
+.note-rendered .md-toggle-head {
+  position: relative;
+  padding-left: calc(22px * var(--note-scale, 1));
+  font-weight: 600;
+  margin: 2px 0;
+}
+.note-rendered .md-toggle-head::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: calc(0.5lh - 4px);
+  border-style: solid;
+  border-width: 4px 0 4px 7px;
+  border-color: transparent transparent transparent var(--ink-soft);
+  transform: rotate(0deg);
+  transition: transform var(--dur-quick) var(--ease-out-soft);
+  cursor: pointer;
+}
+.note-rendered .md-toggle[data-open="true"] > .md-toggle-head::before { transform: rotate(90deg); }
+.note-rendered .md-toggle-body {
+  padding-left: calc(22px * var(--note-scale, 1));
+  border-left: 1px solid var(--line);
+  margin-left: 7px;
+}
+.note-rendered .md-toggle[data-open="false"] > .md-toggle-body { display: none; }
+
+/* a page inside this one, and a link card: each a quiet row that opens on a press */
+.note-rendered .md-page,
+.note-rendered .md-embed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 4px 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--line);
+  background: var(--color-raise);
+  cursor: pointer;
+  max-width: 68ch;
+  user-select: none;
+}
+.note-rendered .md-page:hover,
+.note-rendered .md-embed:hover { border-color: var(--line-strong); box-shadow: var(--shadow-sheet); }
+.note-rendered .md-page::before {
+  content: "▤";
+  color: var(--ink-soft);
+  font-size: var(--text-14);
+}
+.note-rendered .md-page-title { font-weight: 600; border-bottom: 1px solid var(--line); }
+.note-rendered .md-page.is-locked { cursor: default; color: var(--ink-faint); }
+.note-rendered .md-page.is-locked .md-page-title { border-bottom: none; font-weight: 500; }
+.note-rendered .md-page.is-locked::after { content: "can't be opened"; font-size: var(--text-11); color: var(--color-dim); margin-left: auto; }
+.note-rendered .md-embed { flex-direction: column; align-items: flex-start; gap: 0; }
+.note-rendered .md-embed-host { font-weight: 600; font-size: calc(12.5px * var(--note-scale, 1)); }
+.note-rendered .md-embed-url { font-size: var(--text-11); color: var(--color-dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-rendered pre[data-lang]::before {
+  content: attr(data-lang);
+  display: block;
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  font-family: var(--font-sans);
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+/* the handle beside the block under the pointer: drag to move, press for its menu */
+.note-block-handle {
+  position: absolute;
+  z-index: 3;
+  width: 18px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-paper);
+  background: transparent;
+  color: var(--color-dim);
+  cursor: grab;
+  opacity: 0.7;
+  transition: opacity var(--dur-quick) var(--ease-out-soft);
+  touch-action: none;
+}
+.note-block-handle:hover { opacity: 1; background-color: color-mix(in srgb, var(--color-frost) 7%, transparent); }
+.note-block-handle:active { cursor: grabbing; }
+.note-block-handle:focus-visible { outline: 2px solid var(--color-pulse); outline-offset: 1px; }
+.note-block-drop {
+  position: absolute;
+  z-index: 3;
+  height: 2px;
+  margin-top: -1px;
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse);
+  pointer-events: none;
+}
+
+/* the slash menu: a sheet at the caret */
+.note-slash {
+  position: fixed;
+  z-index: 60;
+  width: 264px;
+  max-height: min(360px, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-1);
+  border-radius: var(--radius-pane);
+  background: var(--color-abyss);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pane);
+  font-size: var(--text-13);
+  color: var(--ink);
+}
+.note-slash-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 6px var(--space-2);
+  border: 0;
+  border-radius: var(--radius-card);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.note-slash-item.is-picked { background-color: color-mix(in srgb, var(--color-pulse) 12%, transparent); }
+.note-slash-glyph {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--line);
+  background: var(--color-raise);
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: var(--text-12);
+}
+.note-slash-glyph::before { content: "¶"; }
+.note-slash-glyph[data-block="h1"]::before { content: "H1"; }
+.note-slash-glyph[data-block="h2"]::before { content: "H2"; }
+.note-slash-glyph[data-block="h3"]::before { content: "H3"; }
+.note-slash-glyph[data-block="ul"]::before { content: "•"; font-size: var(--text-16); }
+.note-slash-glyph[data-block="ol"]::before { content: "1."; }
+.note-slash-glyph[data-block="todo"]::before { content: "☐"; font-size: var(--text-14); }
+.note-slash-glyph[data-block="toggle"]::before { content: "▸"; }
+.note-slash-glyph[data-block="quote"]::before { content: "❝"; }
+.note-slash-glyph[data-block^="callout"]::before { content: "i"; }
+.note-slash-glyph[data-block="callout-tip"]::before { content: "✓"; }
+.note-slash-glyph[data-block="callout-important"]::before { content: "!"; }
+.note-slash-glyph[data-block="callout-warning"]::before { content: "▲"; font-size: var(--text-11); }
+.note-slash-glyph[data-block="callout-caution"]::before { content: "✕"; }
+.note-slash-glyph[data-block="code"]::before { content: "</>"; font-family: var(--mono); font-size: var(--text-11); }
+.note-slash-glyph[data-block="divider"]::before { content: "—"; }
+.note-slash-glyph[data-block="page"]::before { content: "▤"; }
+.note-slash-glyph[data-block="image"]::before { content: "▣"; }
+.note-slash-glyph[data-block="bookmark"]::before { content: "↗"; }
+.note-slash-words { display: flex; flex-direction: column; min-width: 0; }
+.note-slash-name { font-weight: 600; }
+.note-slash-hint { font-size: var(--text-12); color: var(--color-mist); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-slash-md {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  padding: 1px 5px;
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--line);
+}
+.note-slash-none { padding: var(--space-3); color: var(--color-mist); }
+
+/* a card showing a note page: who can't open it, or that it was archived */
+.note-locked,
+.note-page-gone {
+  padding: var(--space-4);
+  color: var(--color-mist);
+  font-size: var(--text-13);
+}
+.note-page-gone { padding: 6px 18px; border-bottom: 1px solid var(--line); font-size: var(--text-12); }

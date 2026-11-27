@@ -349,7 +349,7 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
           </button>
           {menu && (
             <div className="tab-new-menu" role="menu" aria-label="New grid type">
-              {(["grid", "deck", "page"] as SpaceKind[]).map((k) => (
+              {(["grid", "deck", "page", "note"] as SpaceKind[]).map((k) => (
                 <button
                   key={k}
                   type="button"
@@ -362,7 +362,7 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
                 >
                   <span className="tab-glyph" aria-hidden>{KIND_GLYPH[k]}</span>
                   <span className="tab-new-name">{KIND_NAME[k]}</span>
-                  <span className="tab-new-hint">{k === "grid" ? "sections, cards, apps" : k === "deck" ? "a grid whose sections are slides" : "an app at its address"}</span>
+                  <span className="tab-new-hint">{k === "grid" ? "sections, cards, apps" : k === "deck" ? "a grid whose sections are slides" : k === "note" ? "a page of words, in Notes; it can go on any grid" : "an app at its address"}</span>
                 </button>
               ))}
             </div>

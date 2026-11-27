@@ -307,6 +307,8 @@ for (const sql of [
   // and a space may be an app opened as a tab (kind 'app'): `app` names it ('t3', or null for one at a url)
   "alter table boards add column theme text",
   "alter table boards add column app text",
+  // note pages (2026-11-26, docs/notes.md): a note page is archived, never deleted; an archived space leaves every list
+  "alter table boards add column archived_at integer",
   "alter table users add column flowform_user_id text",
   // agent sessions: each tab is its own conversation, resumable after a restart
   "alter table agent_runs add column session_id text",

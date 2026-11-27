@@ -21,7 +21,8 @@ import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
 import { WIDTHS, setUi, spaceOpenedAt, toast, useUi } from "../state/ui";
 import { logout } from "../lib/api";
-import { KIND_NAME, childrenOf, isPageKind, fileGrid, parentOf, wouldLoop, type BoardRow, type SpaceKind } from "../lib/grids";
+import { KIND_NAME, childrenOf, isNoteKind, isPageKind, fileGrid, parentOf, wouldLoop, type BoardRow, type SpaceKind } from "../lib/grids";
+import { NOTE_PAGE_MIME } from "../notes/noteSync";
 import { goSettings, type Place } from "../lib/place";
 import { initials } from "./Presence";
 import { FloorEdge } from "./FloorEdge";
@@ -63,20 +64,38 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
   const [drag, setDrag] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
 
-  const listed = useMemo(() => boards.filter((b) => !isSystemGrid(b.id)), [boards]);
+  // grids, and note pages: notes are their own tree (Notes), never in Recent or All Grids (docs/notes.md)
+  const listed = useMemo(() => boards.filter((b) => !isSystemGrid(b.id) && !isNoteKind(b.kind)), [boards]);
+  const notes = useMemo(() => boards.filter((b) => isNoteKind(b.kind)), [boards]);
+  /** the tree a row (or the one being dragged) belongs to */
+  const poolOf = (id: string | null) => (id && notes.some((b) => b.id === id) ? notes : listed);
   const recent = useMemo(() => {
     const at = spaceOpenedAt();
     return [...listed].sort((a, b) => (at[b.id] ?? b.updated_at ?? 0) - (at[a.id] ?? a.updated_at ?? 0));
     // re-sorted when the open grid changes (it just became the most recent)
   }, [listed, current]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canTake = (into: string | null) => !!drag && (into === null ? !!parentOf(boards.find((b) => b.id === drag)!, listed) : !wouldLoop(drag, into, listed) && !isPageKind(listed.find((b) => b.id === into)?.kind) && boards.find((b) => b.id === drag)?.parent !== into);
+  const canTake = (into: string | null) => {
+    if (!drag) return false;
+    const pool = poolOf(drag);
+    if (into === null) return !!parentOf(boards.find((b) => b.id === drag)!, pool);
+    const target = pool.find((b) => b.id === into);
+    // a note goes into a note, a grid into a grid (not a page or an app)
+    if (!target || (pool === notes ? !isNoteKind(target.kind) : isPageKind(target.kind))) return false;
+    return !wouldLoop(drag, into, pool) && boards.find((b) => b.id === drag)?.parent !== into;
+  };
   const drop = async (into: string | null) => {
     const id = drag;
     setDrag(null);
     setOver(null);
     if (!id || !canTake(into)) return;
-    const me = listed.find((b) => b.id === id);
+    const pool = poolOf(id);
+    const me = pool.find((b) => b.id === id);
+    if (pool === notes) {
+      const err = await fileGrid(id, into);
+      if (err) return toast(err, "bad");
+      return toast(into ? `${me?.name ?? "The note"} is inside ${pool.find((b) => b.id === into)?.name ?? "it"} now` : `${me?.name ?? "The note"} is back at the top of Notes`, "ok");
+    }
     const err = await fileGrid(id, into);
     if (err) return toast(err, "bad");
     if (into) {
@@ -97,7 +116,9 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           draggable: true,
           onDragStart: (e: React.DragEvent) => {
             e.dataTransfer.setData(DRAG, b.id);
-            e.dataTransfer.effectAllowed = "move";
+            // a note can also be dropped on a section of the open grid: it goes there as a card (the same note)
+            if (isNoteKind(b.kind)) e.dataTransfer.setData(NOTE_PAGE_MIME, b.id);
+            e.dataTransfer.effectAllowed = isNoteKind(b.kind) ? "copyMove" : "move";
             setDrag(b.id);
           },
           onDragEnd: () => {
@@ -120,10 +141,12 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
   });
 
   const row = (b: BoardRow, depth: number, tree: boolean): React.ReactNode => {
-    const kids = tree ? childrenOf(b.id, listed) : [];
+    const pool = poolOf(b.id);
+    const kids = tree ? childrenOf(b.id, pool) : [];
     const open = !shut.has(b.id);
-    const parent = parentOf(b, listed);
+    const parent = parentOf(b, pool);
     const kind = b.kind ?? "grid";
+    const note = isNoteKind(kind);
     return (
       <div key={b.id} className="grid-node">
         <div
@@ -160,7 +183,7 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             type="button"
             className="pane-row space-open"
             onClick={() => onSwitch(b.id)}
-            data-tip={`${b.name} · ${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : " · drag onto a grid to put it inside"}`}
+            data-tip={`${b.name} · ${KIND_NAME[kind]}${parent ? ` · inside ${parent.name}` : ""}${viewer ? "" : note ? " · drag onto a note to put it inside, or onto a section to put it on the grid" : " · drag onto a grid to put it inside"}`}
           >
             <span className="pane-glyph" aria-hidden>
               <SpaceGlyph space={b} />
@@ -174,8 +197,8 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             {!tree && parent && <span className="pane-when" title={parent.name}>{parent.name}</span>}
             {tree && kids.length > 0 && <span className="pane-when">{kids.length}</span>}
           </button>
-          {tree && !viewer && b.role !== "viewer" && !isPageKind(kind) && (
-            <button type="button" className="space-move" onClick={() => onNew("grid", b.id)} aria-label={`Create new grid inside ${b.name}`} data-tip="New grid inside">
+          {tree && !viewer && b.role !== "viewer" && (note || !isPageKind(kind)) && (
+            <button type="button" className="space-move" onClick={() => onNew(note ? "note" : "grid", b.id)} aria-label={`Create new ${note ? "note" : "grid"} inside ${b.name}`} data-tip={note ? "New note inside" : "New grid inside"}>
               ＋
             </button>
           )}
@@ -192,14 +215,14 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
           {/* how the grids are listed, at the top of them; the rows start at the selector's own left edge */}
           <div className="pane-pick">
             <div className="pane-seg" role="tablist" aria-label="How grids are listed">
-              {(["recent", "all", "chats"] as const).map((v) => (
-                <button key={v} type="button" role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${(v === "all" && over === "top") || (v === "chats" && held) ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} data-pane-seg={v} {...(v === "all" ? dropProps(null) : {})}>
-                  {v === "recent" ? "Recent" : v === "all" ? "All Grids" : "Chats"}
+              {(["recent", "all", "notes", "chats"] as const).map((v) => (
+                <button key={v} type="button" role="tab" aria-selected={ui.spacesView === v} className={`pane-seg-btn${ui.spacesView === v ? " is-on" : ""}${((v === "all" || v === "notes") && over === "top" && (v === "notes") === (poolOf(drag) === notes)) || (v === "chats" && held) ? " is-over" : ""}`} onClick={() => setUi({ spacesView: v })} data-pane-seg={v} {...(v === "all" || v === "notes" ? dropProps(null) : {})}>
+                  {v === "recent" ? "Recent" : v === "all" ? "All Grids" : v === "notes" ? "Notes" : "Chats"}
                 </button>
               ))}
             </div>
             {!viewer && (
-              <button type="button" className="pane-new" onClick={() => onNew("grid")} aria-label="Create new grid" data-tip="New grid">
+              <button type="button" className="pane-new" onClick={() => onNew(ui.spacesView === "notes" ? "note" : "grid")} aria-label={ui.spacesView === "notes" ? "Create new note" : "Create new grid"} data-tip={ui.spacesView === "notes" ? "New note" : "New grid"} data-pane-new={ui.spacesView === "notes" ? "note" : "grid"}>
                 <PlusGlyph />
               </button>
             )}
@@ -209,6 +232,25 @@ export function SidePane({ user, boards, current, place, onSwitch, onNew }: Prop
             {ui.spacesView === "chats" ? (
               <section className="pane-group">
                 <SideChats place={place} />
+              </section>
+            ) : ui.spacesView === "notes" ? (
+              <section className="pane-group" aria-label="Notes">
+                {childrenOf(null, notes).map((b) => row(b, 0, true))}
+                {notes.length === 0 && (
+                  <div className="pane-empty is-create">
+                    <span>No notes yet. A note opens here full size, and can go on any grid.</span>
+                    {!viewer && (
+                      <button className="f-pill is-accent" onClick={() => onNew("note")}>
+                        New note
+                      </button>
+                    )}
+                  </div>
+                )}
+                {drag && poolOf(drag) === notes && parentOf(boards.find((b) => b.id === drag)!, notes) && (
+                  <div className={`grid-top-drop${over === "top" ? " is-over" : ""}`} {...dropProps(null)}>
+                    Drop here to bring it to the top
+                  </div>
+                )}
               </section>
             ) : (
             <section className="pane-group">

@@ -65,9 +65,10 @@ export function SpaceInfo({ user, space, boards, onUpdate }: Props) {
                 <dt>Inside</dt>
                 <dd>
                   <select className="info-pick" value={space.parent ?? ""} disabled={!canEdit} aria-label="The grid this one is inside" onChange={(e) => onUpdate(space.id, { parent: e.target.value || null })}>
-                    <option value="">No grid (the top of All Grids)</option>
+                    <option value="">{kind === "note" ? "No note (the top of Notes)" : "No grid (the top of All Grids)"}</option>
                     {boards
-                      .filter((b) => !isPageKind(b.kind) && !isSystemGrid(b.id) && !wouldLoop(space.id, b.id, boards))
+                      // a note sits inside a note, a grid inside a grid (docs/notes.md)
+                      .filter((b) => (kind === "note" ? b.kind === "note" : !isPageKind(b.kind)) && !isSystemGrid(b.id) && !wouldLoop(space.id, b.id, boards))
                       .sort((a, b) => a.name.localeCompare(b.name))
                       .map((b) => (
                         <option key={b.id} value={b.id}>
