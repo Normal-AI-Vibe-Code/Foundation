@@ -144,7 +144,10 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
       {/* over the open menu the group ends on the menu's edge: its width is the menu's less the bar's own inset,
           which a Mac widens for its lights (spaces.css, --bar-inset), so the line lands on the menu's edge there too */}
       <div className={`top-left${ui.pane ? " is-over-pane" : ""}`} style={ui.pane ? ({ "--pane-w": `${ui.paneW}px` } as CSSProperties) : undefined}>
-        {/* Today, in the window's top-left corner (2026-11-17, Josh): the Shiba very small, the word, and what's waiting right beside it */}
+        {/* Today and the bell, one pair in the window's top-left corner (2026-11-26, Josh: the bell was "a bit
+            floating"): over the open menu they keep the corner together and the fold keeps the menu's edge */}
+        <span className="top-today-pair" data-top-today-pair>
+        {/* Today (2026-11-17, Josh): the Shiba very small, the word, and what's waiting right beside it */}
         <button type="button" className={`top-today${place.kind === "today" ? " is-on" : ""}`} onClick={goToday} data-tip={notices.total ? `Today: ${notices.words}` : "Today: the Shiba, your todos, the apps"} data-top-today data-place="today">
           <ShibaDot size={16} />
           <span className="top-word">Today</span>
@@ -154,8 +157,10 @@ export function TopBar({ boards, current, place, onSwitch, onNew, onClose, onRen
             </span>
           )}
         </button>
-        {/* what was said to me: mentions and direct messages, with a count and a panel (chat/Bell.tsx) */}
+        {/* what was said to me: mentions and direct messages, with a count and a panel (chat/Bell.tsx); the same
+            list is on the Today page, with the notes that tag me on a grid */}
         <NotificationBell />
+        </span>
         <button
           type="button"
           className={`top-btn pane-fold${spacesOpen ? " is-on" : ""}`}

@@ -5,8 +5,12 @@
  * and back work. Asked what's first, the Shiba (the script runtime here)
  * says it and points at it on the page. The company's goals come first: a
  * member sets one on the page, the person who carries it has it in focus, and
- * the server refuses a viewer who tries to set one.
+ * the server refuses a viewer who tries to set one. What was said to you is
+ * listed under Notifications, the bell right beside Today: a DM opens at the
+ * message, a note that tags you frames its card on the grid, and an admin
+ * outside the DM never has it on theirs.
  */
+import { mkdirSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { CLIENT, settle } from "./helpers";
 
@@ -29,7 +33,8 @@ test("Today is home, inside Foundation: the side menu, the Shiba, todos and apps
   await expect(page.locator(".top-bar .top-left [data-top-today]")).toHaveClass(/is-on/);
   // what's waiting (the ask above) is counted right beside the word
   await expect(page.locator(".top-bar [data-top-today] [data-today-badge]")).toBeVisible();
-  await expect(page.locator(".side-pane .pane-seg-btn")).toHaveText(["Recent", "All Grids"]);
+  // (Chats joined the side menu with ChatForm's second round, 4fc3e46)
+  await expect(page.locator(".side-pane .pane-seg-btn")).toHaveText(["Recent", "All Grids", "Chats"]);
   await expect(page.locator(".today-line")).toContainText("Tess");
   await expect(page.locator(".shiba-room")).toBeVisible();
   // the room is the whole window, behind every panel; the side menu and the top bar are clear over it, in white
@@ -147,4 +152,107 @@ test("the company's goals open Today: set on the page by a member, in focus for 
   await expect(veePage.getByLabel("Set a company goal")).toHaveCount(0);
   await expect(veePage.getByRole("button", { name: "Mark “Certify the rim drive for flight” done" })).toBeDisabled();
   for (const c of [vee, admin, context]) await c.close();
+});
+
+test("Today lists what was said to you, beside the bell: a DM opens at the message, a tag on a grid frames its note; day and night", async ({ browser }) => {
+  test.setTimeout(150_000);
+  const SHOTS = "../../docs/evidence/2026-11-26_today-notices";
+  mkdirSync(SHOTS, { recursive: true });
+  const stamp = Date.now().toString(36);
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
+  expect((await context.request.post(`${CLIENT}/auth/dev`, { data: { name: "Nell Notice", email: "nell@normal.dev" } })).ok()).toBeTruthy();
+  const nell = ((await (await context.request.get(`${CLIENT}/api/me`)).json()) as { user: { id: string } }).user.id;
+  const kai = await browser.newContext();
+  expect((await kai.request.post(`${CLIENT}/auth/dev`, { data: { name: "Kai Moreno", email: "kai@normal.dev" } })).ok()).toBeTruthy();
+  const outsider = await browser.newContext();
+  expect((await outsider.request.post(`${CLIENT}/auth/dev`, { data: { name: "Admin", email: "admin@normal.dev" } })).ok()).toBeTruthy();
+
+  // Kai writes to Nell directly, and tags her in a note in a section of the company grid
+  const made = await kai.request.post(`${CLIENT}/api/chat/channels`, { data: { kind: "dm", members: [nell], request_id: `dm-${stamp}` } });
+  expect(made.ok(), await made.text()).toBeTruthy();
+  const dm = ((await made.json()) as { channel: { id: string } }).channel.id;
+  const sent = await kai.request.post(`${CLIENT}/api/chat/channels/${dm}/messages`, { data: { text: `The stator quote ${stamp} is in. Shall I confirm it?`, request_id: `m-${stamp}` } });
+  expect(sent.ok(), await sent.text()).toBeTruthy();
+  const msg = ((await sent.json()) as { message: { id: string; seq: number } }).message;
+  const section = `Stator ${stamp}`;
+  const noted = await kai.request.post(`${CLIENT}/api/boards/company/tools/add_note`, { data: { section, title: "Loads", markdown: `@Nell please sign off the loads ${stamp}` } });
+  expect(noted.ok(), await noted.text()).toBeTruthy();
+  const noteId = ((await noted.json()) as { result: { id: string } }).result.id;
+
+  // an admin who isn't in the DM: neither its words nor its link on their Today
+  const theirs = JSON.stringify(await (await outsider.request.get(`${CLIENT}/api/today`)).json());
+  expect(theirs).not.toContain(dm);
+  expect(theirs).not.toContain(`quote ${stamp}`);
+
+  const page = await context.newPage();
+  await page.goto("/?rafshim#/today");
+  await expect(page.locator(".today")).toBeVisible();
+  // the bell sits right against Today, in the corner
+  await expect(page.locator(".top-bar [data-top-today-pair] [data-top-bell]")).toBeVisible({ timeout: 30_000 });
+  const notices = page.locator("[data-today-notices]");
+  const chatRow = notices.locator(`[data-today-notice="chat:${msg.id}"]`);
+  const gridRow = notices.locator(`[data-today-notice="mention:company:${noteId}"]`);
+  await expect(chatRow).toBeVisible({ timeout: 20_000 });
+  await expect(chatRow).toContainText(`The stator quote ${stamp}`);
+  await expect(chatRow).toHaveAttribute("data-unseen", "true");
+  expect(await chatRow.getAttribute("href")).toBe(`#/chat/chat/${dm}/at/${msg.seq}`);
+  await expect(gridRow).toBeVisible();
+  await expect(gridRow).toContainText(`Tagged in a note in ${section}`);
+  expect(await gridRow.getAttribute("href")).toBe(`/?board=company&focus=${noteId}`);
+  // what was said to her is under Notifications, not again under Todos
+  await expect(page.getByRole("region", { name: "Notifications" })).toBeVisible();
+  await expect(page.locator(".today-group:not(.today-notices) .today-row", { hasText: `loads ${stamp}` })).toHaveCount(0);
+  await settle(page, 900);
+  await page.locator(".today-state").screenshot({ path: `${SHOTS}/01_today-notifications-night.png` });
+  await page.emulateMedia({ colorScheme: "light" });
+  await settle(page, 600);
+  await page.locator(".today-state").screenshot({ path: `${SHOTS}/02_today-notifications-day.png` });
+  await page.screenshot({ path: `${SHOTS}/03_today-whole-day.png` });
+  await page.emulateMedia({ colorScheme: "dark" });
+
+  // the DM's row: ChatForm, at that message, flashed; and it's seen (here and on the bell)
+  await chatRow.click();
+  await expect(page).toHaveURL(new RegExp(`#/chat/chat/${dm}/at/${msg.seq}$`));
+  await expect(page.locator(`.chat-msg[data-message="${msg.id}"]`)).toBeVisible({ timeout: 15_000 });
+  await settle(page, 400);
+  await page.screenshot({ path: `${SHOTS}/04_opened-at-the-message-night.png` });
+  await page.locator(".top-bar [data-top-today]").click();
+  await expect(chatRow).toBeVisible();
+  await expect(chatRow).not.toHaveAttribute("data-unseen", "true");
+
+  // the tag's row: the company grid, its note framed, in its section, without loading the app again
+  await page.evaluate(() => ((window as unknown as { __todayMark: number }).__todayMark = 1));
+  await gridRow.click();
+  await expect(page.locator(".today")).toHaveCount(0);
+  await page.waitForFunction((id) => {
+    const st = (window as unknown as { __foundation?: { getState(): { snapRequest: { kind: string; id?: string } | null; notes: Record<string, unknown> } } }).__foundation?.getState();
+    return !!st && !!st.notes[id] && st.snapRequest?.kind === "object" && st.snapRequest.id === id;
+  }, noteId, { timeout: 20_000 });
+  expect(await page.evaluate(() => (window as unknown as { __todayMark?: number }).__todayMark), "the same page: no reload").toBe(1);
+  await settle(page, 1200);
+  await page.screenshot({ path: `${SHOTS}/05_opened-at-the-note-night.png` });
+
+  // #/design: the pair and the Notifications specimens, night and day (night is kept from a first launch, so a fresh
+  // window for each)
+  for (const scheme of ["dark", "light"] as const) {
+    const look = await browser.newContext({ viewport: { width: 1440, height: 2000 }, colorScheme: scheme });
+    expect((await look.request.post(`${CLIENT}/auth/dev`, { data: { name: "Nell Notice", email: "nell@normal.dev" } })).ok()).toBeTruthy();
+    const page = await look.newPage();
+    await page.goto("/#/design");
+    const name = scheme === "dark" ? "night" : "day";
+    const specimens = page.locator(".design-today-state [data-today-notices]");
+    await expect(specimens).toHaveCount(2);
+    await expect(specimens.first().locator("[data-today-notice]")).toHaveCount(4);
+    await expect(specimens.first().locator("[data-today-notice][data-unseen]")).toHaveCount(2);
+    await specimens.first().scrollIntoViewIfNeeded();
+    await settle(page, 600);
+    await page.locator(".design-today-state").screenshot({ path: `${SHOTS}/06_design-notifications-${name}.png` });
+    const pair = page.locator("[data-design-today-pair]");
+    await pair.scrollIntoViewIfNeeded();
+    await settle(page, 300);
+    await page.locator(".design-today-menu").screenshot({ path: `${SHOTS}/07_design-pair-${name}.png` });
+    await look.close();
+  }
+
+  for (const c of [context, kai, outsider]) await c.close();
 });

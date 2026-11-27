@@ -17,6 +17,14 @@ import { api } from "../lib/api";
 import { floorInsets, useUi } from "../state/ui";
 import { openAppOnGrid } from "../lib/openApp";
 import { ask, loadToday, restoreConversation, saveCompanyGoal, saveGoal, setHeard, stopAsking, useToday, wordsLevel, type CompanyApp, type CompanyGoal, type FocusItem, type Goal, type Mood } from "./model";
+import { goToPlace, plainPress } from "../lib/goPlace";
+import { goChat } from "../lib/place";
+import { useChat } from "../chat/model";
+import { openNotice, seeAllNotices, useNotices as useChatNotices } from "../chat/notify";
+import { unseenCount } from "../chat/notifyLogic";
+import { setListFolded } from "../chat/pins";
+import { restOf } from "../chat/logic";
+import { NoticeList, placeHref, todayNotices, type TodayNotice } from "./TodayNotices";
 import "./today.css";
 
 // ---------- the Shiba ----------
@@ -49,19 +57,37 @@ export function ShibaRoom({ mood, maxFps = 30, levels }: { mood: Mood; maxFps?: 
 
 // ---------- the state beside it ----------
 
-const KIND_GLYPH: Record<FocusItem["kind"], string> = { ask: "?", goal: "◎", stage: "◆", mention: "@", file: "⇪", changes: "↻", related: "∿" };
-const KIND_LABEL: Record<FocusItem["kind"], string> = { ask: "Asked of you", goal: "A company goal you carry", stage: "Your stage", mention: "Tagged", file: "New file", changes: "Changed", related: "Your work" };
+const KIND_GLYPH: Record<FocusItem["kind"], string> = { ask: "?", goal: "◎", stage: "◆", mention: "@", message: "@", file: "⇪", changes: "↻", related: "∿" };
+const KIND_LABEL: Record<FocusItem["kind"], string> = { ask: "Asked of you", goal: "A company goal you carry", stage: "Your stage", mention: "Tagged", message: "ChatForm", file: "New file", changes: "Changed", related: "Your work" };
 
-/** where a focus item opens: its place on the board (this app), or the file */
+/** what Notifications lists (what was said to you), so Todos doesn't list it again */
+export const IS_NOTICE = (f: Pick<FocusItem, "kind">) => f.kind === "mention" || f.kind === "message";
+
+/** where a focus item opens: its place on the board (this app), the file, or ChatForm at the message */
 export function focusHref(f: Pick<FocusItem, "id" | "board" | "objectId" | "kind" | "href">) {
-  if (f.objectId || f.kind === "changes" || f.kind === "mention" || f.kind === "stage" || f.kind === "ask" || f.kind === "goal") return `/?board=${encodeURIComponent(f.board)}${f.objectId ? `&focus=${encodeURIComponent(f.objectId)}` : ""}`;
+  if (f.kind === "message") return f.href;
+  if (f.objectId || f.kind === "changes" || f.kind === "mention" || f.kind === "stage" || f.kind === "ask" || f.kind === "goal") return placeHref(f.board, f.objectId);
   if (f.id.startsWith("file:")) return `/files/${f.id.slice(5)}`;
   return f.href;
 }
 
 export function FocusRow({ item, pointed }: { item: FocusItem; pointed?: boolean }) {
+  const href = focusHref(item);
+  // a place on a grid opens in this window, framed, without loading the app again
+  const onGrid = href.startsWith("/?board=");
   return (
-    <a className="today-row" href={focusHref(item)} data-kind={item.kind} data-tone={item.tone} data-pointed={pointed || undefined}>
+    <a
+      className="today-row"
+      href={href}
+      onClick={(e) => {
+        if (!onGrid || !plainPress(e)) return;
+        e.preventDefault();
+        goToPlace(item.board, item.objectId);
+      }}
+      data-kind={item.kind}
+      data-tone={item.tone}
+      data-pointed={pointed || undefined}
+    >
       <span className="today-glyph" aria-hidden>
         {KIND_GLYPH[item.kind]}
       </span>
@@ -249,6 +275,28 @@ export function Today({ user }: { user: UserInfo }) {
   const companyActive = company.goals.filter((g) => g.status === "active");
   const first = today?.person.first ?? user.name.split(/\s+/)[0];
 
+  // what was said to you: the bell's list (ChatForm) and the notes that tag you (the grids)
+  const chat = useChat();
+  const said = useChatNotices();
+  const chatOn = chat.loaded && chat.status !== "off" && chat.status !== "signin" && chat.status !== "unavailable";
+  const listed = chatOn && said.listed;
+  const notices = useMemo(
+    () => todayNotices({ notices: listed ? said.list : undefined, seen: said.seen, channels: chat.channels, focus: today?.focus ?? [] }),
+    [listed, said.list, said.seen, chat.channels, today?.focus],
+  );
+  const unseen = listed ? unseenCount(said.list, said.seen, chat.channels) : notices.filter((n) => n.unseen).length;
+  const todos = today?.focus.filter((f) => !IS_NOTICE(f)) ?? [];
+  const openTodayNotice = (n: TodayNotice) => {
+    const o = n.open;
+    if ("notice" in o) return openNotice(o.notice);
+    if ("hash" in o) {
+      setListFolded(false);
+      window.location.hash = o.hash;
+      return;
+    }
+    goToPlace(o.board, o.objectId);
+  };
+
   // the words in the room
   let eyebrow = new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
   let line = today ? greeting(first, today.focus.filter((f) => f.kind !== "related").length) : `Hello, ${first}.`;
@@ -365,12 +413,30 @@ export function Today({ user }: { user: UserInfo }) {
           </section>
         )}
 
+        {/* what was said to you, each a press from where it was said (the bell beside Today holds the same list) */}
+        <NoticeList
+          rows={notices}
+          unseen={unseen}
+          busy={!today || (chatOn && said.busy && !said.list.length)}
+          pointed={pointed}
+          onOpen={openTodayNotice}
+          onAll={listed ? seeAllNotices : undefined}
+          onSeeAll={
+            listed
+              ? () => {
+                  setListFolded(false);
+                  goChat("chat", restOf({ view: "mentions" }));
+                }
+              : undefined
+          }
+        />
+
         <section className="today-group">
           <h2 className="f-eyebrow">
-            Todos <span className="today-count">{today ? today.focus.length + active.length : "…"}</span>
+            Todos <span className="today-count">{today ? todos.length + active.length : "…"}</span>
           </h2>
-          {today && today.focus.length === 0 && <p className="today-empty">Nothing is waiting on you. Asks, notes that tag you, stages you own and new files on your grids will show up here.</p>}
-          {today?.focus.map((f) => <FocusRow key={f.id} item={f} pointed={pointed.has(f.id)} />)}
+          {today && todos.length === 0 && <p className="today-empty">Nothing is waiting on you. Asks, stages you own and new files on your grids will show up here.</p>}
+          {todos.map((f) => <FocusRow key={f.id} item={f} pointed={pointed.has(f.id)} />)}
           {today?.goals.map((g) => <GoalRow key={g.id} goal={g} pointed={pointed.has(g.id)} onDone={g.source === "foundation" ? () => void saveGoal({ id: g.id, status: "done", progress: 1 }) : undefined} />)}
           <form
             className="today-add"

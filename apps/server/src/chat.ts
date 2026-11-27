@@ -1556,6 +1556,21 @@ export function unreadsFor(user: UserInfo): { total: number; mentions: number; c
   return { total, mentions, channels };
 }
 
+/** where a message is, as ChatForm's own link: its channel, its thread when it's a reply, at the message (flashed) */
+export function chatHref(channelId: string, at?: { seq: number; root_id: string | null } | null) {
+  const c = encodeURIComponent(channelId);
+  if (!at) return `#/chat/chat/${c}`;
+  return `#/chat/chat/${c}${at.root_id ? `/thread/${encodeURIComponent(at.root_id)}` : ""}/at/${at.seq}`;
+}
+const firstUnread = (channelId: string, readSeq: number) =>
+  one<{ seq: number; root_id: string | null }>("select seq, root_id from chat_messages where channel_id = ? and seq > ? and deleted_at is null and type not in ('system', 'draft') order by seq limit 1", channelId, readSeq);
+const lastMentionOf = (channelId: string, userId: string) =>
+  one<{ seq: number; root_id: string | null }>(
+    `select seq, root_id from chat_messages where channel_id = ? and deleted_at is null and type not in ('system', 'draft')
+      and (mentions_json like ? escape '!' or mentions_json like '%"channel"%' or mentions_json like '%"here"%') order by seq desc limit 1`,
+    channelId, `%"${userId.replace(/[!%_]/g, (x) => `!${x}`)}"%`,
+  );
+
 /** Today's focus (today.ts): kind "message", one per channel with mentions of them, or a dm or group with unread */
 export function chatFocus(user: UserInfo, now = Date.now()) {
   const rows = all<MemberRow & { kind: ChatChannelKind; last_seq: number; last_post_at: number; last_text: string | null; archived_at: number | null }>(
@@ -1582,7 +1597,7 @@ export function chatFocus(user: UserInfo, now = Date.now()) {
       why: `${direct ? `${n} new from ${label}` : `${n} mention${n === 1 ? "" : "s"} in ${label}`} · ${when}`,
       board: CHAT_BOARD,
       boardName: "ChatForm",
-      href: `#/chat/chat/${r.channel_id}`,
+      href: chatHref(r.channel_id, direct ? firstUnread(r.channel_id, r.read_seq) : lastMentionOf(r.channel_id, user.id)),
       at: r.last_post_at,
       ...(lastAuthor?.kind === "agent" ? { tone: "agent" as const } : {}),
     });

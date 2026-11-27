@@ -47,6 +47,10 @@ import { pipeCrossings, polyline, route, routeSides, sideToward, type Side } fro
 import { tunnelGeometry } from "../shell/wireGeometry";
 import { AppChip, AppRow, FocusRow, GoalRow, ShibaRoom } from "../today/Today";
 import type { CompanyApp, CompanyGoal, FocusItem, Goal, Mood } from "../today/model";
+import { IS_NOTICE } from "../today/Today";
+import { NoticeList, todayNotices } from "../today/TodayNotices";
+import { BellButton } from "../chat/Bell";
+import type { Notice, Seen } from "../chat/notifyLogic";
 
 const NOW = Date.now();
 const SAMPLE_COMPANY: CompanyGoal[] = [
@@ -57,10 +61,26 @@ const SAMPLE_FOCUS: FocusItem[] = [
   { id: "goal:cg1", kind: "goal", title: "Fly the PTHP demonstrator", why: "A company goal you carry · 45% · due 24 Dec", board: "company", boardName: "Form Industries", href: "#", at: NOW },
   { id: "ask:a", kind: "ask", title: "Upload the latest stator STEP", why: "Kai asked you for CAD · 1 d overdue", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW, tone: "bad" },
   { id: "stage:s", kind: "stage", title: "03 · CAD", why: "You own this stage · 2 to tick", board: "company", boardName: "Form Industries", href: "#", at: NOW, tone: "warn" },
-  { id: "mention:m", kind: "mention", title: "@Ada can you sign off the bearing loads before Friday?", why: "You're tagged in a note on Rim drive", board: "rim-drive", boardName: "Rim drive", href: "#", at: NOW },
+  { id: "mention:m", kind: "mention", title: "@Ada can you sign off the bearing loads before Friday?", why: "You're tagged in a note on Rim drive", board: "rim-drive", boardName: "Rim drive", objectId: "note_m", sectionId: "sec_b", sectionName: "Bearings", href: "#", at: NOW - 3 * 3600e3 },
   { id: "changes:c", kind: "changes", title: "6 changes on Form Industries", why: "Foundation Agent, Kai · latest: laid out 4 images", board: "company", boardName: "Form Industries", href: "#", at: NOW, tone: "agent" },
   { id: "related:r", kind: "related", title: "Winding thermal model", why: "Matches “thermal”, from your work", board: "motors", boardName: "Motors", href: "#", at: 0 },
 ];
+/** what was said to Ada in ChatForm, as the bell's list has it: a mention (not seen), a DM (not seen), an agent's @channel (seen) */
+const SAMPLE_PARTY = {
+  kai: { kind: "person" as const, id: "u_kai", name: "Kai Moreno", color: "var(--viz-3)" },
+  mei: { kind: "person" as const, id: "u_mei", name: "Mei Tan", color: "var(--viz-5)" },
+  wren: { kind: "agent" as const, id: "Wren", name: "Wren", via: "claude" as const, forName: "Kai Moreno" },
+};
+const sampleMsg = (id: string, author: Notice["message"]["author"], minsAgo: number, text: string, channel: string, seq: number, root: string | null = null): Notice["message"] => ({
+  id, channel, seq, author, type: "text", text, root, createdAt: NOW - minsAgo * 60_000, editedAt: null, deletedAt: null, files: [], reactions: [], replyCount: 0, lastReplyAt: null, pinned: false, mentions: [],
+});
+const SAMPLE_NOTICES: Notice[] = [
+  { id: "n1", why: "mention", channel: { id: "ch_rim", name: "rim-drive", kind: "open" }, message: sampleMsg("n1", SAMPLE_PARTY.kai, 4, "@ada the stator STEP is the old rev, can you re-export before Mei quotes it?", "ch_rim", 41, "m_root") },
+  { id: "n2", why: "direct", channel: { id: "ch_mei", name: "Mei Tan", kind: "dm" }, message: sampleMsg("n2", SAMPLE_PARTY.mei, 38, "Quote's in for the bearings. Shall I confirm it today?", "ch_mei", 12) },
+  { id: "n3", why: "everyone", channel: { id: "ch_gen", name: "general", kind: "open" }, message: sampleMsg("n3", SAMPLE_PARTY.wren, 300, "@channel the flow report for rev C is on the grid.", "ch_gen", 88) },
+];
+const SAMPLE_SEEN: Seen = { allAt: 0, ids: ["n3"] };
+
 const SAMPLE_GOALS: Goal[] = [
   { id: "g1", title: "Freeze the rim-drive CAD for the PTHP build", detail: "Stator and bearings signed off", status: "active", progress: 0.6, dueAt: NOW + 8 * 864e5, board: null, objectId: null, source: "foundation" },
   { id: "g2", title: "Onboard Kai to FactoryForm work orders", detail: "", status: "done", progress: 1, dueAt: null, board: null, objectId: null, source: "foundation" },
@@ -101,11 +121,17 @@ function TodayDemo() {
             <GoalRow key={g.id} goal={g} onDone={() => {}} />
           ))}
         </section>
+        {/* what was said to you (2026-11-26): ChatForm's mentions and DMs, and a note that tags you on a grid; each a
+            press from where it was said. Unseen rows carry the accent's dot; the empty state below */}
+        <NoticeList rows={todayNotices({ notices: SAMPLE_NOTICES, seen: SAMPLE_SEEN, focus: SAMPLE_FOCUS })} unseen={2} now={NOW} onOpen={() => {}} onAll={() => {}} onSeeAll={() => {}} />
+        <div data-design-notices-empty>
+          <NoticeList rows={[]} unseen={0} />
+        </div>
         <section className="today-group">
           <h2 className="f-eyebrow">
-            Todos <span className="today-count">8</span>
+            Todos <span className="today-count">7</span>
           </h2>
-          {SAMPLE_FOCUS.map((f, i) => (
+          {SAMPLE_FOCUS.filter((f) => !IS_NOTICE(f)).map((f, i) => (
             <FocusRow key={f.id} item={f} pointed={i === 2} />
           ))}
           {SAMPLE_GOALS.map((g, i) => (
@@ -1257,14 +1283,14 @@ function DesignSections() {
 
       <Section
         title="Today and the Shiba"
-        note="Home, before the boards. Vision's ethereal shiba fills the room and is the agent's face: warm paper at rest, lilac while it listens, frosted blue while it thinks, dusk while it speaks. Its words are set at 40 (the one size above 32). The day sits beside it on glass: focus rows by kind (overdue red, owned amber, agent violet), goals with a blue bar, and the company apps as chips in the top bar (dashed when not linked). What the Shiba talks about wears the violet ring."
+        note="Home, before the boards. Vision's ethereal shiba fills the room and is the agent's face: warm paper at rest, lilac while it listens, frosted blue while it thinks, dusk while it speaks. Its words are set at 40 (the one size above 32). The day sits beside it on glass: focus rows by kind (overdue red, owned amber, agent violet), goals with a blue bar, and the company apps as chips in the top bar (dashed when not linked). What the Shiba talks about wears the violet ring. Notifications (2026-11-26) list what was said to you, newest first: a ChatForm mention or DM with its author's face, a note that tags you on a grid with @ and its section; each row is a link to where it happened, one not seen yet bold with the accent's dot on its pill, and Mark all read is the bell's."
       >
         <TodayDemo />
       </Section>
 
       <Section
         title="Today's row, what the Shiba says, adding an agent"
-        note="Today's row in the side menu is a pill: the Shiba at 18 px (two soft lights turning in a disc, CSS only), the word, and a badge when something waits on you. Over the Shiba's room everything is white: an answer's prose, its plan as a card, and anything long and literal folded to one line that opens on the right. Adding an agent is four steps on one sheet in the agents panel: who, connect, avatar, add; the open step is ringed violet, a settled one ticks green, a waiting one steps back."
+        note="Today in the top bar's corner is a pill: the Shiba at 16 px (two soft lights turning in a disc, CSS only), the word, and a badge when something waits on you; the bell sits right against it, one pair (2026-11-26), with its own count of what was said to you. Over the Shiba's room everything is white: an answer's prose, its plan as a card, and anything long and literal folded to one line that opens on the right. Adding an agent is four steps on one sheet in the agents panel: who, connect, avatar, add; the open step is ringed violet, a settled one ticks green, a waiting one steps back."
       >
         <TodayPartsDemo />
       </Section>
@@ -2418,15 +2444,22 @@ function TodayPartsDemo() {
     <div className="design-today-parts" data-design-today-parts>
       <div className="design-today-menu">
         {/* in the top bar's left corner (2026-11-17): what's waiting sits right beside the word */}
-        <button className="top-today is-on">
-          <ShibaDot size={16} />
-          Today
-          <span className="pane-badge">3</span>
-        </button>
-        <button className="top-today">
-          <ShibaDot size={16} />
-          Today
-        </button>
+        {/* Today and the bell, one pair (2026-11-26): the bell right against the word, never drifting off */}
+        <span className="top-today-pair" data-design-today-pair>
+          <button className="top-today is-on">
+            <ShibaDot size={16} />
+            Today
+            <span className="pane-badge">3</span>
+          </button>
+          <BellButton count={2} />
+        </span>
+        <span className="top-today-pair">
+          <button className="top-today">
+            <ShibaDot size={16} />
+            Today
+          </button>
+          <BellButton count={0} />
+        </span>
       </div>
       <div className="design-today-room">
         <ShibaRoom mood="speaking" maxFps={24} />

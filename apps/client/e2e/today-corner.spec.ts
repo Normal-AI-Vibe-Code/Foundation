@@ -1,18 +1,29 @@
 /**
  * Today in the top bar's left corner (2026-11-17, Josh: "please move the today over to the top left"): it is the
  * first thing in the bar, before the side menu's fold and the tabs, with the menu open (the fold at the menu's
- * right edge) and folded; it still takes you to Today. Day and night.
+ * right edge) and folded; it still takes you to Today. Day and night. Since 2026-11-26 the bell (what was said to me)
+ * sits right against it, one pair, menu open or folded and at every Mac menu width ("right now it's a bit floating").
  */
 import { mkdirSync } from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { CLIENT, settle, waitLive } from "./helpers";
 
-const SHOTS = "../../docs/evidence/2026-11-17_today-top-left";
+// 2026-11-26: the bell joined Today as one pair; the shots now show the pair (the 2026-11-17 set is kept as it was)
+const SHOTS = "../../docs/evidence/2026-11-26_today-notices/corner";
 const MAC_SHOTS = "../../docs/evidence/2026-11-24_mac-corner";
 
 async function boxes(p: Page) {
   const box = async (sel: string) => (await p.locator(sel).first().boundingBox())!;
-  return { today: await box(".top-bar [data-top-today]"), fold: await box(".top-bar .pane-fold"), tabs: await box(".top-bar .tabs") };
+  return { today: await box(".top-bar [data-top-today]"), bell: await box(".top-bar [data-top-bell]"), fold: await box(".top-bar .pane-fold"), tabs: await box(".top-bar .tabs") };
+}
+type Box = { x: number; y: number; width: number; height: number };
+/** the bell right against Today (2026-11-26, Josh: it was "a bit floating"): beside it, on its line, nothing between */
+function pairHolds(b: { today: Box; bell: Box; fold: Box }, where: string) {
+  const gap = b.bell.x - (b.today.x + b.today.width);
+  expect(gap, `${where}: the bell right after Today`).toBeGreaterThanOrEqual(0);
+  expect(gap, `${where}: the bell not drifting off Today`).toBeLessThanOrEqual(8);
+  expect(Math.abs(b.bell.y + b.bell.height / 2 - (b.today.y + b.today.height / 2)), `${where}: on Today's line`).toBeLessThanOrEqual(1);
+  expect(b.bell.x + b.bell.width, `${where}: before the fold`).toBeLessThanOrEqual(b.fold.x);
 }
 
 test("Today is the top bar's first thing, in the left corner, with the side menu open and folded; day and night", async ({ browser }) => {
@@ -24,6 +35,7 @@ test("Today is the top bar's first thing, in the left corner, with the side menu
     const p = await c.newPage();
     await p.goto("/?board=company");
     await waitLive(p);
+    await expect(p.locator(".top-bar [data-top-bell]")).toBeVisible({ timeout: 30_000 });
     await settle(p, 900);
     const name = scheme === "dark" ? "night" : "day";
 
@@ -36,6 +48,8 @@ test("Today is the top bar's first thing, in the left corner, with the side menu
     expect(b.today.x + b.today.width).toBeLessThanOrEqual(b.fold.x);
     expect(b.fold.x + b.fold.width).toBeLessThanOrEqual(b.tabs.x);
     expect(await p.locator(".top-bar .top-tools [data-top-today]").count(), "no longer at the right end").toBe(0);
+    pairHolds(b, "menu open");
+    await expect(p.locator(".top-bar [data-top-today-pair] [data-top-bell]")).toHaveCount(1);
     await p.screenshot({ path: `${SHOTS}/01_menu-open-${name}.png`, clip: { x: 0, y: 0, width: 1440, height: 260 } });
 
     // folded: Today, the fold, the tabs, left to right
@@ -46,6 +60,7 @@ test("Today is the top bar's first thing, in the left corner, with the side menu
     expect(b.today.x).toBeLessThan(40);
     expect(b.today.x + b.today.width).toBeLessThanOrEqual(b.fold.x);
     expect(b.fold.x + b.fold.width).toBeLessThanOrEqual(b.tabs.x);
+    pairHolds(b, "menu folded");
     await p.screenshot({ path: `${SHOTS}/02_menu-folded-${name}.png`, clip: { x: 0, y: 0, width: 1440, height: 260 } });
 
     // a Mac's window (2026-11-24, Josh: "the tabs are too far out on mac and should be brought back to that panel
@@ -62,14 +77,15 @@ test("Today is the top bar's first thing, in the left corner, with the side menu
         pane.style.width = `${w}px`;
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
-        return { line: tl.getBoundingClientRect().right + 4, edge: pane.getBoundingClientRect().right, today: r(".top-left [data-top-today]"), chat: r(".top-left [data-top-chat]"), fold: r(".top-left .pane-fold") };
+        return { line: tl.getBoundingClientRect().right + 4, edge: pane.getBoundingClientRect().right, today: r(".top-left [data-top-today]"), bell: r(".top-left [data-top-bell]"), fold: r(".top-left .pane-fold") };
       }, w);
       expect(Math.abs(m.line - m.edge), `${w}px menu: the line on its edge`).toBeLessThanOrEqual(1);
       expect(m.fold.right, `${w}px menu: the fold inside it`).toBeLessThanOrEqual(m.edge);
       expect(m.today.left, `${w}px menu: Today clear of the lights`).toBeGreaterThanOrEqual(80);
-      expect(m.chat.right, `${w}px menu: ChatForm before the fold`).toBeLessThanOrEqual(m.fold.left);
+      expect(m.bell.left - m.today.right, `${w}px menu: the bell right against Today`).toBeLessThanOrEqual(8);
+      expect(m.bell.right, `${w}px menu: the bell before the fold`).toBeLessThanOrEqual(m.fold.left);
     }
-    await expect(p.locator(".top-bar [data-top-chat]")).toHaveAccessibleName(/ChatForm/);
+    await expect(p.locator(".top-bar [data-top-bell]")).toHaveAccessibleName(/Notifications/);
     await p.screenshot({ path: `${MAC_SHOTS}/mac-menu-420-${name}.png`, clip: { x: 0, y: 0, width: 720, height: 160 } });
     await p.evaluate(() => document.documentElement.classList.remove("is-desktop", "is-mac"));
 

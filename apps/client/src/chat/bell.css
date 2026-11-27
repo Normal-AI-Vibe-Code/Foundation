@@ -3,7 +3,7 @@
    transform, opacity, box-shadow and border-color only. Every rule here outranks chat.css's by its selector, not by
    its order, so the two files can load either way round. */
 
-/* ---------- the bell, in the top bar after ChatForm's button ---------- */
+/* ---------- the bell, in the top bar's corner beside Today (one pair, shell/TopBar.tsx) ---------- */
 
 .top-btn.top-bell {
   position: relative;
@@ -19,24 +19,25 @@
   padding: 0 4px;
   pointer-events: none;
 }
-/* over the open side menu: Today, ChatForm and the bell keep the corner together; the fold keeps the menu's edge */
-.top-left.is-over-pane .top-chat:has(+ .top-bell) {
-  margin-right: 0;
+/* Today and the bell are one pair (2026-11-26, Josh: the bell was "a bit floating"): the bell sits right against
+   Today's word, the same height, and over the open side menu the two keep the corner together while the fold keeps
+   the menu's edge. Nothing of the pair grows apart: the open stretch is after it, never between them */
+.top-today-pair {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
 }
-.top-left.is-over-pane .top-btn.top-bell {
+.top-left.is-over-pane .top-today-pair {
   margin-right: auto;
 }
-/* a menu too narrow for both words, the bell and the fold: ChatForm keeps its mark and its tip (as spaces.css does
-   at 236 px without the bell; the bell is 30 px and a gap more) */
-@container top-left (max-width: 270px) {
-  .top-left .top-chat:has(+ .top-bell) .top-word {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
+.top-left.is-over-pane .top-today-pair .top-today {
+  margin-right: 0;
+}
+.top-today-pair .top-btn.top-bell {
+  height: 28px;
+  width: 28px;
+  border-radius: var(--radius-pill);
 }
 
 /* ---------- the panel: glass, under the bell ---------- */

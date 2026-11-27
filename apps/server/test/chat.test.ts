@@ -332,7 +332,7 @@ test("unread, mentions (@handle, @channel, a DM), and mark unread from here", as
   assert.equal(bv.me?.starred, true);
   // a DM message is a mention for the other side, and shows on Today
   const dm = await mkChannel(C.cy, { kind: "dm", members: [bob.id] });
-  await post(C.cy, dm.id, "got a minute?");
+  const first = await post(C.cy, dm.id, "got a minute?");
   const dv = await view(C.bob).catch(() => null);
   assert.ok(dv);
   const d = await ok<{ channel: ChatChannelView }>(C.bob, "GET", `/api/chat/channels/${dm.id}`);
@@ -340,7 +340,8 @@ test("unread, mentions (@handle, @channel, a DM), and mark unread from here", as
   const focus = focusFor(bob).find((f) => f.id === `message:${dm.id}`);
   assert.ok(focus, "Today lists the DM");
   assert.equal(focus.kind, "message");
-  assert.equal(focus.href, `#/chat/chat/${dm.id}`);
+  // (2026-11-26) at the first message Bob hasn't read, not the channel's foot
+  assert.equal(focus.href, `#/chat/chat/${dm.id}/at/${first.seq}`);
 });
 
 // ---------- paging ----------
