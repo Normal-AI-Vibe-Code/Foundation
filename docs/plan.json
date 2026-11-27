@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-27T06:50:10.226Z",
+  "syncedAt": "2026-11-27T21:22:32.551Z",
   "columns": [
     {
       "id": "needs-you",
@@ -2529,7 +2529,8 @@
       "milestone": "ship",
       "area": "design",
       "status": "review",
-      "body": "Josh, 2026-11-26 (docs/notes.md; SPEC 3 and 7). One Note primitive: a note page is a space of kind note (its board holds the note), listed in the side menu's Notes as a tree, open full size; the same page goes on any grid as a note card with ref (drag it from Notes onto a section, or Put on a grid), and an edit in either place is in both, live. A grid's own note is the same primitive and becomes a page from its card's menu; every grid's notes are listed in Notes under On grids, in All Grids' tree and their section, and open full size over their grid with a path back (Josh: list them all, their hierarchy referring back to their grids). The editor has blocks: slash menu, markdown shortcuts, to-dos, nested items, callouts, toggles, code, divider, pictures, link cards, sub-pages, a handle to drag or turn a block. Kept as readable markdown. Tools add_note_page, place_note, make_note_page, archive_note_page (confirm). Checked: server notepages.test.ts (11), client note-blocks.test.ts (7), e2e note-pages.spec.ts (3: two people, grid card and page; a grid note listed and opened full size), #/design day and night; evidence docs/evidence/2026-11-26_note-pages. Josh's call left: a new page open to everyone or private by default (built: open, like a grid). A person checks it in the desktop app."
+      "body": "Josh, 2026-11-26 (docs/notes.md; SPEC 3 and 7). One Note primitive: a note page is a space of kind note (its board holds the note), listed in the side menu's Notes as a tree, open full size; the same page goes on any grid as a note card with ref (drag it from Notes onto a section, or Put on a grid), and an edit in either place is in both, live. A grid's own note is the same primitive and becomes a page from its card's menu; every grid's notes are listed in Notes under On grids, in All Grids' tree and their section, and open full size over their grid with a path back (Josh: list them all, their hierarchy referring back to their grids). The editor has blocks: slash menu, markdown shortcuts, to-dos, nested items, callouts, toggles, code, divider, pictures, link cards, sub-pages, a handle to drag or turn a block. Kept as readable markdown. Tools add_note_page, place_note, make_note_page, archive_note_page (confirm). Checked: server notepages.test.ts (11), client note-blocks.test.ts (7), e2e note-pages.spec.ts (3: two people, grid card and page; a grid note listed and opened full size), #/design day and night; evidence docs/evidence/2026-11-26_note-pages. Josh's call left: a new page open to everyone or private by default (built: open, like a grid). A person checks it in the desktop app.",
+      "issue": 265
     },
     {
       "id": "data-flows",
@@ -2698,7 +2699,8 @@
       "milestone": "polish",
       "area": "desktop",
       "status": "review",
-      "body": "Josh, 2026-11-27: keep a strong sense of history in the updates panel, and keep the version number prominent in that panel and the latest changes. Built (SPEC §0.24): docs/releases.json from the v* tags (node scripts/release.mjs history; each CI build writes itself on top); the Changes tool's Releases face leads with this app's version in display 40, when and from which commit, and What's new (a checkout: Not released yet, then its release's changes); then History: a tally, releases per day, every release by day opening to its changes and its post. The version also sits on the faces bar; the Code face marks where releases were cut. Checked: client test/release-history.test.ts, e2e bottom-bar (tools), #/design day and night (docs/evidence/2026-11-27_release-history/). A person checks: the next desktop release's Changes panel. Not done: Settings → Releases still lists posts only."
+      "body": "Josh, 2026-11-27: keep a strong sense of history in the updates panel, and keep the version number prominent in that panel and the latest changes. Built (SPEC §0.24): docs/releases.json from the v* tags (node scripts/release.mjs history; each CI build writes itself on top); the Changes tool's Releases face leads with this app's version in display 40, when and from which commit, and What's new (a checkout: Not released yet, then its release's changes); then History: a tally, releases per day, every release by day opening to its changes and its post. The version also sits on the faces bar; the Code face marks where releases were cut. Checked: client test/release-history.test.ts, e2e bottom-bar (tools), #/design day and night (docs/evidence/2026-11-27_release-history/). A person checks: the next desktop release's Changes panel. Not done: Settings → Releases still lists posts only.",
+      "issue": 266
     },
     {
       "id": "pings",
@@ -2707,7 +2709,8 @@
       "milestone": "crew",
       "area": "chat",
       "status": "review",
-      "body": "Josh, 2026-11-27 (SPEC 0.25). A mention or DM sounds two soft notes when you aren't looking (Settings → General); the bell row shows the card it points at and opens the grid there; a card's and a section's right-click has Ping someone about this… (Recent, On this, Here now, Worked on this grid), sending a DM that @mentions them and links the place; the board keeps who has worked on it, people and agents (protocol workers, server-only). Checked: server activity.test.ts, client ping.test.ts, the browser with a second person through the API (docs/evidence/2026-11-27_ping/). A person checks: two real windows, hearing the chime, pinging an agent, day theme."
+      "body": "Josh, 2026-11-27 (SPEC 0.25). A mention or DM sounds two soft notes when you aren't looking (Settings → General); the bell row shows the card it points at and opens the grid there; a card's and a section's right-click has Ping someone about this… (Recent, On this, Here now, Worked on this grid), sending a DM that @mentions them and links the place; the board keeps who has worked on it, people and agents (protocol workers, server-only). Checked: server activity.test.ts, client ping.test.ts, the browser with a second person through the API (docs/evidence/2026-11-27_ping/). A person checks: two real windows, hearing the chime, pinging an agent, day theme.",
+      "issue": 267
     }
   ]
 }
