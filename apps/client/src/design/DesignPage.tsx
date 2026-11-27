@@ -36,7 +36,7 @@ import type { UpdatePhase } from "../update/updater";
 import { NightOrb } from "../shell/NightOrb";
 import { InfoGlyph } from "../shell/TopBar";
 import { WindowControls } from "../shell/WindowControls";
-import { SunGlyph, MicGlyph, PresentGlyph, SearchGlyph, SlidersGlyph } from "../shell/glyphs";
+import { SunGlyph, MicGlyph, PanelGlyph, PresentGlyph, SearchGlyph, SendGlyph } from "../shell/glyphs";
 import { CouncilGlyph } from "../characters/CouncilGlyph";
 import { FitGlyph, LayoutGlyph, OsGlyph } from "../components/SectionView";
 import { ExpandGlyph } from "../components/Fullscreen";
@@ -886,21 +886,24 @@ function DesignSections() {
                 <span className="hud-icon-text">{COMMANDS_GLYPH}</span>
               </span>
             </div>
-            <button className="hud-icon hud-council f-glass">
-              <CouncilGlyph />
-            </button>
-            <div className="hud-ask-pill f-glass">
-              <button className="hud-ask">
-                <span className="hud-glyph">✦</span>
-                <span className="hud-label">Ask</span>
+            <div className="hud-ask-pill f-glass" data-design-hud-ask>
+              <span className="hud-glyph">✦</span>
+              <input className="hud-ask-text" placeholder="Ask all 3 agents…" readOnly />
+              <button className="hud-ask-send" disabled aria-label="Send">
+                <SendGlyph size={14} />
               </button>
-              <span className="hud-ask-gear">
-                <SlidersGlyph size={15} />
+            </div>
+            <div className="hud-icons hud-agents f-glass">
+              <span className="hud-icon hud-council">
+                <CouncilGlyph />
+              </span>
+              <span className="hud-icon">
+                <PanelGlyph size={15} />
               </span>
             </div>
           </div>
         </div>
-        <div className="floor-demo-caption">The bottom bar · search opens over its pill (the pin moves it to the right) · when the grid's council stands at the bottom right, the bar steps to the bottom left</div>
+        <div className="floor-demo-caption">The bottom bar · search opens over its pill (the pin moves it to the right) · Ask is a line to every agent on the grid (a tap of Space puts the caret in it); beside it, the council and the panel with all the agents · when the grid's council stands at the bottom right, the bar steps to the bottom left</div>
       </Section>
 
       <Section title="Chrome on call" note="The grid runs edge to edge. Everything else waits to be called: search is a small pill at the bottom, a card's bar drops in on hover, and an image's icons slide out from behind it.">
@@ -912,10 +915,6 @@ function DesignSections() {
                 <span className="hud-label">Search</span>
                 <span className="f-kbd">{keys("mod+F")}</span>
               </button>
-              <button className="hud-ask f-glass">
-                <span className="hud-glyph">✦</span>
-                <span className="hud-label">Ask</span>
-              </button>
               <button className="hud-talk f-glass">
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
                   <rect x="5.5" y="1.5" width="5" height="9" rx="2.5" />
@@ -925,7 +924,7 @@ function DesignSections() {
               </button>
               <button className="hud-zoom f-glass">64%</button>
             </div>
-            <div className="effect-label">The search pill, talk (hold Space: what you say goes to the crew) and the zoom</div>
+            <div className="effect-label">The search pill, talk (hold Space: what you say goes to the grid's agents) and the zoom</div>
           </div>
           <div className="oncall-cell">
             <div className="oncall-talking">
@@ -2266,25 +2265,6 @@ function CrewDemo() {
           </div>
         </div>
         <div className="effect-label">Holding Space: the level, the words, the crew at work</div>
-        <div className="talk-sheet f-glass is-open crew-demo-still" data-mode="typing">
-          <div className="talk-input">
-            <span className="talk-level">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <span key={i} />
-              ))}
-            </span>
-            <textarea className="talk-field" rows={1} placeholder="Ask the crew: make a section for…, hook up FactoryForm…" readOnly />
-          </div>
-          <div className="talk-hints">
-            <span>
-              <span className="f-kbd">↵</span> sends
-            </span>
-            <span>
-              Hold <span className="f-kbd">Space</span> on the board to talk
-            </span>
-          </div>
-        </div>
-        <div className="effect-label">A tap of Space: typing</div>
       </div>
     </div>
   );
@@ -2592,8 +2572,8 @@ function CouncilDemo() {
       <div data-design-council-main style={{ display: "flow-root" }}>
         <CouncilView title="Supply" kind="section" seats={seats} ghost={others[3]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onPanel={() => {}} onClose={() => {}} inline />
       </div>
-      {/* pressed: the line to that agent is the last row of the same bar, its name and marks above it */}
-      <div className="f-eyebrow update-demo-label">Pressed: the bar over its head becomes the line to it</div>
+      {/* pressed: the bar stays as it is and the line to that agent is a pill of its own under it (2026-11-26) */}
+      <div className="f-eyebrow update-demo-label">Pressed: its bar stays, and the line to it is a pill under the bar (no box around them)</div>
       <div data-design-council-say style={{ display: "flow-root" }}>
         <CouncilView title="Supply" kind="section" seats={[seats[2]]} ghost={others[3]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onClose={() => {}} inline hot="c" />
       </div>

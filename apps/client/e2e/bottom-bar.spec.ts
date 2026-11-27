@@ -57,12 +57,21 @@ test("the top bar's right end is the tools; search, talk, the zoom, present, com
   await expect(hud.locator('.hud-icon[aria-label="Present"]')).toBeVisible();
   await expect(hud.locator('.hud-icon[aria-label="Commands"]')).toBeVisible();
   await expect(hud.locator("[data-council-open]")).toBeVisible();
-  // Ask is on the right, the council beside it, the settings at Ask's end
-  const order = await hud.evaluate((el) => [...el.querySelectorAll<HTMLElement>(".hud-search, .hud-talk, .hud-zoom, .hud-icons, .hud-council, .hud-ask, .hud-ask-gear")].map((x) => [x.className.split(" ")[0], Math.round(x.getBoundingClientRect().left)] as const));
+  // Ask is a pill to type into (2026-11-26); beside it, on one pill, the council and the button for the panel of all the agents
+  const order = await hud.evaluate((el) => [...el.querySelectorAll<HTMLElement>(".hud-search, .hud-talk, .hud-zoom, .hud-icons:not(.hud-agents), .hud-ask-pill, [data-council-open], [data-hud-agents]")].map((x) => [x.matches("[data-council-open]") ? "council" : x.matches("[data-hud-agents]") ? "panel" : x.className.split(" ")[0], Math.round(x.getBoundingClientRect().left)] as const));
   const xs = order.map(([, x]) => x);
   expect(xs).toEqual([...xs].sort((a, b) => a - b));
-  expect(order.map(([c]) => c)).toEqual(["hud-search", "hud-talk", "hud-zoom", "hud-icons", "hud-icon", "hud-ask", "hud-ask-gear"]);
-  // the gear opens the agents panel
+  expect(order.map(([c]) => c)).toEqual(["hud-search", "hud-talk", "hud-zoom", "hud-icons", "hud-ask-pill", "council", "panel"]);
+  await expect(hud.locator("[data-hud-ask-text]")).toBeVisible();
+  // nothing is up over the bar by default: no box to type into but the pill, and a tap of Space puts the caret in it
+  await expect(admin.locator(".talk-sheet")).toHaveCount(0);
+  await admin.mouse.click(20, 400);
+  await admin.keyboard.press("Space");
+  await expect(hud.locator("[data-hud-ask-text]")).toBeFocused();
+  await expect(admin.locator(".talk-sheet")).toHaveCount(0);
+  await admin.keyboard.press("Escape");
+  await expect(hud.locator("[data-hud-ask-text]")).not.toBeFocused();
+  // the button beside the council opens the agents panel
   await hud.locator("[data-hud-agents]").click();
   await expect(admin.locator(".agents-pane")).toBeVisible();
   // and the agents panel draws a line, the grid's hairline, between its tabs and what scrolls under them

@@ -252,28 +252,6 @@
 .talk-heard.is-empty {
   color: var(--color-mist);
 }
-.talk-field {
-  flex: 1;
-  min-width: 0;
-  min-height: 36px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-raise);
-  color: var(--color-frost);
-  font: 500 var(--text-14) / 1.45 var(--font-sans);
-  resize: none;
-  outline: none;
-}
-.talk-field:focus {
-  border-color: var(--color-agent);
-  box-shadow: 0 0 0 3px var(--color-agent-dim);
-}
-.talk-field:focus-visible {
-  outline: 2px solid var(--color-agent);
-  outline-offset: -1px;
-  box-shadow: 0 0 0 3px var(--color-agent-dim);
-}
 .talk-hints {
   display: flex;
   flex-wrap: wrap;

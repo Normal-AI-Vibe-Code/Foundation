@@ -93,6 +93,15 @@
   ],
   "cards": [
     {
+      "id": "ask-pill-grid-agents",
+      "title": "The bar's Ask is a line to all the grid's agents; the council and the agents panel as two icons beside it; no box around an agent's line",
+      "kind": "plan",
+      "milestone": "crew",
+      "area": "crew",
+      "status": "review",
+      "body": "Josh, 2026-11-26: the \"Ask the crew…\" box need not be up on the grid (remove it); the council as an icon next to the Ask pill and the button that opens the right panel with all the agents; Ask asks all the agents in that grid, from the bottom bar; no box around a council agent, just the pill to type into with the icons above it. Built: HudAsk (shell/Talk.tsx) sends a typed line to every connected agent on the grid through sayToCouncil (none on the grid: the server's own agent); a tap of Space puts the caret in it and the sheet rises only to listen; the council and the panel are two icons on one pill; pressing an agent shows a bare pill under its bar. The session column has no button on the bar now (⌘J). Checked in the browser by day and night and in e2e (bottom-bar, crew, council). Waiting for a person to try it in the desktop app."
+    },
+    {
       "id": "media-grab-undo",
       "title": "Images and video picked up anywhere; undo and redo on the grid",
       "kind": "plan",

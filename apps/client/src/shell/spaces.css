@@ -320,24 +320,8 @@
   visibility: hidden;
 }
 
-/* ---------- a session with the agent: opened from the bottom bar ---------- */
+/* ---------- a session with the agent ---------- */
 
-.hud-ask {
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border-radius: var(--radius-pill);
-  color: var(--color-agent);
-  font: 600 var(--text-13) / 1 var(--font-sans);
-  cursor: pointer;
-}
-.hud-ask.is-on {
-  box-shadow:
-    0 0 0 1.5px var(--color-agent),
-    0 0 0 6px var(--color-agent-dim);
-}
 .session-tools {
   flex-shrink: 0;
   display: inline-flex;
