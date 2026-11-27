@@ -201,3 +201,41 @@ test("many changes at once are one line; two people are two lines; the log stays
   }
   assert.ok(acts(B).length <= 400, `bounded: ${acts(B).length}`);
 });
+
+test("who has worked on a grid: people from their socket (typing too), agents from their tool calls, kept by the server", async () => {
+  const B = "w1";
+  const { workersOf } = await import("@foundation/protocol");
+  const ada1 = personOn(B, ada.id);
+  let secId = "";
+  ada1.edit((d) => (secId = appendSection(d, "Work").id));
+  await Promise.resolve();
+  const n = note(secId, "Typed in");
+  ada1.put(n);
+  ada1.edit((d) => setNoteText(d, n.id, "words"));
+  await new Promise((r) => setTimeout(r, 5));
+  let w = workersOf(getBoard(B).doc);
+  assert.deepEqual(w.map((x) => [x.id, x.name, x.kind]), [[ada.id, "Ada", "person"]]);
+  // at most once a minute: a burst of edits is one note
+  assert.equal(w[0].edits, 1);
+
+  // Kai only types in a note: that's work too, though the activity log leaves it out
+  const kai1 = personOn(B, kai.id);
+  kai1.edit((d) => setNoteText(d, n.id, "more words"));
+  await new Promise((r) => setTimeout(r, 5));
+
+  // an agent acting for Ada, and a crew agent for Kai: agents, by name, with whom they worked for
+  await runTool(httpToolCtx(B, ada, false), "add_note", { section: "Work", title: "From a script", markdown: "hi" });
+  const m = joinCrew({ boardId: B, userId: kai.id, userName: "Kai", runId: "run_w1", task: "x" });
+  await runTool({ boardId: B, actor: m.name, userId: kai.id, crew: m.id }, "add_note", { section: "Work", title: "Crew", markdown: "hi" });
+  leaveCrew(m, "done", 0);
+  w = workersOf(getBoard(B).doc);
+  const by = Object.fromEntries(w.map((x) => [x.id, x]));
+  assert.equal(by[kai.id]?.kind, "person");
+  assert.equal(by["agent:Ada's agent"]?.kind, "agent");
+  assert.equal(by["agent:Ada's agent"]?.for, "Ada");
+  assert.equal(by[`agent:${m.name}`]?.for, "Kai");
+  assert.equal(w[0].id, `agent:${m.name}`, "the most recent first");
+  // a person's socket can't write it: a forged row is put back the way the server left it
+  ada1.edit((d) => boardMaps(d).workers.set("u_forged", { id: "u_forged", name: "Forged", kind: "person", firstAt: 1, lastAt: Date.now() + 1e9, edits: 99 }));
+  assert.equal(boardMaps(getBoard(B).doc).workers.get("u_forged"), undefined);
+});

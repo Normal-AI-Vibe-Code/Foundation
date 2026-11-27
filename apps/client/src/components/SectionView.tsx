@@ -322,7 +322,7 @@ export const SectionView = memo(function SectionView({
       e.preventDefault();
       e.stopPropagation();
       setActiveSection(section.id);
-      openContextMenu(e.clientX, e.clientY, sectionMenuItems(section, worldPoint(e.clientX, e.clientY), { host, hostable, isOpen, isGrid, canRemove, upload: () => fileRef.current?.click() }));
+      openContextMenu(e.clientX, e.clientY, sectionMenuItems(section, worldPoint(e.clientX, e.clientY), { host, hostable, isOpen, isGrid, canRemove, upload: () => fileRef.current?.click(), screen: { x: e.clientX, y: e.clientY } }));
     },
     [section.id, canRemove, host, hostable, worldPoint, section, isOpen, isGrid],
   );
@@ -330,7 +330,7 @@ export const SectionView = memo(function SectionView({
   // ----- right-click on a card: the card's own menu (components/cardMenu.ts) -----
   // A table's cells answer with their own (rows, columns) and stop the event before it gets here
   const onCardContextMenu = useCallback((e: React.MouseEvent, id: string) => {
-    const items = cardMenuItems(id);
+    const items = cardMenuItems(id, { x: e.clientX, y: e.clientY });
     if (!items) return;
     e.preventDefault();
     e.stopPropagation();

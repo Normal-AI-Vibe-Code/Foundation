@@ -321,3 +321,17 @@ span.chat-preview-img {
   outline: 2px solid var(--color-pulse);
   outline-offset: 2px;
 }
+/* a notice about a place on a grid (a ping from a card, a card shared): where it opens (2026-11-27) */
+.chat-bell-place {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: var(--space-1);
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-pulse-dim);
+  color: var(--color-frost);
+  font: 500 var(--text-12) / 1.4 var(--font-sans);
+}

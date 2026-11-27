@@ -35,7 +35,7 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import { IndexeddbPersistence } from "y-indexeddb";
-import { BOARD_SCHEMA, LOCAL_GRID_ID, boardMaps, huddleStateOf, noteTextOf, setNoteText, setTableCells, tableCellMap, tableCellsOf, type HuddleState, type ObjectDoc, type SectionDoc, type UserInfo } from "@foundation/protocol";
+import { BOARD_SCHEMA, LOCAL_GRID_ID, boardMaps, workersOf, huddleStateOf, noteTextOf, setNoteText, setTableCells, tableCellMap, tableCellsOf, type HuddleState, type ObjectDoc, type SectionDoc, type UserInfo } from "@foundation/protocol";
 import { ROOT, applyRemote, getState, setSyncHook, type AnyObject, type AppState, type GridTracks, type PanelMeta, type Section } from "../state/store";
 import { workbook } from "../engine/workbook";
 import { api, openSocket } from "../lib/api";
@@ -189,6 +189,7 @@ class BoardSync {
     // the server's word on who's in each huddle: only the server writes it, so every change is remote
     m.huddles.observe((e) => this.pullHuddles([...e.keysChanged]));
     m.activity.observe(() => this.notify());
+    m.workers.observe(() => this.notify());
     void this.start();
   }
 
@@ -791,6 +792,11 @@ class BoardSync {
 
   activity() {
     return boardMaps(this.doc).activity.toArray();
+  }
+
+  /** who has worked on this grid, people and agents, the most recent first (kept by the server: protocol `workers`) */
+  workers() {
+    return workersOf(this.doc);
   }
 
   destroy() {

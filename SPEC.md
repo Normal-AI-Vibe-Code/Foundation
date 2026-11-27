@@ -531,6 +531,25 @@ Not built, or not as asked: **only tables pin** (a note, a map or a picture span
 - **Full suites.** Server: 700 of 701 tests pass. The one that failed under load, `pagecard`'s real browser, passes alone in 8.8 s. Client: 389 of 389 pass, and typecheck is clean.
 - **Evidence:** `docs/evidence/2026-11-26_work-trail/`.
 
+### 0.24 Pings: a sound, the bell, straight to the card; Ping in the right-click; who has worked on a grid (Josh, 2026-11-27)
+
+**The ask.** "Referencing someone in chat pings them with a sound and adds to their notifications that they can go and access the part of chat or the board that they were referenced at. A ping command in the right context menu … someone that we've recently pinged, or someone who is working in that board or has items associated to them. Keep meta data like this: who has been working in the board, whether they are human or agent."
+
+**What was there.** An @mention already reached the person's bell (chat/notify.ts), and a desktop notification if they'd turned that on, but there was no sound, and a notice always opened ChatForm. A chat link to a card only switched to its grid. The board's `activity` log had people's and agents' lines by name, bounded at 400, leaving out typing.
+
+**What was built.**
+- **Who worked on a grid** (protocol `workers`, `WorkerDoc`, `noteWorker`, `workersOf`). One row per party: user id for a person, `agent:<name>` for an agent (the same id a chat mention uses). Each row has its name, kind, first and last time, a count, and for an agent the person it worked for. The server keeps it alone (it's in `SERVER_MAPS`, so a socket's forged row is put back). A person is noted from any change on their socket, typing included, at most once a minute (gridlog.ts). An agent, or a person at the HTTP door, is noted from their tool calls (tools.ts `touch`). The client reads it as `board.workers()`.
+- **Ping in the right-click.** A card's menu leads with *Ping someone about this…*, and a section's with *Ping someone about this section…*. Either opens a picker at the press (chat/PingPicker.tsx) with a field and four groups (chat/pingLogic.ts): *Recent* (whom I pinged, this device's), *On this* (the card's maker or assignee), *Here now* (on this grid now), and *Worked on this grid*. Each party appears once, never me. An agent ChatForm doesn't know is shown dimmed. Picking one sends, by that press, a direct message that @mentions them and links the place (a message of type "link"). For an agent ChatForm knows, it goes to my conversation with it. Recent is updated.
+- **Their end.** A mention or direct message they aren't looking at sounds two soft notes (chat/pingSound.ts, Web Audio, at most one per 1.5 s; never for @channel or @here; Settings → General → *A sound when you're pinged*, on by default). The bell row shows where it points (↗ card · grid). Pressing it opens that grid with the camera on the card (lib/openPlace.ts). Recent mentions in ChatForm still opens the message. A link in a conversation now frames the card too, not only the grid.
+
+**What shows it's right.** A server test (activity.test.ts) covers people from their socket (typing too), agents with whom they worked for, most recent first, and a forged row put back. Client tests (ping.test.ts) cover the groups, the filter, Recent, the words, and when it sounds. In the browser, on a copy of the data, at night, with a second person signed in through the API, I checked that:
+- Kai, after adding a note, is offered under *Worked on this grid*;
+- Enter sent the ping, and Kai's mentions list has it, with the @mention and the place;
+- Kai's ping back rang both notes and counted on the bell;
+- the bell row showed the place, and pressing it from Today opened the grid with the note in view, the bell cleared (`docs/evidence/2026-11-27_ping/`).
+
+**Not verified.** The sound wasn't heard: the check counted its two tones. A second real browser window wasn't used. Day theme, pinging an agent, a section's ping, and a chat server of its own weren't tried. On such a server the place is folded into the words, and agents can't be pinged.
+
 ## 1. What Foundation is
 
 | | |

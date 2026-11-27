@@ -257,7 +257,7 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
         setActiveSection(section.id);
         const now = getState();
         const s = now.sections[section.id];
-        if (s) openContextMenu(e.x, e.y, sectionMenuItems(s, toWorld(e.x - camera.left, e.y - camera.top), sectionContext(now, s)));
+        if (s) openContextMenu(e.x, e.y, sectionMenuItems(s, toWorld(e.x - camera.left, e.y - camera.top), { ...sectionContext(now, s), screen: { x: e.x, y: e.y } }));
       };
       if (right.down) right.onUp = open;
       else open();

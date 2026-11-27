@@ -23,7 +23,7 @@ import { SETTINGS_TABS, goSettings, setStartsOn, startsOn, type Place, type Sett
 import { useCapabilities } from "../lib/capabilities";
 import { PeopleSection } from "./PeopleSection";
 import { ChatServerSetting } from "./ChatServerSetting";
-import { TellSetting } from "../chat/TellSetting";
+import { SoundSetting, TellSetting } from "../chat/TellSetting";
 import { PlacesTab } from "./PlacesTab";
 import { POSTS, ReleasesTab, ServicesTab } from "./SettingsPage";
 import { RendererTab } from "../rune/RendererTab";
@@ -219,6 +219,7 @@ function GeneralTab({ user }: { user: UserInfo }) {
 
       <Group title="Notifications" note="What this device tells you about while you're elsewhere. It's kept on this device, and each conversation's own Tell me about still applies.">
         <TellSetting />
+        <SoundSetting />
       </Group>
 
       <Group title="Agents on this computer" note="What agents may do beyond writing a grid. Nothing that runs code or spends money starts without a person.">

@@ -56,6 +56,7 @@ import { ToolPane } from "./Tools";
 import { TimelineLayer } from "../timeline/TimelineBar";
 import { toggleGridTimeline } from "../timeline/model";
 import { activeBoard, joinBoard, onBoardChange } from "../sync/board";
+import { PingHost } from "../chat/PingPicker";
 
 function typing(e: KeyboardEvent) {
   const t = e.target as HTMLElement | null;
@@ -347,6 +348,7 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
       <HuddlePip />
       <UploadTray />
       <Toast />
+      <PingHost />
 
       <input
         ref={fileRef}

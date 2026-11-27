@@ -46,6 +46,7 @@ export const BOARD = {
   localWatch: "localWatch", // "state" → LocalWatch (whether this computer is being watched, and when it last looked; kept by the server alone)
   flows: "flows", // fed card id → FlowState (what the server did with what's wired into it: working, ok, error; kept by the server alone, flows.ts)
   desktopLeave: "desktopLeave", // machine panel id → DesktopLeave (a person's leave for agents to use its desktop, and an agent's ask for it; kept by the server alone, off the card)
+  workers: "workers", // party id → WorkerDoc (who has worked on this grid, a person or an agent, and when last; kept by the server alone)
 } as const;
 
 /** the place that means "the whole grid" in the board's `agents` map */
@@ -852,6 +853,47 @@ export interface ActivityEntry {
   for?: string;
 }
 
+/**
+ * Who has worked on a grid (2026-11-27, Josh: "keep meta data like this who has been working in the board whether
+ * they are human or agent"): one row per party, kept by the server alone (a person's edits on their socket, an
+ * agent's tool calls), so a ping can be offered to them. A person's id is their user id; an agent's is
+ * `agent:<name>`, as a chat mention names it.
+ */
+export interface WorkerDoc {
+  id: string;
+  name: string;
+  kind: "person" | "agent";
+  firstAt: number;
+  lastAt: number;
+  /** how many times they've been noted at work (a pause between bursts of a person's, a tool call of an agent's) */
+  edits: number;
+  /** an agent's: the person it last worked for */
+  for?: string;
+}
+
+/** the most workers a grid keeps (the least recent go) */
+export const MAX_WORKERS = 200;
+
+/** an agent's id among a grid's workers (and in a chat mention) */
+export const agentWorkerId = (name: string) => `agent:${name}`;
+
+/** note a party at work on this grid: their row, brought up to date (call inside a transaction of the server's) */
+export function noteWorker(doc: Y.Doc, w: { id: string; name: string; kind: "person" | "agent"; for?: string }, now = Date.now()) {
+  if (!w.id || !w.name) return;
+  const map = boardMaps(doc).workers;
+  const was = map.get(w.id);
+  map.set(w.id, { id: w.id, name: w.name, kind: w.kind, firstAt: was?.firstAt ?? now, lastAt: now, edits: (was?.edits ?? 0) + 1, ...(w.for ? { for: w.for } : was?.for ? { for: was.for } : {}) });
+  if (map.size > MAX_WORKERS) {
+    const old = [...map.values()].sort((a, b) => a.lastAt - b.lastAt).slice(0, map.size - MAX_WORKERS);
+    for (const o of old) map.delete(o.id);
+  }
+}
+
+/** a grid's workers, the most recent first */
+export function workersOf(doc: Y.Doc): WorkerDoc[] {
+  return [...boardMaps(doc).workers.values()].sort((a, b) => b.lastAt - a.lastAt);
+}
+
 export const DEFAULT_COL_W = 1560;
 export const DEFAULT_ROW_H = 1160;
 
@@ -882,6 +924,7 @@ export function boardMaps(doc: Y.Doc) {
     flows: doc.getMap<FlowState>(BOARD.flows),
     local: doc.getMap<LocalProject>(BOARD.local),
     localWatch: doc.getMap<LocalWatch>(BOARD.localWatch),
+    workers: doc.getMap<WorkerDoc>(BOARD.workers),
   };
 }
 

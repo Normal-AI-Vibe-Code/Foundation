@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Row, Seg } from "../settings/SettingsSpace";
 import { setTell, useTell } from "./notify";
 import type { TellPermission } from "./notifyLogic";
+import { playPing, setSound, useSound } from "./pingSound";
 
 export function tellDetail(on: boolean, permission: TellPermission, refused: boolean): string {
   if (permission === "unsupported") return "This window can't show desktop notifications. The bell in the top bar still counts what's said to you.";
@@ -39,4 +40,29 @@ export function TellSetting() {
   const t = useTell();
   const [refused, setRefused] = useState(false);
   return <TellSettingView on={t.on} permission={t.permission} refused={refused} onChange={(on) => void setTell(on).then((p) => setRefused(on && p !== "granted"))} />;
+}
+
+/** the ping's sound (chat/pingSound.ts): on unless turned off here; choosing On plays it once */
+export function SoundSettingView({ on, onChange }: { on: boolean; onChange(on: boolean): void }) {
+  return (
+    <Row
+      name="A sound when you're pinged"
+      detail={<span data-sound-detail>{on ? "On for this device: a soft two-note chime when someone mentions you or writes to you directly and you aren't looking at that conversation." : "Off. Mentions still light the bell."}</span>}
+    >
+      <Seg
+        label="A sound for mentions and direct messages"
+        value={on ? "on" : "off"}
+        options={[
+          { id: "on", label: "Sound" },
+          { id: "off", label: "Off" },
+        ]}
+        onChange={(v) => onChange(v === "on")}
+      />
+    </Row>
+  );
+}
+
+export function SoundSetting() {
+  const on = useSound();
+  return <SoundSettingView on={on} onChange={(v) => (setSound(v), v && playPing(true))} />;
 }

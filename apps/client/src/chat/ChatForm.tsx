@@ -55,6 +55,7 @@ import {
   type ChatState,
 } from "./model";
 import { chatApi, CHAT_SERVER_NAME } from "./server";
+import { openPlace } from "../lib/openPlace";
 import { openNotice, refreshNotices, seeAllNotices, useNotices } from "./notify";
 import { unseenCount } from "./notifyLogic";
 import { layoutTimeline, parseRest, restOf, type ChatRest } from "./logic";
@@ -317,10 +318,8 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
       },
       cancelEdit: () => setEditing(null),
       remove: (m) => void removeMessage(m).catch((x: Error) => toast(x.message, "bad")),
-      openPlace: (m) => {
-        if (!m.place) return;
-        window.dispatchEvent(new CustomEvent("foundation:board", { detail: m.place.board }));
-      },
+      // the grid it's on, and the camera on the card (lib/openPlace.ts)
+      openPlace: (m) => m.place && openPlace(m.place),
     }),
     [go, can],
   );
@@ -448,7 +447,7 @@ function ChatTabView({ user: foundationUser, s, route }: { user: UserInfo; s: Ch
   } else if (route.view === "threads") {
     main = <ThreadsView threads={threadRows} busy={!threadRows} why={threadsWhy} onOpen={(m) => go({ channel: m.channel, thread: m.id })} />;
   } else if (route.view === "mentions") {
-    main = <MentionsView notices={notices.list} seen={notices.seen} channels={s.channels} busy={notices.busy} why={notices.listed ? "" : notices.why} unseen={unseen} onOpen={openNotice} onAll={seeAllNotices} />;
+    main = <MentionsView notices={notices.list} seen={notices.seen} channels={s.channels} busy={notices.busy} why={notices.listed ? "" : notices.why} unseen={unseen} onOpen={(n) => openNotice(n, true)} onAll={seeAllNotices} />;
   } else if (route.view === "search") {
     main = <SearchView q={route.q} hits={hits} busy={searching} why={searchWhy} onOpen={(h) => go(h.message.root ? { channel: h.channel.id, thread: h.message.root, at: h.message.seq } : { channel: h.channel.id, at: h.message.seq })} />;
   } else if (!channel) {

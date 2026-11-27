@@ -25,7 +25,9 @@ import { CHAT_SERVER, chatApi } from "./server";
 import { chatCan } from "./serverLogic";
 import { restOf } from "./logic";
 import { setListFolded } from "./pins";
-import { changeNotice, dropChannel, lookingAt, markAllSeen, markSeen, mergeNotices, noticeFor, noticeOf, NOTHING_SEEN, readSeen, tells, tellWords, titleWithCount, unseenCount, type Notice, type Seen, type TellPermission } from "./notifyLogic";
+import { openPlace } from "../lib/openPlace";
+import { playPing, soundOn } from "./pingSound";
+import { changeNotice, dropChannel, lookingAt, sounds, markAllSeen, markSeen, mergeNotices, noticeFor, noticeOf, NOTHING_SEEN, readSeen, tells, tellWords, titleWithCount, unseenCount, type Notice, type Seen, type TellPermission } from "./notifyLogic";
 
 export interface NoticesState {
   list: Notice[];
@@ -82,9 +84,14 @@ export function seeAllNotices() {
   keepSeen(markAllSeen(state.list));
 }
 
-/** open ChatForm at the message (the place loads the page around it and flashes it), and it's seen */
-export function openNotice(n: Pick<Notice, "id" | "message">) {
+/**
+ * Open where I was referenced, and it's seen: a message that links a place on a grid (a ping from a card, a card
+ * shared into chat) opens that grid at the card; any other opens ChatForm at the message (the place loads the page
+ * around it and flashes it). `inChat` always opens the message.
+ */
+export function openNotice(n: Pick<Notice, "id" | "message">, inChat = false) {
   seeNotice(n.id);
+  if (!inChat && n.message.place) return openPlace(n.message.place);
   setListFolded(false);
   goChat("chat", restOf({ channel: n.message.channel, thread: n.message.root, at: n.message.seq }));
 }
@@ -167,6 +174,7 @@ async function onMessage(m: ChatMessage) {
   // in front of me as it lands: nothing to count
   if (looking) seeNotice(n.id);
   if (tells(why, { on: tellOn(), permission: tellPermission(), looking })) tell(n);
+  if (sounds(why, { on: soundOn(), looking })) playPing();
   badge();
 }
 

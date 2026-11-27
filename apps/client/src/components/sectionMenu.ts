@@ -42,9 +42,12 @@ import { keepAgentsCard } from "./SectionAgents";
 import { setUi } from "../state/ui";
 import type { MenuGroup, MenuItem } from "./menuLayout";
 import { addChatPicker } from "../chat/gridChatPlace";
+import { pingAboutSection } from "../chat/ping";
 import { CHAT_CARD } from "../chat/gridChat";
 
 export interface SectionMenuContext {
+  /** where the menu was opened, on screen (the ping picker opens there) */
+  screen?: { x: number; y: number };
   /** the app the section hosts, or the one card that could fill it */
   host: PanelMeta | null;
   hostable: PanelMeta | null;
@@ -58,7 +61,7 @@ export interface SectionMenuContext {
 }
 
 /** `pt`: where it was right-clicked, in the grid's world (live things land there, not in the flow) */
-export function sectionMenuItems(section: Section, pt: { x: number; y: number } | null, { host, hostable, isOpen, isGrid, canRemove, upload }: SectionMenuContext): MenuItem[] {
+export function sectionMenuItems(section: Section, pt: { x: number; y: number } | null, { host, hostable, isOpen, isGrid, canRemove, upload, screen }: SectionMenuContext): MenuItem[] {
   // live things land where you clicked, not in the flow
   const at = (w: number, h: number) => {
     const st = getState();
@@ -87,6 +90,8 @@ export function sectionMenuItems(section: Section, pt: { x: number; y: number } 
   return [
     // an agent first: the section is somewhere agents build with you
     { icon: "⚇", label: "Council: ask this section's agents…", agent: true, action: () => openCouncil({ kind: "section", id: section.id }) },
+    // someone, in ChatForm, about this section (chat/ping.ts)
+    { icon: "@", label: "Ping someone about this section…", action: () => pingAboutSection(section.id, screen?.x ?? window.innerWidth / 2 - 150, screen?.y ?? 120) },
     ...tag("add", [
     { heading: "Add" },
     { icon: "¶", label: "Note", action: () => addNote(section.id, undefined, at(NOTE_W, NOTE_H)) },

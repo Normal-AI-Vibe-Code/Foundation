@@ -639,7 +639,7 @@ export function RichNote({ note }: { note: NoteMeta }) {
     const sel = window.getSelection();
     // the selection in these words, or none (never one left over from before)
     range.current = sel?.rangeCount && el.current?.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
-    const card = cardMenuItems(note.id) ?? [];
+    const card = cardMenuItems(note.id, { x: e.clientX, y: e.clientY }) ?? [];
     if (!canWrite) return openContextMenu(e.clientX, e.clientY, card);
     const m = readMarks();
     const picked = !!range.current && !range.current.collapsed;

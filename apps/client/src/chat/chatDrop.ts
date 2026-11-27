@@ -59,7 +59,7 @@ export function dropOnChat(zone: HTMLElement, items: ChatDropItem[]) {
 }
 
 /** the grid the card is on, by the name its tab wears */
-function boardName(id: string): string | undefined {
+export function boardName(id: string): string | undefined {
   if (typeof document === "undefined") return undefined;
   return document.querySelector<HTMLElement>(`[data-space-drop="${CSS.escape(id)}"]`)?.dataset.spaceName ?? undefined;
 }

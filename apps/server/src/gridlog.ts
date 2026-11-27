@@ -17,7 +17,7 @@
  * The activity array stays bounded (400, protocol `logActivity`).
  */
 
-import { boardMaps, logActivity, type ObjectDoc, type SectionDoc } from "@foundation/protocol";
+import { boardMaps, logActivity, noteWorker, type ObjectDoc, type SectionDoc } from "@foundation/protocol";
 import { onBoardOpen, socketUserId, type Board } from "./boards.ts";
 import { one } from "./db.ts";
 
@@ -114,8 +114,32 @@ function noteChange(b: Batch, base: Omit<Rec, "added" | "removed">, change: { re
   b.recs.set(base.id, rec);
 }
 
+/**
+ * Who has worked on the grid (protocol `workers`, 2026-11-27): any change a person makes on their socket (typing
+ * in a note too, which the activity lines leave out) notes them, at most once a minute each, written by the server
+ * after the person's own transaction.
+ */
+const WORKER_MS = 60_000;
+const workerAt = new Map<string, number>();
+function noteWorkerSoon(board: Board, userId: string) {
+  const k = `${board.id}|${userId}`;
+  const now = Date.now();
+  if (now - (workerAt.get(k) ?? 0) < WORKER_MS) return;
+  workerAt.set(k, now);
+  queueMicrotask(() => {
+    if (board.doc.isDestroyed) return;
+    const name = one<{ name: string }>("select name from users where id = ?", userId)?.name;
+    if (!name) return;
+    board.doc.transact(() => noteWorker(board.doc, { id: userId, name, kind: "person" }), "gridlog");
+  });
+}
+
 function watch(board: Board) {
   const m = boardMaps(board.doc);
+  board.doc.on("afterTransaction", (tr) => {
+    const userId = socketUserId(tr.origin);
+    if (userId && tr.changed.size) noteWorkerSoon(board, userId);
+  });
   m.sections.observe((ev) => {
     const userId = socketUserId(ev.transaction.origin);
     if (!userId) return; // the server's own writes, an agent's, a load

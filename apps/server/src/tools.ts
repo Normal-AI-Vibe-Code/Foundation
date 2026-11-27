@@ -62,7 +62,7 @@ import { queueJob } from "./jobs.ts";
 import { isCad, readFileText, requireFileVisible, shareFileWith } from "./files.ts";
 import { bringForCard, listPlace, listPlaces, readPlaceText } from "./places.ts";
 import { attachToStage, chooseArtifact, completeStage, describePipeline, setChecklist, startPipeline, updateStageSettings } from "./pipeline.ts";
-import { stageDef } from "@foundation/protocol";
+import { stageDef, noteWorker, agentWorkerId } from "@foundation/protocol";
 import { huddleArchive, transcriptText } from "./huddles.ts";
 import { channelHistory, channelInfo, listChannels } from "./slack.ts";
 import { boardHasChannel } from "./slacklive.ts";
@@ -266,12 +266,12 @@ function touch(ctx: ToolCtx, objectId: string | undefined, text: string) {
     // a crew member: its own cursor lands on what it touched, and the board says who, and for whom
     aim(member, objectId ? resolveTarget(ctx.boardId, objectId) : null);
     if (objectId && (boardMaps(board.doc).objects.get(objectId) as { createdBy?: string } | undefined)?.createdBy === member.name) member.made.add(objectId);
-    editBoard(ctx.boardId, "agent", (doc) => logActivity(doc, { who: member.name, role: "agent", text, objectId, for: member.userName }));
+    editBoard(ctx.boardId, "agent", (doc) => (logActivity(doc, { who: member.name, role: "agent", text, objectId, for: member.userName }), noteWorker(doc, { id: agentWorkerId(member.name), name: member.name, kind: "agent", for: member.userName })));
     return;
   }
   if (ctx.person || ctx.role === "human") {
     // a person's own call (a card's button, ⌘K): theirs in the log, and no agent ring
-    editBoard(ctx.boardId, "agent", (doc) => logActivity(doc, { who: ctx.actor, role: "human", text, objectId }));
+    editBoard(ctx.boardId, "agent", (doc) => (logActivity(doc, { who: ctx.actor, role: "human", text, objectId }), ctx.userId && ctx.userId !== "agent" && noteWorker(doc, { id: ctx.userId, name: ctx.actor, kind: "person" })));
     return;
   }
   // an agent without a cursor of its own (MCP, a bearer token): the shared presence rings what it's touching
@@ -281,7 +281,7 @@ function touch(ctx: ToolCtx, objectId: string | undefined, text: string) {
     at: Date.now(),
   });
   const forWhom = ctx.userId === "agent" ? undefined : userName(ctx.userId);
-  editBoard(ctx.boardId, "agent", (doc) => logActivity(doc, { who: ctx.actor, role: "agent", text, objectId, ...(forWhom ? { for: forWhom } : {}) }));
+  editBoard(ctx.boardId, "agent", (doc) => (logActivity(doc, { who: ctx.actor, role: "agent", text, objectId, ...(forWhom ? { for: forWhom } : {}) }), noteWorker(doc, { id: agentWorkerId(ctx.actor), name: ctx.actor, kind: "agent", ...(forWhom ? { for: forWhom } : {}) })));
 }
 
 export function addPanel(

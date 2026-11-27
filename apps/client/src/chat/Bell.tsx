@@ -230,6 +230,12 @@ export function NoticeRow({ n, unseen, now, onOpen, lead }: { n: Notice; unseen:
           <span>{[n.channel.kind === "dm" ? "" : whereWords(n.channel), why].filter(Boolean).join(" · ") || "Direct message"}</span>
         </span>
         <span className="chat-bell-text">{firstLine(n.message) || "…"}</span>
+        {n.message.place && (
+          <span className="chat-bell-place" data-bell-place={n.message.place.object ?? n.message.place.section ?? n.message.place.board}>
+            <span aria-hidden>↗</span> {n.message.place.label}
+            {n.message.place.boardName ? ` · ${n.message.place.boardName}` : ""}
+          </span>
+        )}
       </span>
       <time className="chat-bell-when" dateTime={new Date(n.message.createdAt).toISOString()}>
         {ago(n.message.createdAt, now)}

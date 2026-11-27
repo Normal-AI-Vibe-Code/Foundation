@@ -26,6 +26,7 @@
  * its own the head has no huddle button, and a quiet line says why.
  */
 
+import { openPlace } from "../lib/openPlace";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence } from "motion/react";
 import { chatHandle, chatTitle, type ChatChannelView } from "@foundation/protocol";
@@ -384,7 +385,7 @@ export function ChatConversation({
       },
       cancelEdit: () => setEditing(null),
       remove: (m) => void removeMessage(m).catch(fail),
-      openPlace: (m) => m.place && window.dispatchEvent(new CustomEvent("foundation:board", { detail: m.place.board })),
+      openPlace: (m) => m.place && openPlace(m.place),
     }),
     [onUse, s.remote, s.features], // eslint-disable-line react-hooks/exhaustive-deps
   );

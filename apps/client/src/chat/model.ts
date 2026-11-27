@@ -554,7 +554,7 @@ function took(channel: ChatChannelView | ChatChannel): ChatChannelView {
   return view;
 }
 
-export async function createChannel(c: { kind: ChatChannelKind; name?: string; topic?: string; purpose?: string; members?: string[] }): Promise<ChatChannelView> {
+export async function createChannel(c: { kind: ChatChannelKind; name?: string; topic?: string; purpose?: string; members?: string[]; agent?: { name: string; via?: string } }): Promise<ChatChannelView> {
   const { channel } = await api<{ channel: ChatChannelView }>("/api/chat/channels", { method: "POST", json: { ...c, request_id: requestId() } });
   const view = took(channel);
   // the list carries my membership; a new channel's row needs it for the sidebar

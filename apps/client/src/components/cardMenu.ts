@@ -23,6 +23,7 @@ import { canPin, getObject, getState, hostOf, isPanel, objectsInSection, removeO
 import { getUi, toast } from "../state/ui";
 import { activeBoard } from "../sync/board";
 import type { MenuItem } from "./menuLayout";
+import { pingAboutCard } from "../chat/ping";
 
 /** what a card is called in a sentence */
 export function kindWord(o: AnyObject): string {
@@ -54,7 +55,7 @@ export function removeCard(id: string): boolean {
 }
 
 /** the items for one card; `null` when it's gone */
-export function cardMenuItems(id: string): MenuItem[] | null {
+export function cardMenuItems(id: string, at?: { x: number; y: number }): MenuItem[] | null {
   const o = getObject(id);
   if (!o) return null;
   const viewer = getUi().role === "viewer";
@@ -63,6 +64,8 @@ export function cardMenuItems(id: string): MenuItem[] | null {
   const word = kindWord(o);
   const items: MenuItem[] = [{ heading: o.name || word }];
 
+  // someone, in ChatForm, about this card (chat/ping.ts): whom I pinged lately, who made it, who's here, who worked here
+  items.push({ icon: "@", label: "Ping someone about this…", action: () => pingAboutCard(id, at?.x ?? window.innerWidth / 2 - 150, at?.y ?? 120) });
   items.push({ icon: "◎", label: "Frame it", action: () => requestSnap({ kind: "object", id }) });
   items.push({ icon: "⤢", label: `Full screen  ${keys("mod+enter")}`, action: () => void toggleFullscreen(id) });
   if (!viewer && !hosted && !o.pinned && !("media" in o))

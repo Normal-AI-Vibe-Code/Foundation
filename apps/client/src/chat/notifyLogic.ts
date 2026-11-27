@@ -145,6 +145,14 @@ export function tells(why: NoticeWhy | null, o: { on: boolean; permission: TellP
   return !!why && o.on && o.permission === "granted" && !o.looking;
 }
 
+/**
+ * Does this device sound the ping (chat/pingSound.ts): a mention of me or a direct message, while I'm not looking
+ * at it. @channel and @here stay quiet (they're for everyone), and a muted conversation never gets here.
+ */
+export function sounds(why: NoticeWhy | null, o: { on: boolean; looking: boolean }): boolean {
+  return (why === "mention" || why === "direct") && o.on && !o.looking;
+}
+
 /** a message's first line as plain words (no markdown marks), for a list row or a notification's body */
 export function firstLine(m: Pick<ChatMessage, "text" | "files">, max = 140): string {
   const plain = m.text
