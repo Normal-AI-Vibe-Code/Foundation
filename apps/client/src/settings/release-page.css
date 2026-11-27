@@ -394,3 +394,241 @@
   background: var(--color-raise);
   box-shadow: var(--shadow-sheet);
 }
+
+/* ---------------------------------------------------------------- the release history (settings/ReleaseHistory.tsx)
+   2026-11-27: this app's version set large with its latest changes, then every release by day */
+
+.history-faces-version {
+  margin-left: auto;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  color: var(--color-frost);
+  font: 600 var(--text-12) / 1.2 var(--font-code);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-3) 0 var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-raise);
+}
+.history-now-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+.history-now-mark {
+  flex: none;
+  color: var(--color-pulse);
+}
+.history-now-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.history-eyebrow {
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.history-now-version {
+  color: var(--color-frost);
+  font: 300 var(--text-40) / 1 var(--font-display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.history-now-ahead {
+  margin-left: var(--space-2);
+  color: var(--color-dim);
+  font-size: var(--text-20);
+  letter-spacing: 0;
+}
+.history-now-when {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.3 var(--font-sans);
+}
+.history-now-when code,
+.history-row-sha code {
+  font: 500 var(--text-11) / 1 var(--font-code);
+}
+.history-newer {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-pulse-dim);
+  color: var(--color-pulse);
+  font: 500 var(--text-12) / 1.4 var(--font-sans);
+}
+.history-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.history-h {
+  margin: 0;
+  color: var(--color-moss);
+  font: 600 var(--text-11) / 1.2 var(--font-sans);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
+}
+.history-changes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.history-changes li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: var(--space-2);
+  color: var(--color-frost);
+  font: 400 var(--text-13) / 1.4 var(--font-sans);
+}
+.history-change-glyph {
+  display: grid;
+  place-items: center;
+  height: 18px;
+  color: var(--color-dim);
+}
+.history-changes li.history-more {
+  display: block;
+  padding-left: calc(18px + var(--space-2));
+  color: var(--color-dim);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+}
+.history-tally {
+  margin: var(--space-2) 0 var(--space-3);
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.history-tally b {
+  color: var(--color-frost);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* releases per day: the history's rhythm */
+.history-rhythm {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 36px;
+  margin-bottom: var(--space-2);
+}
+.history-rhythm-day {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-mist);
+  opacity: 0.55;
+}
+.history-rhythm-day:last-child {
+  background: var(--color-pulse);
+  opacity: 1;
+}
+.history-rhythm-day.is-none {
+  background: var(--color-line);
+  opacity: 1;
+}
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.history-row {
+  border-bottom: 1px solid var(--color-line);
+}
+.history-row-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-3);
+  row-gap: 2px;
+  align-items: baseline;
+  width: 100%;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.history-row-head:hover .history-row-title {
+  color: var(--color-pulse);
+}
+.history-pill {
+  display: inline-block;
+  min-width: 52px;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  color: var(--color-frost);
+  font: 600 var(--text-11) / 1.5 var(--font-code);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.history-row.is-running .history-pill {
+  background: var(--color-pulse);
+  color: var(--color-on-fill);
+}
+.history-row-title {
+  color: var(--color-frost);
+  font: 500 var(--text-13) / 1.35 var(--font-sans);
+}
+.history-row-meta {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.3 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.history-has-post {
+  color: var(--color-moss);
+  font-weight: 600;
+}
+.history-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-1) 0 var(--space-4) calc(52px + var(--space-3));
+}
+.history-row-sha {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1 var(--font-sans);
+}
+
+/* the Code face: where a release was cut */
+.history-cut {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-1);
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+}
+
+@container (max-width: 340px) {
+  .history-now {
+    padding: var(--space-4);
+  }
+  .history-now-version {
+    font-size: var(--text-32);
+  }
+  .history-row-body {
+    padding-left: 0;
+  }
+}

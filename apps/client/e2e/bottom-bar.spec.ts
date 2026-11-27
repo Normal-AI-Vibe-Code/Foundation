@@ -293,11 +293,19 @@ test("the tools: a terminal that runs a line for an admin, the change log, the f
   await m.context.close();
 
   // the change log: this checkout's commits
+  // (2026-11-27) it opens on Releases: this app's version set large, then every release by day
   await admin.locator('[data-tool-tab="changes"]').click();
+  await expect(pane.locator("[data-history-now] .history-now-version")).toHaveText(/^\d+\.\d+\.\d+/, { timeout: 10_000 });
+  await expect(pane.locator(".history-faces-version")).toHaveText(/^\d+\.\d+\.\d+/);
+  expect(await pane.locator("[data-history-release]").count()).toBeGreaterThan(40);
+  await pane.locator('[data-history-release="0.3.0"] .history-row-head').click();
+  await expect(pane.locator('[data-history-release="0.3.0"] .release-card')).toBeVisible();
+  await admin.screenshot({ path: `${SHOTS}/10_changes_releases.png` });
+  await pane.locator('[data-changes-face="code"]').click();
   await expect(pane.locator(".tool-log-row").first()).toBeVisible({ timeout: 10_000 });
+  // where releases were cut, marked among the commits
+  await expect(pane.locator("[data-release-cut]").first()).toBeVisible();
   await admin.screenshot({ path: `${SHOTS}/10_changes.png` });
-  await pane.locator('[data-changes-face="releases"]').click();
-  await expect(pane.locator(".tool-release").first()).toBeVisible();
   // the terminal is still there, its shell alive, when you go back
   await admin.locator('[data-tool-tab="terminal"]').click();
   await expect(screen).toContainText("foundation-terminal-ok");

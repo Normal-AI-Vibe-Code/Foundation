@@ -154,8 +154,8 @@ function TodayDemo() {
     </div>
   );
 }
-import { CardMenuDemo, ReleasePageDemo, ThemesDemo } from "./ThemeDemos";
-import { PlanBoard, ReleasesTab, type NewCardInput, type SyncState } from "../settings/SettingsPage";
+import { CardMenuDemo, ReleaseHistoryDemo, ReleasePageDemo, ThemesDemo } from "./ThemeDemos";
+import { HISTORY, POSTS, PlanBoard, ReleasesTab, type NewCardInput, type SyncState } from "../settings/SettingsPage";
 import type { ReleasePost } from "../settings/releases";
 import { syncSentence } from "../settings/plan";
 import type { Plan } from "../settings/plan";
@@ -1601,6 +1601,10 @@ function DesignSections() {
 
       <Section title="Release page" note="The Changes tool's first face, and what heads a post in Settings → Releases: a release drawn from its own post. A cover (the mark in pulse, the version in display 300/32, the date, THIS APP on the one running) on a wash of the accent and the agent tint over the panel well; the title in display 20/600; the post's opening paragraph as the description (mist 13/1.55); one bar cut in proportion to the post's parts in the data colours, with the counts (changes · fixes) in dim tabular 11; then each part as a tile on raised paper: its icon on a 14 % wash of its colour, its name 13/600, how many things it lists, and one sentence in mist 12. A tile opens the full notes at its part. On tokens only: white over the room on Today, ink on paper elsewhere.">
         <ReleasePageDemo post={DEMO_POSTS[0]} />
+      </Section>
+
+      <Section title="Release history" note="The Changes panel's Releases face (2026-11-27): this app first, then every release Foundation has had (docs/releases.json, from the v* tags; each CI build writes itself on top). The head is raised paper: the mark in pulse, an eyebrow (THIS APP, or THIS APP · FROM THE CHECKOUT), the version in display 300/40 tabular (a checkout adds +n in dim 20), released date and commit in mist 12; then What's new (or a checkout's Not released yet, then what its release changed) as rows of 13/1.4 with each change's kind glyph in dim. The faces' bar carries the version again as a code-face pill at its right, on every face. History: the tally (releases · changes · days since the first) in mist with frost numbers; the rhythm, one bar per day in pulse (a line-coloured stub on days without one); then each day's eyebrow and its releases as rows: a code pill with the version (pulse with on-fill text on the running one), the title 13/500, changes and time in dim 11, NOTES in moss where a person wrote a post. A row opens to its changes, its commit, and the post. The Code face marks the commit each release was cut from with the same pill.">
+        <ReleaseHistoryDemo releases={HISTORY} posts={POSTS} />
       </Section>
 
       <Section title="A card's menu, pinned and minimized" note="Right-click any card: its name, then Frame it, Full screen and Minimize; Pin to the section or Unpin (a table), Let it fill the section or Show as a card (an app), Float or Dock; Inputs and outputs… (the right pane: every port with its type, what is on it now in full, and each card it is wired to); Open as a tab (an app); Copy a link; Remove in the bad colour, last. A viewer gets the ones that change nothing. A table's cells keep their own menu. Pinned, a table leaves the flow and spans its section on the section's own paper: no card under it, its rules only, at the section's exact width; the flow's cards lie over it. A section a person adds starts with one. Minimized, a card is its bar alone (40 tall), always showing, with ▢ to restore.">

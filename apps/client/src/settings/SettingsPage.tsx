@@ -28,6 +28,8 @@ import { PlacesTab } from "./PlacesTab";
 import { UpdatesSection } from "../update/UpdateCard";
 import { renderMarkdown } from "../utils/markdown";
 import clientPackage from "../../package.json";
+import { CLIENT_DESCRIBE } from "../lib/version";
+import { parseDescribe, standing, type HistoryRelease } from "./history";
 import { longDate, releasesFrom, type ReleasePost } from "./releases";
 import { RendererTab } from "../rune/RendererTab";
 import { ago, boardColumns, counts, issueUrl, PLAN, syncSentence, waitingWords, type CardKind, type Plan, type PlanCard, type PlanFilter } from "./plan";
@@ -43,6 +45,9 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 /** the release notes, bundled: every docs/blog/<version>.md, read as text at build time */
 export const POSTS = releasesFrom(import.meta.glob("../../../../docs/blog/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>);
+
+/** every release Foundation has had, bundled: docs/releases.json (settings/history.ts) */
+export const HISTORY: HistoryRelease[] = (Object.values(import.meta.glob("../../../../docs/releases.json", { import: "default", eager: true }))[0] as { releases?: HistoryRelease[] } | undefined)?.releases ?? [];
 
 export function SettingsPage({ route }: { route: string }) {
   const tab: Tab = route.startsWith("#/settings/services") ? "services" : route.startsWith("#/settings/places") ? "places" : route.startsWith("#/settings/releases") ? "releases" : route.startsWith("#/settings/renderer") ? "renderer" : "plan";
@@ -560,6 +565,9 @@ function NewCardForm({ plan, onCreate, onDone }: { plan: Plan; onCreate(input: N
 
 /** the version this app was built as, so its post can say "this app" */
 export const RUNNING = clientPackage.version;
+
+/** where this app stands among the releases: a CI build is its stamped version, a dev client the tag it is ahead of */
+export const STANDING = standing(RUNNING, parseDescribe(CLIENT_DESCRIBE), HISTORY);
 
 export function ReleasesTab({ posts, route }: { posts: ReleasePost[]; route: string }) {
   // #/settings/releases/0.2.0 opens that post; otherwise the newest

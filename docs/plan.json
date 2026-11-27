@@ -1,7 +1,7 @@
 {
   "about": "Foundation's plan as a kanban. GitHub issues are where the team moves cards; this file is the local copy the app shows in Settings → Plan. `npm run plan:push` writes it to GitHub, `npm run plan:pull` reads the issues back. Columns: needs-you (waits on a person: a key, an install, a decision), backlog, next, doing, review (built, waiting to merge or to be checked by a person), done.",
   "repo": "joshleong/Foundation",
-  "syncedAt": "2026-11-26T12:02:28.940Z",
+  "syncedAt": "2026-11-27T06:50:10.226Z",
   "columns": [
     {
       "id": "needs-you",
@@ -99,7 +99,8 @@
       "milestone": "crew",
       "area": "crew",
       "status": "review",
-      "body": "Josh, 2026-11-26: the \"Ask the crew…\" box need not be up on the grid (remove it); the council as an icon next to the Ask pill and the button that opens the right panel with all the agents; Ask asks all the agents in that grid, from the bottom bar; no box around a council agent, just the pill to type into with the icons above it. Built: HudAsk (shell/Talk.tsx) sends a typed line to every connected agent on the grid through sayToCouncil (none on the grid: the server's own agent); a tap of Space puts the caret in it and the sheet rises only to listen; the council and the panel are two icons on one pill; pressing an agent shows a bare pill under its bar. The session column has no button on the bar now (⌘J). Checked in the browser by day and night and in e2e (bottom-bar, crew, council). Waiting for a person to try it in the desktop app."
+      "body": "Josh, 2026-11-26: the \"Ask the crew…\" box need not be up on the grid (remove it); the council as an icon next to the Ask pill and the button that opens the right panel with all the agents; Ask asks all the agents in that grid, from the bottom bar; no box around a council agent, just the pill to type into with the icons above it. Built: HudAsk (shell/Talk.tsx) sends a typed line to every connected agent on the grid through sayToCouncil (none on the grid: the server's own agent); a tap of Space puts the caret in it and the sheet rises only to listen; the council and the panel are two icons on one pill; pressing an agent shows a bare pill under its bar. The session column has no button on the bar now (⌘J). Checked in the browser by day and night and in e2e (bottom-bar, crew, council). Waiting for a person to try it in the desktop app.",
+      "issue": 262
     },
     {
       "id": "media-grab-undo",
@@ -2677,7 +2678,8 @@
       "milestone": "polish",
       "area": "agents",
       "status": "review",
-      "body": "Josh, 2026-11-26 (SPEC 0.23). Every crew step (council or T3) is on the work trail with its section, card, ok and time; a T3 thread's files by name; concurrent_work tells an agent who else is at work and where. Expand on an agent's thinking, or See their work in the T3 block, opens agenttrail's map over the grid. Checked: server worktrail.test.ts, client trail.test.ts, e2e trail.spec.ts and council.spec.ts (Expand), #/design day and night. A person checks: ask two of T3's agents in one section in the desktop app (after the :4410 server restarts) and open See their work. Not done: a T3 agent's own reasoning (T3 keeps it); the trail is in memory, not persisted."
+      "body": "Josh, 2026-11-26 (SPEC 0.23). Every crew step (council or T3) is on the work trail with its section, card, ok and time; a T3 thread's files by name; concurrent_work tells an agent who else is at work and where. Expand on an agent's thinking, or See their work in the T3 block, opens agenttrail's map over the grid. Checked: server worktrail.test.ts, client trail.test.ts, e2e trail.spec.ts and council.spec.ts (Expand), #/design day and night. A person checks: ask two of T3's agents in one section in the desktop app (after the :4410 server restarts) and open See their work. Not done: a T3 agent's own reasoning (T3 keeps it); the trail is in memory, not persisted.",
+      "issue": 263
     },
     {
       "id": "huddle-devices",
@@ -2686,7 +2688,17 @@
       "milestone": "crew",
       "area": "huddles",
       "status": "review",
-      "body": "Josh, 2026-11-26 (SPEC §7). A call asked for camera and mic together, so a computer without a camera failed before any permission prompt. Now each device opens on its own, the call goes ahead with what works, and a headset chip in the controls shows mic/camera state and picks the microphone, camera and speaker, with Allow / Ask again. Checked: test/media-devices.test.ts, e2e/huddle-devices.spec.ts, huddle and chatform-huddle specs. A person checks: a real call in the desktop app, with and without a webcam, and switching headsets mid-call."
+      "body": "Josh, 2026-11-26 (SPEC §7). A call asked for camera and mic together, so a computer without a camera failed before any permission prompt. Now each device opens on its own, the call goes ahead with what works, and a headset chip in the controls shows mic/camera state and picks the microphone, camera and speaker, with Allow / Ask again. Checked: test/media-devices.test.ts, e2e/huddle-devices.spec.ts, huddle and chatform-huddle specs. A person checks: a real call in the desktop app, with and without a webcam, and switching headsets mid-call.",
+      "issue": 264
+    },
+    {
+      "id": "release-history",
+      "title": "The updates panel keeps the whole release history, with this app's version set large and its latest changes",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "desktop",
+      "status": "review",
+      "body": "Josh, 2026-11-27: keep a strong sense of history in the updates panel, and keep the version number prominent in that panel and the latest changes. Built (SPEC §0.24): docs/releases.json from the v* tags (node scripts/release.mjs history; each CI build writes itself on top); the Changes tool's Releases face leads with this app's version in display 40, when and from which commit, and What's new (a checkout: Not released yet, then its release's changes); then History: a tally, releases per day, every release by day opening to its changes and its post. The version also sits on the faces bar; the Code face marks where releases were cut. Checked: client test/release-history.test.ts, e2e bottom-bar (tools), #/design day and night (docs/evidence/2026-11-27_release-history/). A person checks: the next desktop release's Changes panel. Not done: Settings → Releases still lists posts only."
     }
   ]
 }
