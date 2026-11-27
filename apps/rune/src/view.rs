@@ -89,6 +89,9 @@ pub struct Board {
     /// the paper's place: `lib.rs` moves it a hair to ask for a frame
     pub nudge: Live<[f32; 2]>,
     pub held: Option<Held>,
+    /// where the card in hand has got to (world points): a live value, so carrying it draws without
+    /// running the view again (plan *rune-frame-cost*: each move of a note re-ran 300 notes' view)
+    pub hand: Live<[f32; 2]>,
     /// the note being written, and its field
     pub editing: Option<String>,
     pub edit: TextEdit,
@@ -105,7 +108,7 @@ pub struct Board {
 impl Board {
     pub fn new(pan: Live<[f32; 2]>, zoom: Live<f32>, nudge: Live<[f32; 2]>) -> Self {
         Board {
-            scene: Scene::default(), pan, zoom, nudge, held: None, editing: None, edit: TextEdit::new(""), section_held: None, renaming: None,
+            scene: Scene::default(), pan, zoom, nudge, held: None, hand: Live::new([0.0, 0.0]), editing: None, edit: TextEdit::new(""), section_held: None, renaming: None,
             name_edit: TextEdit::new(""), resizing: None, cache: None, images: HashMap::new(),
         }
     }
@@ -115,6 +118,7 @@ impl Board {
     pub fn set_scene(&mut self, scene: Scene) {
         if self.held.as_ref().is_some_and(|h| h.dropped) {
             self.held = None;
+            self.hand.set([0.0, 0.0]);
         }
         if self.section_held.as_ref().is_some_and(|h| h.dropped) {
             self.section_held = None;
@@ -470,16 +474,19 @@ fn section(s: &Section, b: &Board) -> El {
 fn card(c: &Card, b: &Board) -> El {
     let t = &b.scene.tokens;
     let held = b.held.as_ref().filter(|h| h.id == c.id);
-    let (dx, dy) = held.map_or((0.0, 0.0), |h| (h.dx, h.dy));
     let carried = held.is_some_and(|h| h.moved && !h.dropped);
     let editing = b.editing.as_deref() == Some(c.id.as_str());
     let bare_image = c.kind == Kind::Image && b.images.contains_key(&c.src);
 
     // its section is being dragged: it goes along
     let (sx, sy) = b.section_held.as_ref().filter(|h| h.id == c.section && h.moved).map_or((0.0, 0.0), |h| (h.dx, h.dy));
-    let (dx, dy) = (dx + sx, dy + sy);
+    let (dx, dy) = (sx, sy);
     let mut frame = el().key(format!("card-{}", c.id)).absolute(c.x + dx, c.y + dy).size(c.w, c.h).origin(0.0, 0.0).hover_group()
         .scale(c.s * if carried { LIFT } else { 1.0 }).radius(R_CARD).clip_rounded(R_CARD);
+    // the card in hand follows the pointer by a live value (`Board::hand`)
+    if held.is_some() {
+        frame = frame.live_offset(&b.hand);
+    }
     // images rest bare; everything else is paper with a hairline (DESIGN.md §5 Card, Media card)
     if !bare_image {
         // App.css .frame-card: every card's paper is the raised one
@@ -489,14 +496,29 @@ fn card(c: &Card, b: &Board) -> El {
     if c.active || editing {
         frame = frame.border(2.0, color(t.pulse));
     }
-    frame = frame.child(match c.kind {
+    // The page's accessibility mirror is rebuilt up to ten times a second while the camera moves,
+    // every item serialised and restyled (plan *rune-frame-cost*: most of a pan's long frames on 300
+    // notes). A card at rest is one item, an article with its name and words; its spans, links and
+    // the tools that wait for the pointer are left out. The card in hand, or being written, keeps
+    // everything inside it, links and tools included.
+    let whole = c.active || editing;
+    let body = match c.kind {
         Kind::Note if editing => note_field(b, t),
+        Kind::Note if b.scene.far => note_far(c, t),
         Kind::Note => note(c, t),
         Kind::Table => table(c, t),
         Kind::Image if bare_image => el().w_full().h_full().pixels(b.images[&c.src].pixels()),
         // an image still on its way: its paper, until the pixels land
         Kind::Image => el().w_full().h_full().fill(color(t.panel)),
-    });
+    };
+    frame = frame.child(if whole { body } else { body.a11y_hidden() });
+    if !whole {
+        let role = if c.kind == Kind::Image { "img" } else { "article" };
+        frame = frame.role(role).label(c.name.clone());
+        if c.kind == Kind::Note && !c.text.is_empty() {
+            frame = frame.description(c.text.clone());
+        }
+    }
     if !c.agent.is_empty() {
         frame = frame.child(
             el().key("by").absolute(8.0, c.h - 26.0).h(18.0).px(7.0).center().radius(R_PILL).fill(tint(t.agent, 12.0))
@@ -504,7 +526,7 @@ fn card(c: &Card, b: &Board) -> El {
         );
     }
     if !b.scene.read_only {
-        frame = card_chrome(frame, c, t);
+        frame = card_chrome(frame, c, t, whole);
     }
     if editing {
         return frame;
@@ -519,10 +541,13 @@ fn card(c: &Card, b: &Board) -> El {
         Phase::Move => {
             let zoom = b.zoom.get().max(0.01);
             if let Some(h) = b.held.as_mut().filter(|h| h.id == id && !read_only) {
-                h.moved |= d.dx.hypot(d.dy) > 4.0;
+                let lifted = !h.moved && d.dx.hypot(d.dy) > 4.0;
+                h.moved |= lifted;
                 if h.moved {
                     (h.dx, h.dy) = (d.dx / zoom, d.dy / zoom);
-                    tx.instant();
+                    b.hand.set([h.dx, h.dy]);
+                    // it lifts once (a commit: its scale and shadow); after that only the live value moves
+                    if lifted { tx.instant() } else { tx.live_only() }
                 }
             }
         }
@@ -533,6 +558,7 @@ fn card(c: &Card, b: &Board) -> El {
                 emit(Event::Move { id: &id, x: x + h.dx, y: y + h.dy });
             } else {
                 b.held = None;
+                b.hand.set([0.0, 0.0]);
             }
         }
     })
@@ -540,7 +566,9 @@ fn card(c: &Card, b: &Board) -> El {
 
 /// A card's chrome, called by the pointer: a note's bar over its top edge (grip, title, tools),
 /// an image's round buttons, and the resize corner.
-fn card_chrome(mut frame: El, c: &Card, t: &Tokens) -> El {
+fn card_chrome(mut frame: El, c: &Card, t: &Tokens, whole: bool) -> El {
+    // a card at rest says itself in one item: its tools join the mirror once it's the card in hand
+    let quiet = |e: El| if whole { e } else { e.a11y_hidden() };
     let press = |tool: &Tool| {
         let (id, which) = (c.id.clone(), tool.id.clone());
         move |_: &mut Board| emit(Event::CardTool { id: &id, tool: &which })
@@ -554,20 +582,20 @@ fn card_chrome(mut frame: El, c: &Card, t: &Tokens) -> El {
         for tool in &c.tools {
             bar = bar.child(tool_button(t, tool, 26.0, 26.0, t.dim).on_press(press(tool)));
         }
-        frame = frame.child(bar);
+        frame = frame.child(quiet(bar));
     } else if c.chrome == "icons" {
         let mut icons = col().key("icons").absolute(c.w - 36.0, 8.0).gap(6.0).group_opacity(0.0, 1.0);
         for tool in &c.tools {
             icons = icons.child(tool_button(t, tool, 28.0, 28.0, t.mist).radius(R_PILL).fill(tint(t.abyss, 95.0)).border(1.0, tint(t.frost, 14.0)).on_press(press(tool)));
         }
-        frame = frame.child(icons);
+        frame = frame.child(quiet(icons));
     }
     if c.resizable {
         let (id, scale) = (c.id.clone(), c.s.max(0.01));
         let (w0, h0) = (c.w, c.h);
         let corner = canvas(Shape::new().stroke(vec![[15.0, 5.0], [15.0, 15.0], [5.0, 15.0]], 2.5, color(t.dim)).view_box(22.0, 22.0));
         frame = frame.child(
-            corner.key("resize").absolute(c.w - 22.0, c.h - 22.0).size(22.0, 22.0).group_opacity(0.0, 1.0).on_drag(move |b: &mut Board, d: &mut Drag, _: &mut Tx| match d.phase {
+            corner.key("resize").a11y_hidden().absolute(c.w - 22.0, c.h - 22.0).size(22.0, 22.0).group_opacity(0.0, 1.0).on_drag(move |b: &mut Board, d: &mut Drag, _: &mut Tx| match d.phase {
                 Phase::Down => b.resizing = Some((id.clone(), w0, h0)),
                 Phase::Move => {
                     // the size it had when pressed, plus the pointer's travel at the scale it's drawn at
@@ -736,6 +764,25 @@ fn note(c: &Card, t: &Tokens) -> El {
         below = Some(*next_below);
     }
     el().w_full().h_full().px(18.0).py(14.0).child(body)
+}
+
+/// A note seen from far out: each of its blocks as bars where its lines would be, a heading's
+/// heavier, in the text's own ink faded. The words come back when the camera does (`Scene::far`).
+fn note_far(c: &Card, t: &Tokens) -> El {
+    let mut body = col().key("far").w_full().gap(9.0);
+    for (i, (md, _, _)) in note_blocks(&c.text).iter().enumerate().take(12) {
+        let line = md.trim();
+        let heading = line.starts_with('#');
+        // about 60 characters a line at the note's width; a line or two of every block, at most four
+        let chars = line.trim_start_matches(['#', '-', '*', ' ', '>']).chars().count().max(1);
+        let lines = chars.div_ceil(60).clamp(1, 4);
+        for l in 0..lines {
+            let last = l + 1 == lines;
+            let w = if heading { 0.55 } else if last && lines > 1 { 0.6 } else { 0.92 };
+            body = body.child(el().key(format!("f{i}-{l}")).w_frac(w).h(if heading { 14.0 } else { 9.0 }).radius(2.0).fill(tint(t.frost, if heading { 34.0 } else { 18.0 })));
+        }
+    }
+    el().w_full().h_full().px(18.0).py(16.0).child(body)
 }
 
 /// A note being written: Rune's own field, in the code face like the web editor. It starts

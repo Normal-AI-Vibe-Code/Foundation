@@ -1778,8 +1778,8 @@
       "kind": "plan",
       "milestone": "ship",
       "area": "design",
-      "status": "next",
-      "body": "Measured 2026-11-13 (`docs/evidence/2026-11-13_rune-frames/`): on 300 markdown notes the web renderer holds 60 fps and Rune runs long frames on a third to a half of them (p95 83 to 150 ms). Find what makes Rune's view run again on live-only frames (about one run per camera step and per grain tick: its `CommitWhy`), keep off-screen cards out of the frame (cull in `scene.ts`, or a cache that holds), and cut or throttle Rune's accessibility mirror (12 % of a pan). Done when `e2e/rune-frames.spec.ts` shows Rune at the web renderer's p95 on 300 notes, and then holds it there.",
+      "status": "done",
+      "body": "Measured 2026-11-13 (`docs/evidence/2026-11-13_rune-frames/`): on 300 markdown notes the web renderer holds 60 fps and Rune runs long frames on a third to a half of them (p95 83 to 150 ms). Find what makes Rune's view run again on live-only frames (about one run per camera step and per grain tick: its `CommitWhy`), keep off-screen cards out of the frame (cull in `scene.ts`, or a cache that holds), and cut or throttle Rune's accessibility mirror (12 % of a pan). Done when `e2e/rune-frames.spec.ts` shows Rune at the web renderer's p95 on 300 notes, and then holds it there. 2026-11-27: done. Rune at the web renderer's p95 (16.7 ms) on every measure of 300 notes and the heavy board; e2e/rune-frames.spec.ts holds it (within 4 ms, no view runs in a pan). Causes: Rune's web host invalidating on live values (fixed upstream, pin moved to c860a86c), the accessibility mirror, a carried note in state, glyphs at far zoom. docs/evidence/2026-11-27_rune-frames/.",
       "issue": 133
     },
     {

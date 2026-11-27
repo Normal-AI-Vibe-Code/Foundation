@@ -15,9 +15,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Rune is pre-release: pin a rev of `dev` (never rewritten). Bump all six revs together.
-rune = { git = "https://github.com/anomalyco/rune", rev = "a3669283c49b7f01cd1dbd7f3d9abc7f31e2f97c" }
+rune = { git = "https://github.com/anomalyco/rune", rev = "c860a86c8585fc0ada0796c7c226794716761e5f" }
 # Rune's own kit, for a note's markdown (the same rev: bump it with the others)
-rune-kit = { git = "https://github.com/anomalyco/rune", rev = "a3669283c49b7f01cd1dbd7f3d9abc7f31e2f97c", default-features = false, features = ["markdown"] }
+rune-kit = { git = "https://github.com/anomalyco/rune", rev = "c860a86c8585fc0ada0796c7c226794716761e5f", default-features = false, features = ["markdown"] }
 # a note's blocks, to space them as the web note does (the kit's parser, the same options)
 pulldown-cmark = { version = "0.13", default-features = false }
 # the paper's own pass (src/paper.rs): the wgpu Rune draws with, and the features it asks for
@@ -32,10 +32,10 @@ js-sys = "0.3"
 
 # Rune builds against patched copies of these; a dependency's [patch] doesn't reach us, so repeat it.
 [patch.crates-io]
-winit = { git = "https://github.com/anomalyco/rune", rev = "a3669283c49b7f01cd1dbd7f3d9abc7f31e2f97c" }
-parley_engine = { git = "https://github.com/anomalyco/rune", rev = "a3669283c49b7f01cd1dbd7f3d9abc7f31e2f97c" }
-wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "a3669283c49b7f01cd1dbd7f3d9abc7f31e2f97c" }
-accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "a3669283c49b7f01cd1dbd7f3d9abc7f31e2f97c" }
+winit = { git = "https://github.com/anomalyco/rune", rev = "c860a86c8585fc0ada0796c7c226794716761e5f" }
+parley_engine = { git = "https://github.com/anomalyco/rune", rev = "c860a86c8585fc0ada0796c7c226794716761e5f" }
+wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "c860a86c8585fc0ada0796c7c226794716761e5f" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "c860a86c8585fc0ada0796c7c226794716761e5f" }
 
 [profile.release]
 # for speed: measured here, it is also the smaller build (10.7 MB against 13.7 at "s")

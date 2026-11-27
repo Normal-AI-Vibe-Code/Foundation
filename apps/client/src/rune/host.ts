@@ -10,7 +10,7 @@
 
 import { isNight, onNight, setNight } from "@foundation/ui";
 import { workbook } from "../engine/workbook";
-import { camera, onCamera, toWorld } from "../state/camera";
+import { camera, FAR_ZOOM, onCamera, toWorld } from "../state/camera";
 import {
   CONTENT_PAD,
   SECTION_HEADER,
@@ -164,6 +164,7 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
   let editing: string | null = null;
   let frame = 0;
   let last = "";
+  let wasFar = camera.scale < FAR_ZOOM;
   // what Rune was last handed, to tell what kind of change the next board is (transitions.ts)
   let prev: { scene: Scene; board: string; still: string } | null = null;
   // when the person last did something through Rune that the next board answers
@@ -189,6 +190,7 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
   const push = () => {
     frame = 0;
     if (!mod || disposed) return;
+    counts.pushes++;
     const ui = getUi();
     const f = floorInsets(ui);
     const st = getState();
@@ -197,6 +199,7 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
       readOnly: ui.role === "viewer",
       tokens: readTokens(canvas.parentElement ?? document.body),
       paper: !opts.transparent,
+      far: camera.scale < FAR_ZOOM,
       imageSrc: runeImageSrc,
     });
     const json = JSON.stringify(scene);
@@ -208,6 +211,7 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
     const how = sceneMotion(prev, scene, cause, rest);
     prev = { scene, board: cause.board, still: rest };
     if (decided) decided.push(how), decided.length > 50 && decided.shift();
+    counts.scenes++;
     try {
       mod.setScene(json, how.motion === "animated");
     } catch (e) {
@@ -345,7 +349,15 @@ export function mountRune(canvas: HTMLCanvasElement, opts: { transparent: boolea
         () => window.clearInterval(grain),
       );
       offs.push(
-        onCamera((c) => m.setCamera(c.x, c.y, c.scale)),
+        onCamera((c) => {
+          m.setCamera(c.x, c.y, c.scale);
+          // across FAR_ZOOM a note's words become bars (or come back): the one time a camera move changes the scene
+          const far = c.scale < FAR_ZOOM;
+          if (far !== wasFar) {
+            wasFar = far;
+            schedule();
+          }
+        }),
         subscribe(schedule),
         // a table at rest is Rune's: its cells are the workbook's, which recalculates apart from the store
         workbook.subscribeAll(schedule),
@@ -400,8 +412,12 @@ if ((import.meta.env?.DEV || import.meta.env?.VITE_E2E_HOOKS) && typeof window !
     setUi,
     setNight: (on: boolean) => setNight(on, false),
     paper: () => (current as (RuneHost & { paper?(): number[] }) | null)?.paper?.() ?? null,
+    counts: () => ({ ...counts }),
   };
 }
+
+/** how often the scene was built and how often it changed (the frames check reads them beside Rune's own counts) */
+const counts = { pushes: 0, scenes: 0 };
 
 let current: RuneHost | null = null;
 /** the renderer that's mounted now (the grid asks it to open a note) */

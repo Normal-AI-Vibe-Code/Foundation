@@ -38,7 +38,7 @@ import { colName, gutterRuns } from "../lib/gridLines";
 import { formatValue } from "../lib/cellText";
 import { cardChrome, removeQuestion, sectionTools, type SceneTool } from "./tools";
 
-export const SCENE_VERSION = 5;
+export const SCENE_VERSION = 6;
 
 /** sRGB, straight alpha, 0..1 */
 export type Rgba = [number, number, number, number];
@@ -102,6 +102,8 @@ export interface Scene {
   view: { left: number; top: number; right: number };
   paper: boolean;
   readOnly: boolean;
+  /** the camera is far out (`FAR_ZOOM`): a note's text is drawn as bars, its words too small to read (plan rune-frame-cost) */
+  far: boolean;
   tokens: SceneTokens;
   grid: {
     w: number;
@@ -138,6 +140,8 @@ export interface SceneOptions {
   tokens: SceneTokens;
   /** Rune paints the paper (its canvas isn't see-through here) */
   paper: boolean;
+  /** the camera is past FAR_ZOOM (host.ts says so as it crosses) */
+  far?: boolean;
   /** the address Rune can fetch an image from, or "" when it can't (a blob: the web renderer made, a file behind a bearer) */
   imageSrc?(src: string): string;
 }
@@ -252,6 +256,7 @@ export function buildScene(st: AppState, opts: SceneOptions): Scene {
     view: opts.insets,
     paper: opts.paper,
     readOnly: opts.readOnly,
+    far: opts.far ?? false,
     tokens: opts.tokens,
     grid: {
       w: size.w,

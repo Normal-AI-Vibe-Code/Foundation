@@ -10,7 +10,7 @@ use rune::Color;
 use serde::Deserialize;
 
 /// Bumped when the shape changes; the client refuses a module that speaks another version.
-pub const SCENE_VERSION: u32 = 5;
+pub const SCENE_VERSION: u32 = 6;
 
 /// sRGB, straight alpha, 0..1: what CSS computes a token to.
 pub type Rgba = [f32; 4];
@@ -38,6 +38,9 @@ pub struct Scene {
     pub paper: bool,
     /// A viewer: nothing moves and nothing is written.
     pub read_only: bool,
+    /// The camera is far out (the client's `FAR_ZOOM`): a note's words are drawn as bars, too small
+    /// to read and the most of a frame to set (plan *rune-frame-cost*).
+    pub far: bool,
     pub tokens: Tokens,
     pub grid: Grid,
     pub sections: Vec<Section>,
