@@ -19,6 +19,7 @@ import { installCardClipboard } from "../lib/cardClipboard";
 import { DetailPane } from "./DetailPane";
 import { Council, CouncilPreload } from "../characters/Council";
 import { AgentInfoPane } from "../characters/AgentInfo";
+import { TrailGrid } from "../trail/TrailGrid";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { UserInfo } from "@foundation/protocol";
@@ -331,6 +332,7 @@ export function Shell({ user, route, titleActive = true }: { user: UserInfo; rou
       <AgentsPane />
       <ToolPane />
       <AgentInfoPane />
+      {onGrid && !ui.presenting && <TrailGrid name={space?.name} />}
       <DetailPane />
       <CouncilPreload />
       <TouchedRings />

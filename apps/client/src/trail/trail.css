@@ -1,0 +1,1027 @@
+/*
+ * The grid behind the grid (TrailGrid.tsx): agenttrail's map (github.com/sodiumsun/agenttrail) on Foundation's tokens.
+ * Paper and ink for the sections, violet for agents (each in its crew colour), state colours for how a step went.
+ * Motion: agenttrail's settle (cubic-bezier(.32,.72,0,1), 700 ms) is our --ease-settle; opacity, transform, stroke only.
+ */
+
+.trail {
+  position: fixed;
+  inset: 44px 0 0 0;
+  /* over the grid's council (60) and the bottom bar */
+  z-index: 75;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--color-void);
+  color: var(--color-frost);
+  font-family: var(--font-sans);
+  font-size: var(--text-13);
+  border-top: 1px solid var(--color-line);
+  animation: trail-in var(--dur-pane, 320ms) var(--ease-settle) both;
+}
+
+.trail.is-specimen {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  height: 660px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pane);
+  overflow: hidden;
+}
+
+@keyframes trail-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+}
+
+.trail-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+  min-height: 56px;
+}
+
+.trail-title h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-16);
+  font-weight: 600;
+}
+
+.trail-eyebrow,
+.trail-kicker {
+  display: block;
+  font-size: var(--text-11);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-agent);
+}
+
+.trail-kicker {
+  color: var(--color-dim);
+  letter-spacing: 0.08em;
+  font-family: var(--font-code);
+  font-weight: 500;
+}
+
+.trail-sum {
+  margin: 0;
+  color: var(--color-mist);
+  font-variant-numeric: tabular-nums;
+  flex: 1;
+}
+
+.trail-acts {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.trail-seg,
+.trail-x,
+.trail-zoom button {
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-mist);
+  font: inherit;
+  font-size: var(--text-12);
+  cursor: pointer;
+}
+
+.trail-seg.is-on {
+  background: var(--color-raise);
+  color: var(--color-frost);
+  border-color: var(--color-line-strong);
+  box-shadow: var(--shadow-sheet);
+}
+
+.trail-x {
+  width: 28px;
+  padding: 0;
+  margin-left: var(--space-3);
+}
+
+.trail-seg:hover,
+.trail-x:hover,
+.trail-zoom button:hover {
+  color: var(--color-frost);
+  border-color: var(--color-line-strong);
+}
+
+.trail-empty {
+  margin: var(--space-7) auto;
+  max-width: 520px;
+  color: var(--color-mist);
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ---------- the canvas ---------- */
+
+.trail-canvas {
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--color-frost) 13%, transparent) 1.1px, transparent 1.4px);
+  background-size: var(--dot-k, 24px) var(--dot-k, 24px);
+  background-position: var(--dot-x, 0) var(--dot-y, 0);
+}
+
+.trail-canvas:active {
+  cursor: grabbing;
+}
+
+.trail-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.trail-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.trail-edge {
+  fill: none;
+  stroke: var(--color-line-strong);
+  stroke-width: 1.5;
+}
+
+.trail-edge.is-folder {
+  stroke-dasharray: 2 7;
+  stroke-linecap: round;
+}
+
+.trail-edge.is-active {
+  stroke: var(--color-agent);
+  stroke-dasharray: 5 8;
+  animation: trail-travel 1.8s linear infinite;
+}
+
+.trail-arrow {
+  fill: none;
+  stroke: var(--color-line-strong);
+  stroke-width: 1.5;
+}
+
+@keyframes trail-travel {
+  to {
+    stroke-dashoffset: -26;
+  }
+}
+
+/* an agent's way through: dotted, in its colour; quieter once it has finished */
+.trail-path {
+  fill: none;
+  stroke: var(--crew);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1 7;
+  opacity: 0.6;
+  transition: opacity var(--dur-quick, 160ms) var(--ease-out-soft);
+}
+
+.trail-path.is-ended {
+  opacity: 0.25;
+}
+
+.trail-path.is-dim {
+  opacity: 0.08;
+}
+
+.trail-path.is-on {
+  opacity: 0.9;
+  stroke-width: 4;
+}
+
+.trail-handoff path {
+  stroke: var(--crew);
+  stroke-width: 2.5;
+  stroke-dasharray: 9 7;
+  fill: none;
+}
+
+.trail-handoff text {
+  fill: var(--crew);
+  font-size: var(--text-11);
+  font-family: var(--font-code);
+}
+
+.trail-tether {
+  stroke: var(--crew);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 5;
+  fill: none;
+}
+
+/* ---------- a section (or a folder) ---------- */
+
+.trail-node {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sheet);
+  transition:
+    opacity var(--dur-quick, 160ms) var(--ease-out-soft),
+    transform var(--dur-lift, 220ms) var(--ease-spring);
+  animation: trail-reveal 700ms var(--ease-settle) both;
+}
+
+@keyframes trail-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+    filter: blur(4px);
+  }
+}
+
+.trail-node.is-idle {
+  box-shadow: none;
+  background: color-mix(in srgb, var(--color-raise) 55%, transparent);
+}
+
+.trail-node.is-idle .trail-node-name {
+  color: var(--color-mist);
+}
+
+.trail-node.is-active {
+  border-color: color-mix(in srgb, var(--color-agent) 55%, var(--color-line));
+}
+
+.trail-node.is-contested {
+  outline: 2px solid color-mix(in srgb, var(--color-warn) 70%, transparent);
+  outline-offset: 3px;
+}
+
+.trail-node.is-folder {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-agent) 45%, var(--color-line));
+  background: color-mix(in srgb, var(--color-agent) 4%, var(--color-raise));
+}
+
+.trail-node.is-dim {
+  opacity: 0.35;
+}
+
+.trail-node-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.trail-node-name {
+  margin: 0;
+  font-size: var(--text-14);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.trail-node-name button {
+  all: unset;
+  cursor: pointer;
+}
+
+.trail-node-name button:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--color-line-strong);
+}
+
+.trail-node-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 22px;
+}
+
+/* the status ring: an agent's arc spinning while one is in it, a check once written, ! when it failed */
+.trail-ring {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.trail-ring-base {
+  fill: none;
+  stroke: var(--color-line-strong);
+  stroke-width: 1.5;
+}
+
+.trail-ring.is-done .trail-ring-base {
+  fill: var(--color-ok);
+  stroke: var(--color-ok);
+}
+
+.trail-ring.is-failed .trail-ring-base {
+  fill: var(--color-bad);
+  stroke: var(--color-bad);
+}
+
+.trail-ring.is-touched .trail-ring-base {
+  stroke: var(--color-mist);
+}
+
+.trail-ring.is-active .trail-ring-base {
+  stroke: color-mix(in srgb, var(--color-agent) 25%, transparent);
+}
+
+.trail-ring-arc {
+  fill: none;
+  stroke: var(--color-agent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 16 41;
+  transform-origin: 11px 11px;
+  animation: trail-spin 1.3s linear infinite;
+}
+
+.trail-ring-mark {
+  fill: none;
+  stroke: var(--color-on-fill);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trail-ring-dot {
+  fill: var(--color-on-fill);
+}
+
+@keyframes trail-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.trail-chips {
+  display: inline-flex;
+}
+
+.trail-chip {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  font-size: var(--text-11);
+  font-weight: 700;
+  color: var(--color-on-fill);
+  background: var(--crew, var(--color-agent));
+  box-shadow: 0 0 0 2px var(--color-raise);
+  margin-left: -4px;
+}
+
+.trail-chip:first-child {
+  margin-left: 0;
+}
+
+.trail-chip.is-here {
+  box-shadow:
+    0 0 0 2px var(--color-raise),
+    0 0 0 4px color-mix(in srgb, var(--crew) 40%, transparent);
+}
+
+.trail-chip.is-more {
+  background: var(--color-panel);
+  color: var(--color-mist);
+}
+
+.trail-chip.is-small {
+  width: 10px;
+  height: 10px;
+  margin-left: -3px;
+  box-shadow: 0 0 0 1.5px var(--color-raise);
+}
+
+.trail-flag {
+  font-size: var(--text-11);
+  font-weight: 600;
+  color: var(--color-warn);
+}
+
+.trail-busy {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-11);
+  font-weight: 600;
+  color: var(--color-agent);
+}
+
+.trail-busy i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--color-agent) 30%, transparent);
+  border-top-color: var(--color-agent);
+  animation: trail-spin 1.3s linear infinite;
+}
+
+/* a folder's files, and a section's cards (shown when near) */
+.trail-files,
+.trail-cards {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) 0 0;
+  border-top: 1px solid var(--color-line);
+  display: grid;
+  gap: 2px;
+}
+
+.trail-files li,
+.trail-cards li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-12);
+  min-height: 20px;
+}
+
+.trail-file-glyph {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: var(--color-mist);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trail-file-path {
+  font-family: var(--font-code);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.trail-file-change {
+  font-family: var(--font-code);
+  color: var(--color-dim);
+}
+
+.trail-files .is-added .trail-file-change {
+  color: var(--color-ok);
+}
+
+.trail-files .is-removed {
+  opacity: 0.55;
+}
+
+.trail-files .is-removed .trail-file-path {
+  text-decoration: line-through;
+}
+
+.trail-files .is-fresh .trail-file-glyph {
+  stroke: var(--color-agent);
+}
+
+.trail-files .is-more {
+  color: var(--color-dim);
+}
+
+.trail-cards {
+  display: none;
+}
+
+.trail-canvas.is-near .trail-cards {
+  display: grid;
+}
+
+.trail-cards button {
+  all: unset;
+  cursor: pointer;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trail-cards button:hover {
+  color: var(--color-pulse);
+}
+
+.trail-canvas.is-far .trail-node-foot,
+.trail-canvas.is-far .trail-files,
+.trail-canvas.is-far .trail-kicker {
+  visibility: hidden;
+}
+
+/* ---------- the chain under where a focused agent stands ---------- */
+
+.trail-chain {
+  position: absolute;
+  width: 360px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.trail-chain-ask {
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--crew);
+  background: color-mix(in srgb, var(--crew) 7%, var(--color-raise));
+  border-radius: var(--radius-paper);
+}
+
+.trail-chain-ask p {
+  margin: var(--space-1) 0 0;
+  line-height: 1.4;
+}
+
+.trail-chain-more button {
+  all: unset;
+  cursor: pointer;
+  font-size: var(--text-12);
+  color: var(--color-mist);
+  padding-left: var(--space-5);
+}
+
+.trail-chain-quiet {
+  font-size: var(--text-12);
+  color: var(--color-dim);
+  padding-left: var(--space-5);
+  line-height: 1.4;
+}
+
+.trail-capsule {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: var(--space-2);
+  align-items: start;
+  animation: trail-capsule-in 520ms var(--ease-settle) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+@keyframes trail-capsule-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.trail-capsule-mark {
+  width: 10px;
+  height: 10px;
+  margin-top: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-line-strong);
+  background: var(--color-void);
+}
+
+.trail-capsule.is-thought .trail-capsule-mark {
+  border-color: var(--crew);
+  border-style: dashed;
+}
+
+.trail-capsule.is-said .trail-capsule-mark,
+.trail-capsule.is-write .trail-capsule-mark {
+  border-color: var(--crew);
+  background: var(--crew);
+}
+
+.trail-capsule.is-read .trail-capsule-mark {
+  border-color: var(--crew);
+}
+
+.trail-capsule.is-bad .trail-capsule-mark {
+  border-color: var(--color-bad);
+  background: var(--color-bad);
+}
+
+.trail-capsule.is-live .trail-capsule-mark {
+  border-color: var(--color-agent);
+  animation: council-beat 1.6s var(--ease-out-soft) infinite;
+}
+
+.trail-capsule-body {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  min-width: 0;
+}
+
+.trail-capsule.is-thought .trail-capsule-body {
+  background: transparent;
+  border-style: dashed;
+}
+
+.trail-capsule.is-thought .trail-capsule-text {
+  font-style: italic;
+  color: var(--color-mist);
+}
+
+.trail-capsule.is-bad .trail-capsule-body {
+  border-color: color-mix(in srgb, var(--color-bad) 45%, var(--color-line));
+}
+
+.trail-capsule-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.trail-capsule-head b {
+  font-weight: 600;
+}
+
+.trail-capsule-ms {
+  font-family: var(--font-code);
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trail-capsule-args {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-code);
+  font-size: var(--text-11);
+  color: var(--color-mist);
+  overflow-wrap: anywhere;
+}
+
+.trail-capsule-text {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-12);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.trail-capsule.is-bad .trail-capsule-text {
+  color: var(--color-bad);
+}
+
+.trail-capsule-more {
+  all: unset;
+  cursor: pointer;
+  margin-left: var(--space-2);
+  color: var(--color-pulse);
+  font-style: normal;
+}
+
+/* ---------- corner furniture ---------- */
+
+.trail-zoom {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-12);
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.trail-zoom button {
+  background: var(--color-raise);
+}
+
+.trail-legend {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.trail-legend i {
+  display: inline-block;
+  width: 22px;
+  height: 0;
+  margin-left: var(--space-3);
+  border-top: 3px dotted var(--color-agent);
+}
+
+.trail-legend i.is-handoff {
+  border-top: 2px dashed var(--color-agent);
+}
+
+.trail-legend i.is-wire {
+  border-top: 1.5px solid var(--color-line-strong);
+}
+
+/* ---------- run cards at the right ---------- */
+
+.trail-runs {
+  position: absolute;
+  top: 72px;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  width: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+
+.trail-run {
+  background: var(--color-raise);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sheet);
+  padding: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  transition: opacity var(--dur-quick, 160ms) var(--ease-out-soft);
+  animation: trail-reveal 700ms var(--ease-settle) both;
+}
+
+.trail-run.is-on {
+  border-color: var(--crew);
+  box-shadow:
+    var(--shadow-lift),
+    0 0 0 3px color-mix(in srgb, var(--crew) 18%, transparent);
+}
+
+.trail-run.is-dim {
+  opacity: 0.55;
+}
+
+.trail-run-head {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.trail-face {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--color-on-fill);
+  background: var(--crew);
+}
+
+.trail-face-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--crew);
+  animation: trail-spin 1.3s linear infinite;
+}
+
+.trail-run-who {
+  display: grid;
+  min-width: 0;
+}
+
+.trail-run-who b {
+  font-weight: 600;
+}
+
+.trail-run-meta {
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+
+.trail-run-state {
+  font-size: var(--text-11);
+  font-weight: 600;
+  color: var(--color-mist);
+}
+
+.trail-run-state.is-working {
+  color: var(--color-agent);
+}
+
+.trail-run-state.is-error {
+  color: var(--color-bad);
+}
+
+.trail-run-state.is-done {
+  color: var(--color-ok);
+}
+
+.trail-run-doing {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-code);
+  font-size: var(--text-12);
+  color: var(--color-mist);
+  min-width: 0;
+}
+
+.trail-run-home {
+  font-family: var(--font-sans);
+  font-size: var(--text-11);
+  font-weight: 600;
+  color: var(--crew);
+  white-space: nowrap;
+}
+
+.trail-run-thought {
+  margin: 0;
+  font-size: var(--text-12);
+  font-style: italic;
+  color: var(--color-mist);
+  line-height: 1.4;
+  border-left: 2px dashed color-mix(in srgb, var(--crew) 50%, transparent);
+  padding-left: var(--space-2);
+}
+
+.trail-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.trail-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-agent);
+  animation: trail-pulse 1.6s var(--ease-out-soft) infinite;
+}
+
+.trail-dots i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.trail-dots i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes trail-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.trail-run-plan,
+.trail-run-tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-12);
+}
+
+.trail-run-plan li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+}
+
+.trail-run-plan i {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 2px;
+  border: 1.5px solid var(--color-line-strong);
+}
+
+.trail-run-plan .is-active i {
+  border-color: var(--color-agent);
+  animation: trail-pulse 1.6s var(--ease-out-soft) infinite;
+}
+
+.trail-run-plan .is-done {
+  color: var(--color-dim);
+  text-decoration: line-through;
+}
+
+.trail-run-plan .is-done i {
+  background: var(--color-agent);
+  border-color: var(--color-agent);
+}
+
+.trail-run-tools {
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-2);
+}
+
+.trail-run-tools li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.trail-run-tool {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trail-run-tools .is-bad .trail-run-tool {
+  color: var(--color-bad);
+}
+
+.trail-run-tools .is-live .trail-run-tool {
+  color: var(--color-agent);
+}
+
+.trail-run-ms {
+  font-family: var(--font-code);
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.trail-run-foot {
+  margin: 0;
+  font-size: var(--text-11);
+  color: var(--color-dim);
+}
+
+.trail-note {
+  margin: 0;
+  font-size: var(--text-11);
+  color: var(--color-dim);
+  line-height: 1.45;
+}
+
+/* the thinking module's door (RunTrace) and the T3 block's */
+.trail-open {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+@container (max-width: 700px) {
+  .trail-runs {
+    width: 260px;
+  }
+}
+
+@media (max-width: 760px) {
+  .trail-runs {
+    position: static;
+    width: auto;
+    max-height: 40vh;
+    padding: var(--space-3);
+  }
+  .trail-legend {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trail,
+  .trail-node,
+  .trail-run,
+  .trail-capsule {
+    animation: none;
+  }
+  .trail-ring-arc,
+  .trail-busy i,
+  .trail-face-ring,
+  .trail-edge.is-active,
+  .trail-dots i {
+    animation: none;
+  }
+}

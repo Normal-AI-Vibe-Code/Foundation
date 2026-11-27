@@ -64,6 +64,7 @@ function contextBlock(opts: { boardId: string; user: UserInfo; persona?: "shiba"
   if (opts.persona === "shiba") return `<today person="${opts.user.name}"${access}>\n${todayDigest(todayFor(opts.user))}\n</today>`;
   return `<board name="${opts.boardId}" person="${opts.user.name}"${access}>\n${boardDigest(opts.boardId)}\n</board>`;
 }
+import { trailNote } from "./worktrail.ts";
 import { describeCrewWork, joinCrew, leaveCrew, setDoing, setThought, type CrewMember, seatName } from "./crew.ts";
 import { setHelperStarter } from "./tools.ts";
 import { runScript } from "./script.ts";
@@ -340,6 +341,8 @@ function crewFollower(m: CrewMember | undefined): (e: AgentEvent) => void {
   const early = () => m.state.crew.doing === "reading the ask" || m.state.crew.doing.startsWith("called in by ");
   return (e) => {
     if (m.left) return;
+    // the asker's own trail (worktrail.ts): every stretch of reasoning and of its answer, never shown to the grid
+    if (e.type === "thinking" || e.type === "text") trailNote(m, e.type === "thinking" ? "thought" : "said", e.text);
     if (e.type === "thinking") {
       thinking = (thinking + e.text).slice(-2000);
       if (early() || m.state.crew.doing === "writing its answer") setDoing(m, "thinking");

@@ -77,6 +77,7 @@ import { aim, canCallHelp, crewMember, crewWork, describeStep, guide, resolveTar
 import { actorScope, audit, callScope, type AuditInput, type CallScope, type Door, type ScopeActor } from "./audit.ts";
 import { noteLeftBy, recordToolCall, sectionRef, timelineText as gridTimelineText } from "./timeline.ts";
 import { markPrivate } from "./crew.ts";
+import { concurrentWork, trailStepEnd, trailStepStart } from "./worktrail.ts";
 import { contentRefusal, decide, EgressHeld, heldSentence, sendsFor, type Send, type SendKind } from "./egress.ts";
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { extractSection } from "./subgrids.ts";
@@ -1733,6 +1734,13 @@ export const TOOLS: BoardTool[] = [
     },
   }),
   def({
+    name: "concurrent_work",
+    description:
+      "Who else is working on this grid right now, and where: each other agent (Foundation's own or one of T3's), its section, what it's doing, the cards it has changed and the files it is writing in its own folder; and the sections you have touched. Read it before changing a section another agent might be in, so two agents don't edit the same card at once.",
+    schema: z.object({}),
+    run: (ctx) => concurrentWork(ctx.boardId, crewMember(ctx.crew)),
+  }),
+  def({
     name: "call_in_help",
     description: `Call in a helper agent for a separate part of this ask that can run at the same time as yours (a different section, a different data source). It gets its own name and cursor, works through the same tools and finishes on its own; say exactly what it should do and where. At most two per ask; helpers can't call helpers. Don't use it for small or dependent steps.`,
     schema: z.object({ task: z.string().min(8).max(2000), section: z.string().optional() }),
@@ -1895,9 +1903,12 @@ export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Pr
     if (tool.write) await travel(member, stepTarget(ctx.boardId, name, input), doing);
     else setDoing(member, doing);
   }
+  // its trail (worktrail.ts): the step, where it acted, and how it ended
+  const trailStep = member && member.boardId === ctx.boardId ? trailStepStart(member, ctx.boardId, name, input, READ_TOOLS.has(name)) : null;
   // who this call is, for the timeline: the board writes it makes are theirs, and an agent's call is a line Behind the scenes
   const actor = scopeActorOf(ctx);
   const ran = (ok: boolean, result?: unknown) => {
+    trailStepEnd(trailStep, ctx.boardId, ok, result);
     if (ctx.person) return; // a person's own call is their edits, in Changes
     // the card it acted on: what it named, or else what it made (a result's id, checked against the board in timeline.ts)
     const made = result && typeof result === "object" && typeof (result as { id?: unknown }).id === "string" ? (result as { id: string }).id : null;
@@ -1916,6 +1927,8 @@ export async function runTool(ctx: ToolCtx, name: string, rawInput: unknown): Pr
     // the error's words may carry what was asked: only that it was refused, or failed, is kept
     const refused = e instanceof HttpError && e.status === 403;
     recW({ decision: refused ? "refused" : "allowed", reason: refused ? "refused by the tool" : null, approved_by: approved(), result: "error" });
+    // the asker's trail keeps the words (worktrail.ts shows a step's answer to its asker only); the audit row doesn't
+    trailStepEnd(trailStep, ctx.boardId, false, (e as Error)?.message ?? String(e));
     ran(false);
     throw e;
   }

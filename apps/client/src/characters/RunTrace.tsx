@@ -17,6 +17,7 @@ import { openSession } from "../state/ui";
 import { useActiveBoard } from "../shell/Presence";
 import { ago } from "../shell/SidePane";
 import type { CouncilSeat } from "./Council";
+import { openTrail } from "../trail/state";
 
 export interface TraceRun {
   id?: string;
@@ -146,15 +147,30 @@ export function RunTrace({ seat }: { seat: CouncilSeat }) {
     return list.sort((a, b) => b.at - a.at);
   }, [fetched, liveTurn, liveId]);
   const run = runs[Math.min(shown, runs.length - 1)];
-  if (!run) {
-    return (
-      <section className="run-trace is-empty" data-run-trace="none">
-        <h3>Its last run</h3>
-        <p>Nothing you asked {name} on this grid yet. What it thinks and does shows here, step by step.</p>
-      </section>
-    );
-  }
-  return <TraceView run={run} runs={runs} shown={shown} onShow={setShown} />;
+  return (
+    <div className="thinking-module" data-thinking-module={name}>
+      <div className="thinking-module-head">
+        <span className="thinking-module-title">Thinking</span>
+        <button
+          type="button"
+          className="f-pill thinking-module-open"
+          onClick={() => openTrail({ crew: seat.crewId ?? null, name })}
+          data-tip={`Open the grid behind this one: ${name}'s chain of thought and steps, where it is working, and every other agent at work beside it`}
+          data-thinking-open
+        >
+          Expand ⤢
+        </button>
+      </div>
+      {run ? (
+        <TraceView run={run} runs={runs} shown={shown} onShow={setShown} />
+      ) : (
+        <section className="run-trace is-empty" data-run-trace="none">
+          <h3>Its last run</h3>
+          <p>Nothing you asked {name} on this grid yet. What it thinks and does shows here, step by step.</p>
+        </section>
+      )}
+    </div>
+  );
 }
 
 export function TraceView({ run, runs = [run], shown = 0, onShow }: { run: TraceRun; runs?: TraceRun[]; shown?: number; onShow?: (i: number) => void }) {
