@@ -110,7 +110,7 @@ export default defineConfig({
         // Foundation's own T3 (the agents pane) is a stand-in that speaks T3's start, sign-in and streams; no model runs
         // (its settings ride in its launcher: T3 is started with the allowlisted environment only, never the server's)
         // and it uses its pass to the board once, as an agent would (a note in the section it was sent to)
-        FOUNDATION_T3_CLI: standinLauncher(data, { T3_STANDIN_DIR: data, T3_STANDIN_FINISH_MS: "6000", T3_STANDIN_USE_TOOLS: "1" }),
+        FOUNDATION_T3_CLI: standinLauncher(data, { T3_STANDIN_DIR: data, T3_STANDIN_FINISH_MS: "6000", T3_STANDIN_USE_TOOLS: "1", T3_STANDIN_WORK: "1", T3_STANDIN_WORK_MS: "350" }),
         FOUNDATION_T3_PORT: process.env.E2E_T3_PORT ?? "15790",
         ANTHROPIC_API_KEY: "",
         // Anthropic here is the stand-in: a key checked or a model list read never leaves this computer

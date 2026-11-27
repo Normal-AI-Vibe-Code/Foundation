@@ -33,6 +33,7 @@ import { aim, joinCrew, leaveCrew, seatName, setDoing, type CrewMember } from ".
 import { HttpError } from "./http.ts";
 import { audit } from "./audit.ts";
 import { runEnded, runStarted } from "./timeline.ts";
+import { trailEnded, trailHomesFrom, watchTrailFolder } from "./worktrail.ts";
 import { BOARD_TOOLS_FILE, interruptT3Thread, onT3Work, startT3Thread, t3Host, type T3Work } from "./t3host.ts";
 
 interface Bound {
@@ -58,7 +59,7 @@ let askSeq = 0;
 export function t3Brief(o: { board: string; section: string; person: string; name: string; tools: boolean; digest: string; text: string }) {
   const where = `You are ${o.name}, working on the Foundation board "${o.board}" for ${o.person}, in the section “${o.section}”. Foundation is a shared grid: sections hold cards (notes, tables, files, apps), and everyone on the board sees them.`;
   const how = o.tools
-    ? `Your board tools are the mcp__foundation__* tools. Read the board before you change it, put what you make in “${o.section}” as cards unless asked otherwise, and finish by saying in a line or two what you did. People see the board, not this folder: work that should be seen belongs on a card.`
+    ? `Your board tools are the mcp__foundation__* tools. Read the board before you change it, put what you make in “${o.section}” as cards unless asked otherwise, and finish by saying in a line or two what you did. People see the board, not this folder: work that should be seen belongs on a card. Other agents may be working on this board at the same time: call concurrent_work before you change anything, and again before changing a section other than “${o.section}”, and leave cards another agent is changing alone. Everything you do here (each board tool you call, the section and card it touches, and the files you write in this folder, by name) shows on the board's work trail for the people on it.`
     : `You have no board tools in this thread: you can't read or change the board. Work in this folder and say plainly in your answer what you made and where, so ${o.person} can bring it onto the board.`;
   return `${where}\n${how}\n\n<board name="${o.board}">\n${o.digest}\n</board>\n\n<ask from="${o.person}">\n${o.text}\n</ask>`;
 }
@@ -111,6 +112,8 @@ export async function askT3(user: UserInfo, input: { board: string; section: str
     const started = await startT3Thread({ agent: agent.id, model: input.model, title: short(text.split("\n")[0], 80), text: brief, folder, projectTitle: `Foundation · ${input.board} · ${short(text.split("\n")[0], 40)}` });
     const b: Bound = { threadId: started.threadId, boardId: input.board, sectionId: section.id, by: user.id, byName: user.name, member, worked: false, at: Date.now(), token, toolsFile };
     bound.set(started.threadId, b);
+    // its work trail: the files it writes in its folder, by name (worktrail.ts); its board steps come through runTool
+    watchTrailFolder(member, folder, started.threadId);
     // the timeline: the ask (its words as the board's activity says them) and the thread's span, in its section
     runStarted({ board: input.board, section: section.id, runId: `t3:${started.threadId}`, agent: { id: member.id, name: member.name }, user: { id: user.id, name: user.name }, ask: { shown: true, body: short(text) } });
     audit({ actor_kind: "person", actor_id: user.id, actor_name: user.name, board_id: input.board, door: "route", action: "t3_thread.start", target: `${started.threadId} ${agent.id}`, provenance: "ours-local", service: `T3 · ${agent.id}`, decision: "allowed", approved_by: user.id, result: "ok" });
@@ -142,6 +145,7 @@ function release(b: Bound, how: "done" | "stopped" | "error") {
   // its answer stays in T3: the timeline has its span and how many steps it took on the board
   runEnded({ board: b.boardId, section: b.sectionId, runId: `t3:${b.threadId}`, agent: { id: b.member.id, name: b.member.name }, user: { id: b.by, name: b.byName }, answered: false, private: Boolean(b.member.private) });
   endPass(b.token, b.toolsFile);
+  trailEnded(b.member);
   leaveCrew(b.member, how);
 }
 
@@ -172,6 +176,15 @@ export function followT3Work(threadId: string, work: T3Work | null) {
   else if (b.worked) release(b, "done");
 }
 onT3Work(followT3Work);
+
+/** a T3 agent's home section, by its crew id, for the work trail (worktrail.ts trailLanes) */
+export function t3Homes(boardId: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const b of bound.values()) if (b.boardId === boardId) out[b.member.id] = b.sectionId;
+  return out;
+}
+
+trailHomesFrom(t3Homes);
 
 /** which of T3's threads belong to which section, for the pane (thread id → where and who) */
 export function t3Bindings(boardId: string): Record<string, { section: string; sectionName: string; crew: string; by: string }> {

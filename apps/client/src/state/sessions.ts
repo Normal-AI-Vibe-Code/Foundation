@@ -291,6 +291,7 @@ export function objectIn(text: string): string | null {
 
 export const TOOL_WORDS: Record<string, string> = {
   read_board: "Read the board",
+  concurrent_work: "Saw who else is at work",
   search: "Searched",
   set_plan: "Updated the plan",
   find_images: "Found images",

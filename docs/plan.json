@@ -2651,6 +2651,15 @@
       "status": "needs-you",
       "body": "src-tauri/Info.plist now says why Foundation wants the microphone and camera, which macOS requires; it has not been built or signed. A person on a Mac: install the next build, record a voice note and a video note, join a huddle. If macOS refuses, the signed app also needs entitlements for audio input and the camera.",
       "issue": 261
+    },
+    {
+      "id": "work-trail",
+      "title": "The grid behind the grid: how the council thinks, and what T3's agents work on at once (agenttrail)",
+      "kind": "plan",
+      "milestone": "polish",
+      "area": "agents",
+      "status": "review",
+      "body": "Josh, 2026-11-26 (SPEC 0.23). Every crew step (council or T3) is on the work trail with its section, card, ok and time; a T3 thread's files by name; concurrent_work tells an agent who else is at work and where. Expand on an agent's thinking, or See their work in the T3 block, opens agenttrail's map over the grid. Checked: server worktrail.test.ts, client trail.test.ts, e2e trail.spec.ts and council.spec.ts (Expand), #/design day and night. A person checks: ask two of T3's agents in one section in the desktop app (after the :4410 server restarts) and open See their work. Not done: a T3 agent's own reasoning (T3 keeps it); the trail is in memory, not persisted."
     }
   ]
 }

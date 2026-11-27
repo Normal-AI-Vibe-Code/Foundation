@@ -510,6 +510,8 @@ export function describeStep(name: string, input: Record<string, unknown>, board
       return "writing the daily digest";
     case "crew_work":
       return "checking the crew's work";
+    case "concurrent_work":
+      return "seeing who else is at work";
     case "machine_run":
       return `asking to run ${q("command")}`;
     case "desktop_screenshot":
