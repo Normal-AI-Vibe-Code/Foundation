@@ -439,6 +439,7 @@ export const LOCAL_ONLY: Array<[string | null, RegExp, string]> = [
   ["POST", /^\/api\/chat\/bridges\/[^/]+\/(keys|check)$/, "A bridge's credentials"],
   ["POST", /^\/api\/chat\/slack\/(token|check)$/, "The Slack app's token"],
   [null, /^\/api\/t3host\/(start|stop|agents|local|open)(\/|$)/, "T3 on this computer"],
+  ["POST", /^\/api\/factoryform\/start$/, "Starting FactoryForm on this computer"],
   ["POST", /^\/api\/boards\/[^/]+\/(machines|clusters)\//, "Machines on this computer"],
   ["POST", /^\/api\/boards\/[^/]+\/clusters$/, "Machines on this computer"],
   ["GET", /^\/api\/boards\/[^/]+\/clusters\/[^/]+\/kubeconfig$/, "A cluster's kubeconfig"],

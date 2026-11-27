@@ -84,6 +84,7 @@ import { contentRefusal, decide, EgressHeld, heldSentence, sendsFor, type Send, 
 import { COMPANY_BOARD, saveCompanyGoal, saveGoal, setProfile, todayFor } from "./today.ts";
 import { dissolveGrid, extractSection } from "./subgrids.ts";
 import { layFlowExamples } from "./flows.ts";
+import { ensureTwinApp, layFactoryTwin } from "./factorytwin.ts";
 import { addCharacterPipeline, collectionOf, copyOut, layOut as layOutCollection, putIn, takeOut } from "./collections.ts";
 import { CHAT_TOOLS } from "./chattools.ts";
 import { addReplayCard, placeFile, timelineText, userById } from "./replay.ts";
@@ -850,6 +851,25 @@ export const TOOLS: BoardTool[] = [
     },
   }),
   def({
+    name: "lay_factoryform_twin",
+    description:
+      "Lay a \"FactoryForm\" section with FactoryForm's digital twin: the floor twin page and one station twin page (chamber-03 unless you name another: testing, brazing, electronics) as live frames, a table of the stations as the twin has them (provenance shown) wired from the twin, the simulated run as it moves, and the CAD downloads (floor glTF and DXF, each station cell as glTF). Reads only; FactoryForm runs on this computer (FACTORYFORM_URL). Laid once per board.",
+    schema: z.object({ station: z.string().optional().describe("the station twin to show: chamber-03, testing, brazing or electronics"), request_id: z.string().optional() }),
+    write: true,
+    run: (ctx, { station }) => {
+      const out = layFactoryTwin(ctx.boardId, ctx.actor, { station });
+      if (!out.already) touch(ctx, undefined, `laid the FactoryForm twin (${plural(out.cards.length, "card")}, ${plural(out.links.length, "wire")})`);
+      // its pages run in their frames only as a saved app (frameSandbox.ts): a person's lay saves FACTORYFORM_URL's
+      // origin, in their name; an agent's never does, and says so
+      const app = ctx.person ? ensureTwinApp(ctx.userId) : null;
+      return {
+        ...out,
+        app: app ?? { saved: false, already: false, url: out.base },
+        ...(app ? {} : { note: "The twin pages run in their frames once FactoryForm's address is a saved app: a person laying this (⌘K → Add FactoryForm's digital twin) saves it. Until then they show blank." }),
+      };
+    },
+  }),
+  def({
     name: "send_to_port",
     description: "Emit a value on an app's output port (or set an input directly) — downstream apps receive it live.",
     schema: z.object({ panel: z.string(), port: z.string(), value: z.any() }),
@@ -1090,7 +1110,7 @@ export const TOOLS: BoardTool[] = [
   def({
     name: "company",
     description: "Read the company's live systems — Vision, BomForm, FactoryForm, the Data Room, Creation — their health, key numbers and how data flows between them.",
-    schema: z.object({ connector: z.string().optional().describe("one id for detail: factoryform, bomform, vision, dataroom, creation") }),
+    schema: z.object({ connector: z.string().optional().describe("one id for detail: factoryform, factoryform-twin (the digital twin: stations, the simulated run, twin pages, CAD), bomform, vision, dataroom, creation") }),
     sends: COMPANY_SYSTEMS,
     run: async (_ctx, { connector }) => (connector ? readConnector(connector, true) : companySnapshot()),
   }),

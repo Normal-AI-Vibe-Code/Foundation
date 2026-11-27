@@ -21,7 +21,7 @@
 import type * as Y from "yjs";
 import { appendSection, applyLens, boardMaps, putNote, recordsToRows, setTableCells, TABLE_PORT, uid, type FlowState, type LinkDoc, type MapDoc, type NoteDoc, type PanelDoc, type TableDoc } from "@foundation/protocol";
 import { editBoard, getBoard, onBoardOpen, type Board } from "./boards.ts";
-import { readConnector, type ConnectorState } from "./connectors.ts";
+import { connectorEvents, readConnector, type ConnectorState } from "./connectors.ts";
 import { deliver, sourceValue } from "./machineio.ts";
 
 const ORIGIN = "flows";
@@ -262,6 +262,19 @@ function follow(board: Board) {
   }
 }
 onBoardOpen(follow);
+
+/**
+ * A system that pushes (FactoryForm's event streams) feeds what it's wired to when it changes, not only on the
+ * minute: each open board with a card of that connector wired out is read again (the connector cache keeps that
+ * to one read per push; a table is written only when its rows changed).
+ */
+connectorEvents.on("change", (id: string) => {
+  for (const b of followed.values()) {
+    const m = boardMaps(b.doc);
+    const links = [...m.links.values()];
+    if ([...m.objects.values()].some((o) => isConnector(o) && o.connector === id && links.some((l) => l.from.panel === o.id && readFor(m.objects, l)))) soon(b.id, true);
+  }
+});
 
 /** stop following (tests, shutdown) */
 export function stopFlows() {

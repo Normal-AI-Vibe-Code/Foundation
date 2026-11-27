@@ -1,0 +1,201 @@
+/* FactoryForm's digital twin on a card (FactoryTwinView.tsx). Tokens only (DESIGN §2). */
+
+.ftwin-host {
+  padding: 0;
+}
+.ftwin {
+  position: absolute;
+  inset: 0;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  container-type: inline-size;
+  min-height: 0;
+}
+
+/* the run */
+.ftwin-run {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-abyss);
+  border: 1px solid var(--color-line);
+}
+.ftwin-run-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+/* simulated is a fact about the data, not a state: outlined, never a fill */
+.ftwin-sim {
+  height: 18px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-line-strong);
+  color: var(--color-mist);
+  font: 600 10px / 1 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ftwin-state {
+  margin-left: auto;
+  font: 600 var(--text-11) / 1 var(--font-sans);
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+  color: var(--color-dim);
+}
+.ftwin-state.tone-ok {
+  color: var(--color-ok);
+}
+.ftwin-state.tone-warn {
+  color: var(--color-warn);
+}
+.ftwin-task {
+  color: var(--color-frost);
+  font: 600 var(--text-16) / 1.25 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ftwin-where,
+.ftwin-step {
+  color: var(--color-mist);
+  font: 400 var(--text-12) / 1.4 var(--font-sans);
+}
+.ftwin-where b {
+  color: var(--color-frost);
+  font-weight: 600;
+}
+.ftwin-step {
+  color: var(--color-frost);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ftwin-bar {
+  position: relative;
+  height: 4px;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-panel);
+  overflow: hidden;
+}
+.ftwin-bar > span {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--color-pulse);
+  transform-origin: left center;
+  /* the stream sends at most a few states a second: the bar glides between them */
+  transition: transform 480ms linear;
+}
+.ftwin-time {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.2 var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+.ftwin-run.is-empty .ftwin-task {
+  color: var(--color-mist);
+}
+.ftwin-run.is-empty .ftwin-where {
+  white-space: normal;
+}
+.metric-value.is-word {
+  font-size: var(--text-16);
+  line-height: 1.375;
+}
+
+/* offline: the start */
+.ftwin-start {
+  align-self: flex-start;
+  margin-top: var(--space-3);
+}
+.ftwin-hint {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.45 var(--font-sans);
+}
+
+/* the CAD */
+.ftwin-cad {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 0;
+  overflow: auto;
+}
+.ftwin-cad a {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-card);
+  color: var(--color-frost);
+  text-decoration: none;
+}
+.ftwin-cad a:hover {
+  background: color-mix(in srgb, var(--color-frost) 6%, transparent);
+}
+.ftwin-cad a:focus-visible {
+  outline: 2px solid var(--color-pulse);
+  outline-offset: 1px;
+}
+.ftwin-format {
+  grid-row: 1 / span 2;
+  align-self: center;
+  min-width: 36px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-paper);
+  border: 1px solid var(--color-line-strong);
+  color: var(--color-mist);
+  font: 600 10px / 1 var(--font-code);
+  letter-spacing: 0.04em;
+}
+.ftwin-cad-label {
+  font: 500 var(--text-12) / 1.35 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ftwin-cad-what {
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.35 var(--font-sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+@container (max-width: 300px) {
+  .ftwin-cad-what {
+    display: none;
+  }
+}
+
+/* #/design: the cards side by side, each with what it shows */
+.ftwin-specimens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+.ftwin-specimen {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 100%;
+}
+.ftwin-specimen figcaption {
+  max-width: 400px;
+  color: var(--color-dim);
+  font: 400 var(--text-11) / 1.45 var(--font-sans);
+}

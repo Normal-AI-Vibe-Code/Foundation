@@ -51,6 +51,7 @@ import { useCalmAdmit } from "../lib/calm";
 import { keys } from "../lib/keys";
 import { FullscreenBar, useFullscreenCard } from "../components/Fullscreen";
 import { HostPage } from "./HostPage";
+import { FactoryTwinBody, RELOAD_FRAMES, TWIN_CONNECTOR } from "./FactoryTwinView";
 
 interface Props {
   panel: PanelMeta;
@@ -137,6 +138,8 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       <LiveFrame panel={panel} />
     ) : panel.panel === "file" ? (
       <FilePreview panel={panel} />
+    ) : panel.panel === "connector" && panel.connector === TWIN_CONNECTOR ? (
+      <TwinConnectorBody panel={panel} />
     ) : panel.panel === "connector" ? (
       <ConnectorBody panel={panel} />
     ) : panel.panel === "ask" ? (
@@ -426,6 +429,16 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
   const decision: FrameDecision | null = useMemo(() => (url ? frameFor(url, frameCtx) : null), [url, frameCtx, frameCtx.saved]);
   const decided = useRef(decision);
   decided.current = decision;
+  // a service that was just started (FactoryForm's Start, factoryTwin.ts) asks the frames showing it to load again
+  const [reloads, setReloads] = useState(0);
+  useEffect(() => {
+    const on = (e: Event) => {
+      const origin = (e as CustomEvent<{ origin?: string }>).detail?.origin;
+      if (origin && decided.current?.ok && decided.current.origin === origin) setReloads((n) => n + 1);
+    };
+    window.addEventListener(RELOAD_FRAMES, on);
+    return () => window.removeEventListener(RELOAD_FRAMES, on);
+  }, []);
 
   // Foundation bridge: apps talk to the grid with postMessage
   //   app → grid  { type: "foundation:output", port, value }
@@ -493,7 +506,7 @@ function LiveFrame({ panel }: { panel: PanelMeta }) {
     <div ref={host} className={`live-frame${engaged ? " is-engaged" : ""}`}>
       {mount && decision?.ok && (
         <iframe
-          key={url}
+          key={`${url}#${reloads}`}
           ref={frame}
           src={decision.url}
           title={panel.name}
@@ -729,6 +742,17 @@ function FilePreview({ panel }: { panel: PanelMeta }) {
 }
 
 // ---------- company connectors ----------
+
+/** FactoryForm's twin (FactoryTwinView.tsx): read while the card is on screen */
+function TwinConnectorBody({ panel }: { panel: PanelMeta }) {
+  const host = useRef<HTMLDivElement>(null);
+  const live = useOnScreen(host, 0.12);
+  return (
+    <div ref={host} className="connector-body ftwin-host">
+      <FactoryTwinBody panel={panel} live={live} />
+    </div>
+  );
+}
 
 interface ConnectorState {
   ok: boolean;

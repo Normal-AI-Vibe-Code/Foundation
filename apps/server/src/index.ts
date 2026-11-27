@@ -23,7 +23,8 @@ import { archiveFile, listFiles, reindexFilesIfNeeded, requireFileVisible, serve
 import { integrationStatus, searchAll } from "./search.ts";
 import { listApps, probeApp, saveApp } from "./apps.ts";
 import { checkRepo, repoCommits, repoInfo, repoReadme } from "./github.ts";
-import { companySnapshot, connectorEvents, readConnector, watchFactoryForm } from "./connectors.ts";
+import { companySnapshot, connectorEvents, followTwinNow, readConnector, watchFactoryForm, watchFactoryTwin } from "./connectors.ts";
+import { forgetTwin, startFactoryForm, TWIN_CONNECTOR } from "./factorytwin.ts";
 import { createAsk, listAsks, resolveAsk, startHermes } from "./hermes.ts";
 import { getJob, jobShown, listJobs, startJob } from "./jobs.ts";
 import { claudeAccount, followRun, listSessions, pickRuntime, runtimes, seatRuns, sessionTurns, settleOrphanRuns, startRun, stopAllRuns, stopEveryRun, stopRun } from "./agent.ts";
@@ -79,7 +80,7 @@ import { addDesktop, setAgentsMay, stopDesktopInstall } from "./machinedesktop.t
 import { startMachineIo, tryOut } from "./machineio.ts";
 import { listPrefsOf, prefsOf, setPref } from "./prefs.ts";
 import { cookieOriginRefusal, hostRefusal, originAllowed, originAllowedFor } from "./origins.ts";
-import { attachNetwork, networkFront, networkRoutes, networkUpgradeRefusal, signInDoors } from "./network.ts";
+import { attachNetwork, isLocalRequest, networkFront, networkRoutes, networkUpgradeRefusal, signInDoors } from "./network.ts";
 import { serveClient } from "./clientfiles.ts";
 import { whereaboutsFor } from "./whereabouts.ts";
 import { gridOutline } from "./subgrids.ts";
@@ -620,6 +621,22 @@ r.get("/api/connectors/events", (req, res) => {
     clearInterval(ping);
     connectorEvents.off("change", on);
   });
+});
+/**
+ * Start FactoryForm on this computer (factorytwin.ts): an admin's own press, at the server's computer (LOCAL_ONLY),
+ * never an agent's. It runs FactoryForm's launcher (`npm run serve -- --detach`) in its sibling checkout; the cards
+ * pick it up once it answers.
+ */
+r.post("/api/factoryform/start", async (req) => {
+  const u = requireUser(req);
+  const out = await startFactoryForm(u, isPerson(req), { local: isLocalRequest(req) });
+  forgetTwin();
+  followTwinNow();
+  for (const id of ["factoryform", TWIN_CONNECTOR]) {
+    await readConnector(id, true).catch(() => null);
+    connectorEvents.emit("change", id);
+  }
+  return out;
 });
 r.get("/api/connectors/:id", async (req) => {
   requireUser(req);
@@ -1560,6 +1577,7 @@ reindexFilesIfNeeded();
 // the side menu's Notes: boards not opened since the notes index began are read once, after the server is up
 setTimeout(() => backfillNoteIndex(isBoardOpen), 1500).unref?.();
 watchFactoryForm();
+watchFactoryTwin();
 // the Vision loop: bring back what hand-off threads export, and ask the reviewers once they have
 setInterval(() => {
   void pollHandoffs((h, reviewer) => {

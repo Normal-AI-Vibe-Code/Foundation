@@ -3,6 +3,9 @@
  *
  * - FactoryForm (Express + SQLite, :3001): ERP summary, stations, work orders,
  *   and an SSE refresh stream. No CORS there, so Foundation reads it server-side.
+ *   Its digital twin (`factoryform.twin/1`, factorytwin.ts) is the `factoryform-twin`
+ *   connector: the stations as the twin has them, the simulated run, the twin pages
+ *   and the CAD, followed live through /api/twin/v1/stream.
  * - BomForm (remote MCP, stateless JSON-RPC over HTTP, bearer + private CA):
  *   projects, certification progress, critical components, BOM costs.
  * - Vision (desktop): no HTTP API yet — the connector reports what's reachable
@@ -19,6 +22,7 @@ import { config } from "./config.ts";
 import { callMcpTool } from "./mcpclient.ts";
 import { one } from "./db.ts";
 import { t3Url } from "./t3paths.ts";
+import { dropStreamedState, readFactoryTwin, runWords, takeStreamedState, TWIN_CONNECTOR, twinConnectorState, type FactoryTwin } from "./factorytwin.ts";
 
 export interface ConnectorState {
   id: string;
@@ -86,11 +90,14 @@ interface FfBootstrap {
 
 async function factoryform(): Promise<ConnectorState> {
   const base = config.connectors.factoryform.replace(/\/$/, "");
-  const [s, boot] = await Promise.all([
+  const [s, boot, twin] = await Promise.all([
     getJson<{ items: number; inventoryValue: number; negativeStock: number; belowReorderPoint: number; openPurchaseOrders: number; overduePurchaseOrders: number; buildsThisMonth: number }>(`${base}/api/erp/summary`),
     getJson<FfBootstrap>(`${base}/api/bootstrap`).catch(() => ({}) as FfBootstrap),
+    // the twin (factoryform.twin/1): an older FactoryForm has none, and says so; a failed read is said too
+    readFactoryTwin(base).catch((e: unknown): TwinMissing => ({ ok: false, older: false, reason: `its twin didn't answer: ${offlineReason(e, base)}` })),
   ]);
-  const stations = boot.stations ?? [];
+  // the stations as the twin has them (the store's records, with `twin` and `equipment`), when it has them
+  const stations: NonNullable<FfBootstrap["stations"]> = twin.ok && twin.stations.length ? twin.stations : (boot.stations ?? []);
   const units = boot.units ?? [];
   const alerts = (boot.alerts ?? []).filter((a) => a.status !== "resolved" && a.status !== "closed");
   const inProgress = units.filter((u) => u.status !== "completed" && u.status !== "shipped").length;
@@ -132,10 +139,29 @@ async function factoryform(): Promise<ConnectorState> {
           ]),
     ],
     strips: stations.length ? [{ label: "Stations", dots: stations.map((st) => ({ name: `${st.shortName ?? st.name} · ${st.status}${st.wip ? ` · ${st.wip} WIP` : ""}`, tone: tone(st.status) })) }] : undefined,
-    lists: alerts.length ? [{ title: "Open alerts", items: alerts.slice(0, 3).map((a) => ({ text: a.title, tone: a.severity === "critical" ? ("bad" as const) : ("warn" as const) })) }] : undefined,
-    detail: { summary: s, stations, alerts },
+    lists: [
+      ...(alerts.length ? [{ title: "Open alerts", items: alerts.slice(0, 3).map((a) => ({ text: a.title, tone: a.severity === "critical" ? ("bad" as const) : ("warn" as const) })) }] : []),
+      { title: "Digital twin", items: [twinLine(twin)] },
+    ],
+    detail: { summary: s, stations, alerts, twin: twinDetail(twin) },
     checkedAt: Date.now(),
   };
+}
+
+type TwinMissing = { ok: false; older: boolean; reason: string };
+
+/** the twin in one line for FactoryForm's own card */
+function twinLine(twin: FactoryTwin | TwinMissing): { text: string; tone?: "ok" | "warn" | "bad" } {
+  if (!twin.ok) return { text: twin.older ? "No twin API here: an older FactoryForm (npm run serve starts the current one)" : twin.reason, tone: "warn" };
+  const page = twin.stale ? " · its page is older than its source" : "";
+  if (twin.run) return { text: `${twin.twins.length} station twins · simulated: ${runWords(twin.run)}${page}`, tone: twin.stale ? "warn" : "ok" };
+  return { text: `${twin.twins.length} station twins · no simulated run${page}`, tone: twin.stale ? "warn" : undefined };
+}
+
+/** what the FactoryForm connector says about its twin (an object, so flows.ts's main list stays the stations) */
+function twinDetail(twin: FactoryTwin | TwinMissing) {
+  if (!twin.ok) return { available: false, older: twin.older, reason: twin.reason };
+  return { available: true, revision: twin.revision, stale: twin.stale, stations: twin.twins, run: twin.run, pages: twin.pages, cad: twin.cad, sim: twin.sim };
 }
 
 // ---------- live: FactoryForm's event stream ----------
@@ -188,6 +214,98 @@ export function watchFactoryForm() {
       backoff = Math.min(30_000, backoff * 2);
     }
   };
+  void connect();
+}
+
+/** at most this often a moving run tells the cards (the stream sends up to four a second) */
+const TWIN_TELL_MS = 500;
+
+/**
+ * Follow FactoryForm's twin stream (/api/twin/v1/stream, `event: state`): each state is kept (reads use it, so a
+ * card refreshing as the run moves asks FactoryForm nothing more), and the `factoryform-twin` cards are told to
+ * refetch, at most twice a second. FactoryForm's own card is told only when its stations or the run's state
+ * change, not on every tick. An older FactoryForm (no stream) is asked again with the same back-off as a down one.
+ */
+let twinRetry: { timer: ReturnType<typeof setTimeout> | null; connect: (() => void) | null } = { timer: null, connect: null };
+
+/** FactoryForm was just started (factorytwin.ts's Start): follow its stream now, not after the back-off */
+export function followTwinNow() {
+  if (watching.has(TWIN_CONNECTOR) || !twinRetry.connect) return;
+  if (twinRetry.timer) clearTimeout(twinRetry.timer);
+  twinRetry.timer = null;
+  twinRetry.connect();
+}
+
+export function watchFactoryTwin() {
+  const base = config.connectors.factoryform.replace(/\/$/, "");
+  let backoff = 2000;
+  let lastTell = 0;
+  let tellTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastShape = "";
+  const tell = () => {
+    const wait = lastTell + TWIN_TELL_MS - Date.now();
+    if (wait > 0) {
+      tellTimer ??= setTimeout(() => {
+        tellTimer = null;
+        tell();
+      }, wait);
+      return;
+    }
+    lastTell = Date.now();
+    cache.delete(TWIN_CONNECTOR);
+    connectorEvents.emit("change", TWIN_CONNECTOR);
+  };
+  const connect = async () => {
+    try {
+      const res = await fetch(`${base}/api/twin/v1/stream`, { headers: { accept: "text/event-stream" } });
+      if (!res.ok || !res.body) throw new Error(`${res.status}`);
+      watching.add(TWIN_CONNECTOR);
+      backoff = 2000;
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+        let i: number;
+        while ((i = buf.indexOf("\n\n")) >= 0) {
+          const chunk = buf.slice(0, i);
+          buf = buf.slice(i + 2);
+          if (!/^event:\s*state/m.test(chunk)) continue;
+          const data = chunk
+            .split("\n")
+            .filter((l) => l.startsWith("data:"))
+            .map((l) => l.slice(5).trimStart())
+            .join("\n");
+          try {
+            const state = JSON.parse(data) as { stations?: Array<{ id: string; status: string; wip?: number }>; run?: { id?: string; state?: string; station?: string } | null; alerts?: unknown };
+            takeStreamedState(base, state);
+            tell();
+            const shape = JSON.stringify([state.stations?.map((st) => [st.id, st.status, st.wip]), state.run && [state.run.id, state.run.state, state.run.station], state.alerts]);
+            if (shape !== lastShape) {
+              lastShape = shape;
+              cache.delete("factoryform");
+              connectorEvents.emit("change", "factoryform");
+            }
+          } catch {
+            /* a malformed event costs only itself */
+          }
+        }
+      }
+      throw new Error("stream ended");
+    } catch {
+      dropStreamedState();
+      if (watching.delete(TWIN_CONNECTOR)) tell();
+      twinRetry.timer = setTimeout(() => {
+        twinRetry.timer = null;
+        void connect();
+      }, backoff);
+      twinRetry.timer.unref?.();
+      backoff = Math.min(30_000, backoff * 2);
+    }
+  };
+  twinRetry = { timer: null, connect: () => void connect() };
   void connect();
 }
 
@@ -396,10 +514,11 @@ export function offlineReason(e: unknown, url?: string): string {
 export async function readConnector(id: string, fresh = false): Promise<ConnectorState> {
   const hit = cache.get(id);
   if (!fresh && hit && Date.now() - hit.checkedAt < TTL) return hit;
-  const meta = CONNECTORS.find((c) => c.id === id);
+  const meta = CONNECTORS.find((c) => c.id === id) ?? (id === TWIN_CONNECTOR ? { name: "FactoryForm twin" } : undefined);
   let state: ConnectorState;
   try {
     if (id === "factoryform") state = await factoryform();
+    else if (id === TWIN_CONNECTOR) state = { ...(await twinConnectorState()), live: watching.has(TWIN_CONNECTOR) };
     else if (id === "bomform") state = await bomform();
     else if (id === "vision") state = await vision();
     else if (id === "dataroom") state = await probe(id, "Airform Data Room", config.connectors.dataroom);
@@ -412,7 +531,7 @@ export async function readConnector(id: string, fresh = false): Promise<Connecto
       name: meta?.name ?? id,
       ok: false,
       url: "",
-      summary: `offline — ${offlineReason(e, (config.connectors as Record<string, string>)[id])}`,
+      summary: `offline — ${offlineReason(e, (config.connectors as Record<string, string>)[id === TWIN_CONNECTOR ? "factoryform" : id])}`,
       metrics: [],
       checkedAt: Date.now(),
     };

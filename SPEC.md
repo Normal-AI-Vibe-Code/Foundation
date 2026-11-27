@@ -563,6 +563,67 @@ Not built, or not as asked: **only tables pin** (a note, a map or a picture span
 
 **Not verified.** The sound wasn't heard: the check counted its two tones. A second real browser window wasn't used. Day theme, pinging an agent, a section's ping, and a chat server of its own weren't tried. On such a server the place is folded into the words, and agents can't be pinged.
 
+### 0.26 FactoryForm's digital twin as a section, and starting FactoryForm from here (Josh, 2026-11-27)
+
+**The ask.** "In Foundation we should be able to see FactoryForm in one of the sections and the digital twin … create a grid for this." Other apps should be able to start FactoryForm's local server and use an API that produces CAD and data to track the simulation.
+
+**What was there.** FactoryForm now serves a read-only twin contract, `factoryform.twin/1` (FactoryForm's `docs/TWIN_API.md`): a manifest, the floor as data, glTF and DXF, each station cell as glTF, the state (stations with provenance, open alerts, the simulated run, the sim bridge) and an SSE stream of it, and two pages to frame, `/twin` and `/twin/station/<id>`. Its launcher `npm run serve` builds its page when the source is newer and reuses a FactoryForm already on the port; `--detach` starts it in the background and prints where. Foundation's `factoryform` connector read only the ERP summary and `/api/bootstrap`, followed `/api/events`, and `npm run services` started FactoryForm with `npm start`, which serves whatever page was last built.
+
+**What was built.**
+- **The twin connector** (`apps/server/src/factorytwin.ts`, `factoryform-twin`). It reads the manifest, the state and Control's task list (for "step 4 of 11"), and gives:
+  - the stations as the twin has them as its main list, so a wire into a table carries them, provenance included and labelled ("demo stations");
+  - the simulated run (task, station, step, time, state), always `simulated`, with no joints;
+  - whether the twin page is older than FactoryForm's source (`ui.stale`);
+  - the twin pages, and the CAD links: the floor as glTF and DXF, each station cell as glTF, and the posed cell of the station a run is on.
+- **Live.** `watchFactoryTwin` (connectors.ts) follows `/api/twin/v1/stream`. Each state is kept, so a card refreshing as the run moves asks FactoryForm nothing more, and the twin cards are told at most twice a second. FactoryForm's own card is told only when the stations or the run's state change. A wired table is refilled when its system pushes, not only on the minute (flows.ts).
+- **FactoryForm's own card** reads the twin too: its stations are the twin's (with `twin` and `equipment`) when there is one, and a *Digital twin* line says how many station twins and what is running.
+- **Honest when it isn't there.** Down: "FactoryForm isn't answering" and why. Answering without `/api/twin/v1`: "This FactoryForm has no twin API", and what to run. The rest of FactoryForm's card still reads from `/api/bootstrap`.
+- **The section** (`lay_factoryform_twin`; ⌘K → *Add FactoryForm's digital twin*): a "FactoryForm twin" section with
+  - the floor twin and one station twin (chamber-03 unless another is named) as frames;
+  - *Simulated run* (the twin card);
+  - *Stations · FactoryForm twin*, a table wired from the run card, `provenance` a column;
+  - *CAD* (the twin card's other face, `source: "cad"`), each file with its format and what it is;
+  - a note on what each is.
+  A board that already shows the twin answers `already` with that section. The company grid's own "FactoryForm" section (FactoryForm's connector) is not taken for it.
+- **Its frames keep their origin.** Foundation runs a page on this computer opaque unless it is a saved app (frameSandbox.ts), and FactoryForm's page can't load its own scripts from origin `null`. So a person's lay saves FACTORYFORM_URL's origin as an app, "FactoryForm (this computer)", in their name and audited. It is never an address a request names. An agent's lay never saves it and says a person must.
+- **Start FactoryForm** (`POST /api/factoryform/start`, the run card's offline well). It runs FactoryForm's own launcher, `npm run serve -- --detach --port <FACTORYFORM_URL's port> --host 127.0.0.1`, in the sibling checkout (`scripts/siblings.mjs`, shared with `sibling.mjs`: next to Foundation, or `FOUNDATION_SIBLINGS`). It runs only on these conditions:
+  - a person's press (an agent's bearer is refused) by an admin;
+  - at the server's own computer (network.ts `LOCAL_ONLY`, and the route checks it too);
+  - never on a hosted server (local feature `factoryform`);
+  - only for a loopback FACTORYFORM_URL;
+  - only for a checkout that has a `serve` script.
+  Two presses run it once. The cards are read again and the frames showing that origin load again. Anyone else sees who can start it.
+- **`npm run services`** starts FactoryForm with `npm run serve`, so its page is rebuilt when stale.
+
+**Not built, or not verified.**
+- **Start was run end to end against a stand-in launcher** (a scratch sibling whose `serve` printed the launcher's JSON and proxied to a FactoryForm copy). It was not run against the real checkout, which may build FactoryForm's page first: a minute or two with the button saying so.
+- **The CAD are links, not 3D cards.** Downloading a `.glb` into the grid's files as a 3D card (the CAD feed of §0.19) is not built.
+- **The frames are FactoryForm's own pages at FACTORYFORM_URL as laid.** If FactoryForm moves to another port, the section's frames keep the old address. Lay it again on a new grid, or edit the cards.
+- **A hosted Foundation** frames `127.0.0.1` on the viewer's own computer. It is meant for the local server.
+- **Nothing drives a run from Foundation.** Runs are Control's (FactoryForm's Control link). The check started one on the test copy with FactoryForm's own loopback route.
+
+**What shows it's right.** `apps/server/test/factorytwin.test.ts` (7) checks against a stand-in FactoryForm over HTTP:
+- the manifest and state read into the run, pages, CAD and provenance;
+- a stale page said, and no run said;
+- FactoryForm's own card taking the twin's stations;
+- an older FactoryForm said to be older on both cards;
+- the streamed state used without asking again;
+- down said in words;
+- the section laid once, beside a section already called FactoryForm, its frames and wire right, an agent's station name never a path;
+- a person's lay saving the app and an agent's not;
+- Start refused to an agent, a member, another computer, a hosted server, a remote FACTORYFORM_URL, a missing checkout and one without `serve`, run once with fixed arguments for an admin, and the door this-computer-only.
+
+`hosted-features.test.ts` now covers the `factoryform` feature. In the browser (Chromium, dev server on :4471/:1471), the real twin API of a FactoryForm copy on :3312 was read with a looping simulated run of chamber-03, and these were checked:
+- both twin pages drawn in their frames (`allow-same-origin`);
+- the run card moving step by step;
+- the stations table filled, nine of nine rows, provenance `demo`;
+- the CAD list;
+- offline as a member (who can start it) and as an admin (Start), and Start turning the card Live in 2.3 s;
+- day and night, at 1440 and 900 wide;
+- `#/design`'s new section.
+
+Evidence: `docs/evidence/2026-11-27_factoryform-twin/`.
+
 ## 1. What Foundation is
 
 | | |
@@ -700,6 +761,7 @@ Native full OS VMs (2026-11-20, Josh): **implemented / Review; real QEMU runs on
 | | API runtime (Opus 5.5, adaptive thinking, manual tool loop) | partial | Code done, untested (no `ANTHROPIC_API_KEY` here) |
 | **MCP** | `/mcp?board=…`, 19 board tools, `⌘K → Connect Claude Code` copies the `claude mcp add` command | done | The token in it lasts 7 days, and only a person makes one (2026-11-18) |
 | **Data flowing card to card** (2026-11-24, Josh: "test whether disconnecting or connecting actually makes a difference in the flow of information") | A wired connector puts its system's main list on its out port (read while wired, every minute; unwired, not read). A table takes a wire into its rows and the server fills it through its lens (filter, columns, limit). Disconnecting stops the flow: the table keeps its last rows and says it's no longer fed, and ⌘Z puts the wire back. A port's card opens on the page's top layer with a sample of the value. A wire carries a chip with a peek or the far card's real state (reading, waiting, N of M rows, the error, a character stage's progress). Pressing a wire opens its bar with Disconnect. A table→map wire let go off any map disconnects. Tools: `disconnect` (confirm), `set_table_lens`, `lay_flow_examples` | Review | Architecture: `docs/flows.md`. `apps/server/test/flows.test.ts` (10) and `apps/client/e2e/flows.spec.ts` (6, real browser, FactoryForm's real stations). Evidence `docs/evidence/2026-11-24_flows/`. Not on the company grid until the :4410 server restarts and someone runs `lay_flow_examples` there (§7) |
+| **FactoryForm's digital twin** (2026-11-27, §0.26) | `factoryform-twin` connector reads `factoryform.twin/1` (manifest, state, stream): the stations with provenance, the simulated run, `ui.stale`, the twin pages and CAD links; FactoryForm's own card carries the twin. ⌘K → *Add FactoryForm's digital twin* (`lay_factoryform_twin`) lays the floor and a station twin as frames, the run card, a stations table wired from it, the CAD card. *Start FactoryForm*: an admin's own press at the server's computer runs `npm run serve -- --detach` in the sibling checkout | Review | `apps/server/test/factorytwin.test.ts` (7); in the browser against the real twin API on a FactoryForm copy, day and night at 1440 and 900; Start end to end against a stand-in launcher, not the real checkout. Evidence `docs/evidence/2026-11-27_factoryform-twin/` |
 | **Company board** | Six live connectors wired by real flows | done | 2026-11-02: FactoryForm, Creation (+ Hub), Vision, Data Room and Foundation all Live locally; FactoryForm pushed live (SSE relay → cards refetch), floor shown as a station strip + open alerts, provenance stated ("prototype: stations demo · 40 units imported (snapshot 2026-07-07)"). BomForm reads the Data Room's copy (§6.5) — Live, labelled "copy · 58d old" because the Data Room's sync stopped on Sep 5 |
 | | (previous note) | | FactoryForm answered from :3001. Vision found T3 and the Archive up. BomForm offline until keyed (§6) |
 | **The Slack board** (2026-11-12) | ⌘K → *Open the Slack board*: one space with a section for every channel the Slack app can see (`slacklive.ts`). Each section holds a **Summary** note, a **Latest** note (the newest twelve top-level messages: who, when, what, replies; replies stay in their threads) and the channel's latest images, copied into the archive and laid out newest first (a new one takes the first place and the rest move; a card someone moved stays put). Each section wears a **live Slack mark** fed by the board's `slack` map, which the server alone writes: *Live* while the Slack app's process (`apps/slack-agent`, Bolt in Socket Mode, `npm run slack`) forwards events to `POST /api/slack/events` and checks in every 10 s; *Polling* when it goes quiet (channels read in turn while someone has the board open); *Join* where the app isn't in the channel; *Offline* with the reason. **Agents**: off until a person presses ✦; then a crew agent (a name, a cursor) is called to a section when its channel has something new, rewrites the Summary with `slack_read` + `update_card`, names images and puts the section in order with `arrange_section`. Agents never post to Slack | partial | Server: `slacklive.test.ts` (7) against a stand-in Slack: sections and states, top-level only, images and their order, joins only by a person's call, no agent turn until agents are on, one turn per channel, the digest gives way to the agent's summary, the `slack` map can't be written from a socket. The Slack app's bridge: `apps/slack-agent/tests/foundation/bridge.test.js` (5): only an event's kind and channel leave it, the bot token goes only to a loopback Foundation. Browser, day and night, with the stand-in and the **scripted** agent: `docs/evidence/2026-11-12_slack-board/`. **Not run**: the real workspace (the CLI isn't signed in, §Waiting), a real agent's summary, the e2e suite |
@@ -977,7 +1039,7 @@ Every integration is off until its key exists; the server always starts. Copy `.
 | 0 | **Node 22.16 or newer** | The server, run from the repo (the installed desktop app carries its own Node 22.22 and needs none) | Older Node 22 has no FTS5 in `node:sqlite` and the server dies at boot. Since 2026-11-09 `npm run dev` / `npm run desktop` check first and say so (`scripts/node-check.mjs`), and the server's own error names the fix. Josh's Windows machine has 22.13.1 at `C:\Program Files\nodejs`: `winget install OpenJS.NodeJS.LTS` |
 | 4 | **Anthropic API credits** | API runtime | `ANTHROPIC_API_KEY`. The subscription runtime needs only `claude` installed and signed in. On Josh's Windows machine (2026-11-07) Claude Code's own sign-in had expired ("OAuth session expired and could not be refreshed"). Signing in to the Claude desktop app doesn't sign in the CLI: `claude auth status` said `loggedIn: false` until **`claude auth login`** was run in a terminal. Since then real crew turns run |
 | 5 | **BomForm** | The connector | Now reads the **Airform Data Room's daily copy** through its read-only `GET /api/foundation/bomform` digest (branch `foundation-bomform-read` in AirformDataRoom): set `FOUNDATION_READ_TOKEN` there and `DATAROOM_BOMFORM_URL` + `DATAROOM_READ_TOKEN` here. Locally the launcher runs that branch's worktree on :3010 (`node scripts/sibling.mjs dataroom AirformDataRoom-foundation`). **For production:** merge the branch, set the token on Vercel, deploy, and point `DATAROOM_BOMFORM_URL` at airformdata.com. **The copy is stale:** last synced 2026-09-05; the Data Room's daily sync has stopped (check `BOMFORM_API_KEY` / `CRON_SECRET` on Vercel). A direct BomForm key (`BOMFORM_MCP_URL` + `BOMFORM_API_KEY` + `NODE_EXTRA_CA_CERTS`) still takes precedence when present |
-| 6 | **FactoryForm, Creation** | Live factory data; the studio and its Hub | `npm run services` starts FactoryForm (:3001), Creation (:5173 — its own config says 1420, Vision's port) and the Creation Hub (:4317) from the sibling folders (or `FOUNDATION_SIBLINGS`); each is also a launch config. FactoryForm is followed live through its `/api/events` stream. For FactoryForm writes over MCP, `FACTORY_MCP_TOKEN` |
+| 6 | **FactoryForm, Creation** | Live factory data; the studio and its Hub | Since 2026-11-27, `npm run services` runs FactoryForm's own launcher (`npm run serve`: it rebuilds FactoryForm's page when stale and serves the twin API), and an admin at the server's computer can press *Start FactoryForm* on a twin card (§0.26). FactoryForm must be the current checkout for the twin (an older one says so). If Windows reserves :3001, set `FACTORYFORM_URL=http://127.0.0.1:<port>` and Start uses that port. `npm run services` starts FactoryForm (:3001), Creation (:5173 — its own config says 1420, Vision's port) and the Creation Hub (:4317) from the sibling folders (or `FOUNDATION_SIBLINGS`); each is also a launch config. FactoryForm is followed live through its `/api/events` stream. For FactoryForm writes over MCP, `FACTORY_MCP_TOKEN` |
 | 7 | **Slack** | Channel cards, links, huddle invites, Hermes DMs, search | Create the app from **`docs/slack-app-manifest.yml`** (api.slack.com/apps → From a manifest), install it, and set the bot token as `SLACK_BOT_TOKEN`. That covers channel cards (read, post as the person, links, invites, huddle notes) and Hermes DMs. For ⌘K search, set the user token as `SLACK_USER_TOKEN` (`search:read`). For private channels, `/invite @Foundation` first. For the agent to lay out Slack images: the user token's search:read finds them by full text; the bot token needs `files:read` (in the manifest now), and then finds them by name |
 | 8 | **GitHub** | Repo discovery across the org | `GITHUB_TOKEN` (falls back to the `gh` login) and `FOUNDATION_GITHUB_ORG` |
 | 10 | **REA** | Reverse engineering | `npx rea-agents@6.9.0 setup` once (registers REA's MCP with Claude Code; MIT; verify it's `morluto/rea`). Then use Run on a reverse-engineering card |
@@ -995,6 +1057,14 @@ Every integration is off until its key exists; the server always starts. Copy `.
 ---
 
 ## 7. Known issues
+
+- **FactoryForm's twin section, as built 2026-11-27: Review** (§0.26).
+  - (1) **Start was checked against a stand-in launcher only.** It was never pressed against the real FactoryForm checkout. There it may first build FactoryForm's page (`vite build`, writing FactoryForm's `dist/`). The press waits up to four minutes.
+  - (2) **The section's frames hold the address they were laid with.** If FACTORYFORM_URL changes, they stay on the old one, while the run and CAD cards follow the new one.
+  - (3) **Laying it saves FactoryForm's local origin as a saved app**, which lets that page run with its own origin beside Foundation's, as any saved local app does. An agent's lay leaves the frames blank until a person lays it or saves the app.
+  - (4) **The CAD are download links**, not 3D cards on the grid.
+  - (5) **The stations table's lens bar draws a little past the table's own rect**, so the note laid under it is overlapped by a few pixels at rest. This is the table's existing drawing.
+  - (6) **Not on the company grid** until the server on :4410 runs this code. Someone presses ⌘K → *Add FactoryForm's digital twin* there.
 
 - **The release history, as built 2026-11-27: Review** (§0.24). (1) **A checkout's committed `docs/releases.json` goes stale** as CI publishes: a dev client whose tag is newer than the file says *not in the release history* until someone runs `git fetch --tags && node scripts/release.mjs history` (installed apps are always whole: each CI build writes it). (2) Release titles and changes are commit subjects, as the CI notes are: a merge commit's subject is dropped, so a release that is only a merge shows *Small fixes*. (3) Settings → Releases still lists the hand-written posts only. (4) Two checks were already red and are not this change: e2e `bottom-bar` *the side menu's foot* (the orb 213 px from the Settings icon) and the tools test's built-in browser step (`[data-browser-frame]` never shows); and the server's `agent-kinds` *a lost sign-in is said…* timing (under 700 ms) fails under the full parallel suite and passes alone, 3 of 3.
 

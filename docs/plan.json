@@ -2711,6 +2711,15 @@
       "status": "review",
       "body": "Josh, 2026-11-27 (SPEC 0.25). A mention or DM sounds two soft notes when you aren't looking (Settings → General); the bell row shows the card it points at and opens the grid there; a card's and a section's right-click has Ping someone about this… (Recent, On this, Here now, Worked on this grid), sending a DM that @mentions them and links the place; the board keeps who has worked on it, people and agents (protocol workers, server-only). Checked: server activity.test.ts, client ping.test.ts, the browser with a second person through the API (docs/evidence/2026-11-27_ping/). A person checks: two real windows, hearing the chime, pinging an agent, day theme.",
       "issue": 267
+    },
+    {
+      "id": "factoryform-twin-grid",
+      "title": "FactoryForm's digital twin as a grid section: twin pages, stations, the simulated run, CAD, and Start FactoryForm",
+      "kind": "plan",
+      "milestone": "company",
+      "area": "connectors",
+      "status": "review",
+      "body": "Josh, 2026-11-27: \"in Foundation we should be able to see FactoryForm in one of the sections and the digital twin ... create a grid for this\", and other apps start FactoryForm's local server and read an API with CAD and data to track the simulation. Built (SPEC 0.26): the factoryform-twin connector reads FactoryForm's factoryform.twin/1 (manifest, state, Control's task list) and follows /api/twin/v1/stream; FactoryForm's own card carries the twin too and its stations are the twin's; an older FactoryForm (no /api/twin/v1) and a down one are said. lay_factoryform_twin (and Ctrl/Cmd-K: Add FactoryForm's digital twin) lays a FactoryForm twin section: the floor twin and a station twin as frames, the simulated run card, the twin's stations in a table wired from it (provenance a column), the CAD downloads (floor glTF/DXF, each cell glTF, the posed cell while a run is on it), a note. A person's lay saves FACTORYFORM_URL's origin as an app so the frames keep their origin. Start FactoryForm on the run card: an admin, a person, at the server's computer (LOCAL_ONLY), not hosted, only a loopback FACTORYFORM_URL; runs npm run serve -- --detach in the sibling checkout (scripts/siblings.mjs); npm run services uses npm run serve too. Checked: apps/server/test/factorytwin.test.ts (7), the real FactoryForm twin API on :3312, Start end to end against a stand-in launcher, day and night at 1440 and 900 (docs/evidence/2026-11-27_factoryform-twin/). A person checks: Start against the real checkout (it may build FactoryForm's page first), and the twin section on the company grid after the :4410 server restarts."
     }
   ]
 }
