@@ -2,7 +2,7 @@
  * What the connected Foundation server supports (`/api/capabilities`).
  *
  * A local desktop server has every local-computer feature enabled (`terminal`,
- * `browser`, `machines`, `vms`, `t3`, `vision`, `places`, `localDev`). A hosted
+ * `browser`, `machines`, `vms`, `t3`, `vision`, `places`, `localDev`, `factoryform`). A hosted
  * Foundation server turns those off unless `FOUNDATION_ALLOW_HOST_TOOLS=1` is
  * set, so the client shows an honest hosted-server notice instead of Start
  * buttons for host tools. Older servers without `/api/capabilities` fall back
@@ -20,7 +20,8 @@ export type LocalFeature =
   | "t3"
   | "vision"
   | "places"
-  | "localDev";
+  | "localDev"
+  | "factoryform";
 
 export interface ServerCapabilities {
   loaded: boolean;
@@ -47,6 +48,7 @@ export const DEFAULT_CAPABILITIES: ServerCapabilities = {
     vision: true,
     places: true,
     localDev: true,
+    factoryform: true,
   },
   chat: true,
   images: {

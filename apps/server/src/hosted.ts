@@ -23,7 +23,8 @@ export type LocalFeature =
   | "t3"
   | "vision"
   | "places"
-  | "localDev";
+  | "localDev"
+  | "factoryform";
 
 const FEATURE_LABELS: Record<LocalFeature, string> = {
   terminal: "The built-in terminal",
@@ -34,6 +35,7 @@ const FEATURE_LABELS: Record<LocalFeature, string> = {
   vision: "Vision Code on this computer",
   places: "Local computer folders (Places)",
   localDev: "This computer's local projects watch",
+  factoryform: "Starting FactoryForm on this computer",
 };
 
 /** Whether host-level tools are explicitly unlocked on a hosted server. */
@@ -86,6 +88,7 @@ export function serverCapabilities(): ServerCapabilities {
       vision: localFeatureAllowed("vision"),
       places: localFeatureAllowed("places"),
       localDev: localFeatureAllowed("localDev"),
+      factoryform: localFeatureAllowed("factoryform"),
     },
     chat: true,
     codeMode: true,

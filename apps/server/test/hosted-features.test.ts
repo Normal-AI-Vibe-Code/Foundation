@@ -107,7 +107,7 @@ test("serverCapabilities: hosted mode disables local-computer features unless FO
   assert.equal(hostedCaps.allowHostTools, false);
   assert.equal(hostedCaps.chat, true);
   assert.deepEqual(hostedCaps.images, { serverLevels: true, widths: [64, 256, 512, 1024, 2048] });
-  for (const key of ["terminal", "browser", "machines", "vms", "t3", "vision", "places", "localDev"] as const) {
+  for (const key of ["terminal", "browser", "machines", "vms", "t3", "vision", "places", "localDev", "factoryform"] as const) {
     assert.equal(hostedCaps.local[key], false, `expected ${key} to be false in hosted mode`);
     assert.equal(localFeatureAllowed(key), false);
     assert.match(hostedFeatureReason(key), /turned off on a hosted Foundation server/);
@@ -121,7 +121,7 @@ test("serverCapabilities: hosted mode disables local-computer features unless FO
     const unlocked = serverCapabilities();
     assert.equal(unlocked.hosted, true);
     assert.equal(unlocked.allowHostTools, true);
-    for (const key of ["terminal", "browser", "machines", "vms", "t3", "vision", "places", "localDev"] as const) {
+    for (const key of ["terminal", "browser", "machines", "vms", "t3", "vision", "places", "localDev", "factoryform"] as const) {
       assert.equal(unlocked.local[key], true, `expected ${key} to be true when FOUNDATION_ALLOW_HOST_TOOLS=1`);
     }
   } finally {
@@ -134,7 +134,7 @@ test("serverCapabilities: hosted mode disables local-computer features unless FO
     const localCaps = serverCapabilities();
     assert.equal(localCaps.hosted, false);
     assert.equal(localCaps.allowHostTools, false);
-    for (const key of ["terminal", "browser", "machines", "vms", "t3", "vision", "places", "localDev"] as const) {
+    for (const key of ["terminal", "browser", "machines", "vms", "t3", "vision", "places", "localDev", "factoryform"] as const) {
       assert.equal(localCaps.local[key], true, `expected ${key} to be true in local mode`);
     }
   } finally {
