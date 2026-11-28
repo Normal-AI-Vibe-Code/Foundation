@@ -9,6 +9,7 @@
  *   ⌘/Ctrl+Enter and leaving it save (a tick says so), the markdown is what's kept, and the prompt that
  *   goes to Meshy has the plain words. The name is a title you can write in.
  * - Generate on a node's tile runs that stage for that character, and the tile moves to the next node.
+ * - A viewer sees the nodes and who is at each, with no Generate and no ＋ New, and the server refuses its press.
  * - The expressions stage: its own priced press, one wide picture drawn from the sheet, shown large on the
  *   card; the portrait is then drawn from the sheet and it.
  * - A finished character's card is put into Characters · <Set>, and a second beside it: none overlap.
@@ -239,6 +240,32 @@ test("Generate on a node's tile runs that stage; when it lands the tile is at th
   expect(String(made[0].request.prompt)).toMatch(/^Front view\. Kuro is a black shiba with a…/);
   await settle(ada, 500);
   await ada.screenshot({ path: `${SHOTS}/04_tile-at-expressions-night.png` });
+});
+
+test("a viewer sees the pipeline's nodes and who is at each, with no Generate and no ＋ New (plan pipeline-nodes-viewer-e2e)", async ({ browser }) => {
+  // an admin makes Vic a viewer of the studio
+  const boss = await person(browser, "Admin Test", "admin@normal.dev", studio);
+  const vic = await person(browser, "Vic Viewer", "vic.viewer@normal.dev", studio);
+  const vicId = ((await (await vic.context.request.get(`${CLIENT}/api/me`)).json()) as { user: { id: string } }).user.id;
+  const set = await boss.context.request.post(`${CLIENT}/api/boards/${studio}/people`, { data: { userId: vicId, role: "viewer" } });
+  expect(set.ok(), await set.text()).toBe(true);
+  const v = vic.page;
+  await v.goto(`/?board=${studio}`);
+  await waitLive(v);
+  await snap(v, { kind: "section", id: await sectionId(v, "Pipeline · Abstract") });
+  await settle(v, 1600);
+  // the same nine nodes, and Kuro where Ada left it
+  await expect(v.locator('[data-pipe-node][data-pipe-set="abstract"]')).toHaveCount(9);
+  await expect(tile(v, "expressions", "Kuro")).toBeVisible();
+  // nothing a viewer could spend or start
+  await expect(v.locator("[data-pipe-generate]")).toHaveCount(0);
+  await expect(v.getByText("＋ New", { exact: true })).toHaveCount(0);
+  // and the server agrees: a viewer's press on a stage is refused
+  const refused = await vic.context.request.post(`${CLIENT}/api/boards/${studio}/characters/${await cardId(v, "Kuro")}/stages/expressions`, { data: {} });
+  expect(refused.status()).toBe(403);
+  await v.screenshot({ path: `${SHOTS}/04b_viewer-no-presses-night.png` });
+  await boss.context.close();
+  await vic.context.close();
 });
 
 test("the expressions stage: its own priced press, one wide picture from the sheet, large on the card; the portrait is then drawn from both", async () => {

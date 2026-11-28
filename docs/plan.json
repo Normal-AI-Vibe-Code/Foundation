@@ -2348,8 +2348,8 @@
       "kind": "plan",
       "milestone": "crew",
       "area": "pipeline",
-      "status": "next",
-      "body": "A viewer should see the nodes with no Generate and no ＋ New. Written, and only the card's viewer state is on `#/design`; not checked in a browser.",
+      "status": "done",
+      "body": "A viewer should see the nodes with no Generate and no ＋ New. Written, and only the card's viewer state is on `#/design`; not checked in a browser. 2026-11-27: done. e2e/character-studio.spec.ts: an admin makes Vic a viewer; Vic sees the nine nodes and Kuro at Expressions, no Generate, no ＋ New, and a stage press over HTTP is 403. docs/evidence/2026-11-17_character-studio/04b_viewer-no-presses-night.png.",
       "issue": 189
     },
     {
