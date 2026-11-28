@@ -465,8 +465,14 @@ function useToolbarFit(keys: string[], paused: boolean) {
     // what's on the line now, in order (the More button, its menu, last)
     const kids = Array.from(bar.children) as HTMLElement[];
     // the line is always the first items, in order
+    // an item's room on the line is its box and its margins (a separator's 3 + 3, the size picker's 3): without
+    // them a narrow note's line ran a few px past the card's edge (2026-11-27, e2e/card-chrome.spec)
+    const span = (el: HTMLElement) => {
+      const cs = getComputedStyle(el);
+      return el.offsetWidth + (parseFloat(cs.marginLeft) || 0) + (parseFloat(cs.marginRight) || 0);
+    };
     kids.forEach((el, i) => {
-      if (i < ks.length && !el.matches("[data-rich-more], .rich-more-menu")) widths.current.set(ks[i], el.offsetWidth);
+      if (i < ks.length && !el.matches("[data-rich-more], .rich-more-menu")) widths.current.set(ks[i], span(el));
     });
     const bs = getComputedStyle(bar);
     const hs = getComputedStyle(holder);
@@ -477,7 +483,8 @@ function useToolbarFit(keys: string[], paused: boolean) {
     const all = ks.reduce((s, key) => s + w(key), 0) + gap * (ks.length - 1);
     let n = ks.length;
     if (all > room) {
-      const moreW = (bar.querySelector<HTMLElement>("[data-rich-more]")?.offsetWidth ?? 32) + gap;
+      const moreEl = bar.querySelector<HTMLElement>("[data-rich-more]");
+      const moreW = (moreEl ? span(moreEl) : 32) + gap;
       let used = 0;
       n = 0;
       while (n < ks.length) {

@@ -253,7 +253,9 @@ export const PanelView = memo(function PanelView({ panel, pos, isActive, getScal
       bodyClass={`panel-body panel-${panel.panel}`}
       cardClass={`panel-card kind-${panel.panel}${panel.status ? ` status-${panel.status}` : ""}${chat && panel.bare ? " is-bare" : ""}`}
       // a chat card's bar rises above it and the conversation holds still, as a note's does (2026-11-25)
-      barRise={chat}
+      // a terminal or a desktop keeps still too (2026-11-27, plan card-chrome-elsewhere): its bar rises over the
+      // card, so its last line (where you type) never slides under the card's edge while it's hovered
+      barRise={chat || panel.panel === "machine"}
       data={{ "panel-id": panel.id }}
       openUrl={panel.url}
       overlay={panel.ports.length ? <div className="port-rail">{ports}</div> : null}

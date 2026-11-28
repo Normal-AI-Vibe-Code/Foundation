@@ -21,6 +21,7 @@
  *     markdown. Every other card's bar still makes room: a live app's content
  *     moves down 38 px, its document neither reloaded nor resized, and a
  *     chapter card gets shorter from the top.
+ *     A terminal (a machine's card) holds still as a note does (2026-11-27): its bar rises over the card.
  *  2b. A chat card's bar rises the same way, and its paper comes off and back
  *     (`bare`, the note's button) with every layer of it.
  *  3. Alt-wheel (since 2026-11-17; it was Ctrl-wheel for a day) scrolls through a card with more in it than fits (a note, a
@@ -78,6 +79,19 @@ const world = (p: Page) => p.evaluate(() => document.querySelector<HTMLElement>(
 const zoomOf = (t: string) => Number(/scale\(([\d.]+)\)/.exec(t)?.[1] ?? NaN);
 /** the scale a card is drawn at on screen (zoom × its section's fit) */
 const scaleOf = (p: Page, id: string) => slot(p, id).locator(".frame-card").first().evaluate((el) => el.getBoundingClientRect().width / (el as HTMLElement).offsetWidth);
+/** a rising bar comes up 6 px as it fades in: read it once it has stopped moving, not when it's merely opaque */
+async function settled(p: Page, sel: string) {
+  let last = "";
+  await expect
+    .poll(async () => {
+      const now = JSON.stringify(await rect(p, sel));
+      const same = now === last;
+      last = now;
+      return same;
+    }, { timeout: 5_000, intervals: [120] })
+    .toBe(true);
+  return rect(p, sel);
+}
 const rect = (p: Page, sel: string) =>
   p.locator(sel).first().evaluate((el) => {
     const r = el.getBoundingClientRect();
@@ -109,6 +123,9 @@ test.beforeAll(async ({ browser }) => {
   await tool("add_section", { name: "Apps" });
   await tool("add_note", { section: "Apps", title: "Beside", markdown: "A note, so the app is a card and not the section's app." });
   await tool("add_panel", { section: "Apps", panel: "app", name: "Live", url: FRAME });
+  await tool("add_section", { name: "Machines" });
+  await tool("add_note", { section: "Machines", title: "Beside the terminal", markdown: "A note, so the terminal is a card and not the section's own." });
+  await tool("add_panel", { section: "Machines", panel: "machine", name: "Term", url: "http://127.0.0.1:9/ttyd" });
   await tool("add_section", { name: "Chat" });
   await tool("add_note", { section: "Chat", title: "Beside chat", markdown: "A note, so the chat is a card and not the section's own." });
   // a character, on this board: a card in "Characters · Animals"
@@ -133,7 +150,7 @@ test.beforeAll(async ({ browser }) => {
       },
     });
   });
-  for (const n of ["Long", "Short", "Beside", "Live", "Taro", "Design · cards", "Talk"]) {
+  for (const n of ["Long", "Short", "Beside", "Live", "Taro", "Design · cards", "Talk", "Term"]) {
     await expect.poll(() => find(ada, n), { message: `the card “${n}”` }).not.toBeNull();
     ids[n] = (await find(ada, n))!;
   }
@@ -290,8 +307,11 @@ test("2 · a note's bar is its box grown up and the note holds still; its toolba
   await expect(toolbar).toBeVisible();
   await settle(ada, 500);
   expect(await words()).toEqual(still);
-  const card = await rect(ada, sel(ids.Short, ".frame-card"));
-  const tb = await rect(ada, sel(ids.Short, ".rich-bar"));
+  // the card and its toolbar, read on one frame
+  const [card, tb] = await ada.evaluate(([a, b]) => [a, b].map((q) => {
+    const r = document.querySelector(q)!.getBoundingClientRect();
+    return { x: r.x, y: r.y, w: r.width, h: r.height, bottom: r.bottom, right: r.right };
+  }), [sel(ids.Short, ".frame-card"), sel(ids.Short, ".rich-bar")]);
   // at least 40 tall (a narrow note's takes a second row), flush on the card's foot, the card's width
   expect(tb.h).toBeGreaterThanOrEqual(40 * kw - 1);
   near(tb.y, card.bottom - 1 * kw, 1.5);
@@ -330,6 +350,22 @@ test("2 · a note's bar is its box grown up and the note holds still; its toolba
   const d1 = await rect(ada, sel(ids["Design · cards"], ".panel-inner"));
   near(d1.y - d0.y, PUSH * kd, 1);
   near(d1.bottom, d0.bottom, 1);
+  await leave(ada);
+
+  // a terminal (a machine's card) holds still like a note (2026-11-27, plan card-chrome-elsewhere): its bar rises over
+  // the card and nothing in it moves, so its last line, where you type, never slides under the card's edge
+  await frame(ada, ids.Term);
+  await settle(ada, 600);
+  await expect(slot(ada, ids.Term).locator(".frame-anchor")).toHaveClass(/bar-rise/);
+  const t0 = { inner: await rect(ada, sel(ids.Term, ".panel-inner")), card: await rect(ada, sel(ids.Term, ".frame-card")) };
+  await hover(ada, ids.Term);
+  await expect(slot(ada, ids.Term).locator(".frame-header")).toHaveCSS("opacity", "1");
+  const t1 = { bar: await settled(ada, sel(ids.Term, ".frame-header")), inner: await rect(ada, sel(ids.Term, ".panel-inner")), card: await rect(ada, sel(ids.Term, ".frame-card")) };
+  expect(t1.inner).toEqual(t0.inner);
+  expect(t1.card).toEqual(t0.card);
+  // the box grown up: flush on the card's top edge, inside its 1 px border
+  near(t1.bar.bottom, t1.card.y + 1 * (await scaleOf(ada, ids.Term)), 0.75);
+  await ada.screenshot({ path: `${RISE_SHOTS}/05_terminal-holds-still-night.png` });
   await leave(ada);
 
   // a live app: its frame slides down, and its document is neither reloaded nor resized
@@ -377,9 +413,10 @@ test("2b · a chat card's bar rises the same way, and its paper comes off and ba
   await hover(ada, id);
   await expect(s.locator(".frame-header")).toHaveCSS("opacity", "1");
   expect(await read()).toEqual(rest);
-  const bar = await rect(ada, sel(id, ".frame-header"));
+  const bar = await settled(ada, sel(id, ".frame-header"));
   near(bar.h, RISE.h * k, 1);
-  expect(bar.bottom).toBeLessThanOrEqual(rest.card.y + 0.5);
+  // flush on the card's top edge, inside its 1 px border (the box grown up, 2026-11-26)
+  near(bar.bottom, rest.card.y + 1 * k, 0.75);
   await ada.screenshot({ path: `${RISE_SHOTS}/05_chat-bar-risen-night.png` });
 
   // the note's button, words and glyph: Hide the background
@@ -712,7 +749,8 @@ test("day and night: the board's cards and #/design", async ({ browser }) => {
     const held = demo.locator(".frame-anchor.is-hover").first();
     const [hb, hc] = [(await held.locator(".frame-header").boundingBox())!, (await held.locator(".frame-card").boundingBox())!];
     near(hb.height, RISE.h, 0.75);
-    expect(hb.y + hb.height).toBeLessThanOrEqual(hc.y);
+    // the box grown up (2026-11-26): flush on the card's top edge, inside its 1 px border
+    near(hb.y + hb.height, hc.y + 1, 0.75);
     const tb = (await demo.locator(".rich-bar-slot.is-under .rich-bar").boundingBox())!;
     near(tb.height, 40, 0.75);
     await settle(p, 500);
