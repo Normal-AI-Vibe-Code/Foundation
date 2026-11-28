@@ -114,7 +114,33 @@ export async function sendToSession(id: string, prompt: string, runtime?: string
   if (r.turns.length === 0) renameSession(id, titleOf(text));
   patch(id, (x) => ({ ...x, loaded: true, turns: [...x.turns, { prompt: text, events: [], status: "running", at: Date.now() }] }));
   await follow(id, (ctrl, on) => streamAgent({ board: activeBoard()?.boardId ?? "company", prompt: text, runtime, session: id, as, ...(section ? { section } : {}) }, on, ctrl.signal));
+  // a line said to it while it worked goes on in the same conversation, now that it's free (sendOrWait)
+  const next = waiting.get(id)?.shift();
+  if (!waiting.get(id)?.length) waiting.delete(id);
+  if (next && !stopped.has(id)) void sendToSession(id, next.text, next.runtime, next.as, next.section);
+  else if (stopped.has(id)) waiting.delete(id);
+  if (next) emit();
 }
+
+/** lines said to a session's agent while it was at work, in order: each goes into the same session as the run before it ends */
+const waiting = new Map<string, Array<{ text: string; runtime?: string; as?: string; section?: string }>>();
+
+/**
+ * Say something to an agent's session: at once if it's free; if it's at work, after its run, in the same session, so
+ * the agent takes it up as the next turn of the same conversation instead of a stranger's new ask (plan
+ * council-conversation). Claude Code can't hear words in the middle of a turn, so this is as close as it goes.
+ */
+export function sendOrWait(id: string, text: string, runtime?: string, as?: string, section?: string): "sent" | "waiting" {
+  if (!runs.get(id)?.busy) {
+    void sendToSession(id, text, runtime, as, section);
+    return "sent";
+  }
+  waiting.set(id, [...(waiting.get(id) ?? []), { text: text.trim(), runtime, as, section }]);
+  emit();
+  return "waiting";
+}
+/** how many lines wait for a session's agent to finish */
+export const waitingFor = (id: string) => waiting.get(id)?.length ?? 0;
 
 /** said out loud (the talk button, V): into the agent session on screen if it's free, else a new one — sent at once */
 export function sayToAgent(text: string) {

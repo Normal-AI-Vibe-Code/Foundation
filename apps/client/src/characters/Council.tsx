@@ -43,7 +43,7 @@ import { api } from "../lib/api";
 import { activeBoard } from "../sync/board";
 import { useActiveBoard } from "../shell/Presence";
 import { followCrew, useFollowing, type CrewPeer } from "../shell/Crew";
-import { askCrew, crewAsk, stopSession, titleOf, useSession } from "../state/sessions";
+import { askCrew, crewAsk, sendOrWait, stopSession, titleOf, useSession } from "../state/sessions";
 import { getState, requestSnap, subscribe } from "../state/store";
 import { camera, onCamera } from "../state/camera";
 import { floorInsets, getUi, openSession, setUi, toast, useUi } from "../state/ui";
@@ -923,10 +923,19 @@ function askedFrom(crewId: string): string | undefined {
 }
 
 /** send one line to a seat's agent, in a section: the server's own agent through a session, one of this computer's through its host. The session, when it's the server's */
-export async function tellSeat(seat: Pick<CouncilSeat, "agentKey" | "name" | "alias"> | null, text: string, section: { id: string; name: string } | null, from?: CouncilScope): Promise<string | undefined> {
+export async function tellSeat(seat: (Pick<CouncilSeat, "agentKey" | "name" | "alias"> & Partial<Pick<CouncilSeat, "status" | "mine" | "session" | "crewId">>) | null, text: string, section: { id: string; name: string } | null, from?: CouncilScope): Promise<string | undefined> {
   const key = seat?.agentKey ?? "claude";
   if (!key.startsWith("t3:")) {
-    const session = askCrew(section ? `In the “${section.name}” section: ${text}` : text, seat?.alias, section?.id);
+    const said = section ? `In the “${section.name}” section: ${text}` : text;
+    // at work on your ask: the line goes on in the same conversation, the moment this run ends (plan council-conversation)
+    const busy = seat?.status === "working" && seat.mine ? (seat.session ?? (seat.crewId ? crewAsk(seat.crewId)?.session : undefined)) : undefined;
+    if (busy) {
+      const pref = localStorage.getItem("foundation-runtime");
+      if (sendOrWait(busy, said, pref && pref !== "auto" ? pref : undefined, seat?.alias, section?.id) === "waiting") toast(`${seat?.name ?? "It"} is at work: it takes this up next, in the same conversation`, "agent");
+      if (from) launched.set(busy, scopeKey(from));
+      return busy;
+    }
+    const session = askCrew(said, seat?.alias, section?.id);
     if (from) launched.set(session, scopeKey(from));
     return session;
   }

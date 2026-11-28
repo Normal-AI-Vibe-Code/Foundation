@@ -154,10 +154,11 @@ function lineFor(r: Row, reader: UserInfo): CouncilLine {
 
 function replyFor(line: Row, ask: CouncilSeatAsk, reader: UserInfo): CouncilReply {
   if (!ask.session) return { name: ask.name, state: "elsewhere" };
-  // the run this line started: that person's, on this grid, in that session, from the line on
+  // the run this line started: that person's, on this grid, in that session, from the line on, and asked in its words
+  // (a line said to an agent at work goes into the same session after the run in hand: that run isn't its answer)
   const runRow = one<{ id: string }>(
-    "select id from agent_runs where session_id = ? and created_by = ? and board_id = ? and created_at >= ? order by created_at limit 1",
-    ask.session, line.by_user, line.board_id, line.at - BEFORE_MS,
+    "select id from agent_runs where session_id = ? and created_by = ? and board_id = ? and created_at >= ? and instr(prompt, ?) > 0 order by created_at limit 1",
+    ask.session, line.by_user, line.board_id, line.at - BEFORE_MS, line.text,
   );
   const session = line.by_user === reader.id ? { session: ask.session } : {};
   if (!runRow) return { name: ask.name, state: "waiting", ...session };

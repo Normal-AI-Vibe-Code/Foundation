@@ -45,12 +45,14 @@ function grid(name: string) {
 test("a line said to a council is kept with each agent's answer, and an answer that read beyond the grid is its person's alone", async () => {
   const g = grid("Council grid");
   // Ada says one line to two of the grid's agents: one run reads only the grid, the other reads beyond it ([private])
-  const line = addCouncilLine(g.id, ada, { place: "board", text: "Lay out the supply section", to: [{ name: "Wren", session: "ses_wren" }, { name: "Pip", session: "ses_pip" }, { name: "Vision", }], all: true, request_id: "r1" });
+  const said = "Make a section called “Supply” with the parts";
+  const line = addCouncilLine(g.id, ada, { place: "board", text: said, to: [{ name: "Wren", session: "ses_wren" }, { name: "Pip", session: "ses_pip" }, { name: "Vision", }], all: true, request_id: "r1" });
   assert.equal(line.replies.length, 3);
   assert.deepEqual(line.replies.map((r) => r.state), ["waiting", "waiting", "elsewhere"], "before the runs: waiting; an agent with its own thread answers there");
 
-  const open = startRun({ boardId: g.id, user: ada, prompt: "Make a section called “Supply” with the parts", section: g.section, session: "ses_wren" });
-  const closed = startRun({ boardId: g.id, user: ada, prompt: "Make a section called “Quiet” [private]", section: g.section, session: "ses_pip" });
+  // each run is asked in the line's words (the council sends them, a section's name before them)
+  const open = startRun({ boardId: g.id, user: ada, prompt: said, section: g.section, session: "ses_wren" });
+  const closed = startRun({ boardId: g.id, user: ada, prompt: `${said} [private]`, section: g.section, session: "ses_pip" });
   await finish(open, ada.id);
   await finish(closed, ada.id);
   timeline.flushTimeline();
@@ -69,14 +71,14 @@ test("a line said to a council is kept with each agent's answer, and an answer t
 
   const forKai = councilLines(g.id, "board", kai)[0];
   assert.equal(forKai.mine, false);
-  assert.equal(forKai.text, "Lay out the supply section", "the line is the grid's: its author could change the grid");
+  assert.equal(forKai.text, said, "the line is the grid's: its author could change the grid");
   assert.equal(forKai.replies[0].text, wren.text, "an answer that read only the grid is everyone's");
   assert.equal(forKai.replies[1].text, undefined);
   assert.match(forKai.replies[1].withheld ?? "", /beyond the grid/);
   assert.equal(forKai.replies[0].session, undefined, "someone else's session isn't handed out");
 
   // twice with one request_id is once; another place is its own conversation
-  addCouncilLine(g.id, ada, { place: "board", text: "Lay out the supply section", to: [], request_id: "r1" });
+  addCouncilLine(g.id, ada, { place: "board", text: said, to: [], request_id: "r1" });
   assert.equal(councilLines(g.id, "board", ada).length, 1);
   addCouncilLine(g.id, ada, { place: g.section, text: "Just this section", to: [{ name: "Claude", session: "ses_x" }] });
   assert.equal(councilLines(g.id, "board", ada).length, 1);
@@ -87,12 +89,28 @@ test("a line said to a council is kept with each agent's answer, and an answer t
 test("a line can't be pointed at someone else's run", async () => {
   const g = grid("Not yours");
   // Kai's own run, in a session Ada then names in her line
-  const kais = startRun({ boardId: g.id, user: kai, prompt: "Make a section called “Kai's”", section: g.section, session: "ses_kai" });
+  const kais = startRun({ boardId: g.id, user: kai, prompt: "what did Kai's say?", section: g.section, session: "ses_kai" });
   await finish(kais, kai.id);
   timeline.flushTimeline();
   const line = addCouncilLine(g.id, ada, { place: "board", text: "what did Kai's say?", to: [{ name: "Wren", session: "ses_kai" }] });
   assert.equal(line.replies[0].state, "waiting", "only runs Ada started count for Ada's line");
   assert.equal(line.replies[0].text, undefined);
+});
+
+test("a line said to an agent at work is answered by the next run in the same session, not the run in hand", async () => {
+  const g = grid("Same session");
+  // Wren is at work on Ada's first ask; Ada says another line to it, which waits for that run and goes into the same session
+  const first = startRun({ boardId: g.id, user: ada, prompt: "Make a section called “First”", section: g.section, session: "ses_same" });
+  const line = addCouncilLine(g.id, ada, { place: "board", text: "and call the next one Second", to: [{ name: "Wren", session: "ses_same" }] });
+  await finish(first, ada.id);
+  timeline.flushTimeline();
+  assert.equal(councilLines(g.id, "board", ada).at(-1)!.replies[0].state, "waiting", "the run in hand isn't this line's answer");
+  const second = startRun({ boardId: g.id, user: ada, prompt: `In the “Design” section: ${line.text}`, section: g.section, session: "ses_same" });
+  await finish(second, ada.id);
+  timeline.flushTimeline();
+  const reply = councilLines(g.id, "board", ada).at(-1)!.replies[0];
+  assert.equal(reply.state, "answered");
+  assert.ok((reply.text ?? "").length > 0);
 });
 
 // ---------- over HTTP ----------
