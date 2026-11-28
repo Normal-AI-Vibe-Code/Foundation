@@ -2793,7 +2793,18 @@ function CouncilDemo() {
         <header className="agents-head">
           Codex <span className="agents-head-n">at rest</span>
         </header>
-        <AgentInfoBody seat={seats[1]} seats={seats} sectionId={null} viewer={false} still />
+        <AgentInfoBody
+          seat={seats[1]}
+          seats={seats}
+          sectionId={null}
+          viewer={false}
+          still
+          lines={[
+            { id: "a1", place: "board", text: "Which of the parts are we still short of?", by: "You", mine: true, at: Date.now() - 9 * 60_000, all: true, replies: [{ name: seats[1]?.name ?? "Codex", state: "answered", text: "Three: the stator laminations, the M4 rotor bolts and the Hall sensor boards." }] },
+            { id: "a2", place: "board", text: "Who supplies the laminations?", by: "Kai Moreno", mine: false, at: Date.now() - 3 * 60_000, all: false, replies: [{ name: seats[1]?.name ?? "Codex", state: "answered", withheld: "It read beyond the grid while it worked: only the person it worked for reads its answer" }] },
+            { id: "a3", place: "board", text: "And put their lead times beside them", by: "You", mine: true, at: Date.now() - 20_000, all: false, replies: [{ name: seats[1]?.name ?? "Codex", state: "waiting" }] },
+          ]}
+        />
       </div>
       <div className="design-agent-info agents-pane agent-info" data-design-agent-working>
         <header className="agents-head">

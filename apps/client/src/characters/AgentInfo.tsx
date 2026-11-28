@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { boardMaps, type ActivityEntry } from "@foundation/protocol";
-import { useCouncilOpen, useCouncilSelection, selectSeat } from "../lib/councilOpen";
+import { useCouncilLines, useCouncilOpen, useCouncilSelection, selectSeat, type CouncilLine } from "../lib/councilOpen";
 import { GRID_PLACE, unpostAgent } from "../lib/posted";
 import { FloorEdge } from "../shell/FloorEdge";
 import { followCrew, useFollowing } from "../shell/Crew";
@@ -110,7 +110,7 @@ export function AgentInfoPane() {
   );
 }
 
-export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat: CouncilSeat; seats: CouncilSeat[]; sectionId: string | null; viewer: boolean; still?: boolean }) {
+export function AgentInfoBody({ seat, seats, sectionId, viewer, still, lines }: { seat: CouncilSeat; seats: CouncilSeat[]; sectionId: string | null; viewer: boolean; still?: boolean; lines?: CouncilLine[] }) {
   const sections = useSyncExternalStore(subscribe, sectionsOf);
   const roster = useRoster();
   const following = useFollowing();
@@ -121,6 +121,11 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
   // a seat with a name of its own wears what was chosen for that name (2026-11-17: two Claudes, two characters)
   const wearName = seat.alias ?? seat.agentName ?? seat.name;
   const ready = readyCharacters(roster);
+  // what was said to it on its council and what it said back (council.ts), its last few (plan council-conversation)
+  const board = useActiveBoard();
+  const place = seat.place && seat.place !== GRID_PLACE ? seat.place : (sectionId ?? "board");
+  const kept = useCouncilLines(still ? null : (board?.boardId ?? null), place);
+  const talk = useMemo(() => (lines ?? kept.lines).filter((l) => l.replies.some((r) => r.name === seat.name)).slice(-4), [lines, kept.lines, seat.name]);
   return (
     <div className="agents-scroll agent-info-body">
       {/* its profile, small at the top (2026-11-25): the room below is its last run's */}
@@ -249,6 +254,26 @@ export function AgentInfoBody({ seat, seats, sectionId, viewer, still }: { seat:
           </button>
         )}
       </div>
+
+      {talk.length > 0 && (
+        <section className="agent-info-talk" data-agent-talk>
+          <h3>Said to it here</h3>
+          {talk.map((l) => {
+            const r = l.replies.find((x) => x.name === seat.name)!;
+            return (
+              <div key={l.id} className="agent-info-talk-line">
+                <p className="agent-info-talk-said">
+                  <span>{l.mine ? "You" : l.by}: {l.text}</span>
+                  <time>{ago(l.at)}</time>
+                </p>
+                <p className={`agent-info-talk-back${r.withheld ? " is-withheld" : r.state !== "answered" ? " is-state" : ""}`}>
+                  {r.state === "answered" ? (r.text ?? r.withheld) : r.state === "working" ? "working on it" : r.state === "waiting" ? "takes it up next" : r.state === "elsewhere" ? "answered in its own thread" : "finished without a word back"}
+                </p>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {did.length > 0 && (
         <section className="agent-info-did">
