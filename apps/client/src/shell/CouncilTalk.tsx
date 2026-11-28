@@ -4,14 +4,19 @@
  * of them (or the ones you pick), see what you've said, and see how each is answering: what it's doing
  * right now, and a way into its own session where the full reply is.
  *
+ * 2026-11-27 (plan council-replies-in-panel): the conversation is the server's (council.ts), so it survives a
+ * reload and everyone on the grid sees it. Under each line, each agent's answer, as the reader may have it:
+ * an agent whose run read beyond the grid answers its person alone, and others are told so.
+ *
  * It follows the council that's up (a section's, or the grid's); with none up, it is the grid's.
  */
 
 import { useMemo, useState } from "react";
-import { placeOf, useCouncilOpen, useSaid, type CouncilScope } from "../lib/councilOpen";
-import { SEAT_STATUS, SayBox, sayToCouncil, useCouncilSeats, type CouncilSeat } from "../characters/Council";
+import { placeOf, useCouncilLines, useCouncilOpen, useSaid, type CouncilLine, type CouncilReply, type CouncilScope } from "../lib/councilOpen";
+import { useActiveBoard } from "./Presence";
+import { SayBox, sayToCouncil, useCouncilSeats, type CouncilSeat } from "../characters/Council";
 import { ProviderMark } from "../characters/providers";
-import { setUi } from "../state/ui";
+import { openSession, setUi } from "../state/ui";
 import { selectSeat } from "../lib/councilOpen";
 
 const GRID: CouncilScope = { kind: "board" };
@@ -21,20 +26,39 @@ export function CouncilTalk({ viewer }: { viewer: boolean }) {
   const scope = open ?? GRID;
   const { seats, title, sectionId } = useCouncilSeats(scope);
   const said = useSaid();
-  return <CouncilTalkView title={title} seats={seats} said={said.filter((s) => s.place === placeOf(scope))} viewer={viewer} onSay={(text, to, all) => sayToCouncil(scope, text, to, all, sectionId ? { id: sectionId, name: title } : null)} onAdd={() => setUi({ agentsTab: "add" })} onAbout={(s) => (selectSeat(s.id, true), setUi({ agentInfo: true }))} />;
+  const board = useActiveBoard();
+  const place = placeOf(scope);
+  const kept = useCouncilLines(board?.boardId ?? null, place);
+  // what this window said that the server hasn't answered with yet: shown at once, as sent
+  const lines = useMemo(() => {
+    const recent = said.filter((s) => s.place === place && !kept.lines.some((l) => l.mine && l.text === s.text && Math.abs(l.at - s.at) < 120_000));
+    return [...kept.lines, ...recent.map((s): CouncilLine => ({ id: `local-${s.id}`, place, text: s.text, by: "You", mine: true, at: s.at, all: s.all, replies: s.to.map((name) => ({ name, state: "waiting" })) }))];
+  }, [kept.lines, said, place]);
+  return <CouncilTalkView title={title} seats={seats} lines={lines} viewer={viewer} onSay={(text, to, all) => sayToCouncil(scope, text, to, all, sectionId ? { id: sectionId, name: title } : null)} onAdd={() => setUi({ agentsTab: "add" })} onAbout={(s) => (selectSeat(s.id, true), setUi({ agentInfo: true }))} onSession={(id, name) => openSession({ id, kind: "agent", title: name })} />;
 }
 
 interface ViewProps {
   title: string;
   seats: CouncilSeat[];
-  said: Array<{ id: number; at: number; text: string; to: string[]; all: boolean }>;
+  lines: CouncilLine[];
   viewer: boolean;
   onSay?: (text: string, to: CouncilSeat[], all: boolean) => void;
   onAdd?: () => void;
   onAbout?: (seat: CouncilSeat) => void;
+  /** open an agent's session (only the line's author gets one) */
+  onSession?: (session: string, name: string) => void;
 }
 
-export function CouncilTalkView({ title, seats, said, viewer, onSay, onAdd, onAbout }: ViewProps) {
+/** what a reply says while it has no words of its own */
+function replyState(r: CouncilReply, seat: CouncilSeat | undefined): string {
+  if (r.state === "elsewhere") return "answers in its own thread";
+  if (r.state === "none") return "finished without a word back";
+  if (r.state === "waiting") return seat?.offline ? "isn't connected" : "is taking it";
+  return seat?.status === "working" && seat.doing ? seat.doing : "is working on it";
+}
+
+export function CouncilTalkView({ title, seats, lines, viewer, onSay, onAdd, onAbout, onSession }: ViewProps) {
+  const said = lines;
   // who the next line goes to; none picked: all of them
   const [picked, setPicked] = useState<string[]>([]);
   const to = useMemo(() => (picked.length ? seats.filter((s) => picked.includes(s.id)) : seats), [picked, seats]);
@@ -67,28 +91,39 @@ export function CouncilTalkView({ title, seats, said, viewer, onSay, onAdd, onAb
           </p>
         )}
         {said.map((m) => (
-          <div key={m.id} className="council-talk-said">
-            <small>
-              To {m.all && m.to.length > 1 ? `all ${m.to.length}` : m.to.join(", ")} · {new Date(m.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-            </small>
-            {m.text}
+          <div key={m.id} className="council-talk-turn" data-council-line={m.id}>
+            <div className={`council-talk-said${m.mine ? "" : " is-theirs"}`}>
+              <small>
+                {m.mine ? "" : `${m.by} · `}To {m.all && m.replies.length > 1 ? `all ${m.replies.length}` : m.replies.map((r) => r.name).join(", ")} · {new Date(m.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </small>
+              {m.text}
+            </div>
+            {m.replies.map((r, i) => {
+              const seat = seats.find((s) => s.name === r.name);
+              const words = r.state === "answered" && r.text;
+              return (
+                <div key={`${r.name}-${i}`} className={`council-talk-reply is-${r.state}${r.withheld ? " is-withheld" : ""}`} data-council-reply={r.name}>
+                  <ProviderMark provider={seat?.provider ?? "claude"} size={20} />
+                  <div>
+                    {seat && onAbout ? (
+                      <button type="button" className="council-talk-who-btn" onClick={() => onAbout(seat)} data-tip={`About ${r.name}`}>
+                        {r.name}
+                      </button>
+                    ) : (
+                      <b>{r.name}</b>
+                    )}{" "}
+                    {words ? <p className="council-talk-words">{r.text}</p> : r.withheld ? <span className="council-talk-withheld">{r.withheld}</span> : <span className="council-talk-state">{replyState(r, seat)}</span>}
+                    {r.session && onSession && (
+                      <button type="button" className="council-talk-open" onClick={() => onSession(r.session!, r.name)}>
+                        Session
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ))}
-        {/* how each is answering, live */}
-        {said.length > 0 &&
-          seats.map((s) => (
-            <div key={s.id} className="council-talk-now" data-council-talk-now={s.name}>
-              <ProviderMark provider={s.provider} size={20} />
-              <span>
-                <b>{s.name}</b> {s.offline ? <span className="is-off">isn't connected{s.why ? `: ${s.why}` : ""}</span> : s.status === "working" ? (s.doing || "is working on it") : `is ${SEAT_STATUS[s.status]}`}{" "}
-                {onAbout && (
-                  <button type="button" className="council-talk-open" onClick={() => onAbout(s)}>
-                    Open
-                  </button>
-                )}
-              </span>
-            </div>
-          ))}
       </div>
 
       {!viewer && onSay && (

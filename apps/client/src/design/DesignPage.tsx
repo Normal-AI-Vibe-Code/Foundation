@@ -2736,7 +2736,41 @@ function CouncilDemo() {
         <RunCard run={{ status: "done" }} variant="row" />
       </div>
       <div className="design-council-talk agents-pane" style={{ height: 360, display: "flex", flexDirection: "column" }}>
-        <CouncilTalkView title="Supply" seats={seats} said={[{ id: 1, at: Date.UTC(2026, 10, 17, 9, 30), text: "Which of the parts are we still short of?", to: seats.map((s) => s.name), all: true }]} viewer={false} onSay={() => {}} onAdd={() => {}} onAbout={() => {}} />
+        <CouncilTalkView
+          title="Supply"
+          seats={seats}
+          lines={[
+            {
+              id: "l1",
+              place: "s1",
+              text: "Which of the parts are we still short of?",
+              by: "You",
+              mine: true,
+              at: Date.UTC(2026, 10, 17, 9, 30),
+              all: true,
+              replies: [
+                { name: seats[0]?.name ?? "Claude", state: "answered", session: "ses_demo", text: "Short of three: the 48-slot stator laminations (we have 30 of 48), the M4 rotor bolts, and the Hall sensor boards. I've put them in a table under Supply." },
+                { name: seats[1]?.name ?? "Codex", state: "working" },
+                { name: seats[2]?.name ?? "Vision", state: "elsewhere" },
+              ],
+            },
+            {
+              id: "l2",
+              place: "s1",
+              text: "And who supplies the laminations?",
+              by: "Kai Moreno",
+              mine: false,
+              at: Date.UTC(2026, 10, 17, 9, 34),
+              all: false,
+              replies: [{ name: seats[0]?.name ?? "Claude", state: "answered", withheld: "It read beyond the grid while it worked: only the person it worked for reads its answer" }],
+            },
+          ]}
+          viewer={false}
+          onSay={() => {}}
+          onAdd={() => {}}
+          onAbout={() => {}}
+          onSession={() => {}}
+        />
       </div>
       <div className="design-agent-info agents-pane agent-info">
         <header className="agents-head">

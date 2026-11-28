@@ -877,6 +877,9 @@ test("#/design shows the council and the agent's pane, day and night", async ({ 
     // the line, pressed open over a head
     await expect(demo.locator("[data-design-council-say] [data-council-say]")).toBeVisible();
     await expect(demo.locator("[data-council-talk]")).toContainText("To all 4");
+    // the conversation the server keeps: each agent's answer under the line, and one that read beyond the grid says so (2026-11-27)
+    await expect(demo.locator("[data-council-talk] [data-council-reply]")).toHaveCount(4);
+    await expect(demo.locator("[data-council-talk] .council-talk-withheld")).toContainText("beyond the grid");
     await expect(demo.locator(".design-agent-info").first()).toContainText("ChatGPT");
     await expect(demo.locator("[data-design-agent-working] .run-card.is-full .run-step")).toHaveCount(5);
     await settle(p, 1400);

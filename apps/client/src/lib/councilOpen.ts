@@ -4,7 +4,7 @@
  * the component so the toolbar's rules and the menus can open it.
  */
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 export type CouncilScope = { kind: "board" } | { kind: "section"; id: string };
 
@@ -92,4 +92,70 @@ export function useSaid(): Said[] {
     },
     () => said,
   );
+}
+
+// ---- the conversation as the server keeps it (council.ts on the server; plan council-replies-in-panel)
+
+export interface CouncilReply {
+  name: string;
+  state: "waiting" | "working" | "answered" | "none" | "elsewhere";
+  text?: string;
+  withheld?: string;
+  session?: string;
+}
+export interface CouncilLine {
+  id: string;
+  place: string;
+  text: string;
+  by: string;
+  mine: boolean;
+  at: number;
+  all: boolean;
+  replies: CouncilReply[];
+}
+
+/** keep a line on the server, with the sessions it started (a seat with none answers in its own thread) */
+/** the server's door, loaded when first used: this module is read by the grid's menus and tests that run without a page */
+const api = async <T>(path: string, init?: Parameters<typeof import("./api").api>[1]) => (await import("./api")).api<T>(path, init);
+
+export async function keepLine(board: string, scope: CouncilScope, text: string, to: Array<{ name: string; session?: string }>, all: boolean, requestId: string) {
+  await api(`/api/boards/${encodeURIComponent(board)}/council`, { method: "POST", json: { place: placeOf(scope), text, to, all, request_id: requestId } });
+  window.dispatchEvent(new Event(LINES_EVENT));
+}
+const LINES_EVENT = "foundation:council-lines";
+/** how often an open Council tab asks again while an answer is on its way, and while nothing is */
+const BUSY_MS = 2_500;
+const QUIET_MS = 15_000;
+
+/** a council's conversation on a grid, read again while it's shown (sooner while an agent is still answering) */
+export function useCouncilLines(board: string | null, place: string): { lines: CouncilLine[]; loaded: boolean; error: string | null } {
+  const [state, setState] = useState<{ key: string; lines: CouncilLine[]; loaded: boolean; error: string | null }>({ key: "", lines: [], loaded: false, error: null });
+  const key = `${board ?? ""}|${place}`;
+  useEffect(() => {
+    if (!board) return;
+    let off = false;
+    let timer = 0;
+    const read = async () => {
+      window.clearTimeout(timer);
+      let busy = false;
+      try {
+        const { lines } = await api<{ lines: CouncilLine[] }>(`/api/boards/${encodeURIComponent(board)}/council?place=${encodeURIComponent(place)}`);
+        if (off) return;
+        busy = lines.some((l) => l.replies.some((r) => r.state === "waiting" || r.state === "working"));
+        setState({ key, lines, loaded: true, error: null });
+      } catch (e) {
+        if (!off) setState((s) => ({ ...s, key, loaded: true, error: (e as Error).message }));
+      }
+      if (!off) timer = window.setTimeout(() => void read(), busy ? BUSY_MS : QUIET_MS);
+    };
+    void read();
+    const again = () => void read();
+    window.addEventListener(LINES_EVENT, again);
+    return () => {
+      off = true;
+      window.clearTimeout(timer);
+      window.removeEventListener(LINES_EVENT, again);
+    };
+  }, [board, place, key]);
+  return state.key === key ? state : { lines: [], loaded: false, error: null };
 }

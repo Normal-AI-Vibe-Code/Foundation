@@ -32,7 +32,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
 import type { CrewPlan, Mood } from "@foundation/protocol";
-import { closeCouncil, councilOpen, councilSelection, logSaid, openCouncil, selectSeat, useCouncilOpen, type CouncilScope } from "../lib/councilOpen";
+import { closeCouncil, councilOpen, councilSelection, keepLine, logSaid, openCouncil, selectSeat, useCouncilOpen, type CouncilScope } from "../lib/councilOpen";
 import { useCrew, boardWhere } from "../lib/crewWatch";
 import { crewIsIn, sectionOfCrew } from "../lib/sectionCrew";
 import { GRID_PLACE, usePosted, type PostedAgent } from "../lib/posted";
@@ -928,18 +928,26 @@ export async function tellSeat(seat: Pick<CouncilSeat, "agentKey" | "name" | "al
 /** say one line to some of a council (none: the server's own agent takes it), and keep it for the panel's Council tab */
 export function sayToCouncil(scope: CouncilScope, text: string, to: CouncilSeat[], all: boolean, sec: { id: string; name: string } | null) {
   const list: Array<CouncilSeat | null> = to.length ? to : [null];
-  for (const s of list) {
+  const asks = list.map((s) => {
     // its card shows the run starting at once, before the agent has joined (a seat already at work shows its work)
     if (s && !s.crewId && !s.offline) markPending(s.id);
-    void tellSeat(s, text, sec, scope).then(
-      (session) => s && session && pendingSession(s.id, session),
+    return tellSeat(s, text, sec, scope).then(
+      (session) => {
+        if (s && session) pendingSession(s.id, session);
+        return { name: s?.name ?? "Claude", ...(session ? { session } : {}) };
+      },
       (e: Error) => {
         if (s) clearPending(s.id);
         toast(`${s?.name ?? "Claude"} couldn't take it: ${e.message}`, "bad");
+        return { name: s?.name ?? "Claude" };
       },
     );
-  }
+  });
   logSaid(scope, text, to.length ? to.map((s) => s.name) : ["Claude"], all);
+  // the line is kept on the server with the sessions it started, so the conversation outlives this window and reaches the grid
+  const board = activeBoard()?.boardId;
+  const requestId = `cl_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  if (board) void Promise.all(asks).then((sent) => keepLine(board, scope, text, sent, all, requestId)).catch((e: Error) => toast(`The council's conversation didn't keep that line: ${e.message}`, "bad"));
   toast(to.length > 1 ? `Sent to ${to.length} agents` : `Sent to ${to[0]?.name ?? "Claude"}`, "agent");
 }
 

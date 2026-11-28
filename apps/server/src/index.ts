@@ -41,6 +41,7 @@ import { pollHandoffs } from "./vision.ts";
 import { boardPeople, boardRole, canWrite, requireWriter, setBoardRole } from "./roles.ts";
 import { handleUpgrade, issueTicket } from "./sockets.ts";
 import { SERVER_VERSION, minClient, requireCurrentClient } from "./clientversion.ts";
+import { addCouncilLine, councilLines, type CouncilLineInput } from "./council.ts";
 import { httpToolCtx, runTool, TOOLS } from "./tools.ts";
 import { handleMcp } from "./mcp.ts";
 import { seedCompanyBoard } from "./seed.ts";
@@ -428,6 +429,26 @@ r.post("/api/boards/:id", async (req) => {
   return { board: listBoards().find((b) => b.id === id) };
 });
 /** what a grid holds, for the card that stands for it on another grid: its tracks, its sections at their places, their cards as blocks */
+/**
+ * The council's conversation on a grid (council.ts): each line said to a council and each agent's answer, as
+ * this reader may have it. Anyone who can see the grid reads; only someone who may change it says something,
+ * and who said it is the session's to say.
+ */
+r.get("/api/boards/:id/council", (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  const url = new URL(req.url ?? "/", "http://x");
+  const place = url.searchParams.get("place") ?? "board";
+  return { lines: councilLines(req.params.id, place, u, Number(url.searchParams.get("limit") ?? 60) || 60) };
+});
+r.post("/api/boards/:id/council", async (req) => {
+  const u = requireUser(req);
+  requireBoard(u, req.params.id);
+  requireWriter(u, req.params.id);
+  if (!listBoards().some((b) => b.id === req.params.id)) throw new HttpError(404, "No such grid");
+  const body = await readJson<CouncilLineInput>(req);
+  return { line: addCouncilLine(req.params.id, u, body) };
+});
 r.get("/api/boards/:id/outline", (req) => {
   const u = requireUser(req);
   requireBoard(u, req.params.id);

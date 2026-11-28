@@ -1240,6 +1240,23 @@ function answerOf(runId: string): { by: string | null; prompt: string | null; te
   return { by: r.created_by, prompt: r.prompt, text: text.length > 4000 ? `${text.slice(0, 3999)}…` : text };
 }
 
+/**
+ * A run's answer as this reader may have it, by the rule the timeline's `chat.answer` keeps (`runEnded`): the
+ * person it worked for always; anyone else on the grid only if the run read nothing beyond the grid and its ask
+ * was shown. The council's conversation (council.ts) reads answers through this, so it can't say more than the
+ * timeline does. `running`: no answer yet; `none`: it ended without saying anything.
+ */
+export function answerFor(runId: string, reader: UserInfo): { state: "running" | "answered" | "none"; text?: string; withheld?: string } {
+  const run = one<{ status: string; created_by: string | null }>("select status, created_by from agent_runs where id = ?", runId);
+  if (!run) return { state: "none" };
+  const ev = one<{ data_json: string | null }>("select data_json from timeline_events where kind = 'chat.answer' and ref_id = ? order by at desc limit 1", runId);
+  if (!ev) return { state: run.status === "running" ? "running" : "none" };
+  const raw = ev.data_json ? (JSON.parse(ev.data_json) as Record<string, unknown>) : {};
+  if (raw._private && run.created_by !== reader.id) return { state: "answered", withheld: raw._why === "ask" ? NOT_YOURS_ANSWER_ASK : NOT_YOURS_ANSWER };
+  const text = answerOf(runId).text;
+  return text ? { state: "answered", text } : { state: "none" };
+}
+
 /** one stored event as this reader gets it: the server's own keys never leave; an ask's and an answer's words only as far as they may */
 function eventFor(r: EventRow, reader: UserInfo): TimelineEvent {
   const raw = r.data_json ? (JSON.parse(r.data_json) as Record<string, unknown>) : {};
