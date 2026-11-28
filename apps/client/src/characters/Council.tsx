@@ -32,7 +32,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { createPortal } from "react-dom";
 import { useSyncExternalStore } from "react";
 import type { CrewPlan, Mood } from "@foundation/protocol";
-import { closeCouncil, councilOpen, councilSelection, keepLine, logSaid, openCouncil, selectSeat, useCouncilOpen, type CouncilScope } from "../lib/councilOpen";
+import { closeCouncil, councilOpen, councilSelection, keepLine, logSaid, openCouncil, placeOf, selectSeat, useCouncilLines, useCouncilOpen, answersBySeat, type SeatAnswer, type CouncilScope } from "../lib/councilOpen";
 import { useCrew, boardWhere } from "../lib/crewWatch";
 import { crewIsIn, sectionOfCrew } from "../lib/sectionCrew";
 import { GRID_PLACE, usePosted, type PostedAgent } from "../lib/posted";
@@ -566,7 +566,7 @@ type BarSeat = Pick<CouncilSeat, "name" | "provider" | "where" | "offline" | "wh
  * Stop for the one who asked. Opaque paper, never glass. Pressed, the line to it is a pill under the bar, with no box
  * around the two (2026-11-26).
  */
-export function SeatBar({ seat, onAbout, say, onLeave }: { seat: BarSeat; onAbout?: () => void; say?: React.ReactNode; onLeave?: () => void }) {
+export function SeatBar({ seat, onAbout, say, onLeave, answer, onAnswer }: { seat: BarSeat; onAbout?: () => void; say?: React.ReactNode; onLeave?: () => void; answer?: SeatAnswer; onAnswer?: () => void }) {
   const following = useFollowing();
   const ask = seat.crewId ? crewAsk(seat.crewId) : undefined;
   const session = seat.session ?? ask?.session;
@@ -636,9 +636,17 @@ export function SeatBar({ seat, onAbout, say, onLeave }: { seat: BarSeat; onAbou
       {/* pressed (2026-11-26, Josh: no box around it): the bar stays as it is, its name and marks where they were, and the
           line to it is a pill of its own right under the bar */}
       {say && <div className="council-bar-say f-paper">{say}</div>}
+      {/* what it said back to the last line, while it rests (2026-11-27, plan council-conversation): pressed, the whole conversation */}
+      {!say && !working && answer && (
+        <button type="button" className={`council-bar-answer f-paper${answer.withheld ? " is-withheld" : ""}`} onClick={onAnswer} data-council-answer={seat.name} data-tip="The whole conversation, in the agents panel">
+          {answer.withheld ?? answer.text}
+        </button>
+      )}
     </div>
   );
 }
+
+
 
 interface ViewProps {
   title: string;
@@ -663,6 +671,8 @@ interface ViewProps {
   inline?: boolean;
   /** design page: this seat's line already open */
   hot?: string;
+  /** what each seat said back to the last line, by name */
+  answers?: Map<string, SeatAnswer>;
 }
 
 /** the run a seat's card shows */
@@ -697,7 +707,7 @@ export function fitScale(seats: CouncilSeat[], room: number, extra: { fig: numbe
   return scale;
 }
 
-export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, onAbout, onHover, onPanel, panelOpen, onClose, inline, hot }: ViewProps) {
+export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, onAbout, onHover, onPanel, panelOpen, onClose, inline, hot, answers }: ViewProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState<AvatarStage | null>(null);
@@ -797,6 +807,8 @@ export function CouncilView({ title, kind, seats, ghost, canAsk, onSay, onAdd, o
                   <div className="council-head" style={say && headBox ? { minWidth: headBox.w, minHeight: headBox.h } : undefined}>
                     <SeatBar
                       seat={s}
+                      answer={answers?.get(s.name)}
+                      onAnswer={onPanel}
                       onAbout={onAbout ? () => onAbout(s) : undefined}
                       onLeave={() => setSaying(null)}
                       say={
@@ -986,6 +998,9 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
   const { seats: built, title, sectionId } = useCouncilSeats(scope);
   const waiting = usePending();
   const seats = useMemo(() => built.map((s) => (waiting.has(s.id) && !s.crewId ? { ...s, pending: true } : s)), [built, waiting]);
+  // the conversation the server keeps for this council: each seat's answer to the last line rests under its bar
+  const kept = useCouncilLines(board?.boardId ?? null, placeOf(scope));
+  const answers = useMemo(() => answersBySeat(kept.lines), [kept.lines]);
   const sections = useSyncExternalStore(subscribe, sectionsOf);
   const section = sectionId ? sections[sectionId] : undefined;
   const canAsk = ui.role !== "viewer";
@@ -1119,6 +1134,7 @@ function CouncilLive({ scope }: { scope: CouncilScope }) {
         onPanel={() => setUi(ui.agents && ui.agentsTab === "council" ? { agents: false } : { agents: true, agentsTab: "council" })}
         onAdd={() => setUi({ agents: true, agentsTab: "add" })}
         onSay={(text, to, all) => sayToCouncil(scope, text, to, all, sec)}
+        answers={answers}
       />
     </div>
   );

@@ -159,3 +159,25 @@ export function useCouncilLines(board: string | null, place: string): { lines: C
   }, [board, place, key]);
   return state.key === key ? state : { lines: [], loaded: false, error: null };
 }
+
+/** what a seat said back to its council's last line, as this reader may have it */
+export interface SeatAnswer {
+  text?: string;
+  withheld?: string;
+  at: number;
+}
+/** an answer stays under its bar this long after the line it answers */
+const ANSWER_FOR_MS = 10 * 60_000;
+/** each seat's answer to the last line said to it on this council, by name */
+export function answersBySeat(lines: CouncilLine[], now = Date.now()): Map<string, SeatAnswer> {
+  const out = new Map<string, SeatAnswer>();
+  for (const l of lines) {
+    if (now - l.at > ANSWER_FOR_MS) continue;
+    for (const r of l.replies) {
+      // a later line to it that hasn't been answered yet takes the older answer away
+      if (r.state !== "answered") out.delete(r.name);
+      else if (r.text || r.withheld) out.set(r.name, { ...(r.text ? { text: r.text } : {}), ...(r.withheld ? { withheld: r.withheld } : {}), at: l.at });
+    }
+  }
+  return out;
+}

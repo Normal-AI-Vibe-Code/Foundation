@@ -2728,6 +2728,23 @@ function CouncilDemo() {
       <div data-design-council-say style={{ display: "flow-root" }}>
         <CouncilView title="Supply" kind="section" seats={[seats[2]]} ghost={others[3]} canAsk onSay={() => {}} onAdd={() => {}} onAbout={() => {}} onClose={() => {}} inline hot="c" />
       </div>
+      <div className="f-eyebrow update-demo-label">What each said back to the last line rests under its bar (two lines; pressed, the whole conversation in the panel), or why you can't read it</div>
+      <div data-design-council-answers style={{ display: "flow-root" }}>
+        <CouncilView
+          title="Supply"
+          kind="section"
+          seats={seats.slice(0, 2).map((s) => ({ ...s, status: "idle" as const, doing: undefined }))}
+          canAsk
+          onSay={() => {}}
+          onAbout={() => {}}
+          onPanel={() => {}}
+          inline
+          answers={new Map([
+            [seats[0]?.name ?? "Claude", { text: "Short of three: the 48-slot stator laminations (30 of 48), the M4 rotor bolts and the Hall sensor boards. They're in a table under Supply.", at: Date.now() }],
+            [seats[1]?.name ?? "Codex", { withheld: "It read beyond the grid while it worked: only the person it worked for reads its answer", at: Date.now() }],
+          ])}
+        />
+      </div>
       <div className="f-eyebrow update-demo-label">The run card: starting, the plan with its reasoning, done</div>
       <div className="design-council-run" style={{ ["--crew" as string]: "var(--color-crew-0)" }}>
         <RunCard run={{ status: "pending" }} variant="seat" />
