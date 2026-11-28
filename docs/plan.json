@@ -398,8 +398,8 @@
       "kind": "plan",
       "milestone": "polish",
       "area": "perf",
-      "status": "next",
-      "body": "frames.spec.ts measures Edge (WebView2) only; the Mac app is WebKit and was 20× slower than Chromium on the same board until 2026-11-24 (§0.16). Seed a Character studio with characters, inspiration and wired pipeline nodes, and measure pan, zoom and pan at far zoom in Playwright's WebKit (installed 27.2). Then the last 40 → 60 fps at far zoom: the wires drawn into one canvas when far, or cards' DOM culled off screen. The probe scripts are in docs/evidence/2026-11-24_mac-studio-perf/scripts/.",
+      "status": "needs-you",
+      "body": "frames.spec.ts measures Edge (WebView2) only; the Mac app is WebKit and was 20× slower than Chromium on the same board until 2026-11-24 (§0.16). Seed a Character studio with characters, inspiration and wired pipeline nodes, and measure pan, zoom and pan at far zoom in Playwright's WebKit (installed 27.2). Then the last 40 → 60 fps at far zoom: the wires drawn into one canvas when far, or cards' DOM culled off screen. The probe scripts are in docs/evidence/2026-11-24_mac-studio-perf/scripts/. 2026-11-27: the harness is built (e2e/webkit-frames.spec.ts: a seeded studio, at rest, pan, zoom, pan after, pan fitted; it holds 60 fps when run on macOS with PERF_GPU=1). Run here on Windows WebKit it records only: that port composites the whole page in software every frame, so its numbers aren't the Mac's (docs/evidence/2026-11-27_webkit-frames/). Needs: run it on the Mac, then the far-zoom work if it fails there.",
       "issue": 244
     },
     {

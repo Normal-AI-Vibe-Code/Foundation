@@ -1,0 +1,53 @@
+{
+  "browser": "webkit 27.2",
+  "viewport": "1440×900",
+  "characters": 11,
+  "pictures": 12,
+  "results": [
+    {
+      "label": "at rest (3 s)",
+      "frames": 59,
+      "fps": 19.6,
+      "p50": 49,
+      "p95": 58,
+      "max": 61,
+      "longPct": 100
+    },
+    {
+      "label": "pan at the opening zoom (3 s)",
+      "frames": 299,
+      "fps": 25.4,
+      "p50": 76,
+      "p95": 104,
+      "max": 131,
+      "longPct": 99.7
+    },
+    {
+      "label": "zoom out and in (2 s)",
+      "frames": 791,
+      "fps": 81.7,
+      "p50": 16,
+      "p95": 107,
+      "max": 122,
+      "longPct": 26.8
+    },
+    {
+      "label": "pan after the zoom (3 s)",
+      "frames": 149,
+      "fps": 14,
+      "p50": 64,
+      "p95": 116,
+      "max": 123,
+      "longPct": 100
+    },
+    {
+      "label": "pan far out, the board fitted (3 s)",
+      "frames": 269,
+      "fps": 27.4,
+      "p50": 30,
+      "p95": 79,
+      "max": 96,
+      "longPct": 55.8
+    }
+  ]
+}
