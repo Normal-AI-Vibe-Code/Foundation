@@ -2028,8 +2028,8 @@
       "kind": "plan",
       "milestone": "polish",
       "area": "panels",
-      "status": "next",
-      "body": "The bar's room was checked on a note, a live app, a character and a design chapter. Look at Slack, huddle, kanban, machine and file cards (a terminal's bottom line slides under the card's edge while hovered), run the frame-rate check, and try ⌘-wheel, a pinch and a character's ✕ in the desktop window, on a Mac and on a trackpad. 2026-11-27: a machine's card (terminal, desktop) now has the rising bar, so its last line never slides under the edge; e2e/card-chrome.spec checks it. Found and fixed on the way: a narrow note's one-line format bar ran up to 7 px past the card (the fit left out item margins). card-chrome.spec is 8/8 again (two checks predated the 2026-11-26 \"box grown up\" bar). Left: Slack, huddle, kanban and file cards looked at, the frame-rate check, and the desktop window on a Mac and a trackpad.",
+      "status": "needs-you",
+      "body": "The bar's room was checked on a note, a live app, a character and a design chapter. Look at Slack, huddle, kanban, machine and file cards (a terminal's bottom line slides under the card's edge while hovered), run the frame-rate check, and try ⌘-wheel, a pinch and a character's ✕ in the desktop window, on a Mac and on a trackpad. 2026-11-27: a machine's card (terminal, desktop) now has the rising bar, so its last line never slides under the edge; e2e/card-chrome.spec checks it. Found and fixed on the way: a narrow note's one-line format bar ran up to 7 px past the card (the fit left out item margins). card-chrome.spec is 8/8 again (two checks predated the 2026-11-26 \"box grown up\" bar). Left: Slack, huddle, kanban and file cards looked at, the frame-rate check, and the desktop window on a Mac and a trackpad. Later the same day: huddle, kanban and file cards looked at (as designed); PERF_GPU frames 3/3. Left for a person: the Slack card (needs a workspace), and the desktop window on a Mac and a trackpad.",
       "issue": 161
     },
     {
